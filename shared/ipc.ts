@@ -59,11 +59,32 @@ export interface InvokeMap {
   /** Toggle whether the window is interactive (mouse-ignore). */
   'window:set-interactive': { args: [interactive: boolean]; result: void }
 
+  /** Toggle whether the flyout preview is active (widens the window). */
+  'window:set-preview-mode': { args: [active: boolean]; result: void }
+
   /** Minimize the window (used by Onboarding). */
   'window:minimize': { args: []; result: void }
 
-  /** Check for application updates on GitHub releases. */
-  'app:check-update': { args: []; result: { latestVersion: string; downloadUrl: string } | null }
+  /** Quit the application process. */
+  'app:quit': { args: []; result: void }
+
+  /** Reveal a file in native File Explorer / Finder. */
+  'file:reveal': { args: [path: string]; result: boolean }
+
+  /** Get full release notes history from GitHub API (or cached/static fallback). */
+  'app:get-releases': {
+    args: []
+    result: Array<{
+      version: string
+      date: string
+      isLatest: boolean
+      summary: string
+      highlights: Array<{ title: string; description: string }>
+    }>
+  }
+
+  /** Get the list of connected displays. */
+  'displays:list': { args: []; result: import('./types').DisplayInfo[] }
 }
 
 /* ------------------------------------------------------------------ */
@@ -97,7 +118,15 @@ export interface EventMap {
    * Windows transparent windows).
    * payload: { x, y, inEdge, inZone }
    */
-  'window:cursor-edge': [data: { x: number; y: number; inEdge: boolean; inZone: boolean }]
+  'window:cursor-edge': [data: {
+    x: number
+    y: number
+    inEdge: boolean
+    inZone: boolean
+    stickPosition: import('./types').StickPosition
+    displayWidth: number
+    displayHeight: number
+  }]
 }
 
 /* ------------------------------------------------------------------ */

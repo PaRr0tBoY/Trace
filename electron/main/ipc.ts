@@ -156,31 +156,13 @@ export function registerIpc(): void {
     }
   })
 
-  handle('app:check-update', async () => {
-    try {
-      const response = await fetch('https://api.github.com/repos/Deepender25/Trace/releases/latest', {
-        headers: {
-          'User-Agent': 'Trace-App'
-        }
-      })
-      if (!response.ok) {
-        console.error('[IPC] app:check-update fetch failed with status:', response.status)
-        return null
-      }
-      const data = await response.json() as any
-      const latestVersion = data.tag_name || ''
-      const assets = data.assets || []
-      const exeAsset = assets.find((a: any) => a.name && a.name.endsWith('.exe'))
-      const apkAsset = assets.find((a: any) => a.name && a.name.endsWith('.apk'))
-      const downloadUrl = exeAsset?.browser_download_url || apkAsset?.browser_download_url || data.html_url || ''
-      return {
-        latestVersion,
-        downloadUrl
-      }
-    } catch (err) {
-      console.error('[IPC] app:check-update error:', err)
-      return null
+  handle('app:get-releases', async () => {
+    if (_releasesCache) {
+      // Re-validate in background asynchronously without blocking UI render
+      fetchAndCacheReleases().catch(() => {})
+      return _releasesCache
     }
+    return fetchAndCacheReleases()
   })
 
   handle('item:set-pinned', (id, pinned) => {
@@ -592,3 +574,248 @@ export async function writeItemToClipboard(data: ItemData): Promise<void> {
       break
   }
 }
+/** Parses raw GitHub markdown release notes into clean plain text highlights (stripping image/video/HTML tags). */
+function parseReleaseBodyToCleanText(body: string): { summary: string; highlights: Array<{ title: string; description: string }> } {
+  // 1. Strip images, videos, and raw HTML tags completely (pure plain text)
+  const clean = body
+    .replace(/!\[.*?\]\(.*?\)/g, '') // Strip markdown images ![alt](url)
+    .replace(/<img[^>]*>/gi, '')     // Strip HTML img tags
+    .replace(/<video[^>]*>.*?<\/video>/gi, '') // Strip HTML video tags
+    .replace(/<[^>]+>/g, '')         // Strip any remaining HTML tags
+
+  const lines = clean.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+  let summary = ''
+  const highlights: Array<{ title: string; description: string }> = []
+
+  for (const line of lines) {
+    if (line.startsWith('#') || line.startsWith('>')) {
+      const text = line.replace(/^[#>\s]+/, '').trim()
+      if (!summary && text && !text.toLowerCase().includes('what\'s changed') && !text.toLowerCase().includes('full changelog')) {
+        summary = text
+      }
+      continue
+    }
+
+    if (line.startsWith('-') || line.startsWith('*') || line.startsWith('•') || /^\d+\./.test(line)) {
+      const content = line.replace(/^[-*•\d.\s]+/, '').trim()
+      if (!content) continue
+
+      const boldMatch = content.match(/^\*\*(.*?)\*\*[\s:-]*(.*)/)
+      if (boldMatch) {
+        const title = boldMatch[1].trim()
+        const description = boldMatch[2].trim()
+        if (title) {
+          highlights.push({ title, description: description || title })
+          continue
+        }
+      }
+
+      const colonIdx = content.indexOf(':')
+      if (colonIdx > 0 && colonIdx < 45) {
+        const title = content.substring(0, colonIdx).trim()
+        const description = content.substring(colonIdx + 1).trim()
+        if (title) {
+          highlights.push({ title, description: description || title })
+          continue
+        }
+      }
+
+      highlights.push({ title: content, description: '' })
+    } else if (!summary && line.length > 10) {
+      summary = line
+    }
+  }
+
+  return {
+    summary: summary || 'Latest updates and fixes.',
+    highlights: highlights.length > 0 ? highlights : [{ title: 'Bug Fixes & Performance Enhancements', description: 'Includes minor bug fixes and stability improvements.' }]
+  }
+}
+
+const STATIC_CHANGELOG_FALLBACK = [
+  {
+    version: 'v0.2.6',
+    date: 'Aug 05, 2026',
+    isLatest: true,
+    summary: 'Performance optimizations, redesigned settings footer, custom support portal integration, and enhanced 30-language typography.',
+    highlights: [
+      {
+        title: 'Performance Improvements',
+        description: 'Removed CPU blur effects across UI components for smoother panel opening and scrolling.'
+      },
+      {
+        title: 'Settings UI & Navigation Redesign',
+        description: 'Reordered settings footer to place the Support section above the Quit button, redesigned buttons into matching pill shapes with a soft pastel red support button, and simplified Quit into a low-profile bottom button.'
+      },
+      {
+        title: 'Official Support Portal Integration',
+        description: 'Updated support link to open official Edge-Drop support page supporting both International Ko-fi and Indian UPI options.'
+      },
+      {
+        title: 'Localization & Typography Enhancements',
+        description: 'Updated filter category labels across 30 languages with shorter native terms and added dynamic font scaling so filter text fits cleanly without overlapping.'
+      }
+    ]
+  },
+  {
+    version: 'v0.2.5',
+    date: 'Aug 03, 2026',
+    isLatest: false,
+    summary: 'Full 30-language localization with auto-scroll selector, powerMonitor sleep/wake protection, text size typography settings, and multi-file action bar.',
+    highlights: [
+      {
+        title: 'Complete 30-Language Localization & Smart Language Selector',
+        description: 'Implemented full translation dictionaries across 30 languages, added RTL layout support for Arabic and Hebrew, integrated audio haptics, and added auto-scrolling to position the selected language in the dropdown viewport.'
+      },
+      {
+        title: 'Laptop Sleep & Unlock Protection',
+        description: 'Eliminated false Copy Indicator activations when opening laptop lid or unlocking screen using native powerMonitor lifecycle handlers.'
+      },
+      {
+        title: 'Text Size Typography Scale Setting',
+        description: 'Added customizable typography scale settings (Small, Normal, Medium, Large) applying dynamic font scaling across the app.'
+      },
+      {
+        title: 'Multi-File Selection & Preview Action Bar',
+        description: 'Added tap-to-toggle multi-file selection with a batch action bar (Select All, Copy Selected, Paste Selected, Clear Selection).'
+      }
+    ]
+  },
+  {
+    version: 'v0.2.2',
+    date: 'Jul 29, 2026',
+    isLatest: false,
+    summary: 'Stationary 3-category Settings navigation, Web Audio API haptic sound suite, edge trigger alignment presets, and magnetic 5% tick slider.',
+    highlights: [
+      {
+        title: 'Stationary 3-Category Settings Navigation',
+        description: 'Organized Settings into three clean tabs (Behaviour, Position, Appearance) with a stationary header and independent scroll position memory per section.'
+      },
+      {
+        title: 'Synthesized Web Audio Haptic Suite',
+        description: 'Zero-asset Web Audio API sound engine providing tactile audio feedback for dial ticks, button clicks, toggle pops, and mechanical delete thuds.'
+      },
+      {
+        title: 'Independent Edge Trigger Alignment & Proximity Beacon',
+        description: 'Choose Top, Center, or Bottom trigger strip placement with dynamic clipPath alignment, alongside an edge location hint hairline pulse.'
+      },
+      {
+        title: '5% Magnetic Tick Slider & Quit Action',
+        description: 'Continuous 0.002 1-to-1 real-time drag tracking with magnetic 5% snapping on release, plus an integrated Quit Edge-Drop button.'
+      }
+    ]
+  },
+  {
+    version: 'v0.2.1',
+    date: 'Jul 28, 2026',
+    isLatest: false,
+    summary: 'Cross-reboot multi-monitor display persistence, 5-category macOS segmented filter control, unified image classification, and HD anti-aliased curved edges.',
+    highlights: [
+      {
+        title: 'Cross-Reboot Display Persistence',
+        description: '4-tier display resolution pipeline (geometry fuzzy-matching) remembers your chosen monitor across device restarts with an automatic primary display fallback.'
+      },
+      {
+        title: '5-Category Segmented Filter Bar',
+        description: 'Integrated All, Text, Links, Images, and Files quick filter chips with a persistent sliding spring pill and zero shape distortion.'
+      },
+      {
+        title: 'Unified Image Entity Classification',
+        description: 'Native screenshots (Win+Shift+S) and copied image files (.png, .jpg, .webp, .svg) are unified under the Images filter tab.'
+      },
+      {
+        title: 'HD Anti-Aliased Curved Edges',
+        description: 'GPU layer promotion (transform: translateZ(0)) and padding-box clipping deliver crisp, vector-smooth curved borders across all display scales.'
+      }
+    ]
+  },
+  {
+    version: 'v0.2.0',
+    date: 'Jul 26, 2026',
+    isLatest: false,
+    summary: 'Silent background auto-updater, GitHub Releases changelog synchronization, and glassmorphic pinned deck.',
+    highlights: [
+      {
+        title: 'Silent Background Auto-Updater',
+        description: 'GitHub releases feature silent background downloading and a single-click Restart to Update installation button.'
+      },
+      {
+        title: 'Microsoft Store Build Isolation',
+        description: 'Isolated build pipelines ensure Microsoft Store (MSIX) builds remain 100% compliant with Store policies.'
+      },
+      {
+        title: 'Direct URL Launcher',
+        description: 'Added quick action buttons to launch links in your default web browser directly from item cards and preview flyouts.'
+      },
+      {
+        title: 'Pinned Items Deck Container',
+        description: 'Encapsulated pinned items inside a dedicated deck container with smooth spring height animations.'
+      }
+    ]
+  },
+  {
+    version: 'v0.1.5',
+    date: 'Jul 24, 2026',
+    isLatest: false,
+    summary: 'Customizable Copy Indicator styles with a 2x2 grid selector flyout alongside panel hover stability fixes.',
+    highlights: [
+      {
+        title: 'Four Vector Indicator Options',
+        description: 'Added support for 4 customizable copy indicator styles including Logo, Tick, Copy, and Sparkle.'
+      },
+      {
+        title: 'Balanced 2x2 Grid Flyout Selector',
+        description: 'Integrated a 2x2 grid selector flyout inside Settings under Indicator Style for quick previews.'
+      }
+    ]
+  }
+]
+
+let _releasesCache: Array<{
+  version: string
+  date: string
+  isLatest: boolean
+  summary: string
+  highlights: Array<{ title: string; description: string }>
+}> | null = null
+
+async function fetchAndCacheReleases() {
+  try {
+    const response = await fetch('https://api.github.com/repos/PaRr0tBoY/Trace/releases', {
+      headers: { 'User-Agent': 'Trace-App' },
+      signal: AbortSignal.timeout(12000)
+    })
+    if (!response.ok) {
+      return _releasesCache || STATIC_CHANGELOG_FALLBACK
+    }
+    const data = (await response.json()) as any[]
+    if (!Array.isArray(data) || data.length === 0) {
+      return _releasesCache || STATIC_CHANGELOG_FALLBACK
+    }
+
+    const parsed = data.slice(0, 10).map((rel, index) => {
+      const tag = rel.tag_name || rel.name || `v0.1.${index}`
+      const dateStr = rel.published_at
+        ? new Date(rel.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : ''
+
+      const rawBody = rel.body || ''
+      const { summary, highlights } = parseReleaseBodyToCleanText(rawBody)
+
+      return {
+        version: tag.startsWith('v') ? tag : `v${tag}`,
+        date: dateStr,
+        isLatest: index === 0,
+        summary: summary || `Release ${tag}`,
+        highlights
+      }
+    })
+
+    _releasesCache = parsed
+    return parsed
+  } catch {
+    console.log('[IPC] GitHub releases fetch offline or timed out; using static fallback.')
+    return _releasesCache || STATIC_CHANGELOG_FALLBACK
+  }
+}
+

@@ -19,7 +19,7 @@ export interface EdgeApi {
   copySubitem: (req: DragRequest) => Promise<boolean>
   pasteItem: (id: string) => Promise<boolean>
   pasteSubitem: (req: DragRequest) => Promise<boolean>
-  checkUpdate: () => Promise<{ latestVersion: string; downloadUrl: string } | null>
+  quitApp: () => Promise<void>
   /**
    * Begin a native OS drag-out. Fire-and-forget: must be called synchronously
    * from the DOM `dragstart` event, and main calls `event.sender.startDrag`.
@@ -30,7 +30,17 @@ export interface EdgeApi {
   splitItem: (req: import('./types').DragRequest) => Promise<boolean>
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>
   setInteractive: (value: boolean) => Promise<void>
+  setPreviewMode: (active: boolean) => Promise<void>
+  revealFile: (path: string) => Promise<boolean>
   minimizeWindow: () => Promise<void>
+  getDisplays: () => Promise<import('./types').DisplayInfo[]>
+  getReleases: () => Promise<Array<{
+    version: string
+    date: string
+    isLatest: boolean
+    summary: string
+    highlights: Array<{ title: string; description: string }>
+  }>>
   setInternalDrag: (active: boolean) => void
   broadcastTutorialStep: (step: number) => void
 
@@ -41,7 +51,15 @@ export interface EdgeApi {
   onOpenSettings: (cb: () => void) => () => void
   onDragEnd: (cb: () => void) => () => void
   onInternalDrop: (cb: (pos: { x: number; y: number }) => void) => () => void
-  onCursorEdge: (cb: (data: { x: number; y: number; inEdge: boolean; inZone: boolean }) => void) => () => void
+  onCursorEdge: (cb: (data: {
+    x: number
+    y: number
+    inEdge: boolean
+    inZone: boolean
+    stickPosition: import('./types').StickPosition
+    displayWidth: number
+    displayHeight: number
+  }) => void) => () => void
   onToast: (cb: (toast: { id: string; message: string; tone: 'info' | 'error' }) => void) => () => void
   onTutorialStep: (cb: (step: number) => void) => () => void
 }

@@ -10,9 +10,8 @@ import { ClipboardWatcher } from '../clipboard/ClipboardWatcher'
 import { loadSettings, saveSettings } from '../store/settings'
 import type { ClipboardItemDto, Settings } from '../../shared/types'
 import { MAX_STACK } from '../../shared/types'
-import { getMainWindow } from './window'
 import { createId } from '../store/ids'
-import { nativeImage } from 'electron'
+import { nativeImage, BrowserWindow, powerMonitor } from 'electron'
 import { readFileSync } from 'node:fs'
 import { PATHS } from '../store/paths'
 import { prefetchFileIcons } from './drag'
@@ -21,6 +20,23 @@ import { runtime } from './config'
 const store = new ItemStore()
 const watcher = new ClipboardWatcher(600)
 let pruneTimer: ReturnType<typeof setInterval> | null = null
+let wakeTimer: ReturnType<typeof setTimeout> | null = null
+
+function handleSystemSleep(): void {
+  watcher.setPaused(true)
+}
+
+function handleSystemWake(): void {
+  watcher.resyncSignature()
+  watcher.setPaused(true)
+
+  if (wakeTimer !== null) clearTimeout(wakeTimer)
+  wakeTimer = setTimeout(() => {
+    wakeTimer = null
+    watcher.resyncSignature()
+    watcher.setPaused(loadSettings().incognito)
+  }, 1500)
+}
 
 /** Initialize persistence + start the clipboard watcher. */
 export function initState(): void {
@@ -48,6 +64,16 @@ export function initState(): void {
     pushState.items()
   })
   watcher.setPaused(loadSettings().incognito)
+
+  powerMonitor.removeAllListeners('suspend')
+  powerMonitor.removeAllListeners('lock-screen')
+  powerMonitor.removeAllListeners('resume')
+  powerMonitor.removeAllListeners('unlock-screen')
+
+  powerMonitor.on('suspend', handleSystemSleep)
+  powerMonitor.on('lock-screen', handleSystemSleep)
+  powerMonitor.on('resume', handleSystemWake)
+  powerMonitor.on('unlock-screen', handleSystemWake)
 
   // After a restart-clear, the watcher.start() seeds lastSig from the live
   // clipboard (correct). But if clearUnpinnedOnRestart removed items that are
@@ -81,11 +107,14 @@ export function getWatcher(): ClipboardWatcher {
   return watcher
 }
 
-/** Push the full item list (DTO) to the renderer, if it's ready. */
+/** Push updates to all open windows (main window, onboarding window, etc.). */
 function send(channel: string, ...args: unknown[]): void {
   if (runtime.quitting) return
-  const win = getMainWindow()
-  if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send(channel, ...args)
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send(channel, ...args)
+    }
+  }
 }
 
 export const pushState = {
@@ -103,6 +132,14 @@ export const pushState = {
   openSettings(): void {
     console.log('[Main] Sending window:open-settings event to renderer')
     send('window:open-settings')
+  },
+  updateAvailable(info: { version: string }): void {
+    console.log('[Main] Sending app:update-available event to renderer:', info)
+    send('app:update-available', info)
+  },
+  updateDownloaded(info: { version: string }): void {
+    console.log('[Main] Sending app:update-downloaded event to renderer:', info)
+    send('app:update-downloaded', info)
   }
 }
 

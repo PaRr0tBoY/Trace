@@ -25,7 +25,7 @@ import { edge } from '../lib/edge'
 import { useStore } from '../store/appStore'
 
 const TRIGGER_PX = 3    // leftmost px that count as "the edge"
-const DWELL_MS = 120     // cursor must linger this long to open
+const DWELL_MS = 40      // cursor must linger this long to open
 const GRACE_MS = 250     // close delay after leaving
 const PANEL_WIDE = 270   // blade is 270px (var(--panel-width))
 /** Hysteresis thresholds for closing the panel.
@@ -36,32 +36,37 @@ const PANEL_WIDE = 270   // blade is 270px (var(--panel-width))
  */
 const KEEP_OPEN_PX = PANEL_WIDE - 15  // 255 — clearly inside blade
 const START_CLOSE_PX = PANEL_WIDE + 20 // 290 — 20px buffer outside the visual boundary
+const BUFFER_PX = 30                 // 30px overshoot buffer across adjacent monitors
+const PREVIEW_WIDE = 740             // Extended width when preview flyout is active
 
 export const PANEL_LEAVE_EVENT = 'panel:leave'
 export const PANEL_ENTER_EVENT = 'panel:enter'
 
+// How long to keep the panel alive after the user explicitly closes the preview
+// via the X button. This prevents the jarring simultaneous collapse of both
+// the preview and the clipboard.
+const PREVIEW_CLOSE_STAY_MS = 2500
+
+// Module-level flag set by the X button click. useEdgeHover reads this to
+// extend the close grace period without needing React state or store updates.
+let _previewClosedByUser = false
+let _previewClosedTimer: number | undefined
+
+/**
+ * Call this from the preview flyout's X button to signal that the user
+ * deliberately closed the preview — the clipboard should stay open for a
+ * while so they can keep browsing.
+ */
+export function notifyPreviewClosedByUser(): void {
+  _previewClosedByUser = true
+  if (_previewClosedTimer !== undefined) window.clearTimeout(_previewClosedTimer)
+  _previewClosedTimer = window.setTimeout(() => {
+    _previewClosedByUser = false
+    _previewClosedTimer = undefined
+  }, PREVIEW_CLOSE_STAY_MS)
+}
+
 export function useEdgeHover(): void {
-  const open = useStore((s) => s.open)
-  const setOpen = useStore((s) => s.setOpen)
-  const settings = useStore((s) => s.settings)
-  const dragActive = useStore((s) => s.dragActive)
-  const setDragActive = useStore((s) => s.setDragActive)
-  const internalDragReq = useStore((s) => s.internalDragReq)
-
-  // All reactive values accessed inside events kept in refs so the
-  // event-listener effect never needs to restart (restarting cancels timers).
-  const openRef = useRef(open)
-  openRef.current = open
-
-  const dragActiveRef = useRef(dragActive)
-  dragActiveRef.current = dragActive
-
-  const internalDragRef = useRef(!!internalDragReq)
-  internalDragRef.current = !!internalDragReq
-
-  const settingsRef = useRef(settings)
-  settingsRef.current = settings
-
   // Throttle the self-healing setInteractive(true) call.
   // Without this, it fires at 60Hz (every 16ms) via the cursor-edge poll,
   // flooding the IPC queue and starving the messages that open the panel.
@@ -78,20 +83,55 @@ export function useEdgeHover(): void {
   useEffect(() => {
     const recompute = () => {
       const h = window.innerHeight
-      const s = settingsRef.current
-      const half = h * s.hotZoneHeight / 2
-      const panelHalfH = h * (s.panelHeight || 0.5) / 2
+      const s = useStore.getState().settings
+      const pFrac = s.panelHeight || 0.6
+      const panelH = h * pFrac
+      const minY = panelH / 2
+      const maxY = h - panelH / 2
+      const vOffset = s.verticalOffset ?? 0.5
+      const midY = minY + vOffset * (maxY - minY)
+
+      const alignment = s.triggerAlignment || 'center'
+      const panelTop = midY - panelH / 2
+      const panelBottom = midY + panelH / 2
+      const triggerH = Math.min(panelH, h * (s.hotZoneHeight || 0.25))
+
+      let top = midY - triggerH / 2
+      let bottom = midY + triggerH / 2
+
+      if (alignment === 'top') {
+        top = panelTop
+        bottom = panelTop + triggerH
+      } else if (alignment === 'bottom') {
+        top = panelBottom - triggerH
+        bottom = panelBottom
+      }
+
+      const panelHalfH = panelH / 2 + 24
       zone.current = { 
-        top: h / 2 - half, 
-        bottom: h / 2 + half,
-        midY: h / 2,
+        top, 
+        bottom,
+        midY,
         panelHalfH
       }
     }
     recompute()
     window.addEventListener('resize', recompute)
-    return () => window.removeEventListener('resize', recompute)
-  }, [settings.hotZoneHeight, settings.panelHeight])
+    const unsubStore = useStore.subscribe((state, prevState) => {
+      if (
+        state.settings.panelHeight !== prevState.settings.panelHeight ||
+        state.settings.hotZoneHeight !== prevState.settings.hotZoneHeight ||
+        state.settings.verticalOffset !== prevState.settings.verticalOffset ||
+        state.settings.triggerAlignment !== prevState.settings.triggerAlignment
+      ) {
+        recompute()
+      }
+    })
+    return () => {
+      window.removeEventListener('resize', recompute)
+      unsubStore()
+    }
+  }, [])
 
   // Single stable effect — deps never change after mount.
   useEffect(() => {
@@ -99,23 +139,71 @@ export function useEdgeHover(): void {
     let graceTimer: number | undefined
     let interactiveTimer: number | undefined
 
-    const closePanel = () => {
-      if (!openRef.current) return
-      if (dragActiveRef.current && !internalDragRef.current) return
-      setOpen(false)
+    const closePanelNow = () => {
+      const s = useStore.getState()
+      if (s.styleFlyoutOpen) s.setStyleFlyoutOpen(false)
+      if (s.settingsOpen) s.setSettingsOpen(false)
+      s.setOpen(false)
       if (interactiveTimer !== undefined) window.clearTimeout(interactiveTimer)
       interactiveTimer = window.setTimeout(() => {
         interactiveTimer = undefined
-        if (!openRef.current) {
-          edge.setInteractive(false)
-        }
+        if (!useStore.getState().open) edge.setInteractive(false)
       }, 180)
     }
 
+    const closePanel = () => {
+      const state = useStore.getState()
+      if (!state.open) return
+      if (state.sliderActive) return
+      if (state.dragActive && !state.internalDragReq) return
+
+      // If the indicator style flyout is open, let it play its exit spring first.
+      // The Electron window resize (inside setOpen) would cut the flyout animation
+      // in half if we close both simultaneously — so we sequence it properly.
+      if (state.styleFlyoutOpen) {
+        state.setStyleFlyoutOpen(false)
+        if (graceTimer !== undefined) window.clearTimeout(graceTimer)
+        graceTimer = window.setTimeout(() => {
+          graceTimer = undefined
+          if (!useStore.getState().open) return // already closed by another path
+          closePanelNow()
+        }, 300)
+        return
+      }
+
+      // If the preview screen is open, close the preview screen first,
+      // and after a delay let the main clipboard panel start retracting.
+      if (state.previewItemId) {
+        state.setPreviewItemId(null)
+        if (graceTimer !== undefined) window.clearTimeout(graceTimer)
+        graceTimer = window.setTimeout(() => {
+          graceTimer = undefined
+          if (!useStore.getState().open) return
+          closePanelNow()
+        }, 300)
+        return
+      }
+
+      closePanelNow()
+    }
+
     const scheduleClose = (delay = GRACE_MS) => {
-      if (dragActiveRef.current && !internalDragRef.current) return
+      const state = useStore.getState()
+      if (state.sliderActive) return
+      if (state.dragActive && !state.internalDragReq) return
       if (graceTimer !== undefined) return // already closing
-      graceTimer = window.setTimeout(closePanel, delay)
+
+      // If position/display/slider was recently changed (< 1.75s ago), wait out remaining preview stay window
+      const timeSincePositionChange = state.sliderReleasedTime > 0 ? Date.now() - state.sliderReleasedTime : Infinity
+      let effectiveDelay = delay
+
+      if (timeSincePositionChange < 1750) {
+        effectiveDelay = Math.max(delay, 1750 - timeSincePositionChange)
+      } else if (_previewClosedByUser) {
+        effectiveDelay = PREVIEW_CLOSE_STAY_MS
+      }
+
+      graceTimer = window.setTimeout(closePanel, effectiveDelay)
     }
 
     const cancelClose = () => {
@@ -126,6 +214,16 @@ export function useEdgeHover(): void {
       if (interactiveTimer !== undefined) {
         window.clearTimeout(interactiveTimer)
         interactiveTimer = undefined
+      }
+      // User re-entered the clipboard — clear the preview grace period flags so the
+      // next time they leave, the panel retracts at normal speed (250ms)
+      useStore.getState().resetPositionChangedTime()
+      if (_previewClosedByUser) {
+        _previewClosedByUser = false
+        if (_previewClosedTimer !== undefined) {
+          window.clearTimeout(_previewClosedTimer)
+          _previewClosedTimer = undefined
+        }
       }
     }
 
@@ -140,8 +238,8 @@ export function useEdgeHover(): void {
         interactiveTimer = undefined
       }
       edge.setInteractive(true)
-      if (openRef.current) return
-      setOpen(true)
+      if (useStore.getState().open) return
+      useStore.getState().setOpen(true)
     }
 
     // ── panel:leave / panel:enter (from Panel.tsx blade div) ──────────────
@@ -150,10 +248,36 @@ export function useEdgeHover(): void {
     // expand). So we treat `panel:leave` as a *hint* and only actually close
     // if the last known pointer position is genuinely outside the blade.
     const isInsideBlade = () => {
-      const { midY, panelHalfH } = zone.current
+      const state = useStore.getState()
+      if (state.sliderActive) return true
+      const timeSincePositionChange = state.sliderReleasedTime > 0 ? Date.now() - state.sliderReleasedTime : Infinity
+      if (timeSincePositionChange < 1750) return true
+
       const { x, y } = lastClient.current
-      if (x < 0) return true // unknown — be conservative, don't close
-      return x <= PANEL_WIDE && y >= midY - panelHalfH && y <= midY + panelHalfH
+      if (x < -BUFFER_PX || y < 0) return true // unknown — be conservative, don't close
+      const s = state.settings
+      const hasFlyout = !!(state.previewItemId || state.styleFlyoutOpen)
+      const currentPanelWide = hasFlyout ? PREVIEW_WIDE : PANEL_WIDE
+
+      let insideX = false
+      if (s.stickPosition === 'right') {
+        insideX = x >= window.innerWidth - currentPanelWide - BUFFER_PX && x <= window.innerWidth + BUFFER_PX
+      } else {
+        insideX = x >= -BUFFER_PX && x <= currentPanelWide + BUFFER_PX
+      }
+      if (!insideX) return false
+
+      const inPreviewCol = s.stickPosition === 'right'
+        ? x < window.innerWidth - KEEP_OPEN_PX
+        : x > KEEP_OPEN_PX
+
+      if (inPreviewCol && hasFlyout && state.previewFlyoutRect) {
+        const FLYOUT_BUFFER = 24
+        return y >= state.previewFlyoutRect.top - FLYOUT_BUFFER && y <= state.previewFlyoutRect.bottom + FLYOUT_BUFFER
+      }
+
+      const { midY, panelHalfH } = zone.current
+      return y >= midY - panelHalfH && y <= midY + panelHalfH
     }
 
     const onPanelLeave = () => {
@@ -168,77 +292,191 @@ export function useEdgeHover(): void {
       cancelClose()
     }
 
+    let edgeHintTimer: number | undefined
+    let edgeHintFired = false
+
+    const triggerEdgeHint = () => {
+      if (edgeHintFired) return
+      edgeHintFired = true
+      const s = useStore.getState()
+      s.setEdgeHintActive(true)
+      if (edgeHintTimer !== undefined) window.clearTimeout(edgeHintTimer)
+      edgeHintTimer = window.setTimeout(() => {
+        edgeHintTimer = undefined
+        useStore.getState().setEdgeHintActive(false)
+      }, 300)
+    }
+
     // ── main-process cursor poll (replaces broken pointermove forwarding) ──
     // The main process polls screen.getCursorScreenPoint() every 16ms and
     // sends window:cursor-edge with raw x/y coords. We check the hot zone
     // here with the renderer's own settings so everything stays in sync.
     const unsubCursorEdge = window.edge.onCursorEdge((data) => {
       lastClient.current = { x: data.x, y: data.y }
+      const state = useStore.getState()
+      const { stickPosition, displayWidth } = data
       const { top, bottom, midY, panelHalfH } = zone.current
-      const inEdge = data.x <= TRIGGER_PX
-      const inZone = data.y >= top && data.y <= bottom
+      const hasFlyout = !!(state.previewItemId || state.styleFlyoutOpen)
+      const currentKeepOpenPx = hasFlyout ? PREVIEW_WIDE - 15 : KEEP_OPEN_PX
+      const currentStartClosePx = hasFlyout ? PREVIEW_WIDE + 20 : START_CLOSE_PX
 
-      // Edge trigger: only start dwell to OPEN when panel is closed.
-      // When panel is already open, cursor at x=0 is treated like any other
-      // inside-blade position (falls through to insideX check below).
-      if (inEdge && inZone && !openRef.current) {
-        cancelClose()
-        if (dwellTimer === undefined) {
-          dwellTimer = window.setTimeout(() => {
+      switch (stickPosition) {
+        case 'right': {
+          const distFromRight = displayWidth - data.x
+          const inEdgeNear = distFromRight >= -BUFFER_PX && distFromRight <= (TRIGGER_PX + 25)
+          const inZone = data.y >= top && data.y <= bottom
+
+          if (!inEdgeNear) {
+            edgeHintFired = false
+          }
+
+          const isHoverEnabled = state.settings.hoverActivation ?? true
+
+          if (inEdgeNear && !inZone && !state.open && isHoverEnabled && (state.settings.showEdgeLocationHint ?? true)) {
+            triggerEdgeHint()
+          }
+
+          if (distFromRight >= -BUFFER_PX && distFromRight <= TRIGGER_PX && inZone && !state.open && isHoverEnabled) {
+            if (state.edgeHintActive) state.setEdgeHintActive(false)
+            cancelClose()
+            if (dwellTimer === undefined) {
+              dwellTimer = window.setTimeout(() => {
+                dwellTimer = undefined
+                openPanel()
+              }, DWELL_MS)
+            }
+            return
+          }
+
+          if (dwellTimer !== undefined) {
+            window.clearTimeout(dwellTimer)
             dwellTimer = undefined
-            openPanel()
-          }, DWELL_MS)
+          }
+
+          if (!state.open) return
+
+          if (state.edgeHintActive) state.setEdgeHintActive(false)
+
+          const now = Date.now()
+          if (now - lastSetInteractiveRef.current > 2000) {
+            lastSetInteractiveRef.current = now
+            edge.setInteractive(true)
+          }
+
+          const inPreviewColumn = distFromRight > KEEP_OPEN_PX
+          let insideY = false
+          if (inPreviewColumn && hasFlyout && state.previewFlyoutRect) {
+            const FLYOUT_BUFFER = 24
+            insideY = data.y >= state.previewFlyoutRect.top - FLYOUT_BUFFER && data.y <= state.previewFlyoutRect.bottom + FLYOUT_BUFFER
+          } else {
+            insideY = data.y >= midY - panelHalfH && data.y <= midY + panelHalfH
+          }
+
+          if (distFromRight >= -BUFFER_PX && distFromRight <= currentKeepOpenPx && insideY) {
+            cancelClose()
+            return
+          }
+
+          if (distFromRight > currentStartClosePx || distFromRight < -BUFFER_PX || !insideY) {
+            scheduleClose()
+          }
+          break
         }
-        return
+
+        // left
+        default: {
+          const inEdgeNear = data.x >= -BUFFER_PX && data.x <= (TRIGGER_PX + 25)
+          const inZone = data.y >= top && data.y <= bottom
+
+          if (!inEdgeNear) {
+            edgeHintFired = false
+          }
+
+          const isHoverEnabled = state.settings.hoverActivation ?? true
+
+          if (inEdgeNear && !inZone && !state.open && isHoverEnabled && (state.settings.showEdgeLocationHint ?? true)) {
+            triggerEdgeHint()
+          }
+
+          if (data.x >= -BUFFER_PX && data.x <= TRIGGER_PX && inZone && !state.open && isHoverEnabled) {
+            if (state.edgeHintActive) state.setEdgeHintActive(false)
+            cancelClose()
+            if (dwellTimer === undefined) {
+              dwellTimer = window.setTimeout(() => {
+                dwellTimer = undefined
+                openPanel()
+              }, DWELL_MS)
+            }
+            return
+          }
+
+          if (dwellTimer !== undefined) {
+            window.clearTimeout(dwellTimer)
+            dwellTimer = undefined
+          }
+
+          if (!state.open) return
+
+          if (state.edgeHintActive) state.setEdgeHintActive(false)
+
+          const now = Date.now()
+          if (now - lastSetInteractiveRef.current > 2000) {
+            lastSetInteractiveRef.current = now
+            edge.setInteractive(true)
+          }
+
+          const inPreviewColumn = data.x > KEEP_OPEN_PX
+          let insideY = false
+          if (inPreviewColumn && hasFlyout && state.previewFlyoutRect) {
+            const FLYOUT_BUFFER = 24
+            insideY = data.y >= state.previewFlyoutRect.top - FLYOUT_BUFFER && data.y <= state.previewFlyoutRect.bottom + FLYOUT_BUFFER
+          } else {
+            insideY = data.y >= midY - panelHalfH && data.y <= midY + panelHalfH
+          }
+
+          if (data.x >= -BUFFER_PX && data.x <= currentKeepOpenPx && insideY) {
+            cancelClose()
+            return
+          }
+
+          if (data.x > currentStartClosePx || data.x < -BUFFER_PX || !insideY) {
+            scheduleClose()
+          }
+        }
       }
-
-      if (dwellTimer !== undefined) {
-        window.clearTimeout(dwellTimer)
-        dwellTimer = undefined
-      }
-
-      if (!openRef.current) return
-
-      // Self-healing safety: if panel is open, enforce interactivity so it can never be stuck click-through!
-      // Throttled to fire at most once every 2 seconds to prevent flooding the IPC queue.
-      const now = Date.now()
-      if (now - lastSetInteractiveRef.current > 2000) {
-        lastSetInteractiveRef.current = now
-        edge.setInteractive(true)
-      }
-
-      // Hysteresis-based close detection.
-      // Using two separate thresholds prevents the oscillation that occurs when
-      // the cursor hovers right at the blade edge (x ≈ 280px): a single threshold
-      // causes rapid cancel/schedule cycles every 16ms that prevent the grace
-      // timer from ever counting down.
-      //
-      //  x ≤ KEEP_OPEN_PX (250): cursor clearly inside blade → cancel close
-      //  x > START_CLOSE_PX (340): cursor clearly outside window → schedule close
-      //  250 < x ≤ 340 (dead band): neither action — let existing timer run
-      const insideY = data.y >= midY - panelHalfH && data.y <= midY + panelHalfH
-
-      if (data.x <= KEEP_OPEN_PX && insideY) {
-        cancelClose()
-        return
-      }
-
-      if (data.x > START_CLOSE_PX || !insideY) {
-        scheduleClose()
-      }
-      // else: dead band — do nothing, let existing timer expire naturally
     })
 
     // ── keyboard ───────────────────────────────────────────────────────────
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && openRef.current) scheduleClose(0)
+      if (e.key === 'Escape' && useStore.getState().open) scheduleClose(0)
+    }
+
+    // ── window blur (Alt+Tab / OS focus stolen) ────────────────────────────
+    // When the user presses Alt+Tab or any other mechanism gives focus to
+    // another OS window, the Electron renderer fires a native `blur` event on
+    // the global `window` object. Because the Trace window is `focusable:
+    // false`, the cursor-poll path never learns that the app lost OS focus —
+    // the cursor position it last saw was still "inside the blade", so
+    // isInsideBlade() keeps returning true and the panel is stuck open.
+    //
+    // Listening for `window.blur` here catches the exact moment the OS
+    // switches focus away and immediately force-closes the panel with a tiny
+    // grace period so the animation is not jarring (e.g. user Alt+Tabs to
+    // quickly read something and comes back — 400 ms gives them a moment).
+    const onWindowBlur = () => {
+      const state = useStore.getState()
+      if (!state.open) return
+      // Don't close during an external OS file drag — the drag surface may
+      // temporarily shift focus to the OS drag-ghost or file manager.
+      if (state.dragActive && !state.internalDragReq) return
+      scheduleClose(400)
     }
 
     // ── OS file drag awareness ─────────────────────────────────────────────
     const onDocDragEnter = (e: DragEvent) => {
       if (e.dataTransfer?.types.includes('Files')) {
         e.preventDefault()
-        setDragActive(true)
+        useStore.getState().setDragActive(true)
         openPanel()
       }
     }
@@ -250,21 +488,22 @@ export function useEdgeHover(): void {
     }
     const onDocDragLeave = (e: DragEvent) => {
       if (!e.relatedTarget) {
-        setDragActive(false)
-        if (internalDragRef.current) scheduleClose(0)
+        useStore.getState().setDragActive(false)
+        if (useStore.getState().internalDragReq) scheduleClose(0)
       }
     }
     const onDocDrop = (e: DragEvent) => {
       e.preventDefault()
-      setDragActive(false)
+      useStore.getState().setDragActive(false)
     }
     const onDocDragEnd = (e: DragEvent) => {
       e.preventDefault()
-      setDragActive(false)
+      useStore.getState().setDragActive(false)
     }
 
     // ── register ───────────────────────────────────────────────────────────
     window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('blur', onWindowBlur)
     window.addEventListener(PANEL_LEAVE_EVENT, onPanelLeave)
     window.addEventListener(PANEL_ENTER_EVENT, onPanelEnter)
     document.addEventListener('dragenter', onDocDragEnter)
@@ -276,6 +515,7 @@ export function useEdgeHover(): void {
     return () => {
       unsubCursorEdge()
       window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('blur', onWindowBlur)
       window.removeEventListener(PANEL_LEAVE_EVENT, onPanelLeave)
       window.removeEventListener(PANEL_ENTER_EVENT, onPanelEnter)
       document.removeEventListener('dragenter', onDocDragEnter)
@@ -287,6 +527,5 @@ export function useEdgeHover(): void {
       window.clearTimeout(graceTimer)
       window.clearTimeout(interactiveTimer)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setOpen, setDragActive])
+  }, [])
 }

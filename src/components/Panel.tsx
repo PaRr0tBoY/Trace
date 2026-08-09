@@ -252,7 +252,7 @@ export function Panel() {
                   <div className="spacer" />
                   <button 
                     className="text-btn danger"
-                    onClick={clear} 
+                    onClick={() => clear()} 
                     disabled={total === 0} 
                     title="Clear shelf" 
                     style={{ display: 'flex', alignItems: 'center', gap: 6 }}

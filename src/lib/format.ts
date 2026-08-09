@@ -1,6 +1,7 @@
 /**
  * Small display helpers for clipboard item previews.
  */
+import { t } from '../i18n'
 
 /** Truncate long text for list previews. */
 export function previewText(text: string, max = 160): string {
@@ -20,14 +21,15 @@ export function formatBytes(bytes: number): string {
 export function relativeTime(ts: number): string {
   const diff = Date.now() - ts
   const s = Math.round(diff / 1000)
-  if (s < 5) return 'just now'
-  if (s < 60) return `${s}s ago`
+  const agoStr = t('item.ago')
+  if (s < 5) return t('item.justNow')
+  if (s < 60) return `${s}s ${agoStr}`.trim()
   const m = Math.round(s / 60)
-  if (m < 60) return `${m}m ago`
+  if (m < 60) return `${m}m ${agoStr}`.trim()
   const h = Math.round(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return `${h}h ${agoStr}`.trim()
   const d = Math.round(h / 24)
-  if (d < 7) return `${d}d ago`
+  if (d < 7) return `${d}d ${agoStr}`.trim()
   return new Date(ts).toLocaleDateString()
 }
 
@@ -36,6 +38,24 @@ export function basename(p: string): string {
   const norm = p.replace(/\\/g, '/')
   const parts = norm.split('/').filter(Boolean)
   return parts[parts.length - 1] ?? p
+}
+
+/** Formats a path into a clean display title (converts internal hash IDs to human screenshot titles). */
+export function formatImageDisplayName(path: string, capturedAt?: number): string {
+  const name = basename(path)
+  const isInternalHash = /^[a-z0-9]{6,12}-[a-z0-9]{6,12}\.[a-z0-9]+$/i.test(name) || path.includes('trace/images') || path.includes('trace\\images') || path.includes('trace/temp') || path.includes('trace\\temp')
+  
+  if (isInternalHash) {
+    const screenshotLabel = t('item.screenshot')
+    if (capturedAt) {
+      const d = new Date(capturedAt)
+      const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      const timeStr = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+      return `${screenshotLabel} ${dateStr}, ${timeStr}`
+    }
+    return screenshotLabel
+  }
+  return name
 }
 
 /** Is this a path to an image (by extension)? */

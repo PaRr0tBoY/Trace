@@ -1,73 +1,91 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import logoUrl from './assets/logo.svg'
 import { Settings } from './components/Settings'
-
-const slides = [
-  {
-    id: 'slide-1',
-    title: 'Welcome to Trace',
-    description: 'Trace lives hidden on the left edge of your screen. Simply move your mouse to the left edge to open the panel, and move away to hide it.',
-    videoSrc: 'placeholder_welcome.mp4',
-    placeholderColor: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)'
-  },
-  {
-    id: 'slide-2',
-    title: 'Collect Anything',
-    description: 'Whenever you press Ctrl+C to copy text, images, or files, Trace automatically catches and saves them in the background.',
-    videoSrc: 'placeholder_copy.mp4',
-    placeholderColor: 'linear-gradient(135deg, #4FACFE 0%, #00F2FE 100%)'
-  },
-  {
-    id: 'slide-3',
-    title: 'Drag & Drop Anywhere',
-    description: 'Need to use an item? Just open the panel and drag the card directly into any application, folder, or document.',
-    videoSrc: 'placeholder_drag.mp4',
-    placeholderColor: 'linear-gradient(135deg, #43E97B 0%, #38F9D7 100%)'
-  },
-  {
-    id: 'slide-4',
-    title: 'Explore File Stacks',
-    description: 'Copying multiple files groups them into a stack. You can drag the entire stack, or click it to view and extract individual files.',
-    videoSrc: 'placeholder_stacks.mp4',
-    placeholderColor: 'linear-gradient(135deg, #FA709A 0%, #FEE140 100%)'
-  },
-  {
-    id: 'slide-5-ungroup',
-    title: 'Ungroup & Split Stacks',
-    description: 'Want to separate items in a stack? Click to expand the stack, then drag any subitem to the left edge of the screen. A glowing coral bar will appear—drop the item on it to extract it back into a standalone card.',
-    videoSrc: 'placeholder_ungroup.mp4',
-    placeholderColor: 'linear-gradient(135deg, #FAD961 0%, #F76B1C 100%)'
-  },
-  {
-    id: 'slide-5',
-    title: 'Combine & Merge Items',
-    description: 'Combine separate file or image cards by dragging them directly onto each other. This organizes your shelf by bundling related assets into a stack.',
-    videoSrc: 'placeholder_merge.mp4',
-    placeholderColor: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)'
-  },
-  {
-    id: 'slide-6',
-    title: 'Configure Your Clipboard',
-    description: 'Customize how Trace works for you.',
-    videoSrc: '',
-    placeholderColor: 'transparent'
-  }
-]
+import { useTranslation } from './i18n'
+import { useStore } from './store/appStore'
+import { edge } from './lib/edge'
 
 export function Onboarding() {
+  const { t } = useTranslation()
   const [currentIndex, setCurrentIndex] = useState(0)
 
-  const handleNext = () => {
+  useEffect(() => {
+    void useStore.getState().hydrate()
+    const offSettings = edge.onSettings((next) => {
+      useStore.getState().setSettings(next)
+    })
+    return () => {
+      offSettings()
+    }
+  }, [])
+
+  const slides = [
+    {
+      id: 'slide-1',
+      title: t('onboarding.welcomeTitle'),
+      description: t('onboarding.welcomeDesc'),
+      videoSrc: 'welcome.webm',
+      placeholderColor: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)'
+    },
+    {
+      id: 'slide-2',
+      title: t('onboarding.collectTitle'),
+      description: t('onboarding.collectDesc'),
+      videoSrc: 'copy.webm',
+      placeholderColor: 'linear-gradient(135deg, #4FACFE 0%, #00F2FE 100%)'
+    },
+    {
+      id: 'slide-3',
+      title: t('onboarding.dragTitle'),
+      description: t('onboarding.dragDesc'),
+      videoSrc: 'drag.webm',
+      placeholderColor: 'linear-gradient(135deg, #43E97B 0%, #38F9D7 100%)'
+    },
+    {
+      id: 'slide-4',
+      title: t('onboarding.stacksTitle'),
+      description: t('onboarding.stacksDesc'),
+      videoSrc: 'stack.webm',
+      placeholderColor: 'linear-gradient(135deg, #FA709A 0%, #FEE140 100%)'
+    },
+    {
+      id: 'slide-5-ungroup',
+      title: t('onboarding.ungroupTitle'),
+      description: t('onboarding.ungroupDesc'),
+      videoSrc: 'ungroup.webm',
+      placeholderColor: 'linear-gradient(135deg, #FAD961 0%, #F76B1C 100%)'
+    },
+    {
+      id: 'slide-5',
+      title: t('onboarding.mergeTitle'),
+      description: t('onboarding.mergeDesc'),
+      videoSrc: 'merge.webm',
+      placeholderColor: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)'
+    },
+    {
+      id: 'slide-preview',
+      title: t('onboarding.previewTitle'),
+      description: t('onboarding.previewDesc'),
+      videoSrc: 'preview.webm',
+      placeholderColor: 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)'
+    },
+    {
+      id: 'slide-6',
+      title: t('onboarding.configTitle'),
+      description: t('onboarding.configDesc'),
+      videoSrc: '',
+      placeholderColor: 'transparent'
+    }
+  ]
+
+  const handleNext = async () => {
     if (currentIndex < slides.length - 1) {
       setCurrentIndex(currentIndex + 1)
     } else {
-      finish()
+      await useStore.getState().patchSettings({ tutorialCompleted: true })
+      window.close()
     }
-  }
-
-  const handleSkip = () => {
-    setCurrentIndex(slides.length - 1)
   }
 
   const handlePrev = () => {
@@ -76,8 +94,8 @@ export function Onboarding() {
     }
   }
 
-  const finish = async () => {
-    await window.edge.updateSettings({ tutorialCompleted: true })
+  const handleSkip = async () => {
+    await useStore.getState().patchSettings({ tutorialCompleted: true })
     window.close()
   }
 
@@ -87,112 +105,79 @@ export function Onboarding() {
     <div style={{
       width: '100vw',
       height: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
       background: '#121212',
       color: '#fff',
-      overflow: 'hidden',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
+      display: 'flex',
+      flexDirection: 'column',
+      userSelect: 'none',
+      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      {/* Titlebar & Header */}
+      {/* Header Bar */}
       <div style={{
-        height: '60px',
+        height: '64px',
+        padding: '0 32px',
         display: 'flex',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '16px 24px',
-        boxSizing: 'border-box',
-        ...({ WebkitAppRegion: 'drag' } as any)
+        justifyContent: 'space-between',
+        borderBottom: '1px solid #262626'
       }}>
-        {/* Logo Area */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0px' }}>
-          <img src={logoUrl} alt="Trace Logo" style={{ width: '42px', height: '42px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img src={logoUrl} alt="Trace Logo" style={{ width: '28px', height: '28px' }} />
+          <span style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-0.02em' }}>Trace</span>
         </div>
-
-        {/* Header Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', ...({ WebkitAppRegion: 'no-drag' } as any) }}>
-          {currentIndex !== slides.length - 1 && (
-            <button
-              onClick={handleSkip}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#888',
-                fontSize: '14px',
-                fontWeight: 500,
-                cursor: 'pointer',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                transition: 'color 0.2s, background 0.2s'
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)' }}
-              onMouseOut={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.background = 'transparent' }}
-            >
-              Skip
-            </button>
-          )}
-          <button
-            onClick={() => window.edge.minimizeWindow()}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#888',
-              width: '32px',
-              height: '32px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'background 0.2s, color 0.2s'
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; e.currentTarget.style.color = '#fff' }}
-            onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#888' }}
-            title="Minimize"
-          >
-            <svg width="14" height="2" viewBox="0 0 14 2" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M1 1H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
+        <button
+          onClick={handleSkip}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: '#888',
+            fontSize: '14px',
+            cursor: 'pointer',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            transition: 'color 0.2s, background 0.2s'
+          }}
+          onMouseOver={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = '#222' }}
+          onMouseOut={(e) => { e.currentTarget.style.color = '#888'; e.currentTarget.style.background = 'transparent' }}
+        >
+          {t('onboarding.skip')}
+        </button>
       </div>
 
       {/* Main Content Area */}
       {currentSlide.id === 'slide-6' ? (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'row', alignItems: 'stretch', padding: '16px 48px', gap: '40px', width: '100%', boxSizing: 'border-box', minHeight: 0 }}>
-          {/* Left Side: Textual Description */}
+        <div style={{ flex: 1, display: 'flex', gap: '32px', padding: '24px 32px', boxSizing: 'border-box', overflow: 'hidden' }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <h1 style={{ fontSize: '28px', margin: '0 0 16px 0', fontWeight: 700, letterSpacing: '-0.01em' }}>
+            <h1 style={{ fontSize: '28px', margin: '0 0 12px 0', fontWeight: 700, letterSpacing: '-0.02em' }}>
               {currentSlide.title}
             </h1>
             <p style={{ fontSize: '15px', lineHeight: 1.6, color: 'rgba(255,255,255,0.7)', margin: '0 0 24px 0' }}>
               {currentSlide.description}
             </p>
-            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#fff', marginBottom: '8px' }}>Quick Tips:</div>
+            <div style={{ background: '#1a1a1c', padding: '16px 20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {t('onboarding.proTips')}
+              </div>
               <ul style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', margin: 0, paddingLeft: '20px', lineHeight: 1.6 }}>
-                <li>Press <strong>Alt + C</strong> to instantly toggle the shelf.</li>
-                <li>Access settings anytime via the gear icon (top right).</li>
-                <li>Drag & drop files to the left edge to add them.</li>
-                <li>Click a text box, then a clipboard item to auto-paste.</li>
-                <li>Stack files with files (e.g., zip, md, json) or images with images (max 10). Text cannot be stacked.</li>
+                <li>{t('onboarding.proTip1')}</li>
+                <li>{t('onboarding.proTip2')}</li>
+                <li>{t('onboarding.proTip3')}</li>
+                <li>{t('onboarding.proTip4')}</li>
               </ul>
             </div>
           </div>
-          {/* Right Side: Settings */}
-          <div style={{ flex: 1, background: '#1a1a1c', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.05)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)', overflow: 'hidden', display: 'flex', minHeight: 0 }}>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px', boxSizing: 'border-box' }}>
-              <Settings />
+          <div style={{ flex: 1, background: '#1a1a1c', borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.05)', overflow: 'hidden', display: 'flex', minHeight: 0 }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+              <Settings inlineIndicatorStyle={true} />
             </div>
           </div>
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 48px' }}>
-          {/* Video / Placeholder Area */}
           <div style={{
             width: '100%',
             maxWidth: '560px',
-            height: '315px', // 16:9 aspect ratio
+            height: '315px',
             background: '#1a1a1c',
             borderRadius: '16px',
             overflow: 'hidden',
@@ -208,14 +193,7 @@ export function Onboarding() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.3 }}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: currentSlide.placeholderColor
-                }}
+                style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: currentSlide.placeholderColor }}
               >
                 <video
                   key={currentSlide.videoSrc}
@@ -224,20 +202,11 @@ export function Onboarding() {
                   loop
                   muted
                   playsInline
-                  onError={(e) => {
-                    console.error("Video loading error:", currentSlide.videoSrc, e.currentTarget.error);
-                  }}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
-                  }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               </motion.div>
             </AnimatePresence>
           </div>
-
-          {/* Text Area */}
           <div style={{ textAlign: 'center', height: '100px', maxWidth: '480px' }}>
             <AnimatePresence mode="wait">
               <motion.div
@@ -259,16 +228,15 @@ export function Onboarding() {
         </div>
       )}
 
-      {/* Footer Navigation */}
+      {/* Footer / Navigation Bar */}
       <div style={{
         height: '80px',
         padding: '0 40px',
         display: 'grid',
         gridTemplateColumns: '1fr auto 1fr',
         alignItems: 'center',
-        borderTop: '1px solid #333'
+        borderTop: '1px solid #262626'
       }}>
-        {/* Left Area (Previous) */}
         <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
           <button
             onClick={handlePrev}
@@ -283,17 +251,16 @@ export function Onboarding() {
               padding: '8px 20px',
               borderRadius: '6px',
               transition: 'background 0.2s',
-              opacity: currentIndex === 0 ? 0 : 1, // Hide when disabled for perfect symmetry
+              opacity: currentIndex === 0 ? 0 : 1,
               pointerEvents: currentIndex === 0 ? 'none' : 'auto'
             }}
             onMouseOver={(e) => { if (currentIndex !== 0) e.currentTarget.style.background = '#333' }}
             onMouseOut={(e) => { if (currentIndex !== 0) e.currentTarget.style.background = '#2a2a2a' }}
           >
-            Previous
+            {t('onboarding.back')}
           </button>
         </div>
 
-        {/* Center Area (Dots) */}
         <div style={{ display: 'flex', gap: '8px' }}>
           {slides.map((_, i) => (
             <div
@@ -309,7 +276,6 @@ export function Onboarding() {
           ))}
         </div>
 
-        {/* Right Area (Next) */}
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button
             onClick={handleNext}
@@ -330,7 +296,7 @@ export function Onboarding() {
             onMouseOver={(e) => e.currentTarget.style.opacity = '0.9'}
             onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
           >
-            {currentIndex === slides.length - 1 ? "Save & Let's Go" : 'Next'}
+            {currentIndex === slides.length - 1 ? t('onboarding.getStarted') : t('onboarding.next')}
           </button>
         </div>
       </div>

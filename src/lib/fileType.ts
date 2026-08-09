@@ -67,15 +67,51 @@ export function extOf(path: string): string {
   return path.slice(dot + 1).toLowerCase()
 }
 
+import { t } from '../i18n'
+
 /** Resolve a file path to its display metadata (kind / label / color). */
 export function getFileKind(path: string): FileKindInfo {
   const ext = extOf(path)
   const kind = EXT_MAP[ext] ?? 'file'
-  return KIND_INFO[kind]
+  const base = KIND_INFO[kind]
+  const keyMap: Record<FileKind, any> = {
+    pdf: 'fileKinds.pdf',
+    word: 'fileKinds.word',
+    excel: 'fileKinds.excel',
+    powerpoint: 'fileKinds.powerpoint',
+    archive: 'fileKinds.archive',
+    text: 'fileKinds.text',
+    code: 'fileKinds.code',
+    audio: 'fileKinds.audio',
+    video: 'fileKinds.video',
+    image: 'fileKinds.image',
+    file: 'fileKinds.file'
+  }
+  return {
+    ...base,
+    label: t(keyMap[kind]) || base.label
+  }
 }
 
 /** Resolve from an already-extracted extension string. */
 export function getFileKindByExt(ext: string): FileKindInfo {
   const kind = EXT_MAP[ext.toLowerCase()] ?? 'file'
-  return KIND_INFO[kind]
+  const base = KIND_INFO[kind]
+  const keyMap: Record<FileKind, any> = {
+    pdf: 'fileKinds.pdf',
+    word: 'fileKinds.word',
+    excel: 'fileKinds.excel',
+    powerpoint: 'fileKinds.powerpoint',
+    archive: 'fileKinds.archive',
+    text: 'fileKinds.text',
+    code: 'fileKinds.code',
+    audio: 'fileKinds.audio',
+    video: 'fileKinds.video',
+    image: 'fileKinds.image',
+    file: 'fileKinds.file'
+  }
+  return {
+    ...base,
+    label: t(keyMap[kind]) || base.label
+  }
 }

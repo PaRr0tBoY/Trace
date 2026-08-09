@@ -6,7 +6,7 @@
  */
 import { useMemo } from 'react'
 import { useStore } from '../store/appStore'
-import type { ClipboardItemDto } from '../../shared/types'
+import type { ClipboardItemDto, TypeFilter } from '../../shared/types'
 import { basename } from '../lib/format'
 
 function matches(it: ClipboardItemDto, q: string): boolean {
@@ -26,6 +26,30 @@ function matches(it: ClipboardItemDto, q: string): boolean {
   }
 }
 
+import { isImagePath } from '../lib/format'
+
+function isImageItem(it: ClipboardItemDto): boolean {
+  if (it.data.kind === 'image' || it.data.kind === 'image-collection') return true
+  if (it.data.kind === 'files' && it.data.paths.length > 0) {
+    return it.data.paths.every((p) => isImagePath(p))
+  }
+  return false
+}
+
+function matchesType(it: ClipboardItemDto, filter: TypeFilter): boolean {
+  if (filter === 'all') return true
+  switch (filter) {
+    case 'text':
+      return it.data.kind === 'text' && !it.data.isUrl
+    case 'links':
+      return it.data.kind === 'text' && !!it.data.isUrl
+    case 'images':
+      return isImageItem(it)
+    case 'files':
+      return it.data.kind === 'files' && !isImageItem(it)
+  }
+}
+
 export interface GroupedItems {
   pinned: ClipboardItemDto[]
   recent: ClipboardItemDto[]
@@ -34,6 +58,7 @@ export interface GroupedItems {
 export function useFilteredItems(): GroupedItems {
   const items = useStore((s) => s.items)
   const query = useStore((s) => s.query)
+  const typeFilter = useStore((s) => s.typeFilter)
   const tutorialStep = useStore((s) => s.tutorialStep)
 
   return useMemo(() => {
@@ -60,8 +85,9 @@ export function useFilteredItems(): GroupedItems {
 
     for (const it of filteredByTutorial) {
       if (!matches(it, query.trim())) continue
+      if (!matchesType(it, typeFilter)) continue
       ;(it.pinned ? pinned : recent).push(it)
     }
     return { pinned, recent }
-  }, [items, query, tutorialStep])
+  }, [items, query, typeFilter, tutorialStep])
 }

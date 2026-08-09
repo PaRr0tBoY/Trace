@@ -1,6 +1,6 @@
 {
   "name": "trace",
-  "version": "0.1.0",
+  "version": "0.2.6",
   "description": "Trace — a clipboard manager that lives on the left edge of your screen and expands on hover.",
   "author": "Trace",
   "license": "MIT",
@@ -10,12 +10,16 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "build:win": "npm run build && electron-builder --win",
-    "package": "npm run build && electron-builder --win",
+    "build:github": "npm run build && electron-builder --win nsis -c.extraMetadata.buildTarget=github",
+    "build:store": "npm run build && electron-builder --win appx -c.extraMetadata.buildTarget=store",
+    "build:msix": "npm run build && electron-builder --win appx -c.extraMetadata.buildTarget=store",
+    "build:win": "npm run build:github",
+    "package": "npm run build:github",
     "preview": "electron-vite preview",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
-    "typecheck": "npm run typecheck:node && npm run typecheck:web"
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "test": "vitest run"
   },
   "build": {
     "appId": "com.trace.app",
@@ -29,10 +33,21 @@
       "resources/**/*",
       "package.json"
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "PaRr0tBoY",
+      "repo": "Trace"
+    },
     "win": {
       "target": [
         {
           "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "appx",
           "arch": [
             "x64"
           ]
@@ -46,28 +61,47 @@
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "Trace",
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "Trace-Setup-${version}.${ext}"
+    },
+    "appx": {
+      "identityName": "Deepender.EdgeDrop",
+      "publisher": "CN=55FECDC4-7144-4A41-98FC-056C003F76FD",
+      "publisherDisplayName": "Deepender",
+      "applicationId": "EdgeDrop",
+      "displayName": "Trace"
     }
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
     "@types/react": "^18.2.73",
     "@types/react-dom": "^18.2.22",
+    "@vitalets/google-translate-api": "^9.2.1",
     "@vitejs/plugin-react": "^4.2.1",
-    "electron": "^30.5.1",
+    "electron": "^34.2.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^2.1.0",
     "typescript": "^5.4.3",
-    "vite": "^5.2.6"
+    "vite": "^5.2.6",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@iconify-json/cuida": "^1.2.5",
+    "@iconify/react": "^6.0.2",
     "@radix-ui/react-scroll-area": "^1.2.13",
     "@radix-ui/react-separator": "^1.1.11",
     "@resvg/resvg-js": "^2.6.2",
     "framer-motion": "^11.0.24",
+    "gsap": "^3.15.0",
+    "koffi": "^3.1.2",
+    "lucide-react": "^1.26.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "svg-path-bbox": "^2.1.0",
     "zustand": "^4.5.2"
+  },
+  "allowScripts": {
+    "electron@34.5.8": true,
+    "koffi@3.1.4": true
   }
 }

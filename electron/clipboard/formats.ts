@@ -7,40 +7,85 @@
  * variants out of raw Windows formats (copied files arrive as FileNameW).
  */
 import { clipboard } from 'electron'
-import { execSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import koffi from 'koffi'
 import type { ItemData } from '../../shared/types'
+
+let getSeqNum: (() => number) | null = null
+if (process.platform === 'win32') {
+  try {
+    const user32 = koffi.load('user32.dll')
+    getSeqNum = user32.func('uint32 GetClipboardSequenceNumber()')
+  } catch (err) {
+    console.error('[formats] Failed to load GetClipboardSequenceNumber from user32.dll:', err)
+  }
+}
+
+export function getClipboardSequenceNumber(): number {
+  if (getSeqNum) {
+    try {
+      return getSeqNum()
+    } catch {
+      return 0
+    }
+  }
+  return 0
+}
+import { getSystemPowerShellPath } from '../main/powershell'
+import { filterValidPaths } from '../main/pathValidation'
+
+const execFileAsync = promisify(execFile)
 
 /** Windows clipboard format name for a copied-file list. */
 export const CF_FILE_LIST = 'FileNameW'
 
-/** Read the list of copied file paths (Windows), or null if none. */
-function readFileList(): string[] | null {
+/**
+ * Async version: reads the full list of copied file paths via PowerShell
+ * GetFileDropList(), which is the only reliable way to retrieve ALL selected
+ * files from a multi-file Explorer copy (CF_HDROP / FileNameW only carries
+ * the first file as a legacy single-path fallback).
+ *
+ * Falls back to parsing the FileNameW UTF-16LE buffer directly if PowerShell
+ * is unavailable or times out.
+ */
+async function readFileListAsync(): Promise<string[] | null> {
   try {
+    // First, confirm there is actually a file list on the clipboard before
+    // spawning a process.  FileNameW being present is sufficient signal.
     const buf = clipboard.readBuffer(CF_FILE_LIST)
     if (!buf || buf.length < 4) return null
 
     if (process.platform === 'win32') {
       try {
-        // Retrieve the full list of files from the system clipboard using PowerShell
-        // to bypass Electron's built-in single file limit.
-        const stdout = execSync(
-          'powershell.exe -NoProfile -NonInteractive -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::GetFileDropList()"',
-          { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 2000 }
+        const psPath = getSystemPowerShellPath()
+        // Await the result so we actually get all paths — the previous
+        // implementation fired execFile with a callback that returned from
+        // the closure, not from readFileList(), so the result was dropped.
+        const { stdout } = await execFileAsync(
+          psPath,
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::GetFileDropList()'
+          ],
+          { encoding: 'utf8', timeout: 2000 }
         )
-        const paths = stdout
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter((line) => line.length > 0 && existsSync(line))
-        if (paths.length > 0) return paths
+        if (stdout) {
+          const paths = filterValidPaths(stdout.split(/\r?\n/).map((l) => l.trim()))
+          if (paths.length > 0) return paths
+        }
       } catch (err) {
         console.error('[formats] Failed to read file drop list via PowerShell:', err)
       }
     }
 
-    // Fallback: parse the FileNameW buffer directly (only gets the first file on Windows)
+    // Non-Windows or PowerShell fallback: parse the FileNameW buffer directly.
+    // On Windows this will typically only return the first file, but it is
+    // better than nothing when PowerShell is unavailable.
     const wide = buf.toString('utf16le')
-    const parts = wide.split('\u0000').map((s) => s.trim()).filter(Boolean)
+    const parts = filterValidPaths(wide.split('\u0000').map((s) => s.trim()))
     return parts.length ? parts : null
   } catch {
     return null
@@ -168,11 +213,15 @@ export function isClipboardExcluded(): boolean {
 }
 
 /**
- * Snapshot the current clipboard into a single ItemData, or null if it's empty.
+ * Async snapshot of the current clipboard into a single ItemData, or null.
+ *
  * Order matters: a file copy should win over its text fallback, an image wins
  * over nothing, otherwise we keep text (preferring HTML if it carries rich text).
+ *
+ * This is async because reading the full multi-file list from a Windows
+ * Explorer copy requires a PowerShell round-trip (GetFileDropList).
  */
-export function readClipboard(): ItemData | null {
+export async function readClipboard(): Promise<ItemData | null> {
   if (isClipboardExcluded()) {
     return null
   }
@@ -180,7 +229,7 @@ export function readClipboard(): ItemData | null {
   const formats = clipboard.availableFormats()
 
   // Files first — a file copy also places text on the clipboard, which we ignore.
-  const files = readFileList()
+  const files = await readFileListAsync()
   if (files && files.length) return { kind: 'files', paths: files }
 
   // Text vs Image priority heuristic based on available formats.
@@ -269,21 +318,24 @@ export function readClipboard(): ItemData | null {
  * second to be silently ignored as "no change".
  */
 export function clipboardSignature(): string {
+  const seq = getClipboardSequenceNumber()
+  const seqPrefix = seq > 0 ? `seq:${seq}:` : ''
+
   if (isClipboardExcluded()) {
-    return 'excluded'
+    return `${seqPrefix}excluded`
   }
 
   // If files are on the clipboard, their paths are the most stable fingerprint.
   // Use fast, non-blocking read to avoid spawning a child process during polling.
   const files = readFileListFast()
   if (files && files.length) {
-    return `files:${files.join('\n')}`
+    return `${seqPrefix}files:${files.join('\n')}`
   }
 
   // Text — the content itself is the fingerprint.
   const text = clipboard.readText().trim()
   if (text) {
-    return `text:${text}`
+    return `${seqPrefix}text:${text}`
   }
 
   // Images: sample raw pixel bytes through FNV-1a for a fast, stable fingerprint.
@@ -301,10 +353,10 @@ export function clipboardSignature(): string {
       hash = Math.imul(hash, 0x01000193) >>> 0 // FNV prime, keep as uint32
     }
 
-    return `image:${size.width}x${size.height}:${hash.toString(36)}`
+    return `${seqPrefix}image:${size.width}x${size.height}:${hash.toString(36)}`
   }
 
-  return 'empty'
+  return `${seqPrefix}empty`
 }
 
 /** True if the text payload looks like a single URL. */

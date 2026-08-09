@@ -2,7 +2,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
-import { Onboarding } from './Onboarding'
 
 // Stylesheet order matters: tokens first, then globals, then components.
 import './styles/tokens.css'
@@ -14,10 +13,28 @@ import './styles/settings.css'
 const container = document.getElementById('root')
 if (!container) throw new Error('#root element not found')
 
-const isOnboarding = window.location.href.includes('onboarding')
+// Expose Device Pixel Ratio (DPR) to CSS for display-aware rendering.
+// This allows effects like blur() to scale inversely with physical pixel density,
+// saving massive amounts of GPU fill-rate on 4K/Hi-DPI displays.
+const dpr = window.devicePixelRatio || 1
+document.documentElement.style.setProperty('--dpr', dpr.toString())
 
-createRoot(container).render(
-  <StrictMode>
-    {isOnboarding ? <Onboarding /> : <App />}
-  </StrictMode>
-)
+const root = createRoot(container)
+
+if (window.location.hash === '#onboarding' || window.location.hash === '#/onboarding' || window.location.hash.includes('onboarding')) {
+  // The tutorial is only opened once. Keep its component (and its video UI)
+  // out of the always-running panel renderer.
+  void import('./Onboarding').then(({ Onboarding }) => {
+    root.render(
+      <StrictMode>
+        <Onboarding />
+      </StrictMode>
+    )
+  })
+} else {
+  root.render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  )
+}

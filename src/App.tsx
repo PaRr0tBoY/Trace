@@ -33,8 +33,38 @@ export default function App() {
     const offToast = edge.onToast((t) => pushToast(t))
     const offToggle = edge.onToggle((forceOpen) => {
       const next = forceOpen !== undefined ? forceOpen : !useStore.getState().open
-      useStore.getState().setOpen(next)
-      edge.setInteractive(next)
+      if (!next) {
+        const state = useStore.getState()
+        // If the indicator style flyout is open, let its exit spring play first
+        // before collapsing the main panel — same sequencing as useEdgeHover's
+        // closePanel(). Without this, both animate simultaneously and it looks broken.
+        if (state.styleFlyoutOpen) {
+          state.setStyleFlyoutOpen(false)
+          window.setTimeout(() => {
+            const s = useStore.getState()
+            if (s.previewItemId) {
+              s.setPreviewItemId(null)
+              edge.setInteractive(false)
+              window.setTimeout(() => { useStore.getState().setOpen(false) }, 240)
+            } else {
+              s.setOpen(false)
+              edge.setInteractive(false)
+            }
+          }, 300)
+        } else if (state.previewItemId) {
+          state.setPreviewItemId(null)
+          edge.setInteractive(false)
+          window.setTimeout(() => {
+            useStore.getState().setOpen(false)
+          }, 240)
+        } else {
+          state.setOpen(false)
+          edge.setInteractive(false)
+        }
+      } else {
+        useStore.getState().setOpen(next)
+        edge.setInteractive(next)
+      }
     })
     const offOpenSettings = edge.onOpenSettings(() => {
       useStore.getState().setOpen(true)
@@ -57,7 +87,9 @@ export default function App() {
   // Apply theme whenever settings change.
   useEffect(() => {
     applyReduceMotion(settings.reduceMotion)
-  }, [settings.reduceMotion])
+    const scale = settings.fontSizeScale ?? 1.0
+    document.documentElement.style.setProperty('--font-scale', String(scale))
+  }, [settings.reduceMotion, settings.fontSizeScale])
 
   return <Panel />
 }

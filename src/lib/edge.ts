@@ -13,9 +13,14 @@ declare global {
   }
 }
 
-/** Typed handle onto the bridge; throws early if preload didn't run. */
-export const edge: EdgeApi =
-  (window as unknown as { edge?: EdgeApi }).edge ??
-  (() => {
-    throw new Error('window.edge is missing — preload bridge did not load')
-  })()
+export const edge: EdgeApi = new Proxy({} as EdgeApi, {
+  get(_target, prop) {
+    const g = globalThis as any
+    if (g.window && g.window.edge) {
+      const targetApi = g.window.edge
+      const val = targetApi[prop]
+      return typeof val === 'function' ? val.bind(targetApi) : val
+    }
+    return () => {}
+  }
+})

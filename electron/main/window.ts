@@ -22,24 +22,46 @@
  *
  * NOTE: this module must NOT import from state.ts to avoid circular dependencies.
  */
-import { BrowserWindow, screen, shell } from 'electron'
+import { BrowserWindow, screen, shell, powerMonitor, app } from 'electron'
 import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 import { APP_CONFIG } from './config'
 import { runtime } from './config'
 import { PATHS } from '../store/paths'
+import { TRANSLATIONS, en } from '../../src/i18n/translations'
+import { computeStickBounds } from './geometry'
+import { loadSettings, saveSettings } from '../store/settings'
+import { isFullscreenAppActive, registerFullscreenActiveListener } from './fullscreen'
 
 export const PANEL_WIDTH = 384
 /** Visual width of the blade when collapsed (only used by the renderer). */
 export const COLLAPSED_WIDTH = 0
 
 let mainWindow: BrowserWindow | null = null
+// Kept only by the unused legacy helper at the bottom of this module. The
+// detector window is deliberately no longer created at runtime.
 let detectorWindow: BrowserWindow | null = null
 let interactive = false
+export let previewActive = false
 
 export let currentHotZoneWidth = 3
+export let currentStickDisplayId: number | undefined
+
+/**
+ * Fix 3: Consecutive-stale-reads counter for getStickGeometry self-heal.
+ * Tracks how many consecutive repositionWindow() calls have found the saved
+ * stickDisplayId absent from the display list. The preference is only wiped
+ * from disk after this reaches STALE_THRESHOLD (2), preventing transient TV
+ * mirror ID renegotiations from destroying the user's saved monitor choice.
+ */
+let staleIdConsecutiveCount = 0
 
 export function setHotZoneWidth(width: number): void {
   currentHotZoneWidth = width
+}
+
+export function setStickDisplayId(id: number | undefined): void {
+  currentStickDisplayId = id
 }
 
 export function getMainWindow(): BrowserWindow | null {
@@ -77,25 +99,62 @@ export function setInteractive(value: boolean): void {
   }
 }
 
+export function setPreviewMode(active: boolean): void {
+  if (previewActive === active) return
+  previewActive = active
+  repositionWindow()
+}
+
 /**
- * Poll the OS cursor position every ~16ms and send `window:cursor-edge` to
- * the renderer. This is the reliable alternative to `forward:true` on Windows
- * transparent windows, where pointermove forwarding often silently stops
- * working.
+ * Adaptive cursor poll — two-speed design to minimise battery drain.
+ *
+ * Problem: a fixed 16ms setInterval fires 60× per second, permanently
+ * preventing Intel Core Ultra CPUs from entering deep C-states (C6/C7/C8)
+ * that save 2–3W each. During idle browsing (panel closed, cursor far from
+ * edge) there is zero useful work being done at 60Hz.
+ *
+ * Solution: run at SLOW speed (150ms on battery, 80ms on AC) when the panel
+ * is closed and the cursor is not within PROXIMITY_PX of the edge. Switch to
+ * FAST speed (16ms) the moment the cursor approaches within PROXIMITY_PX.
+ * Switch back to SLOW after SLOW_COOLDOWN_MS of no edge-proximity.
+ *
+ * This reduces timer wake-ups by 5–10× during idle browsing while keeping
+ * panel open/close responsiveness completely unchanged (human reaction time
+ * is ~150ms, so a SLOW tick of 150ms is imperceptible).
  */
+
+/** Proximity threshold for entering fast-poll mode (px from the edge). */
+const FAST_POLL_PROXIMITY_PX = 250
+/** Full-speed poll when edge is near. */
+const POLL_FAST_MS = 16
+/** Battery-power slow poll (panel closed, cursor far). */
+const POLL_SLOW_BATTERY_MS = 60
+/** AC-power slow poll (panel closed, cursor far). */
+const POLL_SLOW_AC_MS = 35
+/** After leaving proximity, stay in fast mode for this long before throttling. */
+const SLOW_COOLDOWN_MS = 800
+
 let cursorPollTimer: ReturnType<typeof setInterval> | null = null
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 let lastEdgeState = false
 let heartbeatPaused = false
 
+/** Whether the poll is currently running in fast (16ms) mode. */
+let _pollFast = false
+/** Timestamp of when the cursor last left the proximity zone. */
+let _lastProximityExitMs = 0
+/** Last sent cursor position — used to suppress duplicate IPC messages. */
+let _lastSentX = -9999
+let _lastSentY = -9999
+
 /**
  * Temporarily suspend the always-on-top heartbeat.
  *
- * The heartbeat calls setAlwaysOnTop() every 500 ms, which reasserts z-order
+ * The heartbeat calls setAlwaysOnTop() every 2 000 ms, which reasserts z-order
  * via SetWindowPos(HWND_TOPMOST) on Windows.  During a native drag the OS
  * renders the drag-ghost image using the DWM compositor at a layer that sits
  * BELOW HWND_TOPMOST windows.  Every heartbeat tick therefore pushes our
- * window in front of the ghost, making it disappear ~0.5 s into any drag.
+ * window in front of the ghost, making it disappear during any drag.
  *
  * Pausing the heartbeat for the duration of the drag keeps the window at its
  * current z-position and lets the DWM ghost stay visible for the full drag.
@@ -106,56 +165,135 @@ export function setHeartbeatPaused(paused: boolean): void {
   heartbeatPaused = paused
   if (!paused) {
     // Re-assert z-order immediately when drag ends so the window snaps back
-    // to the correct level without waiting up to 500 ms for the next tick.
+    // to the correct level without waiting for the next heartbeat tick.
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
       mainWindow.setAlwaysOnTop(true, 'screen-saver')
     }
-    if (detectorWindow && !detectorWindow.isDestroyed() && detectorWindow.isVisible()) {
-      detectorWindow.setAlwaysOnTop(true, 'screen-saver')
+  }
+}
+
+/** Restart the poll timer at the given interval. Clears any existing timer. */
+function _restartPollTimer(intervalMs: number): void {
+  if (cursorPollTimer !== null) {
+    clearInterval(cursorPollTimer)
+  }
+  cursorPollTimer = setInterval(_pollTick, intervalMs)
+}
+
+/** Single cursor poll tick — shared by both fast and slow modes. */
+function _pollTick(): void {
+  if (runtime.quitting || !mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return
+
+  const settings = loadSettings()
+  if (settings.suppressInFullscreen && isFullscreenAppActive()) return
+
+  const pt = screen.getCursorScreenPoint()
+
+  // Find the stick display (or fallback to primary)
+  const allDisplays = screen.getAllDisplays()
+  let stickDisplay = allDisplays.find(d => d.id === currentStickDisplayId)
+  if (!stickDisplay) {
+    stickDisplay = screen.getPrimaryDisplay()
+  }
+
+  const wa = stickDisplay.workArea
+
+  // Translate screen coords → stick display client coords.
+  const clientX = pt.x - wa.x
+  const clientY = pt.y - wa.y
+
+  // Guard against garbage values that Windows occasionally sends.
+  if (clientX < -5000 || clientX > 15000 || clientY < -5000 || clientY > 15000) return
+
+  // ── Adaptive speed: switch to fast poll when cursor approaches the edge ──
+  const distFromEdge = settings.stickPosition === 'right'
+    ? wa.width - clientX   // distance from right edge
+    : clientX              // distance from left edge
+  const nearProximity = distFromEdge <= FAST_POLL_PROXIMITY_PX
+
+  if (nearProximity || interactive) {
+    _lastProximityExitMs = 0  // reset cooldown
+    if (!_pollFast) {
+      _pollFast = true
+      _restartPollTimer(POLL_FAST_MS)
+    }
+  } else {
+    // Cursor is far from edge and panel is closed.
+    if (_pollFast) {
+      if (_lastProximityExitMs === 0) {
+        _lastProximityExitMs = Date.now()
+      }
+      // Wait for the cooldown before throttling back.
+      if (Date.now() - _lastProximityExitMs >= SLOW_COOLDOWN_MS) {
+        _pollFast = false
+        _lastProximityExitMs = 0
+        const slowMs = powerMonitor.isOnBatteryPower() ? POLL_SLOW_BATTERY_MS : POLL_SLOW_AC_MS
+        _restartPollTimer(slowMs)
+        return
+      }
+    }
+  }
+
+  let inEdge = false
+  switch (settings.stickPosition) {
+    case 'left':
+      inEdge = clientX >= -30 && clientX <= currentHotZoneWidth
+      break
+    case 'right': {
+      const d = wa.width - clientX
+      inEdge = d >= -30 && d <= currentHotZoneWidth
+      break
+    }
+  }
+
+  const newState = inEdge
+
+  // ── Fix 5: IPC gating — suppress redundant messages ──────────────────────
+  // Previously every poll tick within 450px of the edge sent a full IPC message
+  // to the renderer, even when the cursor hadn't moved. This flooded the IPC
+  // channel at 60Hz during all active browsing.
+  //
+  // Now we only send when:
+  //   a) Edge crossing state changes (inEdge flip) — always send immediately.
+  //   b) Panel is open (interactive) — send on every fast tick so the renderer
+  //      can track cursor position for the close-panel logic.
+  //   c) Cursor moved >= IPC_MIN_DELTA_PX since last send — avoids spamming
+  //      the renderer when the cursor is stationary near the edge.
+  const IPC_MIN_DELTA_PX = 3
+  const nearEdge = settings.stickPosition === 'right'
+    ? (wa.width - clientX) <= 450
+    : clientX <= 450
+
+  const positionChangedEnough =
+    Math.abs(clientX - _lastSentX) >= IPC_MIN_DELTA_PX ||
+    Math.abs(clientY - _lastSentY) >= IPC_MIN_DELTA_PX
+
+  const shouldSend = newState !== lastEdgeState || interactive || (nearEdge && positionChangedEnough)
+
+  if (shouldSend) {
+    lastEdgeState = newState
+    _lastSentX = clientX
+    _lastSentY = clientY
+    if (!mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send('window:cursor-edge', {
+        x: clientX,
+        y: clientY,
+        inEdge,
+        inZone: true,
+        stickPosition: settings.stickPosition,
+        displayWidth: wa.width,
+        displayHeight: wa.height
+      })
     }
   }
 }
 
 export function startCursorPoll(): void {
   if (cursorPollTimer !== null) return
-  cursorPollTimer = setInterval(() => {
-    if (runtime.quitting || !mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return
-
-    const pt = screen.getCursorScreenPoint()
-    const display = screen.getDisplayNearestPoint(pt)
-    const wa = display.workArea
-
-    // Translate screen coords → window-client coords.
-    // getCursorScreenPoint() returns physical pixels on Windows; workArea is
-    // already in physical pixels when scaleFactor > 1 in Electron's screen API.
-    const clientX = pt.x - wa.x
-    const clientY = pt.y - wa.y
-
-    // Guard against garbage values that Windows occasionally sends.
-    if (clientX < -1000 || clientX > 10000 || clientY < -1000 || clientY > 10000) return
-
-    const inEdge = clientX <= currentHotZoneWidth
-    const newState = inEdge
-
-    // Keep streaming the cursor position to the renderer while it is near the
-    // edge (so opening works) OR while the panel is open (so closing works in
-    // EVERY direction). Previously we only streamed while clientX <= 60, which
-    // froze the renderer's last-known position the moment the cursor moved to
-    // the right past 60px — so it never learned the cursor had left and the
-    // blade refused to retract horizontally. When the panel is closed and the
-    // cursor is away from the edge we stop streaming to avoid needless IPC.
-    if (clientX <= 450 || interactive || newState !== lastEdgeState) {
-      lastEdgeState = newState
-      if (!mainWindow.webContents.isDestroyed()) {
-        mainWindow.webContents.send('window:cursor-edge', {
-          x: clientX,
-          y: clientY,
-          inEdge,
-          inZone: true
-        })
-      }
-    }
-  }, 16)
+  // Start in slow mode; will accelerate when cursor approaches the edge.
+  const slowMs = powerMonitor.isOnBatteryPower() ? POLL_SLOW_BATTERY_MS : POLL_SLOW_AC_MS
+  _pollFast = false
+  cursorPollTimer = setInterval(_pollTick, slowMs)
 }
 
 export function stopCursorPoll(): void {
@@ -165,20 +303,116 @@ export function stopCursorPoll(): void {
   }
 }
 
-/** Compute geometry anchored to the left edge of the primary display. */
-function edgeGeometry(): { x: number; y: number; width: number; height: number } {
-  const display = screen.getPrimaryDisplay()
-  const workArea = display.workArea
-  return {
-    x: workArea.x,
-    y: workArea.y,
-    width: PANEL_WIDTH,
-    height: workArea.height
+function getStickGeometry(): { x: number; y: number; width: number; height: number } {
+  let settings = loadSettings()
+  const primaryDisplay = screen.getPrimaryDisplay()
+  const allDisplays = screen.getAllDisplays().map(d => ({
+    id: d.id,
+    workArea: { ...d.workArea },
+    scaleFactor: d.scaleFactor,
+    isPrimary: d.id === primaryDisplay.id
+  }))
+
+  const currentWindowWidth = previewActive ? 820 : PANEL_WIDTH
+
+  const result = computeStickBounds({
+    position: settings.stickPosition,
+    displays: allDisplays,
+    displayId: settings.stickDisplayId,
+    savedWorkArea: settings.stickDisplayWorkArea,
+    savedScaleFactor: settings.stickDisplayScaleFactor,
+    windowWidth: currentWindowWidth,
+    windowHeight: primaryDisplay.workArea.height, // initial hint; result uses resolvedDisplay.workArea.height
+    currentBounds: getMainWindow()?.getBounds()
+  })
+
+  const resolved = result.resolvedDisplay
+
+  // ── Self-heal: persist fresh geometry whenever the resolved display differs ──
+  // This covers two scenarios:
+  //   A) Cross-reboot: OS re-assigned a new numeric ID to the same physical monitor.
+  //      We matched via Tier-2 fuzzy bounds — now save the new ID so future same-
+  //      session lookups hit Tier-1 instantly.
+  //   B) Display disconnected: Tier-4 fell back to primary — clear stale persisted
+  //      display so the app stays fully usable and the UI shows primary as active.
+  const idChanged = settings.stickDisplayId !== undefined && settings.stickDisplayId !== resolved.id
+  const idWasStale = settings.stickDisplayId !== undefined && !allDisplays.some(d => d.id === settings.stickDisplayId)
+
+  if (idWasStale) {
+    // Fix 3: Consecutive-stale-reads guard.
+    //
+    // When a TV mirror is active, Windows briefly removes and re-adds display IDs
+    // during EDID renegotiation. This makes idWasStale=true for a single call even
+    // though the user's chosen monitor is still physically connected.
+    //
+    // Before this fix: the very first stale read immediately wrote stickDisplayId=undefined
+    // to disk, permanently wiping the user's monitor choice.
+    //
+    // After this fix: we require the ID to be absent in 2 CONSECUTIVE calls before
+    // treating it as genuinely gone. With the 600ms debounce on display events, two
+    // consecutive stale reads means the display has been absent for >600ms — a real
+    // disconnection, not a transient OS reconfiguration.
+    staleIdConsecutiveCount++
+    const STALE_THRESHOLD = 2
+    if (staleIdConsecutiveCount < STALE_THRESHOLD) {
+      console.log(`[Main] Display ${settings.stickDisplayId} temporarily absent (count=${staleIdConsecutiveCount}/${STALE_THRESHOLD}) — holding preference, will re-evaluate.`)
+      // Don't wipe settings yet — just reposition using what was resolved (likely Tier-2 or Tier-4)
+    } else {
+      staleIdConsecutiveCount = 0
+      // The old ID no longer exists in this session (disconnected or reboot rename).
+      // Check whether we recovered via Tier-2 or fell all the way to primary.
+      const recoveredViaBounds = settings.stickDisplayWorkArea !== undefined && resolved.id !== primaryDisplay.id
+      if (recoveredViaBounds) {
+        console.log(`[Main] Display ${settings.stickDisplayId} re-matched via geometry to display ${resolved.id} — updating persisted ID.`)
+      } else {
+        console.log(`[Main] Display ${settings.stickDisplayId} disconnected or unrecognised after ${STALE_THRESHOLD} checks. Falling back to display ${resolved.id}.`)
+      }
+      settings = saveSettings({
+        stickDisplayId: recoveredViaBounds ? resolved.id : undefined,
+        stickDisplayWorkArea: recoveredViaBounds ? resolved.workArea : undefined,
+        stickDisplayScaleFactor: recoveredViaBounds ? resolved.scaleFactor : undefined
+      })
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+        mainWindow.webContents.send('state:settings', settings)
+      }
+      if (!recoveredViaBounds) {
+        // Genuinely fell back — briefly show panel on new location.
+        popUpAndRetract(1500)
+      }
+    }
+  } else {
+    // Reset counter: the saved ID was found this call — monitor is present.
+    staleIdConsecutiveCount = 0
+
+    if (idChanged) {
+      // Shouldn't happen if Tier-1 matched, but guard it anyway.
+      settings = saveSettings({
+        stickDisplayId: resolved.id,
+        stickDisplayWorkArea: resolved.workArea,
+        stickDisplayScaleFactor: resolved.scaleFactor
+      })
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+        mainWindow.webContents.send('state:settings', settings)
+      }
+    } else if (settings.stickDisplayId !== undefined && (
+      settings.stickDisplayWorkArea === undefined ||
+      settings.stickDisplayScaleFactor === undefined
+    )) {
+      // Upgrade: user had a stickDisplayId saved before this feature was added;
+      // backfill geometry silently so the next reboot can fuzzy-match.
+      saveSettings({
+        stickDisplayWorkArea: resolved.workArea,
+        stickDisplayScaleFactor: resolved.scaleFactor
+      })
+    }
   }
+
+  currentStickDisplayId = resolved.id
+  return { x: result.x, y: result.y, width: result.width, height: result.height }
 }
 
 export function createWindow(): BrowserWindow {
-  const { x, y, width, height } = edgeGeometry()
+  const { x, y, height } = getStickGeometry()
 
   mainWindow = new BrowserWindow({
     icon: PATHS.icon(),
@@ -213,14 +447,52 @@ export function createWindow(): BrowserWindow {
   // Start click-through with no forwarding — edge detection is done via cursor poll.
   mainWindow.setIgnoreMouseEvents(true, { forward: false })
 
-  // Keep the panel glued to the primary display if the work area changes.
-  screen.on('display-metrics-changed', () => {
-    if (!mainWindow?.isVisible()) return
-    const g = edgeGeometry()
-    mainWindow.setBounds({ ...g })
-    if (detectorWindow && !detectorWindow.isDestroyed()) {
-      detectorWindow.setBounds({ x: g.x, y: g.y, width: 1, height: g.height })
+  registerFullscreenActiveListener(() => {
+    const settings = loadSettings()
+    if (settings.suppressInFullscreen && (settings.hoverActivation ?? true)) {
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+        mainWindow.webContents.send('window:toggle', false)
+      }
+      setInteractive(false)
     }
+  })
+
+  const handleDisplayChange = (triggerPopUp = false) => {
+    console.log('[Main] Display metrics/topology changed — validating bounds and repositioning window')
+    repositionWindow()
+    if (triggerPopUp) {
+      popUpAndRetract(1500)
+    }
+  }
+
+  // Fix 2: Debounce display-metrics-changed.
+  //
+  // When a TV is in mirror mode, Windows can fire this event 5–20 times in rapid
+  // succession each time the TV turns on/off, wakes, or renegotiates EDID.
+  // Without debouncing, each of those 20 calls hits repositionWindow() while the
+  // display list is in a transitional state, potentially resolving to the wrong
+  // display at intermediate frames.
+  //
+  // 600ms is enough for Windows DWM to finish all its display-topology bookkeeping
+  // after a single physical event, while being fast enough to feel instantaneous.
+  let displayChangeDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  const handleDisplayChangeDebounced = (triggerPopUp = false) => {
+    if (displayChangeDebounceTimer !== null) {
+      clearTimeout(displayChangeDebounceTimer)
+    }
+    displayChangeDebounceTimer = setTimeout(() => {
+      displayChangeDebounceTimer = null
+      handleDisplayChange(triggerPopUp)
+    }, 600)
+  }
+
+  // Keep the panel glued to the primary display if the work area changes.
+  screen.on('display-metrics-changed', () => handleDisplayChangeDebounced(false))
+  screen.on('display-added', () => {
+    handleDisplayChangeDebounced(true)
+  })
+  screen.on('display-removed', () => {
+    handleDisplayChangeDebounced(true)
   })
 
   // Respect OS-level always-on-top reordering.
@@ -258,22 +530,22 @@ export function createWindow(): BrowserWindow {
     }
   })
 
-  // Create the detector window for OS drag-in awareness.
-  createDetectorWindow(x, y, width, height)
-
   // Periodic heartbeat: Windows fullscreen apps (Chrome YouTube, games) push
-  // floating windows behind them. Re-asserting 'screen-saver' level every 500ms
-  // ensures the panel instantly re-appears when the user exits fullscreen.
+  // floating windows behind them. Re-asserting 'screen-saver' level periodically
+  // ensures the panel re-appears when the user exits fullscreen.
+  //
+  // Power fix: interval increased from 500ms to 2000ms.
+  // The old 500ms interval called SetWindowPos(HWND_TOPMOST) 120 times/min,
+  // even when nothing was happening. 2000ms reduces this to 30 times/min with
+  // no perceptible difference — the panel reappears within 2s of a fullscreen
+  // app losing focus, which is already faster than the user notices.
   if (heartbeatTimer !== null) clearInterval(heartbeatTimer)
   heartbeatTimer = setInterval(() => {
     if (runtime.quitting || heartbeatPaused || interactive) return
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
       mainWindow.setAlwaysOnTop(true, 'screen-saver')
     }
-    if (detectorWindow && !detectorWindow.isDestroyed() && detectorWindow.isVisible()) {
-      detectorWindow.setAlwaysOnTop(true, 'screen-saver')
-    }
-  }, 500)
+  }, 2000)
 
   return mainWindow
 }
@@ -283,6 +555,141 @@ export function stopHeartbeat(): void {
     clearInterval(heartbeatTimer)
     heartbeatTimer = null
   }
+}
+
+let onWindowRepositioned: (() => void) | null = null
+export function registerWindowRepositionListener(fn: () => void): void {
+  onWindowRepositioned = fn
+}
+
+export function getActiveDisplayId(allDisplays?: Electron.Display[]): number {
+  const displays = allDisplays ?? screen.getAllDisplays()
+  const settings = loadSettings()
+  const primary = screen.getPrimaryDisplay()
+
+  // Tier 1: exact session-local ID match.
+  if (settings.stickDisplayId !== undefined && displays.some(d => d.id === settings.stickDisplayId)) {
+    return settings.stickDisplayId
+  }
+
+  // Tier 2: fuzzy workArea match (cross-reboot).
+  if (settings.stickDisplayWorkArea !== undefined) {
+    const TOLERANCE = 8
+    const sa = settings.stickDisplayWorkArea
+    const candidates = displays.filter(d =>
+      Math.abs(d.workArea.x - sa.x) <= TOLERANCE &&
+      Math.abs(d.workArea.y - sa.y) <= TOLERANCE &&
+      Math.abs(d.workArea.width - sa.width) <= TOLERANCE &&
+      Math.abs(d.workArea.height - sa.height) <= TOLERANCE
+    )
+    if (candidates.length === 1) return candidates[0].id
+    if (candidates.length > 1 && settings.stickDisplayScaleFactor !== undefined) {
+      const byScale = candidates.find(d => d.scaleFactor === settings.stickDisplayScaleFactor)
+      if (byScale) return byScale.id
+      return candidates[0].id
+    }
+    if (candidates.length > 1) return candidates[0].id
+  }
+
+  // Tier 3: in-memory ID set this session by getStickGeometry.
+  if (currentStickDisplayId !== undefined && displays.some(d => d.id === currentStickDisplayId)) {
+    return currentStickDisplayId
+  }
+
+  // Tier 4: primary fallback.
+  return primary.id
+}
+
+export function getDisplayListOptions(): Array<{
+  id: number
+  bounds: { x: number; y: number; width: number; height: number }
+  workArea: { x: number; y: number; width: number; height: number }
+  scaleFactor: number
+  isPrimary: boolean
+  isCurrent: boolean
+  label: string
+  name: string
+  resolution: string
+}> {
+  const all = screen.getAllDisplays()
+  const primary = screen.getPrimaryDisplay()
+  const activeId = getActiveDisplayId(all)
+
+  const settings = loadSettings()
+  let langCode = settings.language || 'system'
+  if (langCode === 'system') {
+    const sysLangs = app.getPreferredSystemLanguages()
+    const first = (sysLangs[0] || '').toLowerCase()
+    if (first.startsWith('zh-tw') || first.startsWith('zh-hk')) langCode = 'zh-TW'
+    else if (first.startsWith('zh')) langCode = 'zh-CN'
+    else if (first.startsWith('es')) langCode = 'es'
+    else if (first.startsWith('fr')) langCode = 'fr'
+    else if (first.startsWith('de')) langCode = 'de'
+    else if (first.startsWith('hi')) langCode = 'hi'
+    else if (first.startsWith('ja')) langCode = 'ja'
+    else if (first.startsWith('ru')) langCode = 'ru'
+    else langCode = 'en'
+  }
+  const dict = TRANSLATIONS[langCode]
+  const primaryText = dict?.position?.primaryDisplay || en.position.primaryDisplay
+
+  return all.map((d, index) => {
+    const isPrimary = d.id === primary.id
+    const rawName = (d as any).label || (d as any).name || ''
+    const fallbackName = isPrimary ? primaryText : `Display ${index + 1}`
+    const baseName = rawName.trim() ? rawName.trim() : fallbackName
+    const name = isPrimary
+      ? (baseName.toLowerCase().includes('primary') || baseName === primaryText ? baseName : `${baseName} (${primaryText})`)
+      : baseName
+    const scale = d.scaleFactor || 1
+    const physW = Math.round(d.bounds.width * scale)
+    const physH = Math.round(d.bounds.height * scale)
+    const resolution = `${physW}×${physH}`
+    return {
+      id: d.id,
+      bounds: { x: d.bounds.x, y: d.bounds.y, width: d.bounds.width, height: d.bounds.height },
+      workArea: { x: d.workArea.x, y: d.workArea.y, width: d.workArea.width, height: d.workArea.height },
+      scaleFactor: scale,
+      isPrimary,
+      isCurrent: d.id === activeId,
+      label: `${name} ${resolution}`,
+      name,
+      resolution
+    }
+  })
+}
+
+let popUpTimer: ReturnType<typeof setTimeout> | null = null
+export function popUpAndRetract(durationMs = 1500): void {
+  if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.webContents || mainWindow.webContents.isDestroyed()) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.showInactive()
+  mainWindow.setAlwaysOnTop(true, 'screen-saver')
+
+  const wasAlreadyOpen = interactive
+  console.log(`[Main] Popping up panel briefly to confirm new screen/edge location (wasAlreadyOpen=${wasAlreadyOpen})`)
+  mainWindow.webContents.send('window:toggle', true)
+
+  if (popUpTimer !== null) clearTimeout(popUpTimer)
+  if (!wasAlreadyOpen) {
+    popUpTimer = setTimeout(() => {
+      popUpTimer = null
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+        console.log('[Main] Retracting panel after brief confirmation pop-up')
+        mainWindow.webContents.send('window:toggle', false)
+      }
+    }, durationMs)
+  }
+}
+
+export function repositionWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.showInactive()
+  mainWindow.setAlwaysOnTop(true, 'screen-saver')
+  const g = getStickGeometry()
+  mainWindow.setBounds({ ...g })
+  onWindowRepositioned?.()
 }
 
 /** Toggle the panel between shown (always on top) and fully hidden. */
@@ -305,42 +712,25 @@ export function setVisible(visible: boolean): void {
  * drag-event absorber; its inline script still forwards file drags to the main
  * window via `window.edge.setInteractive(true)` should it ever receive one.
  */
-function createDetectorWindow(x: number, y: number, _w: number, h: number): void {
-  // Minimal HTML: the detector uses the preload bridge (window.edge) to send IPC.
-  // It listens for dragenter/dragover/drop on the document and sends a signal
-  // when Files are detected.
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-  *{margin:0;padding:0}
-  html,body{width:100%;height:100%;background:transparent;pointer-events:none;overflow:hidden}
-</style></head><body>
-<script>
-  document.addEventListener('dragenter', function(e) {
-    if (e.dataTransfer && e.dataTransfer.types.indexOf && e.dataTransfer.types.indexOf('Files') >= 0) {
-      e.preventDefault();
-      if (window.edge) window.edge.setInteractive(true);
-    }
-  });
-  document.addEventListener('dragover', function(e) {
-    if (e.dataTransfer && e.dataTransfer.types.indexOf && e.dataTransfer.types.indexOf('Files') >= 0) {
-      e.preventDefault();
-    }
-  });
-  document.addEventListener('drop', function(e) {
-    e.preventDefault();
-  });
-</script>
-</body></html>`
-
-  // Center vertically, 30% height so we don't block the Start menu / taskbar clicks
+function getDetectorBounds(g: { x: number; y: number; width: number; height: number }, stickPosition: string): { x: number; y: number; width: number; height: number } {
+  if (stickPosition === 'top') {
+    const detWidth = Math.floor(g.width * 0.3)
+    return { x: g.x + Math.floor((g.width - detWidth) / 2), y: g.y, width: detWidth, height: 1 }
+  }
+  const h = g.height
   const detHeight = Math.floor(h * 0.3)
-  const detY = y + Math.floor((h - detHeight) / 2)
+  const detY = g.y + Math.floor((h - detHeight) / 2)
+  return { x: g.x, y: detY, width: 1, height: detHeight }
+}
+
+export function createDetectorWindow(x: number, y: number, _w: number, h: number): void {
+  const detBounds = getDetectorBounds({ x, y, width: _w, height: h }, loadSettings().stickPosition)
 
   detectorWindow = new BrowserWindow({
-    x,
-    y: detY,
-    width: 1,
-    height: detHeight,
+    x: detBounds.x,
+    y: detBounds.y,
+    width: detBounds.width,
+    height: detBounds.height,
     show: false,
     frame: false,
     fullscreenable: false,
@@ -379,7 +769,11 @@ function createDetectorWindow(x: number, y: number, _w: number, h: number): void
   // Layer behind the main panel (lower always-on-top level).
   detectorWindow.setAlwaysOnTop(true, 'normal')
 
-  detectorWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+  const devDetectorFile = join(__dirname, '../../resources/detector.html')
+  const detectorFile = existsSync(devDetectorFile) ? devDetectorFile : join(process.resourcesPath, 'detector.html')
+  if (existsSync(detectorFile)) {
+    detectorWindow.loadFile(detectorFile)
+  }
 
   detectorWindow.once('ready-to-show', () => {
     detectorWindow?.showInactive()
@@ -389,5 +783,9 @@ function createDetectorWindow(x: number, y: number, _w: number, h: number): void
     if (!runtime.quitting) {
       e.preventDefault()
     }
+  })
+
+  detectorWindow.on('closed', () => {
+    detectorWindow = null
   })
 }

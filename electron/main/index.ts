@@ -15,11 +15,20 @@ import { createWindow, getMainWindow, setInteractive, setVisible, startCursorPol
 import { createTray, registerIncognitoApplier } from './tray'
 import { registerIpc, registerSendListeners } from './ipc'
 import { prewarmDragIcons } from './drag'
-import { initState, getWatcher, loadSettings, pushState, stopStateTimers } from './state'
+import { initState, getWatcher, loadSettings, saveSettings, pushState, stopStateTimers } from './state'
 import { createOnboardingWindow } from './onboardingWindow'
-import { join } from 'node:path'
+import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
+import { extname, normalize } from 'node:path'
 import { existsSync, createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { resolveStoredImage } from './imageProtocol'
+
+// Trace renders a small, mostly static transparent panel. Chromium's GPU
+// process costs substantially more memory (~150–250 MB) than the iGPU compositing
+// savings are worth for such a simple UI. Software compositing keeps the process
+// count and RAM footprint minimal without meaningfully affecting visual quality.
+// Electron requires this call before the ready event.
+app.disableHardwareAcceleration()
 
 // Restrict the renderer to a single webContents and forbid remote module usage.
 app.enableSandbox()
@@ -33,6 +42,9 @@ if (!gotLock) {
     // If a second copy launches, just reveal the existing panel.
     setVisible(true)
     getMainWindow()?.focus()
+  })
+  app.on('browser-window-blur', () => {
+    triggerFullscreenCheck()
   })
 }
 
@@ -52,6 +64,7 @@ app.on('before-quit', () => {
   stopCursorPoll()
   stopHeartbeat()
   stopStateTimers()
+  stopFullscreenMonitor()
   getWatcher().stop()
   try {
     const { globalShortcut } = require('electron')
@@ -61,7 +74,7 @@ app.on('before-quit', () => {
 
 app.whenReady().then(() => {
   // Set App User Model ID so native notifications are branded as "Trace" on Windows
-  app.setAppUserModelId('com.trace.app')
+  app.setAppUserModelId('com.edgedrop.app')
 
   ensureDirs()
   cleanTemp()
@@ -70,11 +83,12 @@ app.whenReady().then(() => {
   const ses = session.defaultSession
   ses.setPermissionRequestHandler((_wc, _perm, cb) => cb(false))
 
-  // Register the image protocol: tracelocal://<imageId> -> images/<imageId>.png
+  // Register the image protocol: tracelocal://<imageId> -> the staged image file.
   registerImageProtocol()
 
   createWindow()
   startCursorPoll()
+  startFullscreenMonitor()
   createTray()
 
   // Register Alt+C global shortcut to toggle panel
@@ -97,13 +111,17 @@ app.whenReady().then(() => {
   prewarmDragIcons()
 
   // Reflect settings immediately.
-  const settings = loadSettings()
-  setHotZoneWidth(settings.hotZoneWidth || 3)
+  let settings = loadSettings()
   if (!settings.tutorialCompleted) {
+    // When onboarding is active (initial launch or reset tutorial), reset language to system default so onboarding always begins in System Default
+    if (settings.language !== 'system') {
+      settings = saveSettings({ language: 'system' })
+    }
     setTimeout(() => {
       createOnboardingWindow()
     }, 2000)
   }
+  setHotZoneWidth(settings.hotZoneWidth || 3)
   
   if (app.isPackaged) {
     try {
@@ -121,9 +139,8 @@ app.whenReady().then(() => {
   // (Tray menu is rebuilt on each open, so no extra wiring is needed here.)
 })
 
-app.on('window-all-closed', (e: Event) => {
-  // Never quit when the window closes (there is no window chrome anyway).
-  e.preventDefault()
+app.on('window-all-closed', () => {
+  // Never quit automatically when panel hides/closes; lifecycle is managed by tray.
 })
 
 app.on('activate', () => {
@@ -134,30 +151,55 @@ app.on('activate', () => {
 function registerImageProtocol(): void {
   protocol.handle(APP_CONFIG.imageProtocol, async (request) => {
     try {
-      const id = request.url.replace(`${APP_CONFIG.imageProtocol}://`, '').replace(/\/$/, '')
-      const file = join(PATHS.imagesDir(), `${sanitizeId(id)}.png`)
-      if (!existsSync(file)) {
+      // Support streaming full-resolution local image files: tracelocal://file/<encodedPath>
+      if (request.url.startsWith(`${APP_CONFIG.imageProtocol}://file/`)) {
+        const rawPath = request.url.slice(`${APP_CONFIG.imageProtocol}://file/`.length)
+        const filePath = normalize(decodeURIComponent(rawPath))
+        if (existsSync(filePath)) {
+          const ext = extname(filePath).toLowerCase()
+          let contentType = 'image/png'
+          if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg'
+          else if (ext === '.gif') contentType = 'image/gif'
+          else if (ext === '.webp') contentType = 'image/webp'
+          else if (ext === '.svg') contentType = 'image/svg+xml'
+          else if (ext === '.bmp') contentType = 'image/bmp'
+          else if (ext === '.avif') contentType = 'image/avif'
+
+          const stream = createReadStream(filePath)
+          const body = new Response(stream as unknown as ReadableStream<Uint8Array>).body
+          return new Response(body, {
+            status: 200,
+            headers: new Headers({
+              'Content-Type': contentType,
+              'Cache-Control': 'max-age=3600'
+            })
+          })
+        }
         return new Response('Not found', { status: 404 })
       }
-      const stream = createReadStream(file)
-      // node 'web stream' readable for the Response body.
+
+      const imageId = new URL(request.url).hostname
+      if (!/^[a-z0-9-]+$/i.test(imageId)) {
+        return new Response('Forbidden', { status: 403 })
+      }
+
+      const storedImage = resolveStoredImage(PATHS.imagesDir(), imageId)
+      if (!storedImage) {
+        return new Response('Not found', { status: 404 })
+      }
+
+      const stream = createReadStream(storedImage.filePath)
       const body = new Response(stream as unknown as ReadableStream<Uint8Array>).body
       const headers = new Headers({
-        'Content-Type': 'image/png',
-        'Cache-Control': 'no-cache'
+        'Content-Type': storedImage.contentType,
+        'Cache-Control': 'no-cache',
+        'ETag': `"${createHash('sha256').update(storedImage.filePath).digest('hex')}"`
       })
-      // ETag based on file path hash for cheap revalidation.
-      headers.set('ETag', `"${createHash('md5').update(file).digest('hex')}"`)
       return new Response(body, { status: 200, headers })
     } catch {
       return new Response('Error', { status: 500 })
     }
   })
-}
-
-/** Allow only id-like characters to prevent path traversal via the protocol. */
-function sanitizeId(id: string): string {
-  return id.replace(/[^a-z0-9-]/gi, '')
 }
 
 // Silence unused import in environments where setVisible isn't referenced

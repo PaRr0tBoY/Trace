@@ -317,7 +317,7 @@ function escapeXml(unsafe: string): string {
   })
 }
 
-/** Generate a custom glassmorphic quote card PNG icon for text dragging. */
+/** Generate a custom quote card PNG icon for text dragging. */
 function createTextDragIcon(text: string): Electron.NativeImage {
   const cleaned = text.replace(/[\r\n]+/g, ' ').trim()
   let line1 = cleaned.substring(0, 28)

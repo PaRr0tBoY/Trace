@@ -20,6 +20,8 @@ export type ItemData =
 
 export type ItemKind = ItemData['kind']
 
+export type TypeFilter = 'all' | 'text' | 'links' | 'images' | 'files'
+
 /**
  * A single clipboard entry. `id` is stable across the lifetime of the entry;
  * it is used as the React key and the storage key for pinned/persisted items.
@@ -61,6 +63,18 @@ export interface ClipboardItemDto extends Omit<ClipboardItem, 'data'> {
 /** Section the renderer groups items into. */
 export type ItemSection = 'pinned' | 'shelf'
 
+export type StickPosition = 'left' | 'right'
+
+export interface DisplayInfo {
+  id: number
+  bounds: { x: number; y: number; width: number; height: number }
+  isPrimary: boolean
+  isCurrent?: boolean
+  label: string
+  name: string
+  resolution: string
+}
+
 /**
  * Request to begin a native OS drag-out of one item.
  *
@@ -101,6 +115,7 @@ export interface Settings {
   /** Reduce motion for the panel animations. */
   reduceMotion: boolean
   /** When true, automatically clears unpinned items on device/app restart. */
+  /** When true, automatically clears unpinned items on device/app restart. */
   clearUnpinnedOnRestart: boolean
   /** Hours after which unpinned items are automatically purged (0 = Never). */
   autoDeleteHours: number
@@ -108,6 +123,49 @@ export interface Settings {
   uiStyle: 'modern' | 'compact'
   /** Flag to track if the onboarding tutorial is completed. */
   tutorialCompleted: boolean
+  stickPosition: StickPosition
+  stickDisplayId?: number
+  /**
+   * Persisted workArea geometry of the display chosen by the user.
+   * Used as a cross-reboot fuzzy-match fingerprint when the OS re-assigns
+   * numeric display IDs after a restart (Windows behaviour).
+   */
+  stickDisplayWorkArea?: { x: number; y: number; width: number; height: number }
+  /**
+   * DPI scale factor of the chosen display — used as a secondary discriminator
+   * when two displays share identical workArea geometry (e.g. dual same-res).
+   */
+  stickDisplayScaleFactor?: number
+  /**
+   * When true, restores the bouncy overshoot panel-open animation.
+   * Off by default because it requires extra GPU compositing work.
+   */
+  bounceAnimation: boolean
+  /**
+   * When true, automatically suppresses edge hover when a fullscreen game or app is active.
+   * On by default to prevent accidental opening during PC gameplay.
+   */
+  suppressInFullscreen: boolean
+  /** When true, shows the visual edge morph indicator on copy actions. Default: true. */
+  showCopyIndicator: boolean
+  /** Style variant of the copy indicator icon ('logo' | 'check' | 'copy' | 'sparkle'). Default: 'logo'. */
+  copyIndicatorStyle: 'logo' | 'check' | 'copy' | 'sparkle'
+  /** Vertical offset fraction along screen edge (0 = top, 0.5 = center, 1 = bottom). Default: 0.5. */
+  verticalOffset: number
+  /** Vertical alignment of the hover trigger strip relative to shelf ('top' | 'center' | 'bottom'). Default: 'center'. */
+  triggerAlignment?: 'top' | 'center' | 'bottom'
+  /** When true, subtly illuminates a beacon hint on the screen edge when touching the edge at a different position. Default: true. */
+  showEdgeLocationHint?: boolean
+  /** When true, plays tactile audio sound effects for sliders, buttons, and switches. Default: true. */
+  soundEffects?: boolean
+  /** Last version for which the user opened/viewed the What's New changelog panel. */
+  lastSeenChangelogVersion?: string
+  /** When true, hovering cursor near edge activates the panel. When false, panel opens exclusively via Alt + C. Default: true. */
+  hoverActivation?: boolean
+  /** Font size scale multiplier (0.85 = Small, 1.00 = Normal, 1.15 = Large). Default: 1.0. */
+  fontSizeScale?: number
+  /** Active UI language code ('system' | 'en' | 'es' | 'fr' | 'de' | ...). Default: 'system'. */
+  language?: string
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -121,7 +179,23 @@ export const DEFAULT_SETTINGS: Settings = {
   clearUnpinnedOnRestart: false,
   autoDeleteHours: 0,
   uiStyle: 'modern',
-  tutorialCompleted: false
+  tutorialCompleted: false,
+  stickPosition: 'left',
+  stickDisplayId: undefined,
+  stickDisplayWorkArea: undefined,
+  stickDisplayScaleFactor: undefined,
+  bounceAnimation: false,
+  suppressInFullscreen: true,
+  showCopyIndicator: true,
+  copyIndicatorStyle: 'logo',
+  verticalOffset: 0.5,
+  triggerAlignment: 'center',
+  showEdgeLocationHint: true,
+  soundEffects: true,
+  lastSeenChangelogVersion: undefined,
+  hoverActivation: true,
+  fontSizeScale: 1.0,
+  language: 'system'
 }
 
 

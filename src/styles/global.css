@@ -28,15 +28,16 @@ html {
 }
 
 body {
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui,
-    sans-serif;
-  font-size: 13px;
-  line-height: 1.45;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: calc(13px * var(--font-scale, 1));
+  line-height: 1.48;
   color: var(--text-primary);
   background: transparent;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
@@ -47,13 +48,53 @@ body {
    dragstart on every element, which breaks our draggable item tiles and
    file sub-rows. Scope it to img/a only, and let .item-main / .file-row
    re-enable dragging explicitly. */
+/* High-Definition Vector & Image Anti-Aliasing */
 img,
 svg,
 canvas,
 video {
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: high-quality;
+  image-rendering: smooth;
   shape-rendering: geometricPrecision;
+  text-rendering: optimizeLegibility;
+}
+
+svg {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+svg path,
+svg circle,
+svg line,
+svg polyline,
+svg rect,
+svg polygon {
+  vector-effect: non-scaling-stroke;
+}
+
+/* HD Anti-Aliased Curved Edges & Micro Surfaces */
+.blade,
+.item,
+.item-main,
+.filter-segmented-track,
+.filter-chip,
+.act,
+.icon-btn,
+.preview-flyout,
+.indicator-flyout,
+.settings-sheet,
+.pinned-count-badge,
+.thumb-wrap,
+.thumb,
+.kind-badge,
+.changelog-pill,
+.copy-curve-container,
+.bundle-stack-card,
+.style-card {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-background-clip: padding-box;
+  background-clip: padding-box;
 }
 
 img,

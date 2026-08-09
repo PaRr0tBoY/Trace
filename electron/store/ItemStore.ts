@@ -11,7 +11,7 @@
  */
 import { existsSync, readFileSync, writeFileSync, rmSync, statSync, readdirSync } from 'node:fs'
 import { join, extname, basename as pathBasename } from 'node:path'
-import { nativeImage } from 'electron'
+import { nativeImage, safeStorage } from 'electron'
 import {
   type ClipboardItem,
   type ClipboardItemDto,
@@ -46,22 +46,74 @@ interface Index {
 export class ItemStore {
   private items: ClipboardItem[] = []
   private sigToId = new Map<string, string>()
-  private dataUrlCache = new Map<string, string>()
+  /** Small, bounded thumbnails for renderer DTOs. Original image bytes stay on disk. */
+  private previewCache = new Map<string, string>()
 
   /** Load persisted state from disk. Called once at startup. */
   load(): void {
     try {
-      if (existsSync(PATHS.indexFile())) {
-        const raw = JSON.parse(readFileSync(PATHS.indexFile(), 'utf8')) as Index
-        if (Array.isArray(raw?.items)) {
-          this.items = raw.items.filter((it) => it && it.data && typeof it.id === 'string')
-          this.rebuildIndex()
-        }
-      } else {
+      const file = PATHS.indexFile()
+      if (!existsSync(file)) {
         this.items = []
         this.rebuildIndex()
+        return
       }
-    } catch {
+
+      const rawBuffer = readFileSync(file)
+      const rawStr = rawBuffer.toString('utf8').trim()
+      let parsedIndex: Index | null = null
+      let needsMigration = false
+
+      let parsedJson: any = null
+      try {
+        parsedJson = JSON.parse(rawStr)
+      } catch {
+        /* Raw non-JSON payload */
+      }
+
+      if (parsedJson && parsedJson.encrypted === true && typeof parsedJson.payload === 'string') {
+        // Encrypted DPAPI Envelope
+        if (safeStorage.isEncryptionAvailable()) {
+          try {
+            const decryptedStr = safeStorage.decryptString(Buffer.from(parsedJson.payload, 'base64'))
+            parsedIndex = JSON.parse(decryptedStr) as Index
+          } catch (err) {
+            console.error('[ItemStore] DPAPI decryption failed:', err)
+          }
+        } else {
+          console.warn('[ItemStore] safeStorage unavailable to decrypt items.json')
+        }
+      } else if (parsedJson && Array.isArray(parsedJson.items)) {
+        // Plain JSON (Legacy v0.1.1 format from active users)
+        parsedIndex = parsedJson as Index
+        needsMigration = true
+      }
+
+      if (parsedIndex && Array.isArray(parsedIndex.items)) {
+        this.items = parsedIndex.items.filter((it) => it && it.data && typeof it.id === 'string')
+        this.rebuildIndex()
+
+        // Auto-migrate legacy plain JSON: create backup & upgrade to DPAPI encryption
+        if (needsMigration) {
+          console.log('[ItemStore] Migrating legacy plain-text items.json to DPAPI safeStorage encryption...')
+          try {
+            const backupFile = `${file}.v1.bak`
+            if (!existsSync(backupFile)) {
+              writeFileSync(backupFile, rawBuffer)
+            }
+            this.persist()
+            console.log('[ItemStore] Auto-migration to DPAPI encryption completed successfully!')
+          } catch (err) {
+            console.error('[ItemStore] Auto-migration backup/persist failed:', err)
+          }
+        }
+      } else {
+        console.warn('[ItemStore] Index file could not be parsed; preserving data without wiping')
+        const backupFile = `${file}.corrupted.${Date.now()}`
+        try { writeFileSync(backupFile, rawBuffer) } catch { /* ignore */ }
+      }
+    } catch (err) {
+      console.error('[ItemStore] Failed to load index file:', err)
       this.items = []
       this.sigToId.clear()
     }
@@ -75,9 +127,23 @@ export class ItemStore {
   /** Persist the current index to disk. Called after every mutation. */
   private persist(): void {
     try {
-      writeFileSync(PATHS.indexFile(), JSON.stringify({ items: this.items } satisfies Index, null, 2), 'utf8')
-    } catch {
-      /* persistence failures are non-fatal; state stays in memory */
+      const indexObj: Index = { items: this.items }
+      const jsonStr = JSON.stringify(indexObj)
+      const file = PATHS.indexFile()
+
+      if (safeStorage.isEncryptionAvailable()) {
+        const encryptedBuf = safeStorage.encryptString(jsonStr)
+        const envelope = {
+          v: 2,
+          encrypted: true,
+          payload: encryptedBuf.toString('base64')
+        }
+        writeFileSync(file, JSON.stringify(envelope, null, 2), 'utf8')
+      } else {
+        writeFileSync(file, JSON.stringify(indexObj, null, 2), 'utf8')
+      }
+    } catch (err) {
+      console.error('[ItemStore] Persistence failed:', err)
     }
   }
 
@@ -167,28 +233,52 @@ export class ItemStore {
     const tgt = this.items[tgtIdx]
 
     // Determine how to merge based on kinds
-    // 1. Files + Files -> Files          (any non-image files stack together)
-    // 2. Image(s) + Image(s) -> Image Collection
-    // 3. Cross image <-> files -> reject (keeps image previews intact)
+    // 1. Image(s) + Image(s) -> Image Collection / Image File Stack (any screenshot or image file)
+    // 2. Files + Files -> Files (any non-image files stack together)
 
     let newData: ItemData | null = null
 
-    const srcIsImage = src.data.kind === 'image' || src.data.kind === 'image-collection'
-    const tgtIsImage = tgt.data.kind === 'image' || tgt.data.kind === 'image-collection'
+    const isImageItem = (item: ClipboardItem): boolean => {
+      if (item.data.kind === 'image' || item.data.kind === 'image-collection') return true
+      if (item.data.kind === 'files' && item.data.paths.length > 0) {
+        return item.data.paths.every((p) => isImageExt(p))
+      }
+      return false
+    }
+
+    const getImagePaths = (item: ClipboardItem): string[] => {
+      if (item.data.kind === 'files') return item.data.paths
+      if (item.data.kind === 'image') return [this.imagePath(item.data.imageId, item.data.ext)]
+      if (item.data.kind === 'image-collection') return item.data.images.map((img) => this.imagePath(img.imageId, img.ext))
+      return []
+    }
+
+    const srcIsImage = isImageItem(src)
+    const tgtIsImage = isImageItem(tgt)
 
     if (srcIsImage && tgtIsImage) {
-      const srcImages = src.data.kind === 'image-collection' ? src.data.images : src.data.kind === 'image' ? [{ imageId: src.data.imageId, width: src.data.width, height: src.data.height, bytes: src.data.bytes }] : []
-      const tgtImages = tgt.data.kind === 'image-collection' ? tgt.data.images : tgt.data.kind === 'image' ? [{ imageId: tgt.data.imageId, width: tgt.data.width, height: tgt.data.height, bytes: tgt.data.bytes }] : []
-      // Filter out exact duplicate imageIds just in case
-      const seen = new Set(tgtImages.map((i: { imageId: string }) => i.imageId))
-      const combined = [...tgtImages, ...srcImages.filter((i: { imageId: string }) => !seen.has(i.imageId))]
+      if (src.data.kind !== 'files' && tgt.data.kind !== 'files') {
+        const srcData = src.data
+        const tgtData = tgt.data
+        const srcImages = srcData.kind === 'image-collection' ? srcData.images : srcData.kind === 'image' ? [{ imageId: srcData.imageId, width: srcData.width, height: srcData.height, bytes: srcData.bytes, ext: srcData.ext }] : []
+        const tgtImages = tgtData.kind === 'image-collection' ? tgtData.images : tgtData.kind === 'image' ? [{ imageId: tgtData.imageId, width: tgtData.width, height: tgtData.height, bytes: tgtData.bytes, ext: tgtData.ext }] : []
+        const seen = new Set(tgtImages.map((i) => i.imageId))
+        const combined = [...tgtImages, ...srcImages.filter((i) => !seen.has(i.imageId))]
 
-      // Enforce the per-stack cap BEFORE mutating anything.
-      if (combined.length > MAX_STACK) return { ok: false, reason: 'full', message: 'An image collection can hold a maximum of 10 items' }
-      newData = { kind: 'image-collection', images: combined }
+        if (combined.length > MAX_STACK) return { ok: false, reason: 'full', message: 'An image collection can hold a maximum of 10 items' }
+        newData = { kind: 'image-collection', images: combined }
+      } else {
+        const srcPaths = getImagePaths(src)
+        const tgtPaths = getImagePaths(tgt)
+        const seen = new Set(tgtPaths)
+        const combined = [...tgtPaths, ...srcPaths.filter((p) => !seen.has(p))]
+
+        if (combined.length > MAX_STACK) return { ok: false, reason: 'full', message: 'An image collection can hold a maximum of 10 items' }
+        newData = { kind: 'files', paths: combined }
+      }
     } else if (src.data.kind === 'files' && tgt.data.kind === 'files') {
       const seen = new Set(tgt.data.paths)
-      const combined = [...tgt.data.paths, ...src.data.paths.filter(p => !seen.has(p))]
+      const combined = [...tgt.data.paths, ...src.data.paths.filter((p) => !seen.has(p))]
 
       if (combined.length > MAX_STACK) return { ok: false, reason: 'full', message: 'A folder bundle can hold a maximum of 10 files' }
       newData = { kind: 'files', paths: combined }
@@ -299,12 +389,25 @@ export class ItemStore {
         this.items.splice(sourceIndex, 1)
       }
 
+      let newData: ItemData = { kind: 'files', paths: targetPaths }
+      if (targetPaths.length === 1) {
+        const p = targetPaths[0]
+        const imgName = pathBasename(p)
+        if (/^[a-z0-9]{6,12}-[a-z0-9]{6,12}\.[a-z0-9]+$/i.test(imgName) || p.includes('trace/images') || p.includes('trace\\images') || p.includes('trace/temp') || p.includes('trace\\temp')) {
+          const imageId = imgName.split('.')[0]
+          const ext = extname(p).slice(1) || 'png'
+          let bytes = 0
+          try { bytes = statSync(p).size } catch {}
+          newData = { kind: 'image', imageId, width: 0, height: 0, bytes, ext }
+        }
+      }
+
       const newItem: ClipboardItem = {
         id: createId(),
         capturedAt: Date.now(),
         hitCount: 1,
         pinned: false,
-        data: { kind: 'files', paths: targetPaths }
+        data: newData
       }
       this.items.splice(req.splitPlacement === 'after' ? sourceIndex + 1 : sourceIndex, 0, newItem)
       this.rebuildIndex()
@@ -365,17 +468,30 @@ export class ItemStore {
 
   /* ----------------------------- image files ----------------------------- */
 
-  /** Read image bytes from disk as a data URL for the renderer. */
+  /**
+   * Build a display-sized image preview. Sending originals as base64 data URLs
+   * duplicates every image in the main process, IPC payload and renderer heap.
+   */
   imageToDataUrl(imageId: string, ext?: string): string | null {
     const cacheKey = `${imageId}.${ext || ''}`
-    if (this.dataUrlCache.has(cacheKey)) {
-      return this.dataUrlCache.get(cacheKey)!
+    const cached = this.previewCache.get(cacheKey)
+    if (cached) {
+      this.previewCache.delete(cacheKey)
+      this.previewCache.set(cacheKey, cached)
+      return cached
     }
     try {
-      const buf = readFileSync(this.imagePath(imageId, ext))
-      const mime = detectImageMime(buf)
-      const url = `data:${mime};base64,` + buf.toString('base64')
-      this.dataUrlCache.set(cacheKey, url)
+      const img = nativeImage.createFromPath(this.imagePath(imageId, ext))
+      if (img.isEmpty()) return null
+      const size = img.getSize()
+      const thumb = size.width > THUMB_SIZE || size.height > THUMB_SIZE
+        ? img.resize({ width: THUMB_SIZE, quality: 'good' })
+        : img
+      const url = thumb.toDataURL({ scaleFactor: 1 })
+      if (this.previewCache.size >= PREVIEW_CACHE_MAX) {
+        this.previewCache.delete(this.previewCache.keys().next().value!)
+      }
+      this.previewCache.set(cacheKey, url)
       return url
     } catch {
       return null
@@ -416,8 +532,8 @@ export class ItemStore {
   }
 
   private removeImageFile(imageId: string): void {
-    for (const key of this.dataUrlCache.keys()) {
-      if (key.startsWith(imageId)) this.dataUrlCache.delete(key)
+    for (const key of this.previewCache.keys()) {
+      if (key.startsWith(imageId)) this.previewCache.delete(key)
     }
     const dir = PATHS.imagesDir()
     if (!existsSync(dir)) return
@@ -456,12 +572,11 @@ export class ItemStore {
         }
       }
       if (it.data.kind === 'files') {
-        // Build per-file metadata entries. If a file is an image, we generate and attach
-        // its preview data URL inline (capped to first 4 images to prevent bloat).
+        // Build per-file metadata entries. Generate image preview thumbnails for image files.
         let imagePreviewCount = 0
         const entries = it.data.paths.map((p) => {
           const entry = buildFileEntry(p)
-          if (entry.isImage && imagePreviewCount < 4) {
+          if (entry.isImage && imagePreviewCount < 20) {
             imagePreviewCount++
             return {
               ...entry,
@@ -483,9 +598,6 @@ export class ItemStore {
   stageImageBytes(imageId: string, png: Buffer, ext = 'png'): void {
     try {
       writeFileSync(this.imagePath(imageId, ext), png)
-      const mime = detectImageMime(png)
-      const url = `data:${mime};base64,` + png.toString('base64')
-      this.dataUrlCache.set(`${imageId}.${ext}`, url)
     } catch {
       /* ignore */
     }
@@ -530,6 +642,8 @@ function buildFileEntry(p: string): FileEntry {
  */
 const THUMB_SIZE = 240 // px — enough for the card UI, tiny IPC payload
 
+const PREVIEW_CACHE_MAX = 100
+
 function fileToDataUrl(p: string): string {
   if (fileDataUrlCache.has(p)) return fileDataUrlCache.get(p)!
   try {
@@ -543,7 +657,6 @@ function fileToDataUrl(p: string): string {
         ? img.resize({ width: THUMB_SIZE, quality: 'good' })
         : img
       const url = thumb.toDataURL({ scaleFactor: 1.0 })
-        .replace('image/png', 'image/jpeg') // hint the renderer it's small
       if (fileDataUrlCache.size > 200) fileDataUrlCache.clear()
       fileDataUrlCache.set(p, url)
       return url

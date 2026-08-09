@@ -14,9 +14,13 @@ import { useStore } from '../store/appStore'
 import { useFilteredItems } from '../hooks/useFilteredItems'
 import { ClipboardItemCard } from './ClipboardItem'
 import { EmptyState } from './EmptyState'
-import { ChevronUpIcon, ChevronDownIcon } from './icons'
+import { ChevronDownIcon, PinFillIcon } from './icons'
+import { playExpandSound } from '../lib/soundEffects'
+
+import { useTranslation } from '../i18n'
 
 export function ItemList() {
+  const { t } = useTranslation()
   const { pinned, recent } = useFilteredItems()
   const query = useStore((s) => s.query)
   const listRef = useRef<HTMLDivElement>(null)
@@ -26,15 +30,24 @@ export function ItemList() {
   const isDraggingAny = useStore((s) => !!s.dragActive || !!s.internalDragReq)
   const open = useStore((s) => s.open)
   
+  const typeFilter = useStore((s) => s.typeFilter) || 'all'
   const [showScrollTop, setShowScrollTop] = useState(false)
-  const [pinnedCollapsed, setPinnedCollapsedState] = useState(() => {
-    const saved = localStorage.getItem('trace_pinned_collapsed')
-    return saved !== null ? saved === 'true' : true // Compressed by default
+  const [collapsedMap, setCollapsedMap] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('trace_pinned_collapsed_map')
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return { all: true, text: true, image: true, file: true, link: true }
   })
 
+  const pinnedCollapsed = collapsedMap[typeFilter] ?? true
+
   const setPinnedCollapsed = (val: boolean) => {
-    setPinnedCollapsedState(val)
-    localStorage.setItem('trace_pinned_collapsed', String(val))
+    setCollapsedMap((prev) => {
+      const next = { ...prev, [typeFilter]: val }
+      localStorage.setItem('trace_pinned_collapsed_map', JSON.stringify(next))
+      return next
+    })
   }
   
   const topRecentId = recent[0]?.id
@@ -178,7 +191,6 @@ export function ItemList() {
     <motion.div 
       className="list" 
       ref={listRef} 
-      layoutScroll
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeaveOrDrop}
       onDrop={handleDragLeaveOrDrop}
@@ -192,31 +204,46 @@ export function ItemList() {
             <section className="pinned-section">
               <div 
                 className={`section-label pinned-header-interactive ${pinnedCollapsed ? 'is-collapsed' : ''}`}
-                onClick={() => setPinnedCollapsed(!pinnedCollapsed)}
-                title={pinnedCollapsed ? "Click to expand pinned items" : "Click to compress pinned items"}
+                onClick={() => {
+                  const next = !pinnedCollapsed
+                  playExpandSound(!next)
+                  setPinnedCollapsed(next)
+                }}
+                title={pinnedCollapsed ? t('item.expandPinned') : t('item.collapsePinned')}
               >
                 <div className="pinned-header-left">
-                  <span>Pinned</span>
+                  <PinFillIcon width={13} height={13} style={{ opacity: 0.9, color: '#ffffff' }} />
+                  <span>{t('item.pinned')}</span>
                   <span className="pinned-count-badge">{pinned.length}</span>
                 </div>
                 <div className="pinned-header-right">
-                  <span className="pinned-toggle-hint">{pinnedCollapsed ? 'Expand' : 'Compress'}</span>
-                  <button className="act bundle-collapse-btn">
-                    {pinnedCollapsed ? <ChevronDownIcon /> : <ChevronUpIcon />}
+                  <button className="act bundle-collapse-btn" type="button" aria-label="Toggle pinned section">
+                    <ChevronDownIcon style={{ transform: pinnedCollapsed ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.22s ease' }} />
                   </button>
                 </div>
               </div>
               <AnimatePresence initial={false}>
-                {!pinnedCollapsed && pinned.map((it) => (
-                  <ClipboardItemCard key={it.id} item={it} />
-                ))}
+                {!pinnedCollapsed && (
+                  <motion.div
+                    key="pinned-items-container"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                    style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}
+                  >
+                    {pinned.map((it) => (
+                      <ClipboardItemCard key={it.id} item={it} />
+                    ))}
+                  </motion.div>
+                )}
               </AnimatePresence>
             </section>
           )}
 
           {recent.length > 0 && (
             <section>
-              {pinned.length > 0 && <div className="section-label">Recent</div>}
+              {pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
               <AnimatePresence initial={false}>
                 {recent.map((it) => (
                   <ClipboardItemCard key={it.id} item={it} />
@@ -235,7 +262,7 @@ export function ItemList() {
             exit={{ opacity: 0, scale: 0.8, y: 20 }}
             className="scroll-top-btn"
             onClick={scrollToTop}
-            title="Scroll to top"
+            title={t('item.scrollToTop')}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="18 15 12 9 6 15"></polyline>

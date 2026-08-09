@@ -7,7 +7,7 @@
 长期目标（见 feature/tasks 分支的 `Product.md`）：以 **Task** 为核心实体，把窗口、文件、剪贴板变成任务的关联资源，最终成为用户的"第二工作记忆"。MVP 是四层面板：Layer 1 窗口切换器（Alt-Tab 替代）· Layer 2 文件中转站 · Layer 3 剪贴板 · Layer 4 任务列表（默认页）。
 
 - **平台**：仅 Windows（Win32 OLE 拖拽、PowerShell HDROP 解析、透明窗口光标轮询、koffi FFI 键盘状态检测）
-- **技术栈**：Electron 30 · React 18 · TypeScript 5 · Framer Motion 11 · Zustand 4 · electron-vite；feature/tasks 分支另用 koffi
+- **技术栈**：Electron 34 · React 18 · TypeScript 5 · Framer Motion 11 · Zustand 4 · electron-vite · vitest；feature/tasks 分支另用 koffi（main 的 koffi 是 upstream 电源检测用的）
 - **仓库是单一 git 仓库、两个 worktree**：`C:\Users\Acid\Documents\repo\Trace`（main）、`...\Trace-tasks`（feature/tasks，任务系统 WIP，**当前开发主线**）
 - **分支状态**：main 已同步最新 AGENTS.md（feature/Animation 已并入后删除）；feature/tasks 基于 f5dd509 领先任务系统 WIP（Alt-Tab 激活、窗口枚举修复等，见下文），**未合并回 main**。跨 worktree 改代码前先确认目标分支。
 
@@ -22,8 +22,9 @@
 | `npm run build` | 生产构建到 `out/` |
 | `npm run package` | 构建 + Windows NSIS 安装包到 `dist/` |
 | `npm run preview` | 预览构建产物 |
+| `npm test` | vitest 单元测试（geometry/imageProtocol/power） |
 
-- **没有 lint 脚本，没有测试框架，没有测试文件。** 验收靠 `npm run typecheck` + `npm run dev` 手动验证。
+- **有 vitest 测试（upstream 2026-08 合并进来），没有 lint 脚本。** 验收靠 `npm run typecheck` + `npm test` + `npm run dev` 手动验证。
 - npm ≥ 11 默认拦截 postinstall 脚本：新 worktree 装完依赖要 `npm approve-scripts electron esbuild koffi`，否则 esbuild/electron 二进制缺失，`npm run dev` 直接失败。
 - 打包失败报 `EBUSY` 时：`taskkill /F /IM electron.exe /T` 关掉运行中的实例再试。
 
@@ -108,12 +109,14 @@
 
 ### 渲染层
 - `src/main.tsx` 按 hash 路由：`#/onboarding` → Onboarding，否则 App。
-- 组件树：App → Panel（Layer 1/2/3/4 按 `currentTab` 切换，Header / DropOverlay / ItemList / SplitDropZone / Settings / ToastStack）。
+- 组件树（main）：App → Panel（Header / ItemList / Settings / ToastStack），Settings 内嵌 ChangelogView 子视图。feature/tasks 分支另有 Layer 1/2/3/4 结构（见 Task 系统节）。
+- `src/components/PreviewFlyout.tsx` 是 upstream 遗留死文件（无人引用），别动。
 - 样式分层：tokens.css（主题变量）→ global → panel/item/settings。
 
 ## 注意事项
 
-- **重命名进行中**：main 已 rebrand（package.json name、`APP_CONFIG.appName`、`tracelocal://` 协议、CSP、localStorage key `trace_pinned_collapsed`），feature/tasks **尚未合并**，仍叫 edge-drop。userData 目录随应用名变化（`%APPDATA%\Trace`），旧 `edge-drop` 数据不会自动迁移。
+- **upstream 同步（2026-08-09）**：已合并 Deepender25/Edge-Drop 到 v0.2.6（63 提交 / 3 万行：i18n 30 语言、设置 3-tab 重构、Web Audio 音效、多显示器持久化、性能优化、vitest）。**自动更新（electron-updater）已整体剔除**——silent auto-update 会下载 upstream 的包覆盖 Trace，合并后删除了 updater.ts、相关 IPC 通道、设置 UI 与 i18n 键；保留手动 `app:get-releases`（What's New 视图，指向 PaRr0tBoY/Trace releases，离线回退静态 changelog）。品牌已全部替换为 Trace；ChangelogView.tsx 与 ipc.ts 的静态 changelog 保留 Edge-Drop 历史原文；AppX 证书身份（Deepender.EdgeDrop）保留（证书绑定）。
+- **main 已 rebrand**（package.json name、`APP_CONFIG.appName`、`tracelocal://` 协议、CSP、localStorage key `trace_pinned_collapsed_map`），feature/tasks **尚未合并**，仍叫 edge-drop。userData 目录随应用名变化（`%APPDATA%\Trace`），旧 `edge-drop` 数据不会自动迁移。
 - `drag_debug.txt` 是 OLE 拖拽排障日志，**被 git 跟踪且持续增长**（drag.ts 的 `logDrag` 用 `appendFileSync` 写 `process.cwd()`）。自己调试跑出来的追加行不要提交。
 - `Product.md`（feature/tasks）是产品规范，含工程上下文附录（IPC 四文件注册链、实现顺序、风险表）；`docs/agents/*.md` 是模板化 agent 约定（issue tracker 用 `gh` 管理 PaRr0tBoY/Trace issues）。`features_and_architecture.md`/`README.md` 可能滞后于代码。
 - 根目录的 `electron.vite.config.*.mjs` 是 electron-vite 生成的历史备份（main 已删，feature/tasks 还有），可清理。

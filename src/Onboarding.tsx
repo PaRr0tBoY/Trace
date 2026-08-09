@@ -6,15 +6,15 @@ import { Settings } from './components/Settings'
 const slides = [
   {
     id: 'slide-1',
-    title: 'Welcome to Edge-Drop',
-    description: 'Edge-Drop lives hidden on the left edge of your screen. Simply move your mouse to the left edge to open the panel, and move away to hide it.',
+    title: 'Welcome to Trace',
+    description: 'Trace lives hidden on the left edge of your screen. Simply move your mouse to the left edge to open the panel, and move away to hide it.',
     videoSrc: 'placeholder_welcome.mp4',
     placeholderColor: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)'
   },
   {
     id: 'slide-2',
     title: 'Collect Anything',
-    description: 'Whenever you press Ctrl+C to copy text, images, or files, Edge-Drop automatically catches and saves them in the background.',
+    description: 'Whenever you press Ctrl+C to copy text, images, or files, Trace automatically catches and saves them in the background.',
     videoSrc: 'placeholder_copy.mp4',
     placeholderColor: 'linear-gradient(135deg, #4FACFE 0%, #00F2FE 100%)'
   },
@@ -49,7 +49,7 @@ const slides = [
   {
     id: 'slide-6',
     title: 'Configure Your Clipboard',
-    description: 'Customize how Edge-Drop works for you.',
+    description: 'Customize how Trace works for you.',
     videoSrc: '',
     placeholderColor: 'transparent'
   }
@@ -106,7 +106,7 @@ export function Onboarding() {
       }}>
         {/* Logo Area */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0px' }}>
-          <img src={logoUrl} alt="Edge-Drop Logo" style={{ width: '42px', height: '42px' }} />
+          <img src={logoUrl} alt="Trace Logo" style={{ width: '42px', height: '42px' }} />
         </div>
 
         {/* Header Controls */}

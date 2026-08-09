@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="public/Logo%20(4).png" alt="Edge-Drop Logo" width="140" height="140" />
+  <img src="public/Logo%20(4).png" alt="Trace Logo" width="140" height="140" />
 </p>
 
-<h1 align="center">Edge-Drop</h1>
+<h1 align="center">Trace</h1>
 
 <p align="center">
   <strong>A zero-click, hover-activated clipboard shelf and native OS file-transfer hub for the desktop.</strong><br/>
@@ -30,7 +30,7 @@
 
 Every clipboard manager on the market breaks your flow. You copy something, switch apps, paste, then hunt through `Win+V` history with arrow keys or dig into a tray menu. Multi-step. Modal. Slow.
 
-**Edge-Drop removes the friction.** It anchors to the leftmost pixel of your monitor as a transparent, always-on-top, click-through surface. When your cursor approaches the edge, the shelf springs open. Drag images, file stacks, rich text, and HTML bundles *out* of it — directly into whatever desktop app you're already using. No shortcuts. No window switching. No modal dialogs.
+**Trace removes the friction.** It anchors to the leftmost pixel of your monitor as a transparent, always-on-top, click-through surface. When your cursor approaches the edge, the shelf springs open. Drag images, file stacks, rich text, and HTML bundles *out* of it — directly into whatever desktop app you're already using. No shortcuts. No window switching. No modal dialogs.
 
 It is built for the developer and creative workflow where you constantly juggle screenshots, code snippets, file paths, design assets, and reference links between many windows at once.
 
@@ -42,7 +42,7 @@ It is built for the developer and creative workflow where you constantly juggle 
 
 <table>
   <tr>
-    <td width="50%" align="center"><b>1. Welcome to Edge-Drop</b><br/><br/>
+    <td width="50%" align="center"><b>1. Welcome to Trace</b><br/><br/>
       <video src="https://github.com/user-attachments/assets/118d59cc-9821-4da1-9424-ea9bc1b6e548" width="100%" autoplay loop muted playsinline></video>
     </td>
     <td width="50%" align="center"><b>2. Collect Anything</b><br/><br/>
@@ -77,8 +77,8 @@ It is built for the developer and creative workflow where you constantly juggle 
 
 ### Run from source
 ```bash
-git clone https://github.com/Deepender25/Edge-Drop.git
-cd Edge-Drop
+git clone https://github.com/Deepender25/Trace.git
+cd Trace
 npm install
 npm run dev          # launches Electron + Vite HMR
 ```
@@ -94,13 +94,13 @@ npm run package      # outputs an NSIS .exe to /dist
 ```
 
 > [!NOTE]
-> On Windows, if packaging fails with `EBUSY: resource busy or locked`, close any running Edge-Drop instances first: `taskkill /F /IM electron.exe /T`.
+> On Windows, if packaging fails with `EBUSY: resource busy or locked`, close any running Trace instances first: `taskkill /F /IM electron.exe /T`.
 
 ---
 
 ## How It Works
 
-Edge-Drop is an Electron app split into three strictly isolated processes — **Main** (Node.js, OS access), **Preload** (typed sandbox bridge), and **Renderer** (React UI). They communicate over a fully typed IPC contract. No string channel names, no `any` payloads.
+Trace is an Electron app split into three strictly isolated processes — **Main** (Node.js, OS access), **Preload** (typed sandbox bridge), and **Renderer** (React UI). They communicate over a fully typed IPC contract. No string channel names, no `any` payloads.
 
 ### The invisible edge trigger
 
@@ -131,13 +131,13 @@ It also **respects privacy flags**. Clipboard formats from password managers and
 
 ### Native OS drag-out (OLE)
 
-Standard HTML5 drag events cannot hand file handles to external desktop software. Edge-Drop intercepts the renderer's `dragstart`, sends a fire-and-forget IPC (`item:start-drag`) to the Main process, which stages the item's content as a temp file and calls `webContents.startDrag({ file, icon })`. The OS then renders a native drag ghost and handles the drop into Photoshop, Word, Explorer, or any other app — exactly as if you had dragged the file from Explorer itself.
+Standard HTML5 drag events cannot hand file handles to external desktop software. Trace intercepts the renderer's `dragstart`, sends a fire-and-forget IPC (`item:start-drag`) to the Main process, which stages the item's content as a temp file and calls `webContents.startDrag({ file, icon })`. The OS then renders a native drag ghost and handles the drop into Photoshop, Word, Explorer, or any other app — exactly as if you had dragged the file from Explorer itself.
 
 Custom drag icons are generated on the fly: stacked card PNGs for file bundles (with a count badge), glassmorphic quote cards for text, real image thumbnails for images. Rendered via `@resvg/resvg-js`, cached, and pre-warmed on startup so the first drag is instant.
 
 ### Smart deduplication, stacks, and merging
 
-When you re-copy existing content, Edge-Drop doesn't add a duplicate — it bumps the item to position 0, increments its `hitCount` badge, and refreshes its timestamp. Multi-file drag-ins and multi-image copies auto-group into expandable 3D card stacks (max 10 per stack). Drag any item card over another to merge them into a bundle; double-click to expand and drag a sub-item to the left edge to split it back out.
+When you re-copy existing content, Trace doesn't add a duplicate — it bumps the item to position 0, increments its `hitCount` badge, and refreshes its timestamp. Multi-file drag-ins and multi-image copies auto-group into expandable 3D card stacks (max 10 per stack). Drag any item card over another to merge them into a bundle; double-click to expand and drag a sub-item to the left edge to split it back out.
 
 ---
 
@@ -289,7 +289,7 @@ sequenceDiagram
 
 ## Security
 
-Edge-Drop touches the OS clipboard, the filesystem, and the Win32 OLE drag pipeline — so the security posture is intentional, not optional.
+Trace touches the OS clipboard, the filesystem, and the Win32 OLE drag pipeline — so the security posture is intentional, not optional.
 
 | Control | Implementation |
 |---|---|
@@ -318,7 +318,7 @@ Edge-Drop touches the OS clipboard, the filesystem, and the Win32 OLE drag pipel
 ## Project Structure
 
 ```
-Edge-Drop/
+Trace/
 ├─ shared/                 Typed IPC contracts & domain models
 │  ├─ types.ts             ClipboardItem, Bundle, Settings, DragRequest DTOs
 │  └─ ipc.ts               InvokeMap / EventMap / SendMap channel definitions
@@ -348,7 +348,7 @@ Edge-Drop/
 
 ## Roadmap
 
-Edge-Drop is in **public beta**. The following are planned, in rough priority order:
+Trace is in **public beta**. The following are planned, in rough priority order:
 
 - [ ] **AI semantic self-organization** — embed text/URL/HTML items, auto-cluster into named groups, replace manual pinning
 - [ ] **AI summarization** — condense multi-file bundles and long HTML copies into one-line summaries + tags
@@ -364,11 +364,11 @@ The AI features are the headline roadmap items and the reason this project is ap
 
 ## Contributing
 
-Edge-Drop is Apache-2.0 licensed and open to contributions. As a solo-maintained project in active beta, the best ways to help right now are:
+Trace is Apache-2.0 licensed and open to contributions. As a solo-maintained project in active beta, the best ways to help right now are:
 
 1. **File issues** for bugs, crashes, or privacy-edge-cases you hit (especially around clipboard format detection on different apps)
-2. **macOS porting** — Currently Edge-Drop only supports Windows; contributions for a macOS port are welcome
-3. **Suggest format readers** — if you copy from an app whose content Edge-Drop mis-categorizes, open an issue with the available formats list (`clipboard.availableFormats()` output)
+2. **macOS porting** — Currently Trace only supports Windows; contributions for a macOS port are welcome
+3. **Suggest format readers** — if you copy from an app whose content Trace mis-categorizes, open an issue with the available formats list (`clipboard.availableFormats()` output)
 4. **Pick up a roadmap item** — open an issue first to discuss scope, then send a PR against a feature branch
 
 ### Development workflow

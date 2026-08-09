@@ -28,13 +28,13 @@ export function ItemList() {
   
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [pinnedCollapsed, setPinnedCollapsedState] = useState(() => {
-    const saved = localStorage.getItem('edge_drop_pinned_collapsed')
+    const saved = localStorage.getItem('trace_pinned_collapsed')
     return saved !== null ? saved === 'true' : true // Compressed by default
   })
 
   const setPinnedCollapsed = (val: boolean) => {
     setPinnedCollapsedState(val)
-    localStorage.setItem('edge_drop_pinned_collapsed', String(val))
+    localStorage.setItem('trace_pinned_collapsed', String(val))
   }
   
   const topRecentId = recent[0]?.id

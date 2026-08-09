@@ -203,7 +203,7 @@ export function Settings() {
         </div>
         <button
           className="github-promo-btn"
-          onClick={() => window.open('https://github.com/Deepender25/Edge-Drop', '_blank')}
+          onClick={() => window.open('https://github.com/Deepender25/Trace', '_blank')}
         >
           <svg
             className="star-icon"

@@ -1,8 +1,8 @@
 {
-  "name": "edge-drop",
+  "name": "trace",
   "version": "0.1.0",
-  "description": "Edge-Drop — a clipboard manager that lives on the left edge of your screen and expands on hover.",
-  "author": "Edge-Drop",
+  "description": "Trace — a clipboard manager that lives on the left edge of your screen and expands on hover.",
+  "author": "Trace",
   "license": "MIT",
   "private": true,
   "main": "out/main/index.js",
@@ -18,8 +18,8 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web"
   },
   "build": {
-    "appId": "com.edgedrop.app",
-    "productName": "Edge-Drop",
+    "appId": "com.trace.app",
+    "productName": "Trace",
     "directories": {
       "output": "dist",
       "buildResources": "resources"
@@ -44,7 +44,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "Edge-Drop",
+      "shortcutName": "Trace",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     }
@@ -54,7 +54,7 @@
     "@types/react": "^18.2.73",
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.2.1",
-    "electron": "^30.0.0",
+    "electron": "^30.5.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^2.1.0",
     "typescript": "^5.4.3",

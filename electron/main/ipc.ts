@@ -158,9 +158,9 @@ export function registerIpc(): void {
 
   handle('app:check-update', async () => {
     try {
-      const response = await fetch('https://api.github.com/repos/Deepender25/Edge-Drop/releases/latest', {
+      const response = await fetch('https://api.github.com/repos/Deepender25/Trace/releases/latest', {
         headers: {
-          'User-Agent': 'Edge-Drop-App'
+          'User-Agent': 'Trace-App'
         }
       })
       if (!response.ok) {
@@ -311,7 +311,7 @@ export function registerIpc(): void {
 
       // DO NOT call store.add() here. hitCount must only increment when the user
       // genuinely copies the content from a source app (detected by the watcher).
-      // Pasting from Edge-Drop is a retrieval action, not a new copy.
+      // Pasting from Trace is a retrieval action, not a new copy.
 
       // Close panel so focus returns to the user's active input/text box.
       // Pass false to explicitly close and avoid toggle race conditions.

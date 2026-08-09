@@ -1,4 +1,4 @@
-/** Simple, Minimalist, High-Legibility Settings UI matching Edge-Drop */
+/** Simple, Minimalist, High-Legibility Settings UI matching Trace */
 .settings-list {
   flex: 1;
   display: flex;
@@ -158,7 +158,7 @@
   font-weight: 600;
   color: #000000;
   background: #f97316;
-  /* Edge-drop orange color */
+  /* Trace accent color */
   border: none;
   cursor: pointer;
   transition: opacity 0.2s ease, transform 0.1s ease;

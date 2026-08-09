@@ -41,14 +41,14 @@ export function createTray(): Tray {
     image = fallbackIcon()
   }
   tray = new Tray(image)
-  tray.setToolTip('Edge-Drop')
+  tray.setToolTip('Trace')
 
   // Show welcome notification on first run
   if (!existsSync(PATHS.indexFile())) {
     try {
       if (Notification.isSupported()) {
         new Notification({
-          title: 'Edge-Drop Clipboard Shelf',
+          title: 'Trace Clipboard Shelf',
           body: 'Hover against the middle-left screen edge, or press Alt+C to slide open your shelf.',
           icon: PATHS.icon()
         }).show()
@@ -90,7 +90,7 @@ export function createTray(): Tray {
       },
       { type: 'separator' },
       {
-        label: 'Quit Edge-Drop',
+        label: 'Quit Trace',
         click: () => {
           app.quit()
         }

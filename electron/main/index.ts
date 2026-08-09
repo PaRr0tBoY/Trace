@@ -2,7 +2,7 @@
  * Electron main process entry point.
  *
  * Lifecycle:
- *   1. Single-instance lock (only one Edge-Drop may run).
+ *   1. Single-instance lock (only one Trace may run).
  *   2. App 'ready' -> ensure dirs, create the edge window + tray, register the
  *      image protocol + IPC handlers, start the clipboard watcher.
  *   3. On 'window-all-closed' we DON'T quit (the panel is hidden, not closed).
@@ -60,8 +60,8 @@ app.on('before-quit', () => {
 })
 
 app.whenReady().then(() => {
-  // Set App User Model ID so native notifications are branded as "Edge-Drop" on Windows
-  app.setAppUserModelId('com.edgedrop.app')
+  // Set App User Model ID so native notifications are branded as "Trace" on Windows
+  app.setAppUserModelId('com.trace.app')
 
   ensureDirs()
   cleanTemp()
@@ -70,7 +70,7 @@ app.whenReady().then(() => {
   const ses = session.defaultSession
   ses.setPermissionRequestHandler((_wc, _perm, cb) => cb(false))
 
-  // Register the image protocol: edgelocal://<imageId> -> images/<imageId>.png
+  // Register the image protocol: tracelocal://<imageId> -> images/<imageId>.png
   registerImageProtocol()
 
   createWindow()

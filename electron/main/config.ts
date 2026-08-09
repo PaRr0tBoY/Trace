@@ -7,9 +7,9 @@ export const runtime = {
 }
 
 export const APP_CONFIG = {
-  appName: 'Edge-Drop',
+  appName: 'Trace',
   /** Custom protocol used to serve local image files to the renderer securely. */
-  imageProtocol: 'edgelocal',
+  imageProtocol: 'tracelocal',
   is: {
     get dev(): boolean {
       return !!process.env.ELECTRON_RENDERER_URL || process.env.NODE_ENV === 'development'

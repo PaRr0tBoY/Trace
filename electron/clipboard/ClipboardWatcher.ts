@@ -100,7 +100,7 @@ export class ClipboardWatcher {
    *    the change and re-capture it correctly.
    *
    * NOTE: The one edge case this does NOT solve is: user copies X, deletes X
-   * from Edge-Drop, then immediately copies X again WITHOUT copying anything
+   * from Trace, then immediately copies X again WITHOUT copying anything
    * else in between (system clipboard never changed). In that narrow case we
    * cannot detect the re-copy because the OS clipboard didn't change. This is
    * an acceptable limitation — the common-case fix (zombie prevention) is far

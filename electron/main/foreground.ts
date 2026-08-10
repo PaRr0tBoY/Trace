@@ -34,7 +34,7 @@ export interface ForegroundSnapshot {
 type GetForegroundWindowFn = () => unknown
 type GetWindowThreadProcessIdFn = (hwnd: unknown, pid: number[]) => number
 type GetWindowTextWFn = (hwnd: unknown, buf: string[], maxCount: number) => number
-type OpenProcessFn = (access: number, inherit: boolean, pid: number) => unknown
+type OpenProcessFn = (access: number, inherit: number, pid: number) => unknown
 type QueryFullProcessImageNameWFn = (handle: unknown, flags: number, buf: string[], size: number[]) => number
 type CloseHandleFn = (handle: unknown) => number
 
@@ -90,7 +90,7 @@ export function queryForegroundSnapshot(): ForegroundSnapshot | null {
 
 function queryExePath(pid: number): string {
   if (!openProcess || !queryFullProcessImageNameW || !closeHandle || pid <= 0) return ''
-  const handle = openProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+  const handle = openProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid)
   if (!handle) return ''
   try {
     const pathBuf = ['\0'.repeat(PATH_BUF_CHARS)]

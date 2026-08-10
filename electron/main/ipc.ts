@@ -10,12 +10,13 @@ import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { psHost } from './powershell'
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel } from '../../shared/ipc'
-import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher } from './state'
+import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore } from './state'
 import { getMainWindow } from './window'
 import { setInteractive, setHeartbeatPaused, setHotZoneWidth } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData } from './drag'
 import { clipboardSignature } from '../clipboard/formats'
+import { buildClipboardRef } from '../store/TaskStore'
 import type { ItemData, MergeResult } from '../../shared/types'
 
 /**
@@ -152,8 +153,54 @@ export function registerIpc(): void {
     return {
       items: getStore().toDto(),
       settings: loadSettings(),
-      version: app.getVersion()
+      version: app.getVersion(),
+      tasks: getTaskStore().toDto()
     }
+  })
+
+  /* --------------------------- task domain --------------------------- */
+
+  handle('task:load', () => {
+    return getTaskStore().toDto()
+  })
+
+  handle('task:create', (title, note) => {
+    getTaskStore().create(title, note !== undefined ? { note } : undefined)
+    pushState.tasks()
+    return getTaskStore().toDto()
+  })
+
+  handle('task:update', (id, patch) => {
+    getTaskStore().update(id, patch)
+    pushState.tasks()
+    return getTaskStore().toDto()
+  })
+
+  handle('task:delete', (id) => {
+    getTaskStore().delete(id)
+    pushState.tasks()
+    return getTaskStore().toDto()
+  })
+
+  handle('task:merge', (targetId, sourceId) => {
+    getTaskStore().merge(targetId, sourceId)
+    pushState.tasks()
+    return getTaskStore().toDto()
+  })
+
+  handle('task:link-item', (taskId, itemId) => {
+    const item = getStore().get(itemId)
+    if (item) {
+      getTaskStore().linkItem(taskId, buildClipboardRef(item))
+    }
+    pushState.tasks()
+    return getTaskStore().toDto()
+  })
+
+  handle('task:unlink-item', (taskId, target) => {
+    getTaskStore().unlinkItem(taskId, target)
+    pushState.tasks()
+    return getTaskStore().toDto()
   })
 
   handle('app:get-releases', async () => {
@@ -418,6 +465,11 @@ export function registerIpc(): void {
     }
     if (patch.hotZoneWidth !== undefined) {
       setHotZoneWidth(patch.hotZoneWidth)
+    }
+    if (patch.taskPauseThresholdMinutes !== undefined) {
+      // A changed threshold may immediately flip Active tasks; re-evaluate now.
+      getTaskStore().setPauseThreshold(next.taskPauseThresholdMinutes)
+      if (getTaskStore().sweep() > 0) pushState.tasks()
     }
     pushState.settings(next)
     return next

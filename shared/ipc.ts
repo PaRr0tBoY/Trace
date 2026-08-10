@@ -9,15 +9,15 @@
  *   - `Renderer -> Main` calls (invoke/handle) are listed in `InvokeMap`.
  *   - `Main -> Renderer` events (send/on) are listed in `EventMap`.
  */
-import type { ClipboardItemDto, DragRequest, MergeResult, Settings } from './types'
+import type { ClipboardItemDto, DragRequest, MergeResult, Settings, TaskDto, TaskPatch, UnlinkTarget } from './types'
 
 /* ------------------------------------------------------------------ */
 /* Renderer -> Main  (ipcMain.handle / ipcRenderer.invoke)            */
 /* ------------------------------------------------------------------ */
 
 export interface InvokeMap {
-  /** Returns the full current item list + settings on startup. */
-  'state:load': { args: []; result: { items: ClipboardItemDto[]; settings: Settings; version: string } }
+  /** Returns the full current item list + settings + tasks on startup. */
+  'state:load': { args: []; result: { items: ClipboardItemDto[]; settings: Settings; version: string; tasks: TaskDto[] } }
 
   /** Set an item's pinned state. */
   'item:set-pinned': { args: [id: string, pinned: boolean]; result: ClipboardItemDto[] }
@@ -85,6 +85,29 @@ export interface InvokeMap {
 
   /** Get the list of connected displays. */
   'displays:list': { args: []; result: import('./types').DisplayInfo[] }
+
+  /* --------------------------- task domain --------------------------- */
+
+  /** Load the full task list (also included in state:load). */
+  'task:load': { args: []; result: TaskDto[] }
+
+  /** Create a task (title required and non-empty). Returns the full task list. */
+  'task:create': { args: [title: string, note?: string]; result: TaskDto[] }
+
+  /** Edit title/note or apply a manual status transition. Returns the full task list. */
+  'task:update': { args: [id: string, patch: TaskPatch]; result: TaskDto[] }
+
+  /** Hard-delete a task (no recycle bin; confirmation is a UI concern). */
+  'task:delete': { args: [id: string]; result: TaskDto[] }
+
+  /** Merge source task into target (apps union + same-kind resource merge); source is deleted. */
+  'task:merge': { args: [targetId: string, sourceId: string]; result: TaskDto[] }
+
+  /** Link a clipboard item to a task; main snapshots the item content. */
+  'task:link-item': { args: [taskId: string, itemId: string]; result: TaskDto[] }
+
+  /** Unlink a resource from a task (clipboard by itemId, files by exact path list). */
+  'task:unlink-item': { args: [taskId: string, target: UnlinkTarget]; result: TaskDto[] }
 }
 
 /* ------------------------------------------------------------------ */
@@ -94,6 +117,8 @@ export interface InvokeMap {
 export interface EventMap {
   /** Full new item list whenever the history changes. */
   'state:items': [items: ClipboardItemDto[]]
+  /** Full task list whenever the task domain changes. */
+  'state:tasks': [tasks: TaskDto[]]
   /** Settings changed (e.g. from the tray menu). */
   'state:settings': [settings: Settings]
   /** Toggle the panel open/closed from the main process (e.g. tray). */

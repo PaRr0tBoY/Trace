@@ -99,6 +99,140 @@ export interface MergeResult {
   message?: string
 }
 
+/* ------------------------------------------------------------------ */
+/* Task domain (t11)                                                    */
+/* ------------------------------------------------------------------ */
+
+/** Lifecycle of a task. Only 'active' ↔ 'paused' is rule-driven; the rest is manual. */
+export type TaskStatus = 'active' | 'paused' | 'waiting' | 'completed'
+
+/**
+ * An application a task is associated with.
+ * `id` is the identity key: lowercase-normalized exePath, or the process name
+ * when no exePath is known. `lastContext` is the latest L0 capture landing spot.
+ */
+export interface AppRef {
+  id: string
+  name: string
+  exePath?: string
+  lastContext?: {
+    windowTitle?: string
+    url?: string
+    workspace?: string
+    cwd?: string
+  }
+}
+
+/**
+ * Snapshot of a linked clipboard item, taken once at link time.
+ * Text keeps a 200-char preview (never the full body); images keep their
+ * identity + dimensions + byte count so a detail view survives item eviction.
+ */
+export type ResourceSnapshot =
+  | { type: 'text'; preview: string; capturedAt: number }
+  | { type: 'image'; imageId: string; width: number; height: number; bytes: number; preview: string; capturedAt: number }
+  | { type: 'image-collection'; imageId: string; width: number; height: number; bytes: number; preview: string; capturedAt: number }
+  | { type: 'files'; preview: string; capturedAt: number }
+
+/** A piece of material attached to a task (clipboard entry or file list). */
+export type ResourceRef =
+  | { kind: 'clipboard'; itemId: string; snapshot: ResourceSnapshot }
+  | { kind: 'files'; paths: string[] }
+
+/** A unit of focused work. `lastActiveAt` is the state machine's time base. */
+export interface Task {
+  id: string // 't_' prefix
+  title: string
+  status: TaskStatus
+  note?: string
+  apps: AppRef[]
+  resources: ResourceRef[]
+  createdAt: number
+  updatedAt: number
+  lastActiveAt: number
+}
+
+/** Editable surface exposed to the renderer (title/note edits + manual status transitions). */
+export type TaskPatch = Partial<Pick<Task, 'title' | 'note' | 'status'>>
+
+/** Locator for a resource to unlink: clipboard refs by itemId, files refs by exact path list. */
+export type UnlinkTarget =
+  | { kind: 'clipboard'; itemId: string }
+  | { kind: 'files'; paths: string[] }
+
+/** Task as pushed to the renderer: resources carry a liveness flag computed against ItemStore. */
+export interface TaskDto extends Task {
+  resources: (ResourceRef & { alive: boolean })[]
+}
+
+/** L0 foreground/window switch event (t12 collector emits, t16 clustering consumes). */
+export interface AppSwitchEvent {
+  type: 'app-switch'
+  appName: string
+  exePath: string
+  pid: number
+  windowTitle: string
+  ts: number
+}
+
+/** Clipboard copy event attributed to the foreground app (t14 emits). */
+export interface ClipboardEvent {
+  type: 'clipboard'
+  appName: string
+  exePath: string
+  pid: number
+  ts: number
+}
+
+export type UsageEvent = AppSwitchEvent | ClipboardEvent
+
+/** An AI endpoint in the provider chain (t15 implements the calls). */
+export interface ProviderConfig {
+  id: string
+  baseUrl: string
+  apiKey?: string
+  model: string
+  kind: 'local' | 'cloud'
+  /** Structured (json_schema) output support; defaults to true, DeepSeek-style endpoints set false. */
+  supportsSchemaOutput?: boolean
+}
+
+/** A task suggestion card (t16 produces, t19/20 refine). */
+export interface Suggestion {
+  id: string
+  title: string
+  appNames: string[]
+  /** 0-1 confidence from the clustering margin rule. */
+  confidence: number
+  /** θ_low ≤ conf < θ_high: flagged for explicit user confirmation. */
+  lowConfidence: boolean
+  /** One-sentence algorithmic evidence. */
+  algorithmReason: string
+  evidence: {
+    appCombination: string
+    durationMs: number
+    overlappingTasks: string[]
+  }
+  /** Human-readable LLM rationale; may be absent when the provider chain failed. */
+  reason?: string
+}
+
+export type MemoryType = 'identity' | 'tool' | 'project' | 'workflow'
+export type MemoryUserState = 'confirmed' | 'suggested' | 'ignored' | 'banned'
+
+/** Long-term memory entry (t19/20 persist + decay; never written without user confirmation). */
+export interface Memory {
+  id: string
+  type: MemoryType
+  content: string
+  confidence: number
+  hitCount: number
+  lastSeenAt: number
+  createdAt: number
+  source: 'ai-suggest' | 'task-feedback' | 'user'
+  userState: MemoryUserState
+}
+
 export interface Settings {
   /** Fraction of the screen height the hot zone occupies (0.2 - 0.6). */
   hotZoneHeight: number
@@ -166,6 +300,30 @@ export interface Settings {
   fontSizeScale?: number
   /** Active UI language code ('system' | 'en' | 'es' | 'fr' | 'de' | ...). Default: 'system'. */
   language?: string
+  /** Master switch for the whole task system (capture + state machine + suggestions). */
+  taskCaptureEnabled: boolean
+  /** L0 foreground/window event capture. Off = nothing leaves the machine. */
+  l0CaptureEnabled: boolean
+  /** Minutes without an attribution event before an Active task auto-pauses (1-120). */
+  taskPauseThresholdMinutes: number
+  /** Auto-attach clipboard copies to tasks by source process. */
+  autoAttributionEnabled: boolean
+  /** Minimum new events before a suggestion pass triggers (1-50). */
+  suggestionMinEvents: number
+  /** Silence duration before a suggestion pass triggers (30-300s). */
+  suggestionSilenceSeconds: number
+  /** θ_high: confidence at/above which a segment merges into a task unconditionally (0-1, > θ_low). */
+  confidenceHigh: number
+  /** θ_low: below this a segment starts a new candidate (0-1). */
+  confidenceLow: number
+  /** Memory decay λ (per week, 0.01-1). */
+  memoryLambda: number
+  /** Days without a hit after which a memory is down-weighted (7-365). */
+  memoryStaleDays: number
+  /** Score floor below which a memory becomes a cleanup candidate (0-1). */
+  memoryCleanupScore: number
+  /** Provider chain in priority order (first = primary, auto-failover within the list). */
+  aiProviders: ProviderConfig[]
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -195,7 +353,19 @@ export const DEFAULT_SETTINGS: Settings = {
   lastSeenChangelogVersion: undefined,
   hoverActivation: true,
   fontSizeScale: 1.0,
-  language: 'system'
+  language: 'system',
+  taskCaptureEnabled: true,
+  l0CaptureEnabled: true,
+  taskPauseThresholdMinutes: 15,
+  autoAttributionEnabled: true,
+  suggestionMinEvents: 5,
+  suggestionSilenceSeconds: 60,
+  confidenceHigh: 0.7,
+  confidenceLow: 0.45,
+  memoryLambda: 0.25,
+  memoryStaleDays: 60,
+  memoryCleanupScore: 0.1,
+  aiProviders: []
 }
 
 

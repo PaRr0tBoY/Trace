@@ -5,12 +5,12 @@
  * contract lives in one place. The actual implementation lives in the preload;
  * the renderer only ever sees `window.edge` typed as this interface.
  */
-import type { Settings } from './types'
+import type { Settings, TaskDto, TaskPatch, UnlinkTarget } from './types'
 import type { DragRequest } from './types'
 
 export interface EdgeApi {
   /* Renderer -> Main */
-  loadState: () => Promise<{ items: import('./types').ClipboardItemDto[]; settings: Settings; version: string }>
+  loadState: () => Promise<{ items: import('./types').ClipboardItemDto[]; settings: Settings; version: string; tasks: TaskDto[] }>
   setPinned: (id: string, pinned: boolean) => Promise<import('./types').ClipboardItemDto[]>
   deleteItem: (id: string) => Promise<import('./types').ClipboardItemDto[]>
   clearItems: () => Promise<import('./types').ClipboardItemDto[]>
@@ -44,8 +44,18 @@ export interface EdgeApi {
   setInternalDrag: (active: boolean) => void
   broadcastTutorialStep: (step: number) => void
 
+  /* Task domain */
+  loadTasks: () => Promise<TaskDto[]>
+  createTask: (title: string, note?: string) => Promise<TaskDto[]>
+  updateTask: (id: string, patch: TaskPatch) => Promise<TaskDto[]>
+  deleteTask: (id: string) => Promise<TaskDto[]>
+  mergeTasks: (targetId: string, sourceId: string) => Promise<TaskDto[]>
+  linkItemToTask: (taskId: string, itemId: string) => Promise<TaskDto[]>
+  unlinkItemFromTask: (taskId: string, target: UnlinkTarget) => Promise<TaskDto[]>
+
   /* Main -> Renderer */
   onItems: (cb: (items: import('./types').ClipboardItemDto[]) => void) => () => void
+  onTasks: (cb: (tasks: TaskDto[]) => void) => () => void
   onSettings: (cb: (settings: Settings) => void) => () => void
   onToggle: (cb: (open?: boolean) => void) => () => void
   onOpenSettings: (cb: () => void) => () => void

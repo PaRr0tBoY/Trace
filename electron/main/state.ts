@@ -8,11 +8,12 @@
 import { ItemStore } from '../store/ItemStore'
 import { ClipboardWatcher } from '../clipboard/ClipboardWatcher'
 import { loadSettings, saveSettings } from '../store/settings'
-import type { ClipboardItemDto, Settings } from '../../shared/types'
+import { TaskStore, type TaskIndex } from '../store/TaskStore'
+import type { ClipboardItemDto, Settings, TaskDto } from '../../shared/types'
 import { MAX_STACK } from '../../shared/types'
 import { createId } from '../store/ids'
-import { nativeImage, BrowserWindow, powerMonitor } from 'electron'
-import { readFileSync } from 'node:fs'
+import { nativeImage, BrowserWindow, powerMonitor, safeStorage } from 'electron'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { PATHS } from '../store/paths'
 import { prefetchFileIcons } from './drag'
 import { runtime } from './config'
@@ -21,6 +22,55 @@ const store = new ItemStore()
 const watcher = new ClipboardWatcher(600)
 let pruneTimer: ReturnType<typeof setInterval> | null = null
 let wakeTimer: ReturnType<typeof setTimeout> | null = null
+let taskSweepTimer: ReturnType<typeof setInterval> | null = null
+
+/**
+ * Task persistence adapter: tasks.json with DPAPI encryption when available
+ * (same envelope as items.json — task titles are work context, not public).
+ * The pure TaskStore never sees Electron; it only gets load/save here.
+ */
+const taskStore = new TaskStore({
+  load: () => loadTasksFile(),
+  save: (index) => saveTasksFile(index),
+  isItemAlive: (itemId) => store.get(itemId) !== undefined
+})
+
+function loadTasksFile(): TaskIndex | null {
+  try {
+    const file = PATHS.tasksFile()
+    if (!existsSync(file)) return null
+    const text = readFileSync(file, 'utf8').trim()
+    if (!text) return null
+    const parsed = JSON.parse(text) as { encrypted?: boolean; payload?: string; tasks?: unknown }
+    if (parsed.encrypted === true && typeof parsed.payload === 'string') {
+      if (!safeStorage.isEncryptionAvailable()) return null
+      return JSON.parse(safeStorage.decryptString(Buffer.from(parsed.payload, 'base64'))) as TaskIndex
+    }
+    if (Array.isArray(parsed.tasks)) return parsed as TaskIndex
+    return null
+  } catch (err) {
+    console.error('[Task] tasks.json load failed:', err)
+    return null
+  }
+}
+
+function saveTasksFile(index: TaskIndex): void {
+  try {
+    const file = PATHS.tasksFile()
+    if (safeStorage.isEncryptionAvailable()) {
+      const envelope = {
+        v: 2,
+        encrypted: true,
+        payload: safeStorage.encryptString(JSON.stringify(index)).toString('base64')
+      }
+      writeFileSync(file, JSON.stringify(envelope, null, 2), 'utf8')
+    } else {
+      writeFileSync(file, JSON.stringify(index, null, 2), 'utf8')
+    }
+  } catch (err) {
+    console.error('[Task] tasks.json save failed:', err)
+  }
+}
 
 function handleSystemSleep(): void {
   watcher.setPaused(true)
@@ -41,6 +91,10 @@ function handleSystemWake(): void {
 /** Initialize persistence + start the clipboard watcher. */
 export function initState(): void {
   store.load()
+  taskStore.load()
+  taskStore.setPauseThreshold(loadSettings().taskPauseThresholdMinutes)
+  const swept = taskStore.sweep() // stale Active tasks from a previous session must not masquerade as live
+  console.log(`[Task] store ready: ${taskStore.list().length} tasks${swept > 0 ? `, ${swept} idle-paused` : ''}`)
   if (loadSettings().clearUnpinnedOnRestart) {
     store.clearUnpinned()
   }
@@ -90,12 +144,23 @@ export function initState(): void {
       pushState.items()
     }
   }, 60_000)
+
+  if (taskSweepTimer !== null) clearInterval(taskSweepTimer)
+  taskSweepTimer = setInterval(() => {
+    if (runtime.quitting) return
+    taskStore.setPauseThreshold(loadSettings().taskPauseThresholdMinutes)
+    if (taskStore.sweep() > 0) pushState.tasks()
+  }, 60_000)
 }
 
 export function stopStateTimers(): void {
   if (pruneTimer !== null) {
     clearInterval(pruneTimer)
     pruneTimer = null
+  }
+  if (taskSweepTimer !== null) {
+    clearInterval(taskSweepTimer)
+    taskSweepTimer = null
   }
 }
 
@@ -105,6 +170,10 @@ export function getStore(): ItemStore {
 
 export function getWatcher(): ClipboardWatcher {
   return watcher
+}
+
+export function getTaskStore(): TaskStore {
+  return taskStore
 }
 
 /** Push updates to all open windows (main window, onboarding window, etc.). */
@@ -121,6 +190,10 @@ export const pushState = {
   items(): void {
     const dto: ClipboardItemDto[] = store.toDto()
     send('state:items', dto)
+  },
+  tasks(): void {
+    const dto: TaskDto[] = taskStore.toDto()
+    send('state:tasks', dto)
   },
   settings(next: Settings): void {
     send('state:settings', next)

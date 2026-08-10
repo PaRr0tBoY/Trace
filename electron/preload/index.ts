@@ -116,8 +116,18 @@ const api = {
   setInternalDrag: (active: boolean) => { internalDrag = active },
   broadcastTutorialStep: (step: number) => send('tutorial:set-step', step),
 
+  /* Task domain */
+  loadTasks: () => invoke('task:load'),
+  createTask: (title: string, note?: string) => invoke('task:create', title, note),
+  updateTask: (id: string, patch: import('../../shared/types').TaskPatch) => invoke('task:update', id, patch),
+  deleteTask: (id: string) => invoke('task:delete', id),
+  mergeTasks: (targetId: string, sourceId: string) => invoke('task:merge', targetId, sourceId),
+  linkItemToTask: (taskId: string, itemId: string) => invoke('task:link-item', taskId, itemId),
+  unlinkItemFromTask: (taskId: string, target: import('../../shared/types').UnlinkTarget) => invoke('task:unlink-item', taskId, target),
+
   /* Main -> Renderer */
   onItems: (cb: (items: EventArgs<'state:items'>[0]) => void) => on('state:items', cb),
+  onTasks: (cb: (tasks: EventArgs<'state:tasks'>[0]) => void) => on('state:tasks', cb),
   onSettings: (cb: (settings: EventArgs<'state:settings'>[0]) => void) => on('state:settings', cb),
   onToggle: (cb: (open?: boolean) => void) => on('window:toggle', cb),
   onOpenSettings: (cb: () => void) => on('window:open-settings', cb),

@@ -18,6 +18,8 @@ export const PATHS = {
   imagesDir: () => join(root(), 'images'),
   /** Path to the items index JSON. */
   indexFile: () => join(root(), 'items.json'),
+  /** Path to the task index JSON. */
+  tasksFile: () => join(root(), 'tasks.json'),
   /** Path to the settings JSON. */
   settingsFile: () => join(root(), 'settings.json'),
   /** Scratch dir for temp files handed to native drag-out. */

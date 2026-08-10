@@ -9,7 +9,25 @@
  *   - `Renderer -> Main` calls (invoke/handle) are listed in `InvokeMap`.
  *   - `Main -> Renderer` events (send/on) are listed in `EventMap`.
  */
-import type { ClipboardItemDto, DragRequest, MergeResult, Settings, TaskDto, TaskPatch, UnlinkTarget } from './types'
+import type { ClipboardItemDto, DragRequest, MergeResult, ProviderConfig, Settings, TaskDto, TaskPatch, UnlinkTarget } from './types'
+
+/** Result of a connection test against one provider (ai:test-provider). */
+export interface ProviderTestResult {
+  ok: boolean
+  latencyMs?: number
+  status?: number
+  error?: string
+  /** The model that was probed. */
+  model?: string
+}
+
+/** Result of probing a local Ollama instance (ai:detect-ollama). */
+export interface OllamaDetectionResult {
+  found: boolean
+  baseUrl: string
+  models?: string[]
+  error?: string
+}
 
 /* ------------------------------------------------------------------ */
 /* Renderer -> Main  (ipcMain.handle / ipcRenderer.invoke)            */
@@ -108,6 +126,14 @@ export interface InvokeMap {
 
   /** Unlink a resource from a task (clipboard by itemId, files by exact path list). */
   'task:unlink-item': { args: [taskId: string, target: UnlinkTarget]; result: TaskDto[] }
+
+  /* --------------------------- ai provider --------------------------- */
+
+  /** Test a provider connection (one 1-token chat completion). */
+  'ai:test-provider': { args: [config: ProviderConfig]; result: ProviderTestResult }
+
+  /** Probe for a local Ollama instance via GET /v1/models. */
+  'ai:detect-ollama': { args: [baseUrl?: string]; result: OllamaDetectionResult }
 }
 
 /* ------------------------------------------------------------------ */

@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, type CSSProperties } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '../store/appStore'
-import type { DisplayInfo } from '../../shared/types'
+import type { DisplayInfo, ProviderConfig } from '../../shared/types'
 import { LiquidOctopusLoader } from './LiquidOctopusLoader'
 import { TickIndicatorIcon, CopyIndicatorIcon, SparkleIndicatorIcon } from './CopyIndicatorCurve'
 import { ChevronRightIcon, CloseIcon, LogOutIcon, StarIcon, GithubOctocatLogo } from './icons'
@@ -389,6 +389,10 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                       ))}
                     </div>
                   </div>
+
+                  <div className="setting-divider" />
+
+                  <AIProviderSection />
 
                   {PersistentFooter}
                 </motion.div>
@@ -1125,5 +1129,239 @@ function LanguageDropdown() {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+/**
+ * AI Provider chain editor: ordered list (first = primary, auto-failover),
+ * inline editing, per-provider connection test with status, local Ollama
+ * detection. State is local to the section; the chain itself lives in
+ * settings.aiProviders (main is the single source of truth).
+ */
+function AIProviderSection() {
+  const { t } = useTranslation()
+  const settings = useStore((s) => s.settings)
+  const patch = useStore((s) => s.patchSettings)
+  const providers = settings.aiProviders ?? []
+
+  const [testStates, setTestStates] = useState<Record<string, { status: 'testing' | 'ok' | 'fail'; detail?: string }>>({})
+  const [detectState, setDetectState] = useState<{ status: 'idle' | 'detecting' | 'ok' | 'fail'; detail?: string }>({ status: 'idle' })
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<ProviderConfig | null>(null)
+
+  const hasChainFailure = Object.values(testStates).some((s) => s.status === 'fail')
+
+  const setProviders = (next: ProviderConfig[]) => patch({ aiProviders: next })
+
+  const moveProvider = (index: number, dir: -1 | 1) => {
+    const target = index + dir
+    if (target < 0 || target >= providers.length) return
+    const next = [...providers]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    playButtonClickSound()
+    setProviders(next)
+  }
+
+  const addProvider = (kind: 'local' | 'cloud') => {
+    const provider: ProviderConfig = kind === 'local'
+      ? { id: `local-${Date.now().toString(36)}`, baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen3:8b', kind, supportsSchemaOutput: true }
+      : { id: `cloud-${Date.now().toString(36)}`, baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-v4-flash', kind, supportsSchemaOutput: false }
+    playButtonClickSound()
+    setProviders([...providers, provider])
+    setExpandedId(provider.id)
+    setDraft({ ...provider })
+  }
+
+  const commitDraft = () => {
+    if (draft && draft.id === expandedId) {
+      setProviders(providers.map((p) => (p.id === draft.id ? { ...draft, baseUrl: draft.baseUrl.trim() } : p)))
+    }
+  }
+
+  const testProvider = async (p: ProviderConfig) => {
+    setTestStates((s) => ({ ...s, [p.id]: { status: 'testing' } }))
+    const res = await window.edge.testProvider(p)
+    setTestStates((s) => ({
+      ...s,
+      [p.id]: res.ok
+        ? { status: 'ok', detail: String(res.latencyMs ?? 0) }
+        : { status: 'fail', detail: res.error ?? '' }
+    }))
+  }
+
+  const detectOllama = async () => {
+    setDetectState({ status: 'detecting' })
+    const res = await window.edge.detectOllama()
+    if (!res.found) {
+      setDetectState({ status: 'fail', detail: res.error ?? '' })
+      return
+    }
+    const existing = providers.find((p) => p.kind === 'local' && p.baseUrl.includes('127.0.0.1:11434'))
+    if (existing) {
+      setDetectState({ status: 'ok', detail: res.models?.join(', ') ?? '' })
+      return
+    }
+    const model = res.models?.find((m) => /qwen3/i.test(m)) ?? res.models?.[0] ?? 'qwen3:8b'
+    setProviders([...providers, { id: `local-ollama-${Date.now().toString(36)}`, baseUrl: 'http://127.0.0.1:11434/v1', model, kind: 'local', supportsSchemaOutput: true }])
+    setDetectState({ status: 'ok', detail: model })
+  }
+
+  const inputStyle: CSSProperties = {
+    width: '100%',
+    padding: '6px 8px',
+    borderRadius: 6,
+    border: '1px solid rgba(255, 255, 255, 0.15)',
+    background: 'rgba(255, 255, 255, 0.06)',
+    color: '#fff',
+    fontSize: 12,
+    outline: 'none',
+    boxSizing: 'border-box'
+  }
+
+  const iconBtn: CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    border: 'none',
+    background: 'rgba(255, 255, 255, 0.08)',
+    color: 'rgba(255, 255, 255, 0.85)',
+    cursor: 'pointer',
+    fontSize: 11,
+    lineHeight: 1,
+    padding: 0,
+    flexShrink: 0
+  }
+
+  return (
+    <>
+      <div className="setting-group-label">{t('ai.sectionTitle')}</div>
+      <div className="setting-desc" style={{ marginTop: 2, marginBottom: 8 }}>{t('ai.sectionDesc')}</div>
+
+      {providers.length === 0 && (
+        <div className="setting-desc" style={{ marginBottom: 8, opacity: 0.7 }}>{t('ai.noProviders')}</div>
+      )}
+
+      {providers.map((p, i) => {
+        const test = testStates[p.id]
+        const isExpanded = expandedId === p.id
+        const isDraft = draft && draft.id === p.id ? draft : p
+        return (
+          <div key={p.id} className="setting-row vertical" style={{ gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  flexShrink: 0,
+                  background: p.kind === 'local' ? '#4ade80' : '#60a5fa'
+                }}
+                title={p.kind === 'local' ? t('ai.kindLocal') : t('ai.kindCloud')}
+              />
+              <div className="setting-info" style={{ flex: 1, minWidth: 0 }}>
+                <div className="setting-title" style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {isDraft.model}
+                </div>
+                <div className="setting-desc" style={{ fontSize: 10.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p.baseUrl}
+                </div>
+              </div>
+              {test?.status === 'testing' && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{t('ai.testing')}</span>}
+              {test?.status === 'ok' && <span style={{ fontSize: 11, color: '#4caf50', whiteSpace: 'nowrap' }}>✓ {t('ai.testOk', { ms: test.detail ?? '' })}</span>}
+              {test?.status === 'fail' && <span style={{ fontSize: 11, color: '#ff6b6b', whiteSpace: 'nowrap', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>✗ {t('ai.testFailed', { error: test.detail ?? '' })}</span>}
+              <button
+                className="pill display-pill"
+                style={{ padding: '4px 10px', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}
+                onClick={() => { playButtonClickSound(); void testProvider(isDraft) }}
+              >
+                {t('ai.test')}
+              </button>
+              <button style={{ ...iconBtn, ...(i === 0 ? { opacity: 0.35, cursor: 'default' } : {}) }} disabled={i === 0} title={t('ai.moveUp')} onClick={() => moveProvider(i, -1)}>
+                <ChevronRightIcon width={12} height={12} style={{ transform: 'rotate(-90deg)' }} />
+              </button>
+              <button style={{ ...iconBtn, ...(i === providers.length - 1 ? { opacity: 0.35, cursor: 'default' } : {}) }} disabled={i === providers.length - 1} title={t('ai.moveDown')} onClick={() => moveProvider(i, 1)}>
+                <ChevronRightIcon width={12} height={12} style={{ transform: 'rotate(90deg)' }} />
+              </button>
+              <button style={iconBtn} title={t('ai.remove')} onClick={() => { playButtonClickSound(); setProviders(providers.filter((x) => x.id !== p.id)); if (expandedId === p.id) { setExpandedId(null); setDraft(null) } }}>
+                <CloseIcon width={10} height={10} />
+              </button>
+            </div>
+
+            {isExpanded && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                  {t('ai.baseUrl')}
+                  <input
+                    style={{ ...inputStyle, marginTop: 4 }}
+                    value={isDraft.baseUrl}
+                    onChange={(e) => setDraft({ ...isDraft, baseUrl: e.target.value })}
+                    onBlur={commitDraft}
+                  />
+                </label>
+                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                  {t('ai.apiKey')}
+                  <input
+                    style={{ ...inputStyle, marginTop: 4 }}
+                    value={isDraft.apiKey ?? ''}
+                    onChange={(e) => setDraft({ ...isDraft, apiKey: e.target.value })}
+                    onBlur={commitDraft}
+                  />
+                </label>
+                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                  {t('ai.model')}
+                  <input
+                    style={{ ...inputStyle, marginTop: 4 }}
+                    value={isDraft.model}
+                    onChange={(e) => setDraft({ ...isDraft, model: e.target.value })}
+                    onBlur={commitDraft}
+                  />
+                </label>
+                <div className="setting-row" style={{ width: '100%' }}>
+                  <div className="setting-info">
+                    <div className="setting-title" style={{ fontSize: 12 }}>{t('ai.schemaOutput')}</div>
+                  </div>
+                  <Toggle
+                    checked={isDraft.supportsSchemaOutput !== false}
+                    onChange={(v) => { setDraft({ ...isDraft, supportsSchemaOutput: v }); setProviders(providers.map((x) => (x.id === p.id ? { ...x, supportsSchemaOutput: v } : x))) }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+        <button
+          className="pill display-pill"
+          style={{ padding: '6px 12px', cursor: 'pointer', fontSize: 12 }}
+          onClick={() => addProvider('local')}
+        >
+          {t('ai.addLocal')}
+        </button>
+        <button
+          className="pill display-pill"
+          style={{ padding: '6px 12px', cursor: 'pointer', fontSize: 12 }}
+          onClick={() => addProvider('cloud')}
+        >
+          {t('ai.addCloud')}
+        </button>
+        <button
+          className="pill display-pill"
+          style={{ padding: '6px 12px', cursor: 'pointer', fontSize: 12 }}
+          onClick={() => { playButtonClickSound(); void detectOllama() }}
+        >
+          {t('ai.detectOllama')}
+        </button>
+      </div>
+
+      {detectState.status === 'detecting' && <div className="setting-desc" style={{ marginTop: 8 }}>{t('ai.detecting')}</div>}
+      {detectState.status === 'ok' && <div className="setting-desc" style={{ marginTop: 8, color: '#4caf50' }}>{t('ai.detectFound', { model: detectState.detail ?? '' })}</div>}
+      {detectState.status === 'fail' && <div className="setting-desc" style={{ marginTop: 8, color: '#ff6b6b' }}>{t('ai.detectNotFound')}{detectState.detail ? ` (${detectState.detail})` : ''}</div>}
+      {hasChainFailure && <div className="setting-desc" style={{ marginTop: 8, opacity: 0.7 }}>{t('ai.chainHint')}</div>}
+    </>
   )
 }

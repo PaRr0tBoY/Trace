@@ -6,7 +6,8 @@
  * the renderer only ever sees `window.edge` typed as this interface.
  */
 import type { Settings, TaskDto, TaskPatch, UnlinkTarget } from './types'
-import type { DragRequest } from './types'
+import type { DragRequest, ProviderConfig } from './types'
+import type { OllamaDetectionResult, ProviderTestResult } from './ipc'
 
 export interface EdgeApi {
   /* Renderer -> Main */
@@ -52,6 +53,10 @@ export interface EdgeApi {
   mergeTasks: (targetId: string, sourceId: string) => Promise<TaskDto[]>
   linkItemToTask: (taskId: string, itemId: string) => Promise<TaskDto[]>
   unlinkItemFromTask: (taskId: string, target: UnlinkTarget) => Promise<TaskDto[]>
+
+  /* AI provider */
+  testProvider: (config: ProviderConfig) => Promise<ProviderTestResult>
+  detectOllama: (baseUrl?: string) => Promise<OllamaDetectionResult>
 
   /* Main -> Renderer */
   onItems: (cb: (items: import('./types').ClipboardItemDto[]) => void) => () => void

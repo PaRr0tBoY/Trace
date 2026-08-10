@@ -213,6 +213,32 @@ export interface TranslationKeys {
     itemUnpinned: string
     settingsSaved: string
   }
+  ai: {
+    sectionTitle: string
+    sectionDesc: string
+    noProviders: string
+    addLocal: string
+    addCloud: string
+    detectOllama: string
+    detecting: string
+    detectNotFound: string
+    detectFound: string
+    test: string
+    testing: string
+    testOk: string
+    testFailed: string
+    chainHint: string
+    baseUrl: string
+    apiKey: string
+    model: string
+    kindLocal: string
+    kindCloud: string
+    schemaOutput: string
+    moveUp: string
+    moveDown: string
+    remove: string
+  }
+
   footer: {
     communityAndSupport: string
     feedbackTitle: string
@@ -611,6 +637,32 @@ export const en: TranslationKeys = {
     "itemUnpinned": "Item unpinned",
     "settingsSaved": "Settings saved"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Community & Support",
     "feedbackTitle": "Feedback & Issues",
@@ -842,6 +894,32 @@ export const es: TranslationKeys = {
     "itemUnpinned": "Elemento desfijado",
     "settingsSaved": "Configuración guardada"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Comunidad y soporte",
     "feedbackTitle": "Comentarios y problemas",
@@ -1073,6 +1151,32 @@ export const fr: TranslationKeys = {
     "itemUnpinned": "Élément désépinglé",
     "settingsSaved": "Paramètres enregistrés"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Communauté et assistance",
     "feedbackTitle": "Commentaires et problèmes",
@@ -1304,6 +1408,32 @@ export const de: TranslationKeys = {
     "itemUnpinned": "Element gelöst",
     "settingsSaved": "Einstellungen gespeichert"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Community & Support",
     "feedbackTitle": "Feedback & Probleme",
@@ -1535,6 +1665,32 @@ export const it: TranslationKeys = {
     "itemUnpinned": "Elemento sbloccato",
     "settingsSaved": "Impostazioni salvate"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Community e supporto",
     "feedbackTitle": "Feedback e problemi",
@@ -1766,6 +1922,32 @@ export const pt: TranslationKeys = {
     "itemUnpinned": "Item desafixado",
     "settingsSaved": "Configurações salvas"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Comunidade e suporte",
     "feedbackTitle": "Feedback e problemas",
@@ -1997,6 +2179,32 @@ export const ru: TranslationKeys = {
     "itemUnpinned": "Элемент откреплён",
     "settingsSaved": "Настройки сохранены"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Сообщество и поддержка",
     "feedbackTitle": "Отзывы и проблемы",
@@ -2228,6 +2436,32 @@ export const ja: TranslationKeys = {
     "itemUnpinned": "項目のピンを解除しました",
     "settingsSaved": "設定を保存しました"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "コミュニティとサポート",
     "feedbackTitle": "フィードバックと問題",
@@ -2459,6 +2693,32 @@ export const ko: TranslationKeys = {
     "itemUnpinned": "항목 고정 해제됨",
     "settingsSaved": "설정이 저장됨"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "커뮤니티 및 지원",
     "feedbackTitle": "피드백 및 이슈",
@@ -2690,6 +2950,32 @@ export const zhCN: TranslationKeys = {
     "itemUnpinned": "项已取消固定",
     "settingsSaved": "设置已保存"
   },
+  "ai": {
+    "sectionTitle": "AI Provider 配置",
+    "sectionDesc": "配置任务建议所用的 AI 端点。列表首位为主 provider，失败时自动降级到链中下一个。",
+    "noProviders": "尚未配置 provider，AI 建议功能不可用。",
+    "addLocal": "添加本地 (Ollama)",
+    "addCloud": "添加云端 (OpenAI 兼容)",
+    "detectOllama": "检测本地 Ollama",
+    "detecting": "检测中…",
+    "detectNotFound": "未检测到本地 Ollama（http://127.0.0.1:11434）",
+    "detectFound": "已检测到 Ollama，已添加 provider（{model}）",
+    "test": "测试",
+    "testing": "测试中…",
+    "testOk": "正常 · {ms} ms",
+    "testFailed": "失败 · {error}",
+    "chainHint": "测试失败的 provider 会被自动跳过，降级到链中下一个。",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key（可选）",
+    "model": "模型",
+    "kindLocal": "本地",
+    "kindCloud": "云端",
+    "schemaOutput": "结构化输出 (json_schema)",
+    "moveUp": "上移",
+    "moveDown": "下移",
+    "remove": "删除"
+  },
+
   "footer": {
     "communityAndSupport": "社区和支持",
     "feedbackTitle": "反馈与问题",
@@ -2921,6 +3207,32 @@ export const zhTW: TranslationKeys = {
     "itemUnpinned": "項目已取消固定",
     "settingsSaved": "設定已儲存"
   },
+  "ai": {
+    "sectionTitle": "AI Provider 設定",
+    "sectionDesc": "設定任務建議所用的 AI 端點。清單首位為主 provider，失敗時自動降級到鏈中下一個。",
+    "noProviders": "尚未設定 provider，AI 建議功能不可用。",
+    "addLocal": "新增本機 (Ollama)",
+    "addCloud": "新增雲端 (OpenAI 相容)",
+    "detectOllama": "偵測本機 Ollama",
+    "detecting": "偵測中…",
+    "detectNotFound": "未偵測到本機 Ollama（http://127.0.0.1:11434）",
+    "detectFound": "已偵測到 Ollama，已新增 provider（{model}）",
+    "test": "測試",
+    "testing": "測試中…",
+    "testOk": "正常 · {ms} ms",
+    "testFailed": "失敗 · {error}",
+    "chainHint": "測試失敗的 provider 會自動跳過，降級到鏈中下一個。",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key（選填）",
+    "model": "模型",
+    "kindLocal": "本機",
+    "kindCloud": "雲端",
+    "schemaOutput": "結構化輸出 (json_schema)",
+    "moveUp": "上移",
+    "moveDown": "下移",
+    "remove": "刪除"
+  },
+
   "footer": {
     "communityAndSupport": "社群和支援",
     "feedbackTitle": "回饋與問題",
@@ -3152,6 +3464,32 @@ export const hi: TranslationKeys = {
     "itemUnpinned": "आइटम अनपिन किया गया",
     "settingsSaved": "सेटिंग्स सहेजी गईं"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "समुदाय और सहायता",
     "feedbackTitle": "प्रतिक्रिया और समस्याएँ",
@@ -3383,6 +3721,32 @@ export const ar: TranslationKeys = {
     "itemUnpinned": "أُلغي تثبيت العنصر",
     "settingsSaved": "حُفظت الإعدادات"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "المجتمع والدعم",
     "feedbackTitle": "الملاحظات والمشكلات",
@@ -3614,6 +3978,32 @@ export const bn: TranslationKeys = {
     "itemUnpinned": "আইটেম আনপিন করা হয়েছে",
     "settingsSaved": "সেটিংস সংরক্ষিত হয়েছে"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "কমিউনিটি ও সহায়তা",
     "feedbackTitle": "প্রতিক্রিয়া ও সমস্যা",
@@ -3845,6 +4235,32 @@ export const tr: TranslationKeys = {
     "itemUnpinned": "Öğenin sabitlemesi kaldırıldı",
     "settingsSaved": "Ayarlar kaydedildi"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Topluluk ve Destek",
     "feedbackTitle": "Geri Bildirim ve Sorunlar",
@@ -4076,6 +4492,32 @@ export const vi: TranslationKeys = {
     "itemUnpinned": "Đã bỏ ghim mục",
     "settingsSaved": "Đã lưu cài đặt"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Cộng đồng & Hỗ trợ",
     "feedbackTitle": "Phản hồi & Vấn đề",
@@ -4307,6 +4749,32 @@ export const pl: TranslationKeys = {
     "itemUnpinned": "Element odpięty",
     "settingsSaved": "Ustawienia zapisane"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Społeczność i wsparcie",
     "feedbackTitle": "Opinie i problemy",
@@ -4538,6 +5006,32 @@ export const nl: TranslationKeys = {
     "itemUnpinned": "Item losgemaakt",
     "settingsSaved": "Instellingen opgeslagen"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Community en ondersteuning",
     "feedbackTitle": "Feedback en problemen",
@@ -4769,6 +5263,32 @@ export const sv: TranslationKeys = {
     "itemUnpinned": "Objekt lösgjort",
     "settingsSaved": "Inställningar sparade"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Community och support",
     "feedbackTitle": "Feedback och problem",
@@ -5000,6 +5520,32 @@ export const id: TranslationKeys = {
     "itemUnpinned": "Sematan item dilepas",
     "settingsSaved": "Pengaturan disimpan"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Komunitas & Dukungan",
     "feedbackTitle": "Umpan Balik & Masalah",
@@ -5231,6 +5777,32 @@ export const uk: TranslationKeys = {
     "itemUnpinned": "Елемент відкріплено",
     "settingsSaved": "Налаштування збережено"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Спільнота та підтримка",
     "feedbackTitle": "Відгуки та проблеми",
@@ -5462,6 +6034,32 @@ export const el: TranslationKeys = {
     "itemUnpinned": "Το στοιχείο ξεκαρφιτσώθηκε",
     "settingsSaved": "Οι ρυθμίσεις αποθηκεύτηκαν"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Κοινότητα και Υποστήριξη",
     "feedbackTitle": "Σχόλια και Προβλήματα",
@@ -5693,6 +6291,32 @@ export const cs: TranslationKeys = {
     "itemUnpinned": "Položka odepnuta",
     "settingsSaved": "Nastavení uložena"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Komunita a podpora",
     "feedbackTitle": "Zpětná vazba a problémy",
@@ -5924,6 +6548,32 @@ export const ro: TranslationKeys = {
     "itemUnpinned": "Element anulat",
     "settingsSaved": "Setări salvate"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Comunitate și suport",
     "feedbackTitle": "Feedback și probleme",
@@ -6155,6 +6805,32 @@ export const hu: TranslationKeys = {
     "itemUnpinned": "Elem feloldva",
     "settingsSaved": "Beállítások elmentve"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Közösség és támogatás",
     "feedbackTitle": "Visszajelzés és problémák",
@@ -6386,6 +7062,32 @@ export const da: TranslationKeys = {
     "itemUnpinned": "Element frigjort",
     "settingsSaved": "Indstillinger gemt"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Fællesskab og support",
     "feedbackTitle": "Feedback og problemer",
@@ -6617,6 +7319,32 @@ export const fi: TranslationKeys = {
     "itemUnpinned": "Kohteen kiinnitys poistettu",
     "settingsSaved": "Asetukset tallennettu"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Yhteisö ja tuki",
     "feedbackTitle": "Palaute ja ongelmat",
@@ -6848,6 +7576,32 @@ export const th: TranslationKeys = {
     "itemUnpinned": "ยกเลิกปักหมุดรายการแล้ว",
     "settingsSaved": "บันทึกการตั้งค่าแล้ว"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "ชุมชนและการสนับสนุน",
     "feedbackTitle": "ผลตอบรับและปัญหา",
@@ -7079,6 +7833,32 @@ export const he: TranslationKeys = {
     "itemUnpinned": "הצמדת פריט בוטלה",
     "settingsSaved": "הגדרות נשמרו"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "קהילה ותמיכה",
     "feedbackTitle": "משוב ובעיות",
@@ -7310,6 +8090,32 @@ export const no: TranslationKeys = {
     "itemUnpinned": "Element løsnet",
     "settingsSaved": "Innstillinger lagret"
   },
+  "ai": {
+    "sectionTitle": "AI Providers",
+    "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
+    "noProviders": "No providers configured — AI suggestions are disabled.",
+    "addLocal": "Add local (Ollama)",
+    "addCloud": "Add cloud (OpenAI-compatible)",
+    "detectOllama": "Detect local Ollama",
+    "detecting": "Detecting…",
+    "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
+    "detectFound": "Ollama detected — added provider ({model})",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "OK · {ms} ms",
+    "testFailed": "Failed · {error}",
+    "chainHint": "Failed providers are skipped automatically in favour of the next one.",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key (optional)",
+    "model": "Model",
+    "kindLocal": "Local",
+    "kindCloud": "Cloud",
+    "schemaOutput": "Structured output (json_schema)",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "remove": "Remove"
+  },
+
   "footer": {
     "communityAndSupport": "Fellesskap og støtte",
     "feedbackTitle": "Tilbakemelding og problemer",

@@ -17,6 +17,7 @@ import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData } from './drag'
 import { clipboardSignature } from '../clipboard/formats'
 import { buildClipboardRef } from '../store/TaskStore'
+import { ProviderChain, buildLocalProvider, detectOllama, testProvider } from './provider'
 import type { ItemData, MergeResult } from '../../shared/types'
 
 /**
@@ -157,6 +158,12 @@ export function registerIpc(): void {
       tasks: getTaskStore().toDto()
     }
   })
+
+  /* --------------------------- ai provider --------------------------- */
+
+  handle('ai:test-provider', (config) => testProvider(config))
+  handle('ai:detect-ollama', (baseUrl) => detectOllama(baseUrl))
+  void detectOllamaAtStartup()
 
   /* --------------------------- task domain --------------------------- */
 
@@ -485,6 +492,32 @@ export function registerIpc(): void {
       win.minimize()
     }
   })
+}
+
+/** Singleton provider chain for the suggestion engine (t19); settings-driven. */
+let providerChain: ProviderChain | null = null
+
+export function getProviderChain(): ProviderChain {
+  if (!providerChain) {
+    providerChain = new ProviderChain({ getProviders: () => loadSettings().aiProviders })
+    console.log(`[AI] provider chain ready (${loadSettings().aiProviders.length} providers)`)
+  }
+  return providerChain
+}
+
+/**
+ * Silent one-shot detection at startup: when no provider is configured yet
+ * (fresh install -> onboarding) and Ollama is running, prefill the local
+ * provider. Never overwrites a user-configured chain.
+ */
+async function detectOllamaAtStartup(): Promise<void> {
+  if (loadSettings().aiProviders.length > 0) return
+  const result = await detectOllama()
+  if (!result.found) return
+  const provider = buildLocalProvider(result.models)
+  const next = saveSettings({ aiProviders: [provider] })
+  pushState.settings(next)
+  console.log(`[AI] ollama detected at startup, prefilled local provider (${provider.model})`)
 }
 
 /**

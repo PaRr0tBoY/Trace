@@ -125,6 +125,10 @@ const api = {
   linkItemToTask: (taskId: string, itemId: string) => invoke('task:link-item', taskId, itemId),
   unlinkItemFromTask: (taskId: string, target: import('../../shared/types').UnlinkTarget) => invoke('task:unlink-item', taskId, target),
 
+  /* AI provider */
+  testProvider: (config: import('../../shared/types').ProviderConfig) => invoke('ai:test-provider', config),
+  detectOllama: (baseUrl?: string) => invoke('ai:detect-ollama', baseUrl),
+
   /* Main -> Renderer */
   onItems: (cb: (items: EventArgs<'state:items'>[0]) => void) => on('state:items', cb),
   onTasks: (cb: (tasks: EventArgs<'state:tasks'>[0]) => void) => on('state:tasks', cb),

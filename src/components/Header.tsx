@@ -1,8 +1,9 @@
 /** Panel header: title + settings toggle. */
 import { motion } from 'framer-motion'
 import { useStore } from '../store/appStore'
-import { GearIcon, CloseIcon, InfoIcon } from './icons'
+import { GearIcon, CloseIcon, InfoIcon, TaskIcon } from './icons'
 import { playButtonClickSound } from '../lib/soundEffects'
+import { taskBadgeCount } from '../lib/taskGroups'
 
 import { useTranslation } from '../i18n'
 
@@ -15,6 +16,10 @@ export function Header() {
   const settings = useStore((s) => s.settings)
   const patchSettings = useStore((s) => s.patchSettings)
   const currentVersion = useStore((s) => s.currentVersion)
+  const view = useStore((s) => s.view)
+  const setView = useStore((s) => s.setView)
+  const tasks = useStore((s) => s.tasks)
+  const badge = taskBadgeCount(tasks)
 
   const isChangelogUnread = settingsOpen && (
     !settings.lastSeenChangelogVersion ||
@@ -55,6 +60,10 @@ export function Header() {
         {settingsOpen ? (
           <span style={{ fontSize: 13, fontWeight: 600, color: '#8e8e93', letterSpacing: '0.01em', paddingLeft: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>
             {settingsSubView === 'changelog' ? t('header.whatsNew') : t('header.settings')}
+          </span>
+        ) : view === 'tasks' ? (
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#8e8e93', letterSpacing: '0.01em', paddingLeft: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>
+            {t('tasks.viewTitle')}
           </span>
         ) : (
           <div 
@@ -178,6 +187,67 @@ export function Header() {
                   pointerEvents: 'none'
                 }}
               />
+            )}
+          </button>
+        )}
+
+        {!settingsOpen && (
+          <button
+            type="button"
+            className={`icon-btn${view === 'tasks' ? ' active' : ''}`}
+            title={view === 'tasks' ? t('tasks.back') : t('tasks.viewTitle')}
+            onClick={() => {
+              playButtonClickSound()
+              if (view === 'tasks') {
+                setView('clipboard')
+                return
+              }
+              // Leave the shelf cleanly: no item preview / style flyout may
+              // linger over the task layer.
+              const state = useStore.getState()
+              state.setPreviewItemId(null)
+              state.setStyleFlyoutOpen(false)
+              setView('tasks')
+            }}
+            style={{
+              color: view === 'tasks' ? '#ffffff' : 'rgba(255, 255, 255, 0.75)',
+              background: view === 'tasks' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
+              border: 'none',
+              boxShadow: 'none',
+              flexShrink: 0,
+              cursor: 'pointer',
+              width: 32,
+              height: 32,
+              display: 'grid',
+              placeItems: 'center',
+              position: 'relative',
+              borderRadius: 8,
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <TaskIcon width={16} height={16} />
+            {badge > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  minWidth: 13,
+                  height: 13,
+                  padding: '0 3px',
+                  borderRadius: 999,
+                  backgroundColor: '#f87171',
+                  color: '#000000',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  lineHeight: '13px',
+                  textAlign: 'center',
+                  boxShadow: '0 0 6px rgba(0, 0, 0, 0.5)',
+                  pointerEvents: 'none'
+                }}
+              >
+                {badge > 9 ? '9+' : badge}
+              </span>
             )}
           </button>
         )}

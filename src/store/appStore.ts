@@ -8,7 +8,7 @@
  */
 import { create } from 'zustand'
 import { edge } from '../lib/edge'
-import type { ClipboardItemDto, Settings, DragRequest } from '../../shared/types'
+import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
@@ -22,6 +22,7 @@ export interface ToastMsg {
 
 interface AppState {
   items: ClipboardItemDto[]
+  tasks: TaskDto[]
   settings: Settings
   /** True until the first `state:load` resolves. */
   hydrated: boolean
@@ -33,6 +34,9 @@ interface AppState {
   open: boolean
   /** Settings sheet visibility. */
   settingsOpen: boolean
+  /** Active panel layer: clipboard shelf or task layer. */
+  view: 'clipboard' | 'tasks'
+  setView: (view: 'clipboard' | 'tasks') => void
   /** Active view mode within settings ('main' | 'changelog'). */
   settingsSubView: 'main' | 'changelog'
   setSettingsSubView: (subView: 'main' | 'changelog') => void
@@ -59,6 +63,7 @@ interface AppState {
   /* hydration + sync */
   hydrate: () => Promise<void>
   setItems: (items: ClipboardItemDto[]) => void
+  setTasks: (tasks: TaskDto[]) => void
   setSettings: (next: Settings) => void
 
   /* UI */
@@ -89,10 +94,16 @@ interface AppState {
   pasteSubitem: (req: DragRequest) => Promise<void>
   patchSettings: (patch: Partial<Settings>) => Promise<void>
   setTutorialStep: (step: number) => void
+
+  /* task mutations (delegate to main; authoritative list comes back) */
+  createTask: (title: string, note?: string) => Promise<void>
+  updateTask: (id: string, patch: TaskPatch) => Promise<void>
+  deleteTask: (id: string) => Promise<void>
 }
 
 export const useStore = create<AppState>((set, get) => ({
   items: [],
+  tasks: [],
   settings: { ...DEFAULT_SETTINGS },
   hydrated: false,
   query: '',
@@ -100,6 +111,8 @@ export const useStore = create<AppState>((set, get) => ({
   setTypeFilter: (typeFilter) => set({ typeFilter }),
   open: false,
   settingsOpen: false,
+  view: 'clipboard',
+  setView: (view) => set({ view }),
   settingsSubView: 'main',
   setSettingsSubView: (subView) => set({ settingsSubView: subView }),
   dragActive: false,
@@ -135,11 +148,12 @@ export const useStore = create<AppState>((set, get) => ({
   flareKey: 0,
 
   async hydrate() {
-    const { items, settings, version } = await edge.loadState()
+    const { items, settings, version, tasks } = await edge.loadState()
     set({ 
       items, 
       settings, 
       currentVersion: version,
+      tasks,
       hydrated: true
     })
   },
@@ -161,6 +175,7 @@ export const useStore = create<AppState>((set, get) => ({
     }
     set({ items })
   },
+  setTasks: (tasks) => set({ tasks }),
   setSettings: (next) => set({ settings: next }),
 
   setQuery: (query) => set({ query }),
@@ -276,5 +291,17 @@ export const useStore = create<AppState>((set, get) => ({
   setTutorialStep: (step) => {
     set({ tutorialStep: step })
     edge.broadcastTutorialStep(step)
+  },
+
+  async createTask(title, note) {
+    set({ tasks: await edge.createTask(title, note) })
+  },
+
+  async updateTask(id, patch) {
+    set({ tasks: await edge.updateTask(id, patch) })
+  },
+
+  async deleteTask(id) {
+    set({ tasks: await edge.deleteTask(id) })
   }
 }))

@@ -38,7 +38,14 @@ import {
   LogOut,
   Coffee,
   Heart,
-  Star
+  Star,
+  ListTodo,
+  Pause,
+  Play,
+  CircleCheck,
+  RotateCcw,
+  Plus,
+  SquarePen
 } from 'lucide-react'
 import { getFileKindByExt } from '../lib/fileType'
 
@@ -88,6 +95,14 @@ export const ContractIcon = (p: P) => <Minimize2 size={p.width ?? 16} {...(p as 
 export const FolderOpenIcon = (p: P) => <FolderOpen size={p.width ?? 16} {...(p as any)} />
 export const CheckIcon = (p: P) => <Check size={p.width ?? 16} {...(p as any)} />
 export const FileIconGlyph = FileIcon
+
+export const TaskIcon = (p: P) => <ListTodo size={p.width ?? 16} strokeWidth={2} {...(p as any)} />
+export const PauseIcon = (p: P) => <Pause size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
+export const ResumeIcon = (p: P) => <Play size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
+export const CompleteIcon = (p: P) => <CircleCheck size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
+export const RestoreIcon = (p: P) => <RotateCcw size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
+export const PlusIcon = (p: P) => <Plus size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
+export const EditIcon = (p: P) => <SquarePen size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
 
 const PdfGlyph = (p: P) => <FileText size={p.width ?? 16} {...(p as any)} />
 const ArchiveGlyph = (p: P) => <FileArchive size={p.width ?? 16} {...(p as any)} />

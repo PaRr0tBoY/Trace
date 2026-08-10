@@ -8,6 +8,7 @@ import './styles/tokens.css'
 import './styles/global.css'
 import './styles/panel.css'
 import './styles/item.css'
+import './styles/tasks.css'
 import './styles/settings.css'
 
 const container = document.getElementById('root')

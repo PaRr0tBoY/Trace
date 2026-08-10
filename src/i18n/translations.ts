@@ -269,6 +269,14 @@ export interface TranslationKeys {
     resourceDead: string
     openDetail: string
     suggestionsHint: string
+    addContent: string
+    addContentTitle: string
+    addContentEmpty: string
+    alreadyLinked: string
+    linkToast: string
+    pinBackToast: string
+    dropBarHint: string
+    resourceHint: string
   }
   footer: {
     communityAndSupport: string
@@ -722,7 +730,15 @@ export const en: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -1010,7 +1026,15 @@ export const es: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -1298,7 +1322,15 @@ export const fr: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -1586,7 +1618,15 @@ export const de: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -1874,7 +1914,15 @@ export const it: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -2162,7 +2210,15 @@ export const pt: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -2450,7 +2506,15 @@ export const ru: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -2738,7 +2802,15 @@ export const ja: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -3026,7 +3098,15 @@ export const ko: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -3314,7 +3394,15 @@ export const zhCN: TranslationKeys = {
     "noResources": "还没有关联内容",
     "resourceDead": "已从剪贴板移除",
     "openDetail": "打开任务",
-    "suggestionsHint": "静默一段时间后，这里会出现任务建议。"
+    "suggestionsHint": "静默一段时间后，这里会出现任务建议。",
+    "addContent": "添加内容",
+    "addContentTitle": "从剪贴板挑选",
+    "addContentEmpty": "剪贴板为空",
+    "alreadyLinked": "已关联",
+    "linkToast": "已添加到任务",
+    "pinBackToast": "已复制并置顶",
+    "dropBarHint": "拖到任务上",
+    "resourceHint": "可拖出到桌面，或点击复制到剪贴板"
   },
 
   "footer": {
@@ -3602,7 +3690,15 @@ export const zhTW: TranslationKeys = {
     "noResources": "還沒有關聯內容",
     "resourceDead": "已從剪貼簿移除",
     "openDetail": "開啟任務",
-    "suggestionsHint": "靜默一段時間後，這裡會出現任務建議。"
+    "suggestionsHint": "靜默一段時間後，這裡會出現任務建議。",
+    "addContent": "新增內容",
+    "addContentTitle": "從剪貼簿挑選",
+    "addContentEmpty": "剪貼簿是空的",
+    "alreadyLinked": "已關聯",
+    "linkToast": "已新增至任務",
+    "pinBackToast": "已複製並置頂",
+    "dropBarHint": "拖到任務上",
+    "resourceHint": "可拖出到桌面，或點擊複製到剪貼簿"
   },
 
   "footer": {
@@ -3890,7 +3986,15 @@ export const hi: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -4178,7 +4282,15 @@ export const ar: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -4466,7 +4578,15 @@ export const bn: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -4754,7 +4874,15 @@ export const tr: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -5042,7 +5170,15 @@ export const vi: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -5330,7 +5466,15 @@ export const pl: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -5618,7 +5762,15 @@ export const nl: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -5906,7 +6058,15 @@ export const sv: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -6194,7 +6354,15 @@ export const id: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -6482,7 +6650,15 @@ export const uk: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -6770,7 +6946,15 @@ export const el: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -7058,7 +7242,15 @@ export const cs: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -7346,7 +7538,15 @@ export const ro: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -7634,7 +7834,15 @@ export const hu: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -7922,7 +8130,15 @@ export const da: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -8210,7 +8426,15 @@ export const fi: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -8498,7 +8722,15 @@ export const th: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -8786,7 +9018,15 @@ export const he: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {
@@ -9074,7 +9314,15 @@ export const no: TranslationKeys = {
     "noResources": "Nothing attached yet",
     "resourceDead": "Removed from clipboard",
     "openDetail": "Open task",
-    "suggestionsHint": "Task suggestions appear here after a quiet period."
+    "suggestionsHint": "Task suggestions appear here after a quiet period.",
+    "addContent": "Add content",
+    "addContentTitle": "Pick from clipboard",
+    "addContentEmpty": "Clipboard is empty",
+    "alreadyLinked": "Already linked",
+    "linkToast": "Linked to task",
+    "pinBackToast": "Copied & pinned to top",
+    "dropBarHint": "Drop onto a task",
+    "resourceHint": "Drag out, or click to copy to clipboard"
   },
 
   "footer": {

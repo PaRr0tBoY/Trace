@@ -93,9 +93,13 @@ function ClipboardItemBase({ item }: Props) {
 
   const handleDragStart = useCallback((e: React.DragEvent, req: DragRequest) => {
     if (item.data.kind === 'text') {
-      // We no longer support dragging text/links.
-      // Prevent the default browser drag behavior (e.g. text selection dragging) entirely.
-      e.preventDefault()
+      // In-panel HTML5 drag: lets the user drop the item onto a task (drop
+      // bar) to link it. Text never OLE-drags out of the app, so the payload
+      // only matters inside the panel. The drag itself must run (no
+      // preventDefault) for dragover/drop to fire on the drop targets.
+      setInternalDragReq(req)
+      e.dataTransfer.setData('application/x-trace-item', item.id)
+      e.dataTransfer.setData('text/plain', previewText(item.data.text, 200))
       return
     } else {
       // Images and files need OS-level file handles via Electron's startDrag.
@@ -146,7 +150,7 @@ function ClipboardItemBase({ item }: Props) {
       <div
         className={`item-main${isPreviewing ? ' force-actions previewing' : ''}`}
         data-id={item.id}
-        draggable={!isPreviewing && item.data.kind !== 'text' && (!isBundle || !expanded)}
+        draggable={!isPreviewing && (!isBundle || !expanded)}
         onDragStart={(e) => handleDragStart(e, { id: item.id })}
         onDragEnd={() => setInternalDragReq(null)}
         onDragOver={(e) => {

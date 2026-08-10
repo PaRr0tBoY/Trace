@@ -15,6 +15,7 @@ import { Header } from './Header'
 import { ItemList } from './ItemList'
 import { Settings } from './Settings'
 import { TaskView } from './tasks/TaskView'
+import { TaskDropBar, linkDraggedItem } from './tasks/TaskDropBar'
 import { ToastStack } from './Toast'
 import { TrashIcon } from './icons'
 
@@ -85,6 +86,19 @@ export function Panel() {
       const el = document.elementFromPoint(pos.x, pos.y)
       if (!el) {
         if (req.imageId || (req.paths && req.paths.length > 0)) window.edge.splitItem(req)
+        return
+      }
+
+      const taskChip = el.closest('.task-drop-chip')
+      if (taskChip) {
+        const taskId = taskChip.getAttribute('data-task-id')
+        if (taskId) void linkDraggedItem(taskId, req)
+        return
+      }
+
+      // Task-layer drop targets: dropping a task resource back onto the task
+      // layer is a no-op (no merge/split semantics apply).
+      if (el.closest('.task-view, .task-card, .task-detail, .task-list, .task-editor')) {
         return
       }
 
@@ -281,6 +295,7 @@ export function Panel() {
           </AnimatePresence>
           <DropOverlay />
           <SplitDropZone />
+          <TaskDropBar />
         </div>
       </motion.div>
     </div>

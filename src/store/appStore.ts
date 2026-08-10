@@ -99,6 +99,7 @@ interface AppState {
   createTask: (title: string, note?: string) => Promise<void>
   updateTask: (id: string, patch: TaskPatch) => Promise<void>
   deleteTask: (id: string) => Promise<void>
+  linkItemToTask: (taskId: string, itemId: string) => Promise<void>
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -303,5 +304,9 @@ export const useStore = create<AppState>((set, get) => ({
 
   async deleteTask(id) {
     set({ tasks: await edge.deleteTask(id) })
+  },
+
+  async linkItemToTask(taskId, itemId) {
+    set({ tasks: await edge.linkItemToTask(taskId, itemId) })
   }
 }))

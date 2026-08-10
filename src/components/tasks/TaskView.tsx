@@ -14,6 +14,7 @@ import { TaskList } from './TaskList'
 import { TaskDetail } from './TaskDetail'
 import { TaskEditor } from './TaskEditor'
 import { ConfirmDialog } from './ConfirmDialog'
+import { ContentPicker } from './ContentPicker'
 
 /** Reserved slot for suggestion cards (t19). Rendered empty for now. */
 function SuggestionArea() {
@@ -41,6 +42,8 @@ export function TaskView() {
   const [editing, setEditing] = useState<string | 'new' | null>(null)
   /** Task awaiting hard-delete confirmation. */
   const [confirmDelete, setConfirmDelete] = useState<TaskDto | null>(null)
+  /** Task whose content picker (add content) is open. */
+  const [pickerTaskId, setPickerTaskId] = useState<string | null>(null)
 
   const selected = selectedId ? (tasks.find((task) => task.id === selectedId) ?? null) : null
 
@@ -83,6 +86,7 @@ export function TaskView() {
           onBack={() => setSelectedId(null)}
           onEdit={() => setEditing(selected.id)}
           onDeleteRequest={setConfirmDelete}
+          onAddContent={() => setPickerTaskId(selected.id)}
         />
       ) : (
         <TaskList
@@ -90,6 +94,16 @@ export function TaskView() {
           onOpen={(task) => setSelectedId(task.id)}
           onCreate={() => setEditing('new')}
           onDeleteRequest={setConfirmDelete}
+        />
+      )}
+
+      {pickerTaskId && selected && (
+        <ContentPicker
+          taskId={pickerTaskId}
+          linkedItemIds={new Set(
+            selected.resources.flatMap((r) => (r.kind === 'clipboard' ? [r.itemId] : []))
+          )}
+          onClose={() => setPickerTaskId(null)}
         />
       )}
 

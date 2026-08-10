@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import { basename } from '../../lib/format'
+import { useDragOut } from '../../hooks/useDragOut'
 import type { ResourceRef, TaskDto, TaskStatus } from '../../../shared/types'
 import {
   ChevronLeftIcon,
@@ -17,7 +18,8 @@ import {
   PauseIcon,
   ResumeIcon,
   CompleteIcon,
-  RestoreIcon
+  RestoreIcon,
+  PlusIcon
 } from '../icons'
 
 interface Props {
@@ -25,6 +27,7 @@ interface Props {
   onBack: () => void
   onEdit: () => void
   onDeleteRequest: (task: TaskDto) => void
+  onAddContent: () => void
 }
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
@@ -37,10 +40,39 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
 function ResourceRow({ resource }: { resource: ResourceRef & { alive: boolean } }) {
   const { t } = useTranslation()
   const [imgFailed, setImgFailed] = useState(false)
+  const startDrag = useDragOut()
+  const copy = useStore((s) => s.copy)
+  const setInternalDragReq = useStore((s) => s.setInternalDragReq)
+  const pushToast = useStore((s) => s.pushToast)
+
+  const beginDrag = (e: React.DragEvent) => {
+    e.preventDefault()
+    if (resource.kind === 'files') {
+      // File-list resource: drag the real paths; no shelf item behind it.
+      setInternalDragReq({ id: '', paths: resource.paths })
+      startDrag({ id: '', paths: resource.paths })
+    } else {
+      // Clipboard resource: OLE-drag the backing shelf item's content.
+      setInternalDragReq({ id: resource.itemId })
+      startDrag({ id: resource.itemId })
+    }
+  }
+
+  const pinBack = () => {
+    if (resource.kind !== 'clipboard') return
+    void copy(resource.itemId)
+    pushToast({ id: `pin-${Date.now()}`, message: t('tasks.pinBackToast'), tone: 'info' })
+  }
 
   if (resource.kind === 'files') {
     return (
-      <div className="task-resource">
+      <div
+        className="task-resource"
+        draggable
+        onDragStart={beginDrag}
+        onDragEnd={() => setInternalDragReq(null)}
+        title={t('tasks.resourceHint')}
+      >
         <div className="task-resource-head">
           <FolderOpenIcon width={13} height={13} />
           <span>{t('tasks.resourceCount', { count: resource.paths.length })}</span>
@@ -64,7 +96,14 @@ function ResourceRow({ resource }: { resource: ResourceRef & { alive: boolean } 
 
   if (snapshot.type === 'text') {
     return (
-      <div className={`task-resource${dead ? ' dead' : ''}`}>
+      <div
+        className={`task-resource${dead ? ' dead' : ' live'}`}
+        draggable={!dead}
+        onDragStart={beginDrag}
+        onDragEnd={() => setInternalDragReq(null)}
+        onClick={dead ? undefined : pinBack}
+        title={dead ? undefined : t('tasks.resourceHint')}
+      >
         {dead && (
           <div className="task-dead-label">
             <span className="task-dead-dot" />
@@ -79,7 +118,14 @@ function ResourceRow({ resource }: { resource: ResourceRef & { alive: boolean } 
   // image / image-collection
   if (snapshot.type !== 'image' && snapshot.type !== 'image-collection') return null
   return (
-    <div className={`task-resource${dead ? ' dead' : ''}`}>
+    <div
+      className={`task-resource${dead ? ' dead' : ' live'}`}
+      draggable={!dead}
+      onDragStart={beginDrag}
+      onDragEnd={() => setInternalDragReq(null)}
+      onClick={dead ? undefined : pinBack}
+      title={dead ? undefined : t('tasks.resourceHint')}
+    >
       {dead ? (
         <div className="task-resource-image-placeholder">
           <ImageIcon width={18} height={18} />
@@ -102,7 +148,7 @@ function ResourceRow({ resource }: { resource: ResourceRef & { alive: boolean } 
   )
 }
 
-export function TaskDetail({ task, onBack, onEdit, onDeleteRequest }: Props) {
+export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent }: Props) {
   const { t } = useTranslation()
   const updateTask = useStore((s) => s.updateTask)
 
@@ -148,7 +194,13 @@ export function TaskDetail({ task, onBack, onEdit, onDeleteRequest }: Props) {
         </div>
       )}
 
-      <div className="task-resources-title">{t('tasks.resourcesTitle')}</div>
+      <div className="task-resources-head">
+        <span className="task-resources-title">{t('tasks.resourcesTitle')}</span>
+        <button type="button" className="task-btn ghost" onClick={onAddContent}>
+          <PlusIcon width={12} height={12} />
+          {t('tasks.addContent')}
+        </button>
+      </div>
       {task.resources.length === 0 ? (
         <div className="task-empty">
           <div className="hint">{t('tasks.noResources')}</div>

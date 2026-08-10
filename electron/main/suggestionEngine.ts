@@ -11,7 +11,10 @@
  *      last analysis AND no new event for `suggestionSilenceSeconds`.
  *   2. clusterEvents (t16) attributes segments to tasks; each attribution
  *      becomes a Suggestion unless its signature is on the ignored table.
- *   3. LLM annotation — only for low-confidence and new-candidate
+ *   3. Context-prior (spec 实现决策 7): confirmed project/workflow memories
+ *      matching a segment nudge its confidence up and travel as
+ *      memoryContext into the LLM annotation.
+ *   4. LLM annotation — only for low-confidence and new-candidate
  *      suggestions, and only for title + rationale (never the attribution
  *      decision). One batched call for the whole analysis; when no provider
  *      is configured or the chain fails, the pass degrades silently to pure
@@ -21,7 +24,10 @@
  * only — never persisted (restart clears them). Accept merges into the
  * candidate task (type-safe, TaskStore.merge) or creates a new one; ignore
  * writes the signature into the ignored table and drops the card. A new
- * analysis replaces the whole pending list.
+ * analysis replaces the whole pending list. A successful accept also emits a
+ * memory candidate (onMemorySuggestion) so the task system's feedback
+ * distills into long-term memory — the candidate stays 'suggested' until the
+ * user confirms it in the memory panel.
  *
  * Privacy (spec 铁律): the LLM call carries the event-batch summary (app
  * names, window titles, durations) and similar task titles — only to the
@@ -35,7 +41,7 @@ import type { ChatRequest, ChatResult } from './provider'
 import { createId } from '../store/ids'
 import { suggestionSignature, type IgnoredTable } from './ignored'
 import type { TaskStore } from '../store/TaskStore'
-import type { AppRef, AppSwitchEvent, Suggestion, Task, UsageEvent } from '../../shared/types'
+import type { AppRef, AppSwitchEvent, Memory, MemoryType, Suggestion, Task, UsageEvent } from '../../shared/types'
 
 /** Segmenting defaults are fixed for V1 (settings carry only the confidence thresholds). */
 const SEGMENT_PARAMS = { hardGapMs: 600_000, transientMs: 2_500, overlapThreshold: 0.3 } as const
@@ -45,6 +51,68 @@ const MAX_REASON_CHARS = 300
 const MAX_LLM_CANDIDATES = 8
 const TICK_INTERVAL_MS = 2_000
 const LLM_TIMEOUT_MS = 20_000
+
+/**
+ * Confidence gain when a segment matches a confirmed project/workflow memory
+ * (context-prior, spec decision 7). Deliberately small: zones are decided by
+ * the clusterer, so the boost only nudges the displayed confidence and must
+ * not look like a zone change. Visible but honest — one memory hit is weak
+ * evidence on top of the clustering margin.
+ */
+export const MEMORY_CONFIDENCE_BOOST = 0.05
+
+/** Memory candidate emitted after a successful accept (feedback sink). */
+export interface MemoryCandidate {
+  type: MemoryType
+  content: string
+}
+
+/**
+ * The confirmed title becomes the memory content: it is the user's own term
+ * (the whole point of context-prior is 标题贴合用户术语), and the type
+ * 'project' encodes 长期项目. The app set is already on the task, so it adds
+ * nothing to the memory. Null for blank titles.
+ */
+export function buildMemoryCandidate(title: string): MemoryCandidate | null {
+  const content = title.trim()
+  if (!content) return null
+  return { type: 'project', content }
+}
+
+/** Text a segment is matched against: window titles + app names. */
+export interface SegmentText {
+  appNames: string[]
+  windowTitles: string[]
+}
+
+/**
+ * Context-prior matching (spec decision 7): which confirmed project/workflow
+ * memories each segment hits. A memory matches when its content and the
+ * segment text overlap in either direction (case-insensitive substring) — a
+ * memory "CAD Agent" hits a "CAD Agent" segment, and a memory describing the
+ * segment's own terms hits as well. Identity/tool memories and anything not
+ * user-confirmed are never injected.
+ */
+export function matchMemories(segments: SegmentText[], memories: readonly Memory[]): string[][] {
+  const usable = memories.filter(
+    (m) => m.userState === 'confirmed' && (m.type === 'project' || m.type === 'workflow') && m.content.trim().length > 0
+  )
+  return segments.map((seg) => {
+    const parts = [...seg.windowTitles, ...seg.appNames].map((p) => p.trim().toLowerCase()).filter((p) => p.length > 0)
+    if (parts.length === 0) return []
+    const joined = parts.join(' ')
+    const hits: string[] = []
+    for (const m of usable) {
+      const content = m.content.trim().toLowerCase()
+      if (!content) continue
+      // Either the memory is a phrase inside the segment text, or the segment
+      // carries one of the memory's phrases — checked per part, because the
+      // joined text is only meaningful in the memory->text direction.
+      if (joined.includes(content) || parts.some((p) => content.includes(p))) hits.push(m.content.trim())
+    }
+    return hits
+  })
+}
 
 /** The subset of settings the engine reads live on every tick. */
 export interface SuggestionSettings {
@@ -68,6 +136,13 @@ export interface SuggestionEngineOptions {
   chat?: ChatFn
   /** Full-list push to the renderer (state.ts pushState.suggestions). */
   onSuggestions: (suggestions: Suggestion[]) => void
+  /**
+   * Long-term memories (context-prior input; only confirmed project/workflow
+   * entries are used). Absent = context-prior disabled.
+   */
+  readMemories?: () => readonly Memory[]
+  /** Feedback sink: called with a memory candidate after a successful accept. */
+  onMemorySuggestion?: (candidate: MemoryCandidate) => void
 }
 
 /** Per-suggestion engine-side material the renderer never needs. */
@@ -77,6 +152,8 @@ interface SuggestionMeta {
   signature: string
   /** Window titles of the source segment (LLM material only). */
   windowTitles: string[]
+  /** Confirmed project/workflow memories this segment matched (LLM material). */
+  memoryContext: string[]
 }
 
 export interface SuggestionEngine {
@@ -152,6 +229,8 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
     const segments = candidates.map((c) => ({
       apps: c.suggestion.appNames,
       windowTitles: c.meta.windowTitles,
+      // Familiar phrases from the user's confirmed memories; omitted when absent.
+      ...(c.meta.memoryContext.length > 0 ? { memoryContext: c.meta.memoryContext } : {}),
       similarTasks: c.suggestion.evidence.overlappingTasks
     }))
     const req: ChatRequest = {
@@ -162,6 +241,7 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
             'You name short work sessions for a task tracker. Given a JSON list of activity segments, reply with JSON only: ' +
             '{"items": [{"title": "...", "reason": "..."}]}, one item per segment in the same order. ' +
             'title: a concise task title, at most 8 words, no quotes, written in the same language as the window titles. ' +
+            'When a segment has "memoryContext", prefer those familiar phrases in the title when they fit. ' +
             'reason: one plain sentence explaining what this session looks like.'
         },
         { role: 'user', content: `Segments: ${JSON.stringify(segments)}` }
@@ -241,7 +321,21 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
           },
           taskId: attr.taskId ?? undefined
         }
-        built.push({ suggestion, meta: { appRefs, segmentStartTs: attr.segment.startTs, signature, windowTitles: attr.segment.windowTitles.slice(0, 3) } })
+        built.push({ suggestion, meta: { appRefs, segmentStartTs: attr.segment.startTs, signature, windowTitles: attr.segment.windowTitles.slice(0, 3), memoryContext: [] } })
+      }
+
+      // Context-prior: confirmed project/workflow memories matching a segment
+      // nudge its confidence up and give the LLM the user's own terms.
+      if (options.readMemories) {
+        const hits = matchMemories(
+          built.map((b) => ({ appNames: b.suggestion.appNames, windowTitles: b.meta.windowTitles })),
+          options.readMemories()
+        )
+        for (let i = 0; i < built.length; i++) {
+          if (hits[i].length === 0) continue
+          built[i].meta.memoryContext = hits[i]
+          built[i].suggestion.confidence = Math.min(1, built[i].suggestion.confidence + MEMORY_CONFIDENCE_BOOST)
+        }
       }
 
       const llmCandidates = built.filter((b) => b.suggestion.taskId === undefined || b.suggestion.lowConfidence)
@@ -309,6 +403,12 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       onSuggestions(pending)
 
       const title = titleOverride?.trim() || suggestion.title
+      const emitMemoryCandidate = (): void => {
+        // Feedback distillation (spec decision 7): a confirmed work pattern
+        // becomes a suggested memory candidate — never live without the user.
+        const candidate = buildMemoryCandidate(title)
+        if (candidate) options.onMemorySuggestion?.(candidate)
+      }
       if (suggestion.taskId && store.get(suggestion.taskId)) {
         if (titleOverride?.trim()) store.update(suggestion.taskId, { title })
         // Absorb the segment's apps through the type-safe merge path: create a
@@ -317,10 +417,12 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         const temp = store.create(title, { apps: m?.appRefs ?? [] })
         if (temp) store.merge(suggestion.taskId, temp.id)
         console.log(`[Suggestion] accepted ${id} -> merged into ${suggestion.taskId}`)
+        emitMemoryCandidate()
         return suggestion.taskId
       }
       const created = store.create(title, { apps: m?.appRefs ?? [] })
       console.log(`[Suggestion] accepted ${id} -> new task ${created?.id ?? '(none)'}`)
+      emitMemoryCandidate()
       return created?.id ?? null
     },
     ignore(id: string): boolean {

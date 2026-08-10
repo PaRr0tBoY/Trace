@@ -62,6 +62,10 @@ export interface EdgeApi {
   acceptSuggestion: (id: string, titleOverride?: string) => Promise<TaskDto[]>
   ignoreSuggestion: (id: string) => Promise<void>
 
+  /* Memory */
+  loadMemories: () => Promise<import('./types').MemoryListPayload>
+  actMemory: (id: string, action: import('./types').MemoryAction) => Promise<import('./types').MemoryListPayload>
+
   /* Main -> Renderer */
   onItems: (cb: (items: import('./types').ClipboardItemDto[]) => void) => () => void
   onTasks: (cb: (tasks: TaskDto[]) => void) => () => void

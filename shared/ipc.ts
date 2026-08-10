@@ -142,6 +142,17 @@ export interface InvokeMap {
 
   /** Dismiss a suggestion; its signature suppresses the same kind later. */
   'suggestion:ignore': { args: [id: string]; result: void }
+
+  /* --------------------------- memory --------------------------- */
+
+  /** List the memory panel buckets (candidates / confirmed / banned / cleanup). */
+  'memory:list': { args: []; result: import('./types').MemoryListPayload }
+
+  /**
+   * One user decision on a memory (confirm/ignore/ban/unban/delete).
+   * Returns the refreshed buckets so the panel stays in sync in one round-trip.
+   */
+  'memory:act': { args: [id: string, action: import('./types').MemoryAction]; result: import('./types').MemoryListPayload }
 }
 
 /* ------------------------------------------------------------------ */

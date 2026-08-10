@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, type CSSProperties } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '../store/appStore'
-import type { DisplayInfo, ProviderConfig } from '../../shared/types'
+import type { DisplayInfo, Memory, MemoryAction, ProviderConfig } from '../../shared/types'
 import { LiquidOctopusLoader } from './LiquidOctopusLoader'
 import { TickIndicatorIcon, CopyIndicatorIcon, SparkleIndicatorIcon } from './CopyIndicatorCurve'
 import { ChevronRightIcon, CloseIcon, LogOutIcon, StarIcon, GithubOctocatLogo } from './icons'
@@ -393,6 +393,10 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                   <div className="setting-divider" />
 
                   <AIProviderSection />
+
+                  <div className="setting-divider" />
+
+                  <MemorySection />
 
                   {PersistentFooter}
                 </motion.div>
@@ -1362,6 +1366,146 @@ function AIProviderSection() {
       {detectState.status === 'ok' && <div className="setting-desc" style={{ marginTop: 8, color: '#4caf50' }}>{t('ai.detectFound', { model: detectState.detail ?? '' })}</div>}
       {detectState.status === 'fail' && <div className="setting-desc" style={{ marginTop: 8, color: '#ff6b6b' }}>{t('ai.detectNotFound')}{detectState.detail ? ` (${detectState.detail})` : ''}</div>}
       {hasChainFailure && <div className="setting-desc" style={{ marginTop: 8, opacity: 0.7 }}>{t('ai.chainHint')}</div>}
+    </>
+  )
+}
+
+/**
+ * Long-term memory panel: candidates await a decision, confirmed memories are
+ * viewable/deletable, cleanup candidates are the decayed ones the user
+ * confirms for deletion, banned patterns are viewable and un-bannable. Decay
+ * thresholds are shown read-only (their only editor is settings:update).
+ */
+function MemorySection() {
+  const { t } = useTranslation()
+  const settings = useStore((s) => s.settings)
+  const memories = useStore((s) => s.memories)
+  const loadMemories = useStore((s) => s.loadMemories)
+  const actMemory = useStore((s) => s.actMemory)
+
+  useEffect(() => {
+    void loadMemories()
+  }, [loadMemories])
+
+  const typeLabel = (type: Memory['type']): string => {
+    switch (type) {
+      case 'identity': return t('memory.typeIdentity')
+      case 'tool': return t('memory.typeTool')
+      case 'project': return t('memory.typeProject')
+      case 'workflow': return t('memory.typeWorkflow')
+    }
+  }
+
+  const sourceLabel = (m: Memory): string => {
+    switch (m.source) {
+      case 'task-feedback': return t('memory.sourceTaskFeedback')
+      case 'ai-suggest': return t('memory.sourceAiSuggest')
+      case 'user': return t('memory.sourceUser')
+    }
+  }
+
+  const act = (id: string, action: MemoryAction): void => {
+    playButtonClickSound()
+    void actMemory(id, action)
+  }
+
+  const rowActions = (m: Memory, actions: Array<{ action: MemoryAction; label: string; danger?: boolean }>) => (
+    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+      {actions.map((a) => (
+        <button
+          key={a.action}
+          className="pill display-pill"
+          style={{
+            padding: '3px 8px',
+            fontSize: 10.5,
+            cursor: 'pointer',
+            ...(a.danger ? { color: '#ff8a8a' } : {})
+          }}
+          onClick={() => act(m.id, a.action)}
+        >
+          {a.label}
+        </button>
+      ))}
+    </div>
+  )
+
+  const metaLine = (m: Memory) => (
+    <div className="setting-desc" style={{ fontSize: 10, opacity: 0.75 }}>
+      {typeLabel(m.type)} · {sourceLabel(m)} · {t('memory.confidence', { value: Math.round(m.confidence * 100) })} · {t('memory.hitCount', { count: m.hitCount })}
+    </div>
+  )
+
+  const memoryRow = (m: Memory, actions: Array<{ action: MemoryAction; label: string; danger?: boolean }>) => (
+    <div key={m.id} className="setting-row vertical" style={{ gap: 2, padding: '6px 0' }}>
+      <div style={{ fontSize: 12.5, lineHeight: 1.35, wordBreak: 'break-word' }}>{m.content}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>{metaLine(m)}</div>
+        {rowActions(m, actions)}
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      <div className="setting-group-label">{t('memory.sectionTitle')}</div>
+      <div className="setting-desc" style={{ marginTop: 2, marginBottom: 8 }}>{t('memory.sectionDesc')}</div>
+
+      {/* Decay thresholds, read-only: their editor is settings:update. */}
+      <div className="setting-row vertical" style={{ gap: 2 }}>
+        <div className="setting-title" style={{ fontSize: 12 }}>{t('memory.thresholdsTitle')}</div>
+        <div className="setting-desc" style={{ fontSize: 10.5 }}>
+          {t('memory.thresholdsDesc', {
+            lambda: settings.memoryLambda,
+            days: settings.memoryStaleDays,
+            score: settings.memoryCleanupScore
+          })}
+        </div>
+      </div>
+
+      <div className="setting-divider" />
+
+      {/* Candidates: pending user decisions. */}
+      <div className="setting-title" style={{ fontSize: 12, marginBottom: 2 }}>{t('memory.candidatesTitle')}</div>
+      {!memories ? null : memories.candidates.length === 0 ? (
+        <div className="setting-desc" style={{ fontSize: 10.5, opacity: 0.6 }}>{t('memory.candidatesEmpty')}</div>
+      ) : (
+        memories.candidates.map((m) => memoryRow(m, [
+          { action: 'confirm', label: t('memory.save') },
+          { action: 'ignore', label: t('memory.ignore') },
+          { action: 'ban', label: t('memory.ban'), danger: true }
+        ]))
+      )}
+
+      <div className="setting-divider" />
+
+      {/* Confirmed: live memories, deletable. */}
+      <div className="setting-title" style={{ fontSize: 12, marginBottom: 2 }}>{t('memory.confirmedTitle')}</div>
+      {!memories ? null : memories.confirmed.length === 0 ? (
+        <div className="setting-desc" style={{ fontSize: 10.5, opacity: 0.6 }}>{t('memory.confirmedEmpty')}</div>
+      ) : (
+        memories.confirmed.map((m) => memoryRow(m, [{ action: 'delete', label: t('memory.delete'), danger: true }]))
+      )}
+
+      <div className="setting-divider" />
+
+      {/* Cleanup: stale + low-score, deletion awaits the user. */}
+      <div className="setting-title" style={{ fontSize: 12, marginBottom: 2 }}>{t('memory.cleanupTitle')}</div>
+      <div className="setting-desc" style={{ fontSize: 10.5, opacity: 0.75, marginBottom: 4 }}>{t('memory.cleanupDesc')}</div>
+      {!memories ? null : memories.cleanup.length === 0 ? (
+        <div className="setting-desc" style={{ fontSize: 10.5, opacity: 0.6 }}>{t('memory.cleanupEmpty')}</div>
+      ) : (
+        memories.cleanup.map((m) => memoryRow(m, [{ action: 'delete', label: t('memory.delete'), danger: true }]))
+      )}
+
+      <div className="setting-divider" />
+
+      {/* Banned: pattern vetoes, viewable and un-bannable. */}
+      <div className="setting-title" style={{ fontSize: 12, marginBottom: 2 }}>{t('memory.bannedTitle')}</div>
+      {!memories ? null : memories.banned.length === 0 ? (
+        <div className="setting-desc" style={{ fontSize: 10.5, opacity: 0.6 }}>{t('memory.bannedEmpty')}</div>
+      ) : (
+        memories.banned.map((m) => memoryRow(m, [{ action: 'unban', label: t('memory.unban') }]))
+      )}
     </>
   )
 }

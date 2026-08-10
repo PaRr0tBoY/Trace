@@ -133,6 +133,10 @@ const api = {
   acceptSuggestion: (id: string, titleOverride?: string) => invoke('suggestion:accept', id, titleOverride),
   ignoreSuggestion: (id: string) => invoke('suggestion:ignore', id),
 
+  /* Memory */
+  loadMemories: () => invoke('memory:list'),
+  actMemory: (id: string, action: import('../../shared/types').MemoryAction) => invoke('memory:act', id, action),
+
   /* Main -> Renderer */
   onItems: (cb: (items: EventArgs<'state:items'>[0]) => void) => on('state:items', cb),
   onTasks: (cb: (tasks: EventArgs<'state:tasks'>[0]) => void) => on('state:tasks', cb),

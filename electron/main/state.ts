@@ -9,6 +9,7 @@ import { ItemStore } from '../store/ItemStore'
 import { ClipboardWatcher } from '../clipboard/ClipboardWatcher'
 import { loadSettings, saveSettings } from '../store/settings'
 import { TaskStore, type TaskIndex, buildClipboardRef } from '../store/TaskStore'
+import { MemoryStore, type MemoryIndex } from '../store/MemoryStore'
 import type { ClipboardItem, ClipboardItemDto, Settings, Suggestion, TaskDto } from '../../shared/types'
 import { MAX_STACK } from '../../shared/types'
 import { createId } from '../store/ids'
@@ -31,6 +32,7 @@ let wakeTimer: ReturnType<typeof setTimeout> | null = null
 let taskSweepTimer: ReturnType<typeof setInterval> | null = null
 let suggestionTimer: ReturnType<typeof setInterval> | null = null
 let suggestionEngine: SuggestionEngine | null = null
+let memoryStore: MemoryStore | null = null
 
 /**
  * Task persistence adapter: tasks.json with DPAPI encryption when available
@@ -77,6 +79,49 @@ function saveTasksFile(index: TaskIndex): void {
     }
   } catch (err) {
     console.error('[Task] tasks.json save failed:', err)
+  }
+}
+
+/**
+ * Memory persistence adapter: memories.json with the same DPAPI envelope as
+ * tasks.json — memory content (identity/workflow) is strictly more sensitive
+ * than task titles, so it never sits on disk as plaintext when the OS key
+ * store is available.
+ */
+function loadMemoriesFile(): MemoryIndex | null {
+  try {
+    const file = PATHS.memoriesFile()
+    if (!existsSync(file)) return null
+    const text = readFileSync(file, 'utf8').trim()
+    if (!text) return null
+    const parsed = JSON.parse(text) as { encrypted?: boolean; payload?: string; memories?: unknown }
+    if (parsed.encrypted === true && typeof parsed.payload === 'string') {
+      if (!safeStorage.isEncryptionAvailable()) return null
+      return JSON.parse(safeStorage.decryptString(Buffer.from(parsed.payload, 'base64'))) as MemoryIndex
+    }
+    if (Array.isArray(parsed.memories)) return parsed as MemoryIndex
+    return null
+  } catch (err) {
+    console.error('[Memory] memories.json load failed:', err)
+    return null
+  }
+}
+
+function saveMemoriesFile(index: MemoryIndex): void {
+  try {
+    const file = PATHS.memoriesFile()
+    if (safeStorage.isEncryptionAvailable()) {
+      const envelope = {
+        v: 1,
+        encrypted: true,
+        payload: safeStorage.encryptString(JSON.stringify(index)).toString('base64')
+      }
+      writeFileSync(file, JSON.stringify(envelope, null, 2), 'utf8')
+    } else {
+      writeFileSync(file, JSON.stringify(index, null, 2), 'utf8')
+    }
+  } catch (err) {
+    console.error('[Memory] memories.json save failed:', err)
   }
 }
 
@@ -130,6 +175,13 @@ export function initState(): void {
   store.load()
   taskStore.load()
   taskStore.setPauseThreshold(loadSettings().taskPauseThresholdMinutes)
+  const settings = loadSettings()
+  getMemoryStore().load()
+  getMemoryStore().setDecay({
+    lambda: settings.memoryLambda,
+    staleDays: settings.memoryStaleDays,
+    cleanupScore: settings.memoryCleanupScore
+  })
   const swept = taskStore.sweep() // stale Active tasks from a previous session must not masquerade as live
   console.log(`[Task] store ready: ${taskStore.list().length} tasks${swept > 0 ? `, ${swept} idle-paused` : ''}`)
   if (loadSettings().clearUnpinnedOnRestart) {
@@ -255,6 +307,21 @@ export function getTaskStore(): TaskStore {
 }
 
 /**
+ * Memory store singleton (t20). Lazily constructed so the IPC layer and the
+ * suggestion engine can reach it without ordering constraints. Loaded once in
+ * initState(); decay parameters track Settings at runtime (settings:update).
+ */
+export function getMemoryStore(): MemoryStore {
+  if (!memoryStore) {
+    memoryStore = new MemoryStore({
+      load: () => loadMemoriesFile(),
+      save: (index) => saveMemoriesFile(index)
+    })
+  }
+  return memoryStore
+}
+
+/**
  * Suggestion engine singleton (t19). Lazily constructed so the IPC layer can
  * reach it without ordering constraints; the provider chain is wired in
  * index.ts via setSuggestionChat once both sides exist.
@@ -267,7 +334,13 @@ export function getSuggestionEngine(): SuggestionEngine {
       store: taskStore,
       getSettings: () => loadSettings(),
       ignored: createIgnoredTable({ load: loadIgnoredSignatures, save: saveIgnoredSignatures }),
-      onSuggestions: (suggestions) => pushState.suggestions(suggestions)
+      onSuggestions: (suggestions) => pushState.suggestions(suggestions),
+      // Context-prior: only live project/workflow memories reach the engine.
+      readMemories: () => getMemoryStore().list(),
+      // Feedback distillation: accepted suggestions become suggested candidates.
+      onMemorySuggestion: (candidate) => {
+        getMemoryStore().suggestMemory({ ...candidate, source: 'task-feedback' })
+      }
     })
   }
   return suggestionEngine

@@ -222,6 +222,21 @@ export interface Suggestion {
 export type MemoryType = 'identity' | 'tool' | 'project' | 'workflow'
 export type MemoryUserState = 'confirmed' | 'suggested' | 'ignored' | 'banned'
 
+/** A user decision on one memory, mirroring MemoryStore method names (memory:act). */
+export type MemoryAction = 'confirm' | 'ignore' | 'ban' | 'unban' | 'delete'
+
+/** Memory panel buckets, refreshed after every decision so the UI never recomputes decay. */
+export interface MemoryListPayload {
+  /** Pending user decisions (suggested). */
+  candidates: Memory[]
+  /** Live memories (confirmed). */
+  confirmed: Memory[]
+  /** Pattern vetoes (banned), viewable and un-bannable. */
+  banned: Memory[]
+  /** Stale + low-score memories awaiting user-confirmed deletion. */
+  cleanup: Memory[]
+}
+
 /** Long-term memory entry (t19/20 persist + decay; never written without user confirmation). */
 export interface Memory {
   id: string

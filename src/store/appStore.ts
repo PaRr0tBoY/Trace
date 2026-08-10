@@ -8,7 +8,7 @@
  */
 import { create } from 'zustand'
 import { edge } from '../lib/edge'
-import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, Suggestion } from '../../shared/types'
+import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, Suggestion, MemoryAction, MemoryListPayload } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
@@ -106,6 +106,11 @@ interface AppState {
   /* suggestion actions (delegate to main; pending list comes back via event) */
   acceptSuggestion: (id: string, titleOverride?: string) => Promise<void>
   ignoreSuggestion: (id: string) => Promise<void>
+
+  /* memory panel (delegate to main; the refreshed buckets come back) */
+  memories: MemoryListPayload | null
+  loadMemories: () => Promise<void>
+  actMemory: (id: string, action: MemoryAction) => Promise<void>
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -324,5 +329,13 @@ export const useStore = create<AppState>((set, get) => ({
 
   async ignoreSuggestion(id) {
     await edge.ignoreSuggestion(id)
+  },
+
+  memories: null,
+  async loadMemories() {
+    set({ memories: await edge.loadMemories() })
+  },
+  async actMemory(id, action) {
+    set({ memories: await edge.actMemory(id, action) })
   }
 }))

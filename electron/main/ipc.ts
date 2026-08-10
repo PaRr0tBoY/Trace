@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { psHost } from './powershell'
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel } from '../../shared/ipc'
-import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine } from './state'
+import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore } from './state'
 import { getMainWindow } from './window'
 import { setInteractive, setHeartbeatPaused, setHotZoneWidth } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
@@ -18,7 +18,7 @@ import { startDragOut, resolveDragData } from './drag'
 import { clipboardSignature } from '../clipboard/formats'
 import { buildClipboardRef } from '../store/TaskStore'
 import { ProviderChain, buildLocalProvider, detectOllama, testProvider } from './provider'
-import type { ItemData, MergeResult } from '../../shared/types'
+import type { ItemData, MergeResult, MemoryListPayload } from '../../shared/types'
 
 /**
  * Returns true if the current system clipboard content matches the given item data.
@@ -220,6 +220,28 @@ export function registerIpc(): void {
 
   handle('suggestion:ignore', (id) => {
     getSuggestionEngine().ignore(id)
+  })
+
+  /* --------------------------- memory --------------------------- */
+
+  /** The panel's four buckets, decay-aware (MemoryStore computes time-aware confidence). */
+  const memoryListPayload = (): MemoryListPayload => {
+    const store = getMemoryStore()
+    const all = store.list()
+    return {
+      candidates: store.candidates(),
+      confirmed: all.filter((m) => m.userState === 'confirmed'),
+      banned: all.filter((m) => m.userState === 'banned'),
+      cleanup: store.cleanupCandidates()
+    }
+  }
+
+  handle('memory:list', () => memoryListPayload())
+
+  handle('memory:act', (id, action) => {
+    // Action names mirror MemoryStore methods; each returns whether it applied.
+    getMemoryStore()[action](id)
+    return memoryListPayload()
   })
 
   handle('app:get-releases', async () => {
@@ -490,6 +512,13 @@ export function registerIpc(): void {
       getTaskStore().setPauseThreshold(next.taskPauseThresholdMinutes)
       if (getTaskStore().sweep() > 0) pushState.tasks()
     }
+    // Memory decay thresholds live in Settings; keep the store's decay params
+    // in lockstep (idempotent, so this also covers the unchanged case).
+    getMemoryStore().setDecay({
+      lambda: next.memoryLambda,
+      staleDays: next.memoryStaleDays,
+      cleanupScore: next.memoryCleanupScore
+    })
     pushState.settings(next)
     return next
   })

@@ -215,13 +215,27 @@ export class MemoryStore {
 
   /**
    * Permanently block: content becomes a keyword pattern and the type a
-   * category pattern (see isBanned). Applies from any state — a ban is an
-   * absolute veto and cannot be undone.
+   * category pattern (see isBanned). Applies from any state; only unban()
+   * lifts it.
    */
   ban(id: string): boolean {
     const memory = this.memories.find((m) => m.id === id)
     if (!memory || memory.userState === 'banned') return false
     memory.userState = 'banned'
+    this.persist()
+    return true
+  }
+
+  /**
+   * Lift a ban: the entry returns to 'ignored' (dead, never live without
+   * confirmation) and its keyword/type patterns stop suppressing new
+   * suggestions. The same content+type stays deduped, so only the veto is
+   * lifted — a re-suggestion of the identical text still won't re-ask.
+   */
+  unban(id: string): boolean {
+    const memory = this.memories.find((m) => m.id === id)
+    if (!memory || memory.userState !== 'banned') return false
+    memory.userState = 'ignored'
     this.persist()
     return true
   }

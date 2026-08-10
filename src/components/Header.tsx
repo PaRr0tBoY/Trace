@@ -19,6 +19,7 @@ export function Header() {
   const view = useStore((s) => s.view)
   const setView = useStore((s) => s.setView)
   const tasks = useStore((s) => s.tasks)
+  const suggestions = useStore((s) => s.suggestions)
   const badge = taskBadgeCount(tasks)
 
   const isChangelogUnread = settingsOpen && (
@@ -247,6 +248,30 @@ export function Header() {
                 }}
               >
                 {badge > 9 ? '9+' : badge}
+              </span>
+            )}
+            {suggestions.length > 0 && (
+              <span
+                title={t('tasks.suggestionBadge', { count: suggestions.length })}
+                style={{
+                  position: 'absolute',
+                  bottom: 4,
+                  right: 4,
+                  minWidth: 13,
+                  height: 13,
+                  padding: '0 3px',
+                  borderRadius: 999,
+                  backgroundColor: '#fbbf24',
+                  color: '#000000',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  lineHeight: '13px',
+                  textAlign: 'center',
+                  boxShadow: '0 0 6px rgba(0, 0, 0, 0.5)',
+                  pointerEvents: 'none'
+                }}
+              >
+                {suggestions.length > 9 ? '9+' : suggestions.length}
               </span>
             )}
           </button>

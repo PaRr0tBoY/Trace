@@ -129,9 +129,14 @@ const api = {
   testProvider: (config: import('../../shared/types').ProviderConfig) => invoke('ai:test-provider', config),
   detectOllama: (baseUrl?: string) => invoke('ai:detect-ollama', baseUrl),
 
+  /* Suggestions */
+  acceptSuggestion: (id: string, titleOverride?: string) => invoke('suggestion:accept', id, titleOverride),
+  ignoreSuggestion: (id: string) => invoke('suggestion:ignore', id),
+
   /* Main -> Renderer */
   onItems: (cb: (items: EventArgs<'state:items'>[0]) => void) => on('state:items', cb),
   onTasks: (cb: (tasks: EventArgs<'state:tasks'>[0]) => void) => on('state:tasks', cb),
+  onSuggestions: (cb: (suggestions: EventArgs<'state:suggestions'>[0]) => void) => on('state:suggestions', cb),
   onSettings: (cb: (settings: EventArgs<'state:settings'>[0]) => void) => on('state:settings', cb),
   onToggle: (cb: (open?: boolean) => void) => on('window:toggle', cb),
   onOpenSettings: (cb: () => void) => on('window:open-settings', cb),

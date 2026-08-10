@@ -88,6 +88,13 @@ export interface SegmentInfo {
   eventCount: number
   /** App display names, most-dwelled first. */
   appNames: string[]
+  /**
+   * App identity keys (lowercase exePath, fallback appName), most-dwelled
+   * first and index-aligned with appNames. Exposed for the suggestion
+   * engine (t19) to build AppRefs and ignore signatures — the clusterer's
+   * own matching keeps its name-first internal keys.
+   */
+  appKeys: string[]
   /** Unique window titles, most-dwelled first (LLM/evidence material). */
   windowTitles: string[]
   /** Noise-filtered title tokens (deterministic order). */
@@ -243,6 +250,7 @@ function dwellAt(sorted: AppSwitchEvent[], i: number): number {
 function toInternalSegment(sorted: AppSwitchEvent[], range: number[]): InternalSegment {
   const appDwell = new Map<string, number>()
   const appDisplay = new Map<string, string>()
+  const identDwell = new Map<string, number>()
   const titleDwell = new Map<string, number>()
   const tokenCount = new Map<string, number>()
   const appKeys = new Set<string>()
@@ -256,6 +264,10 @@ function toInternalSegment(sorted: AppSwitchEvent[], range: number[]): InternalS
       appDwell.set(key, (appDwell.get(key) ?? 0) + dwell)
       if (e.appName.trim().length > 0 && !appDisplay.has(key)) appDisplay.set(key, e.appName.trim())
     }
+    const ident = normalizeAppKey(e.exePath) || normalizeAppKey(e.appName)
+    if (ident.length > 0) {
+      identDwell.set(ident, (identDwell.get(ident) ?? 0) + dwell)
+    }
     const title = e.windowTitle.trim()
     if (title.length > 0) {
       titleDwell.set(title, (titleDwell.get(title) ?? 0) + dwell)
@@ -268,6 +280,7 @@ function toInternalSegment(sorted: AppSwitchEvent[], range: number[]): InternalS
   const byDwellDesc = (a: [string, number], b: [string, number]) =>
     b[1] - a[1] || (a[0] < b[0] ? -1 : 1)
   const appNames = [...appDwell.entries()].sort(byDwellDesc).map(([k]) => appDisplay.get(k) ?? k)
+  const appIdentKeys = [...identDwell.entries()].sort(byDwellDesc).map(([k]) => k)
   const windowTitles = [...titleDwell.entries()].sort(byDwellDesc).map(([t]) => t)
   const tokens = [...tokenCount.entries()].sort(byDwellDesc).map(([t]) => t)
   const first = sorted[range[0]].ts
@@ -279,6 +292,7 @@ function toInternalSegment(sorted: AppSwitchEvent[], range: number[]): InternalS
       durationMs: Math.max(0, last - first),
       eventCount: range.length,
       appNames,
+      appKeys: appIdentKeys,
       windowTitles,
       titleTokens: tokens
     },

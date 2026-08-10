@@ -9,23 +9,28 @@ import { ItemStore } from '../store/ItemStore'
 import { ClipboardWatcher } from '../clipboard/ClipboardWatcher'
 import { loadSettings, saveSettings } from '../store/settings'
 import { TaskStore, type TaskIndex, buildClipboardRef } from '../store/TaskStore'
-import type { ClipboardItem, ClipboardItemDto, Settings, TaskDto } from '../../shared/types'
+import type { ClipboardItem, ClipboardItemDto, Settings, Suggestion, TaskDto } from '../../shared/types'
 import { MAX_STACK } from '../../shared/types'
 import { createId } from '../store/ids'
-import { nativeImage, BrowserWindow, powerMonitor, safeStorage } from 'electron'
+import { nativeImage, BrowserWindow, powerMonitor, safeStorage, app } from 'electron'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { PATHS } from '../store/paths'
 import { prefetchFileIcons } from './drag'
 import { runtime } from './config'
 import { queryForegroundSnapshot } from './foreground'
-import { emit } from './eventBus'
+import { emit, recentEvents } from './eventBus'
 import { buildClipboardEvent, decideClipboardAttribution } from './attributor'
+import { createSuggestionEngine, TICK_INTERVAL_MS, type ChatFn, type SuggestionEngine } from './suggestionEngine'
+import { createIgnoredTable } from './ignored'
 
 const store = new ItemStore()
 const watcher = new ClipboardWatcher(600)
 let pruneTimer: ReturnType<typeof setInterval> | null = null
 let wakeTimer: ReturnType<typeof setTimeout> | null = null
 let taskSweepTimer: ReturnType<typeof setInterval> | null = null
+let suggestionTimer: ReturnType<typeof setInterval> | null = null
+let suggestionEngine: SuggestionEngine | null = null
 
 /**
  * Task persistence adapter: tasks.json with DPAPI encryption when available
@@ -72,6 +77,35 @@ function saveTasksFile(index: TaskIndex): void {
     }
   } catch (err) {
     console.error('[Task] tasks.json save failed:', err)
+  }
+}
+
+/**
+ * Ignored-suggestion signatures (userData/ignored.json, LRU 200). Plain JSON:
+ * signatures are one-way hashes of app+time-slot material, no titles or paths.
+ */
+const ignoredFile = (): string => join(app.getPath('userData'), 'ignored.json')
+
+function loadIgnoredSignatures(): string[] | null {
+  try {
+    const file = ignoredFile()
+    if (!existsSync(file)) return null
+    const text = readFileSync(file, 'utf8').trim()
+    if (!text) return null
+    const parsed = JSON.parse(text) as { signatures?: unknown }
+    if (!Array.isArray(parsed.signatures)) return null
+    return parsed.signatures.filter((s): s is string => typeof s === 'string' && s.length > 0)
+  } catch (err) {
+    console.error('[Suggestion] ignored.json load failed:', err)
+    return null
+  }
+}
+
+function saveIgnoredSignatures(signatures: string[]): void {
+  try {
+    writeFileSync(ignoredFile(), JSON.stringify({ version: 1, signatures }, null, 2), 'utf8')
+  } catch (err) {
+    console.error('[Suggestion] ignored.json save failed:', err)
   }
 }
 
@@ -156,6 +190,13 @@ export function initState(): void {
     taskStore.setPauseThreshold(loadSettings().taskPauseThresholdMinutes)
     if (taskStore.sweep() > 0) pushState.tasks()
   }, 60_000)
+
+  if (suggestionTimer !== null) clearInterval(suggestionTimer)
+  suggestionTimer = setInterval(() => {
+    if (runtime.quitting) return
+    getSuggestionEngine().tick()
+  }, TICK_INTERVAL_MS)
+  getSuggestionEngine().start()
 }
 
 /**
@@ -194,6 +235,11 @@ export function stopStateTimers(): void {
     clearInterval(taskSweepTimer)
     taskSweepTimer = null
   }
+  if (suggestionTimer !== null) {
+    clearInterval(suggestionTimer)
+    suggestionTimer = null
+  }
+  suggestionEngine?.stop()
 }
 
 export function getStore(): ItemStore {
@@ -206,6 +252,30 @@ export function getWatcher(): ClipboardWatcher {
 
 export function getTaskStore(): TaskStore {
   return taskStore
+}
+
+/**
+ * Suggestion engine singleton (t19). Lazily constructed so the IPC layer can
+ * reach it without ordering constraints; the provider chain is wired in
+ * index.ts via setSuggestionChat once both sides exist.
+ */
+export function getSuggestionEngine(): SuggestionEngine {
+  if (!suggestionEngine) {
+    suggestionEngine = createSuggestionEngine({
+      now: () => Date.now(),
+      readEvents: () => recentEvents(),
+      store: taskStore,
+      getSettings: () => loadSettings(),
+      ignored: createIgnoredTable({ load: loadIgnoredSignatures, save: saveIgnoredSignatures }),
+      onSuggestions: (suggestions) => pushState.suggestions(suggestions)
+    })
+  }
+  return suggestionEngine
+}
+
+/** Wire the provider chain into the engine (index.ts, after registerIpc). */
+export function setSuggestionChat(chat: ChatFn): void {
+  getSuggestionEngine().setChat(chat)
 }
 
 /** Push updates to all open windows (main window, onboarding window, etc.). */
@@ -226,6 +296,9 @@ export const pushState = {
   tasks(): void {
     const dto: TaskDto[] = taskStore.toDto()
     send('state:tasks', dto)
+  },
+  suggestions(suggestions: Suggestion[]): void {
+    send('state:suggestions', suggestions)
   },
   settings(next: Settings): void {
     send('state:settings', next)

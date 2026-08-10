@@ -8,7 +8,7 @@
  */
 import { create } from 'zustand'
 import { edge } from '../lib/edge'
-import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch } from '../../shared/types'
+import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, Suggestion } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
@@ -23,6 +23,7 @@ export interface ToastMsg {
 interface AppState {
   items: ClipboardItemDto[]
   tasks: TaskDto[]
+  suggestions: Suggestion[]
   settings: Settings
   /** True until the first `state:load` resolves. */
   hydrated: boolean
@@ -64,6 +65,7 @@ interface AppState {
   hydrate: () => Promise<void>
   setItems: (items: ClipboardItemDto[]) => void
   setTasks: (tasks: TaskDto[]) => void
+  setSuggestions: (suggestions: Suggestion[]) => void
   setSettings: (next: Settings) => void
 
   /* UI */
@@ -100,11 +102,16 @@ interface AppState {
   updateTask: (id: string, patch: TaskPatch) => Promise<void>
   deleteTask: (id: string) => Promise<void>
   linkItemToTask: (taskId: string, itemId: string) => Promise<void>
+
+  /* suggestion actions (delegate to main; pending list comes back via event) */
+  acceptSuggestion: (id: string, titleOverride?: string) => Promise<void>
+  ignoreSuggestion: (id: string) => Promise<void>
 }
 
 export const useStore = create<AppState>((set, get) => ({
   items: [],
   tasks: [],
+  suggestions: [],
   settings: { ...DEFAULT_SETTINGS },
   hydrated: false,
   query: '',
@@ -177,6 +184,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({ items })
   },
   setTasks: (tasks) => set({ tasks }),
+  setSuggestions: (suggestions) => set({ suggestions }),
   setSettings: (next) => set({ settings: next }),
 
   setQuery: (query) => set({ query }),
@@ -308,5 +316,13 @@ export const useStore = create<AppState>((set, get) => ({
 
   async linkItemToTask(taskId, itemId) {
     set({ tasks: await edge.linkItemToTask(taskId, itemId) })
+  },
+
+  async acceptSuggestion(id, titleOverride) {
+    set({ tasks: await edge.acceptSuggestion(id, titleOverride) })
+  },
+
+  async ignoreSuggestion(id) {
+    await edge.ignoreSuggestion(id)
   }
 }))

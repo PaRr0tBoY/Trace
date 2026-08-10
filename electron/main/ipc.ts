@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { psHost } from './powershell'
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel } from '../../shared/ipc'
-import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore } from './state'
+import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine } from './state'
 import { getMainWindow } from './window'
 import { setInteractive, setHeartbeatPaused, setHotZoneWidth } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
@@ -208,6 +208,18 @@ export function registerIpc(): void {
     getTaskStore().unlinkItem(taskId, target)
     pushState.tasks()
     return getTaskStore().toDto()
+  })
+
+  /* --------------------------- suggestions --------------------------- */
+
+  handle('suggestion:accept', (id, titleOverride) => {
+    const accepted = getSuggestionEngine().accept(id, titleOverride)
+    if (accepted !== null) pushState.tasks()
+    return getTaskStore().toDto()
+  })
+
+  handle('suggestion:ignore', (id) => {
+    getSuggestionEngine().ignore(id)
   })
 
   handle('app:get-releases', async () => {

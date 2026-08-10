@@ -1,9 +1,9 @@
 /**
  * TaskView — the task layer root inside the panel.
  *
- * Layout: reserved suggestion-card slot on top (t19 fills it), then either the
- * grouped list, the detail view, or the create/edit form. Delete is always a
- * confirmed hard delete.
+ * Layout: suggestion cards on top (t19 fills the reserved slot), then either
+ * the grouped list, the detail view, or the create/edit form. Delete is always
+ * a confirmed hard delete.
  */
 import { useEffect, useState } from 'react'
 import { useStore } from '../../store/appStore'
@@ -15,16 +15,27 @@ import { TaskDetail } from './TaskDetail'
 import { TaskEditor } from './TaskEditor'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ContentPicker } from './ContentPicker'
+import { SuggestionCard } from './SuggestionCard'
 
-/** Reserved slot for suggestion cards (t19). Rendered empty for now. */
+/** Reserved suggestion-card slot (t19): live cards when pending, hint when empty. */
 function SuggestionArea() {
   const { t } = useTranslation()
-  return (
-    <div className="task-suggest">
-      <div className="task-suggest-icon">
-        <SparklesIcon width={14} height={14} />
+  const suggestions = useStore((s) => s.suggestions)
+  if (suggestions.length === 0) {
+    return (
+      <div className="task-suggest">
+        <div className="task-suggest-icon">
+          <SparklesIcon width={14} height={14} />
+        </div>
+        <div className="task-suggest-text">{t('tasks.suggestionsHint')}</div>
       </div>
-      <div className="task-suggest-text">{t('tasks.suggestionsHint')}</div>
+    )
+  }
+  return (
+    <div className="task-suggest-list">
+      {suggestions.map((s) => (
+        <SuggestionCard key={s.id} suggestion={s} />
+      ))}
     </div>
   )
 }

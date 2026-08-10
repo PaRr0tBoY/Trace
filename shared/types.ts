@@ -215,6 +215,8 @@ export interface Suggestion {
   }
   /** Human-readable LLM rationale; may be absent when the provider chain failed. */
   reason?: string
+  /** Candidate task id for merges; absent = new-candidate suggestion (t19). */
+  taskId?: string
 }
 
 export type MemoryType = 'identity' | 'tool' | 'project' | 'workflow'

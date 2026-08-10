@@ -13,9 +13,9 @@ import { APP_CONFIG, runtime } from './config'
 import { ensureDirs, cleanTemp, PATHS } from '../store/paths'
 import { createWindow, getMainWindow, setInteractive, setVisible, startCursorPoll, stopCursorPoll, stopHeartbeat, setHotZoneWidth } from './window'
 import { createTray, registerIncognitoApplier } from './tray'
-import { registerIpc, registerSendListeners } from './ipc'
+import { registerIpc, registerSendListeners, getProviderChain } from './ipc'
 import { prewarmDragIcons } from './drag'
-import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushState, stopStateTimers } from './state'
+import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushState, stopStateTimers, setSuggestionChat } from './state'
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
 import { ForegroundWatcher } from './foreground'
@@ -117,6 +117,11 @@ app.whenReady().then(() => {
   registerSendListeners()
   initState()
   prewarmDragIcons()
+
+  // Wire the provider chain into the suggestion engine (after initState so the
+  // engine's singletons exist; the 30s+ silence floor guarantees the chain is
+  // in place long before any analysis can trigger).
+  setSuggestionChat((req) => getProviderChain().callChat(req))
 
   // Reflect settings immediately.
   let settings = loadSettings()

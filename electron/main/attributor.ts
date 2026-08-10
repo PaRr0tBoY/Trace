@@ -1,0 +1,71 @@
+/**
+ * Attributor (ticket 13) — routes L0 foreground events to tasks.
+ *
+ * Pure module: no Electron imports, no shared singletons. The event bus
+ * subscription, the TaskStore and the renderer push callback are injected so
+ * vitest can drive it end to end with a real TaskStore and a fake bus.
+ *
+ * Matching contract (spec decision 2): an event's app identity is the
+ * lowercase, slash-normalized exePath — or the process name when no exePath
+ * is known. That key must equal the AppRef.id of the task (t11 convention).
+ * Attribution itself (most-recently-active disambiguation, Paused auto-resume,
+ * lastContext refresh) lives in TaskStore.applyAttribution; this module only
+ * maps events to keys, calls it and nudges the renderer when a task changed.
+ *
+ * Privacy gates (task-capture / L0 switches, incognito) are enforced at the
+ * collector (foreground.ts): no events leave it while disabled, so there is
+ * nothing to re-check here.
+ */
+import type { AppSwitchEvent, UsageEvent } from '../../shared/types'
+import type { TaskStore } from '../store/TaskStore'
+
+/** Lowercase + slash-normalize an app identity string (same rule as the clusterer). */
+function normalize(s: string): string {
+  return s.trim().toLowerCase().replace(/\\/g, '/')
+}
+
+/**
+ * App identity key for an L0 event: lowercase exePath, falling back to the
+ * process name when no exePath is known. Must equal AppRef.id semantics.
+ */
+export function appKeyFromEvent(event: AppSwitchEvent): string {
+  const exe = normalize(event.exePath)
+  return exe.length > 0 ? exe : normalize(event.appName)
+}
+
+export interface AttributorOptions {
+  /** Task attribution entry point (t11). */
+  store: Pick<TaskStore, 'applyAttribution'>
+  /** Event bus subscription; injectable for tests. */
+  subscribe: (listener: (event: UsageEvent) => void) => () => void
+  /** Called after a task was attributed (wired to pushState.tasks in main). */
+  onAttributed?: (taskId: string) => void
+}
+
+export interface Attributor {
+  dispose(): void
+}
+
+export function createAttributor(options: AttributorOptions): Attributor {
+  const { store, subscribe, onAttributed } = options
+  let unsubscribe: (() => void) | null = null
+
+  const handleEvent = (event: UsageEvent): void => {
+    if (event.type !== 'app-switch') return // clipboard attribution is t14's job
+    const key = appKeyFromEvent(event)
+    if (key.length === 0) return
+    const taskId = store.applyAttribution(key, { windowTitle: event.windowTitle })
+    if (taskId !== null) onAttributed?.(taskId)
+  }
+
+  unsubscribe = subscribe(handleEvent)
+  console.log('[Attributor] started')
+
+  return {
+    dispose(): void {
+      unsubscribe?.()
+      unsubscribe = null
+      console.log('[Attributor] stopped')
+    }
+  }
+}

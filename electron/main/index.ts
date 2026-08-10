@@ -15,10 +15,12 @@ import { createWindow, getMainWindow, setInteractive, setVisible, startCursorPol
 import { createTray, registerIncognitoApplier } from './tray'
 import { registerIpc, registerSendListeners } from './ipc'
 import { prewarmDragIcons } from './drag'
-import { initState, getWatcher, loadSettings, saveSettings, pushState, stopStateTimers } from './state'
+import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushState, stopStateTimers } from './state'
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
 import { ForegroundWatcher } from './foreground'
+import { createAttributor, type Attributor } from './attributor'
+import { subscribe as subscribeEvents } from './eventBus'
 import { extname, normalize } from 'node:path'
 import { existsSync, createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -61,6 +63,7 @@ protocol.registerSchemesAsPrivileged([
 
 // ---- app lifecycle ---------------------------------------------------------
 let foregroundWatcher: ForegroundWatcher | null = null
+let attributor: Attributor | null = null
 
 app.on('before-quit', () => {
   runtime.quitting = true
@@ -69,6 +72,7 @@ app.on('before-quit', () => {
   stopStateTimers()
   stopFullscreenMonitor()
   foregroundWatcher?.stop()
+  attributor?.dispose()
   getWatcher().stop()
   try {
     const { globalShortcut } = require('electron')
@@ -144,6 +148,11 @@ app.whenReady().then(() => {
   registerIncognitoApplier((v) => {
     getWatcher().setPaused(v)
     foregroundWatcher?.setPaused(v)
+  })
+  attributor = createAttributor({
+    store: getTaskStore(),
+    subscribe: subscribeEvents,
+    onAttributed: () => pushState.tasks()
   })
   getWatcher().setPaused(settings.incognito)
   foregroundWatcher.setPaused(settings.incognito)

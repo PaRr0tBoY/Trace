@@ -13,3 +13,6 @@ FIXES_CHECKLIST.md
 docs/
 dev-app-update.yml
 
+
+# local tracker artifacts
+.scratch/

@@ -15,9 +15,17 @@
  * Privacy gates (task-capture / L0 switches, incognito) are enforced at the
  * collector (foreground.ts): no events leave it while disabled, so there is
  * nothing to re-check here.
+ *
+ * Clipboard auto-attribution (ticket 14) lives here as pure functions too:
+ * buildClipboardEvent constructs the logged event, decideClipboardAttribution
+ * is the link decision (event + tasks + switch -> task id). state.ts wires
+ * them into the clipboard capture callback.
  */
-import type { AppSwitchEvent, UsageEvent } from '../../shared/types'
+import type { AppSwitchEvent, ClipboardEvent, Task, UsageEvent } from '../../shared/types'
 import type { TaskStore } from '../store/TaskStore'
+
+/** App identity carried by L0 events; app-switch and clipboard events share it. */
+type AppIdentity = Pick<AppSwitchEvent, 'appName' | 'exePath'>
 
 /** Lowercase + slash-normalize an app identity string (same rule as the clusterer). */
 function normalize(s: string): string {
@@ -28,7 +36,7 @@ function normalize(s: string): string {
  * App identity key for an L0 event: lowercase exePath, falling back to the
  * process name when no exePath is known. Must equal AppRef.id semantics.
  */
-export function appKeyFromEvent(event: AppSwitchEvent): string {
+export function appKeyFromEvent(event: AppIdentity): string {
   const exe = normalize(event.exePath)
   return exe.length > 0 ? exe : normalize(event.appName)
 }
@@ -68,4 +76,44 @@ export function createAttributor(options: AttributorOptions): Attributor {
       console.log('[Attributor] stopped')
     }
   }
+}
+
+/* ------------------ clipboard attribution (ticket 14) ------------------- */
+
+/**
+ * Build the clipboard event logged when new content is captured. The source
+ * app is the foreground snapshot read at capture time.
+ */
+export function buildClipboardEvent(
+  snapshot: AppIdentity & { pid: number },
+  ts: number
+): ClipboardEvent {
+  return { type: 'clipboard', appName: snapshot.appName, exePath: snapshot.exePath, pid: snapshot.pid, ts }
+}
+
+/**
+ * Decide whether a captured clipboard item links to a task.
+ *
+ * Same rules as t13's app-switch attribution (spec decision 4): only Active
+ * or Paused tasks qualify; the event's app identity must match a task AppRef
+ * id; when several tasks share the app, the most recently active wins.
+ * `enabled` is the "clipboard auto-attribution" setting — off degrades to
+ * manual linking only. Pure: never mutates tasks or the store.
+ */
+export function decideClipboardAttribution(
+  event: ClipboardEvent,
+  tasks: readonly Task[],
+  enabled: boolean
+): string | null {
+  if (!enabled) return null
+  const key = appKeyFromEvent(event)
+  if (key.length === 0) return null
+  let best: Task | null = null
+  for (const t of tasks) {
+    if (t.status !== 'active' && t.status !== 'paused') continue
+    if (t.apps.some((a) => a.id === key) && (!best || t.lastActiveAt > best.lastActiveAt)) {
+      best = t
+    }
+  }
+  return best ? best.id : null
 }

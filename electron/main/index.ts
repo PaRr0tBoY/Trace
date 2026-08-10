@@ -18,6 +18,7 @@ import { prewarmDragIcons } from './drag'
 import { initState, getWatcher, loadSettings, saveSettings, pushState, stopStateTimers } from './state'
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
+import { ForegroundWatcher } from './foreground'
 import { extname, normalize } from 'node:path'
 import { existsSync, createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -59,12 +60,15 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 // ---- app lifecycle ---------------------------------------------------------
+let foregroundWatcher: ForegroundWatcher | null = null
+
 app.on('before-quit', () => {
   runtime.quitting = true
   stopCursorPoll()
   stopHeartbeat()
   stopStateTimers()
   stopFullscreenMonitor()
+  foregroundWatcher?.stop()
   getWatcher().stop()
   try {
     const { globalShortcut } = require('electron')
@@ -131,8 +135,19 @@ app.whenReady().then(() => {
       })
     } catch { /* ignore in non-packaged / sandbox */ }
   }
-  registerIncognitoApplier((v) => getWatcher().setPaused(v))
+  foregroundWatcher = new ForegroundWatcher({
+    isEnabled: () => {
+      const s = loadSettings()
+      return s.taskCaptureEnabled && s.l0CaptureEnabled
+    }
+  })
+  registerIncognitoApplier((v) => {
+    getWatcher().setPaused(v)
+    foregroundWatcher?.setPaused(v)
+  })
   getWatcher().setPaused(settings.incognito)
+  foregroundWatcher.setPaused(settings.incognito)
+  foregroundWatcher.start()
   pushState.settings(settings)
 
   // Keep the tray checkmarks in sync after settings change from the UI.

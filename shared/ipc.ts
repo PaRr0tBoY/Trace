@@ -30,6 +30,15 @@ export interface OllamaDetectionResult {
 }
 
 /**
+ * Resource attached to a task created by dropping onto a suggestion card
+ * (t25): a clipboard item (linked by id, snapshotted main-side) or raw
+ * file paths (deduped against the task's existing file refs).
+ */
+export type DropResource =
+  | { kind: 'clipboard'; itemId: string }
+  | { kind: 'files'; paths: string[] }
+
+/**
  * Context for one AI title suggestion (task:suggest-title): whatever the
  * renderer knows about the task being created/edited. All fields optional;
  * main decides how much it can use.
@@ -137,6 +146,9 @@ export interface InvokeMap {
   /** Link a clipboard item to a task; main snapshots the item content. */
   'task:link-item': { args: [taskId: string, itemId: string]; result: TaskDto[] }
 
+  /** Link OS file paths dropped onto a task; deduped against existing file refs. */
+  'task:link-files': { args: [taskId: string, paths: string[]]; result: TaskDto[] }
+
   /** Unlink a resource from a task (clipboard by itemId, files by exact path list). */
   'task:unlink-item': { args: [taskId: string, target: UnlinkTarget]; result: TaskDto[] }
 
@@ -158,6 +170,12 @@ export interface InvokeMap {
 
   /** Accept a suggestion: merge into its candidate task or create a new one. Returns the full task list. */
   'suggestion:accept': { args: [id: string, titleOverride?: string]; result: TaskDto[] }
+
+  /**
+   * Accept a suggestion AND attach the dropped resource to the resulting
+   * task in one main-side step. Returns the full task list.
+   */
+  'suggestion:accept-with-resource': { args: [id: string, titleOverride: string | undefined, resource: DropResource]; result: TaskDto[] }
 
   /** Dismiss a suggestion; its signature suppresses the same kind later. */
   'suggestion:ignore': { args: [id: string]; result: void }

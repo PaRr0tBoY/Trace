@@ -63,6 +63,13 @@ win.addEventListener('dragover', (e: any) => {
   e.preventDefault()
 }, false)
 
+/**
+ * OS file drops: resolve paths here (File objects die at the bridge), then
+ * hand them to the renderer as a `trace-os-drop` event so Panel can pick the
+ * drop target (save zone / task row / suggestion card) and act accordingly.
+ * The renderer never sees the File objects, so target resolution must happen
+ * against the coordinates captured at drop time.
+ */
 win.addEventListener('drop', (e: any) => {
   if (internalDrag) {
     e.preventDefault()
@@ -83,10 +90,19 @@ win.addEventListener('drop', (e: any) => {
   }
 
   if (paths.length > 0) {
-    // Fire and forget to the main process.
-    // The main process will broadcast the new state back to React.
     e.preventDefault()
-    invoke('item:add-files', paths).catch(console.error)
+    // Renderer's Panel claims the drop synchronously (shared-DOM attribute,
+    // visible across worlds) by resolving the target from these coordinates.
+    // Windows without a Panel listener (e.g. onboarding) must not swallow
+    // the drop: fall back to the plain save-to-shelf path.
+    const docEl = win.document?.documentElement
+    if (docEl) docEl.removeAttribute('data-trace-drop-claimed')
+    win.dispatchEvent(new CustomEvent('trace-os-drop', {
+      detail: { paths, x: e.clientX, y: e.clientY }
+    }))
+    if (docEl && !docEl.hasAttribute('data-trace-drop-claimed')) {
+      invoke('item:add-files', paths).catch(console.error)
+    }
   }
 }, true)
 
@@ -126,6 +142,7 @@ const api = {
   deleteTask: (id: string) => invoke('task:delete', id),
   mergeTasks: (targetId: string, sourceId: string) => invoke('task:merge', targetId, sourceId),
   linkItemToTask: (taskId: string, itemId: string) => invoke('task:link-item', taskId, itemId),
+  linkFilesToTask: (taskId: string, paths: string[]) => invoke('task:link-files', taskId, paths),
   unlinkItemFromTask: (taskId: string, target: import('../../shared/types').UnlinkTarget) => invoke('task:unlink-item', taskId, target),
   suggestTaskTitle: (ctx: SuggestTitleContext) => invoke('task:suggest-title', ctx),
 
@@ -135,6 +152,8 @@ const api = {
 
   /* Suggestions */
   acceptSuggestion: (id: string, titleOverride?: string) => invoke('suggestion:accept', id, titleOverride),
+  acceptSuggestionWithResource: (id: string, titleOverride: string | undefined, resource: import('../../shared/ipc').DropResource) =>
+    invoke('suggestion:accept-with-resource', id, titleOverride, resource),
   ignoreSuggestion: (id: string) => invoke('suggestion:ignore', id),
 
   /* Memory */

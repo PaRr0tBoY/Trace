@@ -7,7 +7,7 @@
  */
 import type { Settings, Suggestion, TaskDto, TaskPatch, UnlinkTarget } from './types'
 import type { DragRequest, ProviderConfig } from './types'
-import type { OllamaDetectionResult, ProviderTestResult, SuggestTitleContext } from './ipc'
+import type { OllamaDetectionResult, ProviderTestResult, SuggestTitleContext, DropResource } from './ipc'
 
 export interface EdgeApi {
   /* Renderer -> Main */
@@ -56,6 +56,7 @@ export interface EdgeApi {
   deleteTask: (id: string) => Promise<TaskDto[]>
   mergeTasks: (targetId: string, sourceId: string) => Promise<TaskDto[]>
   linkItemToTask: (taskId: string, itemId: string) => Promise<TaskDto[]>
+  linkFilesToTask: (taskId: string, paths: string[]) => Promise<TaskDto[]>
   unlinkItemFromTask: (taskId: string, target: UnlinkTarget) => Promise<TaskDto[]>
   suggestTaskTitle: (ctx: SuggestTitleContext) => Promise<string[] | null>
 
@@ -65,6 +66,8 @@ export interface EdgeApi {
 
   /* Suggestions */
   acceptSuggestion: (id: string, titleOverride?: string) => Promise<TaskDto[]>
+  /** Accept a suggestion and attach the dragged resource (t25 drop-to-bind). */
+  acceptSuggestionWithResource: (id: string, titleOverride: string | undefined, resource: DropResource) => Promise<TaskDto[]>
   ignoreSuggestion: (id: string) => Promise<void>
 
   /* Memory */

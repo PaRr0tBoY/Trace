@@ -389,6 +389,33 @@ describe('TaskStore — link/unlink resources', () => {
     expect(store.linkItem('t_nope', { kind: 'clipboard', itemId: 'i1', snapshot: { type: 'text', preview: 'p', capturedAt: 1 } })).toBe(false)
     expect(store.unlinkItem('t_nope', { kind: 'clipboard', itemId: 'i1' })).toBe(false)
   })
+
+  it('linkFiles trims, drops empties and in-list duplicates', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务')!
+    expect(store.linkFiles(task.id, ['  a.txt  ', '', 'b.txt', 'a.txt', ' '])).toBe(true)
+    const files = store.get(task.id)!.resources.filter((r) => r.kind === 'files')
+    expect(files.flatMap((f) => (f.kind === 'files' ? f.paths : []))).toEqual(['a.txt', 'b.txt'])
+  })
+
+  it('linkFiles dedups against existing file refs', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务')!
+    expect(store.linkFiles(task.id, ['a.txt', 'b.txt'])).toBe(true)
+    expect(store.linkFiles(task.id, ['b.txt', 'c.txt'])).toBe(true)
+    expect(store.linkFiles(task.id, ['a.txt', 'b.txt'])).toBe(false)
+    const files = store.get(task.id)!.resources.filter((r) => r.kind === 'files')
+    expect(files.flatMap((f) => (f.kind === 'files' ? f.paths : []))).toEqual(['a.txt', 'b.txt', 'c.txt'])
+  })
+
+  it('linkFiles rejects blank/empty input and unknown tasks', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务')!
+    expect(store.linkFiles(task.id, [])).toBe(false)
+    expect(store.linkFiles(task.id, ['  ', ''])).toBe(false)
+    expect(store.linkFiles('t_nope', ['a.txt'])).toBe(false)
+    expect(store.get(task.id)!.resources).toHaveLength(0)
+  })
 })
 
 describe('TaskStore — snapshots and alive', () => {

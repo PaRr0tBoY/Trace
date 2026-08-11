@@ -414,6 +414,24 @@ export class TaskStore {
     return true
   }
 
+  /**
+   * Link raw file paths (t25 drop-to-bind). Trims, drops empties and
+   * in-list duplicates, then delegates to linkItem's dedup against the
+   * task's existing file refs. Returns whether anything changed.
+   */
+  linkFiles(taskId: string, paths: string[]): boolean {
+    const clean: string[] = []
+    const seen = new Set<string>()
+    for (const p of paths) {
+      const s = p.trim()
+      if (s.length === 0 || seen.has(s)) continue
+      seen.add(s)
+      clean.push(s)
+    }
+    if (clean.length === 0) return false
+    return this.linkItem(taskId, { kind: 'files', paths: clean })
+  }
+
   /** Remove a resource: clipboard by itemId, files by exact path list. Returns whether anything changed. */
   unlinkItem(taskId: string, target: UnlinkTarget): boolean {
     const task = this.tasks.find((t) => t.id === taskId)

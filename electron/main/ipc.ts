@@ -13,13 +13,14 @@ import { requestPanelFocus, releasePanelFocus } from './focus'
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
 import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore } from './state'
 import { getMainWindow } from './window'
-import { setInteractive, setHeartbeatPaused, setHotZoneWidth } from './window'
+import { setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData } from './drag'
 import { clipboardSignature } from '../clipboard/formats'
 import { buildClipboardRef } from '../store/TaskStore'
+import { acceptWithResource } from './suggestionDrop'
 import { ProviderChain, buildLocalProvider, detectOllama, testProvider } from './provider'
-import type { ItemData, MergeResult, MemoryListPayload } from '../../shared/types'
+import type { ItemData, MergeResult, MemoryListPayload, ResourceRef } from '../../shared/types'
 
 /**
  * Returns true if the current system clipboard content matches the given item data.
@@ -205,6 +206,12 @@ export function registerIpc(): void {
     return getTaskStore().toDto()
   })
 
+  handle('task:link-files', (taskId, paths) => {
+    getTaskStore().linkFiles(taskId, paths)
+    pushState.tasks()
+    return getTaskStore().toDto()
+  })
+
   handle('task:unlink-item', (taskId, target) => {
     getTaskStore().unlinkItem(taskId, target)
     pushState.tasks()
@@ -219,6 +226,23 @@ export function registerIpc(): void {
 
   handle('suggestion:accept', (id, titleOverride) => {
     const accepted = getSuggestionEngine().accept(id, titleOverride)
+    if (accepted !== null) pushState.tasks()
+    return getTaskStore().toDto()
+  })
+
+  handle('suggestion:accept-with-resource', (id, titleOverride, resource) => {
+    // Build the clipboard snapshot here (ItemStore access lives in this layer),
+    // then let the pure composition accept + link atomically.
+    const ref: ResourceRef | null =
+      resource.kind === 'clipboard'
+        ? (() => {
+            const item = getStore().get(resource.itemId)
+            return item ? buildClipboardRef(item) : null
+          })()
+        : { kind: 'files', paths: resource.paths }
+    const accepted = ref
+      ? acceptWithResource(getSuggestionEngine(), getTaskStore(), id, titleOverride, ref)
+      : getSuggestionEngine().accept(id, titleOverride)
     if (accepted !== null) pushState.tasks()
     return getTaskStore().toDto()
   })
@@ -530,6 +554,18 @@ export function registerIpc(): void {
 
   handle('window:set-interactive', (value) => {
     setInteractive(value)
+  })
+
+  handle('window:set-preview-mode', (active) => {
+    // Restored from upstream (lost in the 0.2.6 merge, same class as file:reveal):
+    // widens the window so the preview flyout renders beside the blade.
+    setPreviewMode(active)
+  })
+
+  handle('displays:list', () => {
+    // Restored from upstream (lost in the 0.2.6 merge): the settings display
+    // picker + tray menu both consume this.
+    return getDisplayListOptions()
   })
 
   handle('file:reveal', (filePath) => {

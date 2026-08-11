@@ -1254,6 +1254,7 @@ function AIProviderSection() {
         const isDraft = draft && draft.id === p.id ? draft : p
         return (
           <div key={p.id} className="setting-row vertical" style={{ gap: 8 }}>
+            {/* Layer 1: status dot + model name (own line) + reorder/remove */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
               <span
                 style={{
@@ -1265,24 +1266,13 @@ function AIProviderSection() {
                 }}
                 title={p.kind === 'local' ? t('ai.kindLocal') : t('ai.kindCloud')}
               />
-              <div className="setting-info" style={{ flex: 1, minWidth: 0 }}>
-                <div className="setting-title" style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {isDraft.model}
-                </div>
-                <div className="setting-desc" style={{ fontSize: 10.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {p.baseUrl}
-                </div>
-              </div>
-              {test?.status === 'testing' && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{t('ai.testing')}</span>}
-              {test?.status === 'ok' && <span style={{ fontSize: 11, color: '#4caf50', whiteSpace: 'nowrap' }}>✓ {t('ai.testOk', { ms: test.detail ?? '' })}</span>}
-              {test?.status === 'fail' && <span style={{ fontSize: 11, color: '#ff6b6b', whiteSpace: 'nowrap', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>✗ {t('ai.testFailed', { error: test.detail ?? '' })}</span>}
-              <button
-                className="pill display-pill"
-                style={{ padding: '4px 10px', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}
-                onClick={() => { playButtonClickSound(); void testProvider(isDraft) }}
+              <div
+                className="setting-title"
+                style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                title={isDraft.model}
               >
-                {t('ai.test')}
-              </button>
+                {isDraft.model}
+              </div>
               <button style={{ ...iconBtn, ...(i === 0 ? { opacity: 0.35, cursor: 'default' } : {}) }} disabled={i === 0} title={t('ai.moveUp')} onClick={() => moveProvider(i, -1)}>
                 <ChevronRightIcon width={12} height={12} style={{ transform: 'rotate(-90deg)' }} />
               </button>
@@ -1292,6 +1282,26 @@ function AIProviderSection() {
               <button style={iconBtn} title={t('ai.remove')} onClick={() => { playButtonClickSound(); setProviders(providers.filter((x) => x.id !== p.id)); if (expandedId === p.id) { setExpandedId(null); setDraft(null) } }}>
                 <CloseIcon width={10} height={10} />
               </button>
+            </div>
+            {/* Layer 2: baseUrl + test button + full test status (wraps, never truncates) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', flexWrap: 'wrap' }}>
+              <div
+                className="setting-desc"
+                style={{ flex: 1, minWidth: 0, fontSize: 10.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                title={p.baseUrl}
+              >
+                {p.baseUrl}
+              </div>
+              <button
+                className="pill display-pill"
+                style={{ padding: '4px 10px', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}
+                onClick={() => { playButtonClickSound(); void testProvider(isDraft) }}
+              >
+                {t('ai.test')}
+              </button>
+              {test?.status === 'testing' && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>{t('ai.testing')}</span>}
+              {test?.status === 'ok' && <span style={{ fontSize: 11, color: '#4caf50', whiteSpace: 'nowrap' }}>✓ {t('ai.testOk', { ms: test.detail ?? '' })}</span>}
+              {test?.status === 'fail' && <span style={{ fontSize: 11, color: '#ff6b6b', overflowWrap: 'anywhere' }}>✗ {t('ai.testFailed', { error: test.detail ?? '' })}</span>}
             </div>
 
             {isExpanded && (
@@ -1362,9 +1372,9 @@ function AIProviderSection() {
         </button>
       </div>
 
-      {detectState.status === 'detecting' && <div className="setting-desc" style={{ marginTop: 8 }}>{t('ai.detecting')}</div>}
-      {detectState.status === 'ok' && <div className="setting-desc" style={{ marginTop: 8, color: '#4caf50' }}>{t('ai.detectFound', { model: detectState.detail ?? '' })}</div>}
-      {detectState.status === 'fail' && <div className="setting-desc" style={{ marginTop: 8, color: '#ff6b6b' }}>{t('ai.detectNotFound')}{detectState.detail ? ` (${detectState.detail})` : ''}</div>}
+      {detectState.status === 'detecting' && <div className="setting-desc" style={{ marginTop: 8, fontSize: 11.5 }}>{t('ai.detecting')}</div>}
+      {detectState.status === 'ok' && <div className="setting-desc" style={{ marginTop: 8, color: '#4caf50', fontSize: 11.5 }}>{t('ai.detectFound', { model: detectState.detail ?? '' })}</div>}
+      {detectState.status === 'fail' && <div className="setting-desc" style={{ marginTop: 8, color: '#ff6b6b', fontSize: 11.5 }}>{t('ai.detectNotFound')}{detectState.detail ? ` (${detectState.detail})` : ''}</div>}
       {hasChainFailure && <div className="setting-desc" style={{ marginTop: 8, opacity: 0.7 }}>{t('ai.chainHint')}</div>}
     </>
   )

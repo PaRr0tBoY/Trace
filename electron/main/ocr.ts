@@ -117,47 +117,46 @@ export function queryForegroundRect(): ScreenRect | null {
  * failing prints '' so main sees "no OCR" instead of an error.
  */
 export function buildOcrScript(rect: ScreenRect): string {
-  return `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-Add-Type -AssemblyName System.Drawing
-Add-Type -AssemblyName System.Runtime.WindowsRuntime
-# PS 5.1 does not project WinRT types until each assembly is touched with the
-# WindowsRuntime content type — resolving the ones this script uses.
-$null = [Windows.Storage.Streams.InMemoryRandomAccessStream, Windows.Storage.Streams, ContentType=WindowsRuntime]
-$null = [Windows.Graphics.Imaging.BitmapDecoder, Windows.Graphics.Imaging, ContentType=WindowsRuntime]
-$null = [Windows.Graphics.Imaging.SoftwareBitmap, Windows.Graphics.Imaging, ContentType=WindowsRuntime]
-$null = [Windows.Media.Ocr.OcrEngine, Windows.Media.Ocr, ContentType=WindowsRuntime]
-$null = [Windows.Globalization.Language, Windows.Globalization, ContentType=WindowsRuntime]
-$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0]
-function Await($WinRtTask, $ResultType) {
-  $asTask = $asTaskGeneric.MakeGenericMethod($ResultType)
-  $netTask = $asTask.Invoke($null, @($WinRtTask))
-  $netTask.Wait(-1) | Out-Null
-  $netTask.Result
-}
-$width = [int](${rect.right} - ${rect.left})
-$height = [int](${rect.bottom} - ${rect.top})
+  // Single-line body: the persistent PS session reads stdin line by line, and
+  // multi-line blocks have proven unreliable there — every statement is joined
+  // with ';' and braces blocks stay on one line.
+  return `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;
+Add-Type -AssemblyName System.Drawing;
+Add-Type -AssemblyName System.Runtime.WindowsRuntime;
+
+$null = [Windows.Storage.Streams.InMemoryRandomAccessStream, Windows.Storage.Streams, ContentType=WindowsRuntime];
+$null = [Windows.Graphics.Imaging.BitmapDecoder, Windows.Graphics.Imaging, ContentType=WindowsRuntime];
+$null = [Windows.Graphics.Imaging.SoftwareBitmap, Windows.Graphics.Imaging, ContentType=WindowsRuntime];
+$null = [Windows.Media.Ocr.OcrEngine, Windows.Media.Ocr, ContentType=WindowsRuntime];
+$null = [Windows.Globalization.Language, Windows.Globalization, ContentType=WindowsRuntime];
+$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0];
+function Await($WinRtTask, $ResultType) { $asTask = $asTaskGeneric.MakeGenericMethod($ResultType); $netTask = $asTask.Invoke($null, @($WinRtTask)); $netTask.Wait(-1) | Out-Null; $netTask.Result }
+$width = [int](${rect.right} - ${rect.left});
+$height = [int](${rect.bottom} - ${rect.top});
 if ($width -le 0 -or $height -le 0) { Write-Output ''; exit 0 }
-$bmp = New-Object System.Drawing.Bitmap($width, $height)
-$g = [System.Drawing.Graphics]::FromImage($bmp)
+$bmp = New-Object System.Drawing.Bitmap($width, $height);
+$g = [System.Drawing.Graphics]::FromImage($bmp);
+
 try { $g.CopyFromScreen(${rect.left}, ${rect.top}, 0, 0, $bmp.Size) } catch { $g.Dispose(); $bmp.Dispose(); Write-Output ''; exit 0 }
-$g.Dispose()
-$stream = New-Object Windows.Storage.Streams.InMemoryRandomAccessStream
+$g.Dispose();
+$stream = New-Object Windows.Storage.Streams.InMemoryRandomAccessStream;
 try { $bmp.Save([System.IO.WindowsRuntimeStreamExtensions]::AsStream($stream), [System.Drawing.Imaging.ImageFormat]::Png) } catch { $bmp.Dispose(); $stream.Dispose(); Write-Output ''; exit 0 }
-$bmp.Dispose()
-$decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
-$bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
-if ($bitmap.BitmapPixelFormat -ne [Windows.Graphics.Imaging.BitmapPixelFormat]::Bgra8 -or $bitmap.BitmapAlphaMode -ne [Windows.Graphics.Imaging.BitmapAlphaMode]::Premultiplied) {
-  $converted = [Windows.Graphics.Imaging.SoftwareBitmap]::Convert($bitmap, [Windows.Graphics.Imaging.BitmapPixelFormat]::Bgra8, [Windows.Graphics.Imaging.BitmapAlphaMode]::Premultiplied)
-  $bitmap.Dispose()
-  $bitmap = $converted
-}
-$lang = New-Object Windows.Globalization.Language('zh-Hans')
-$engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($lang)
+$bmp.Dispose();
+
+$decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder]);
+$bitmap = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap]);
+
+if ($bitmap.BitmapPixelFormat -ne [Windows.Graphics.Imaging.BitmapPixelFormat]::Bgra8 -or $bitmap.BitmapAlphaMode -ne [Windows.Graphics.Imaging.BitmapAlphaMode]::Premultiplied) { $converted = [Windows.Graphics.Imaging.SoftwareBitmap]::Convert($bitmap, [Windows.Graphics.Imaging.BitmapPixelFormat]::Bgra8, [Windows.Graphics.Imaging.BitmapAlphaMode]::Premultiplied); $bitmap.Dispose(); $bitmap = $converted }
+$lang = New-Object Windows.Globalization.Language('zh-Hans');
+
+$engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($lang);
 if (-not $engine) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
 if (-not $engine) { $bitmap.Dispose(); Write-Output ''; exit 0 }
-$result = Await ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
-$text = [string]$result.Text
-$bitmap.Dispose()
+
+$result = Await ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult]);
+
+$text = [string]$result.Text;
+$bitmap.Dispose();
 [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($text))`
 }
 

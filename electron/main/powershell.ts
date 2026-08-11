@@ -63,6 +63,10 @@ class PersistentPowerShell {
         console.error('[PersistentPowerShell] error:', err)
         this.running = false
       })
+      // Resume whatever queued while the old process was down (a timeout kill
+      // leaves the queue behind; without this every queued command would hang
+      // until its own timeout — the PS channel would stay dead for good).
+      this.processQueue()
     } catch (err) {
       console.error('[PersistentPowerShell] spawn failed:', err)
     }

@@ -64,10 +64,10 @@
 .task-suggestion-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 8px 10px;
   border: 1px solid rgba(251, 191, 36, 0.22);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: linear-gradient(180deg, rgba(251, 191, 36, 0.05), rgba(255, 255, 255, 0.02));
 }
 
@@ -77,16 +77,12 @@
   gap: 8px;
   min-width: 0;
 }
-.task-suggestion-head .task-suggest-icon {
-  width: 22px;
-  height: 22px;
-  color: #fbbf24;
-}
 
 .task-suggestion-title {
   flex: 1;
   min-width: 0;
   font-size: calc(12.5px * var(--font-scale, 1));
+  line-height: 1.35;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
   overflow: hidden;
@@ -97,7 +93,7 @@
 .task-suggestion-input {
   flex: 1;
   min-width: 0;
-  padding: 4px 8px;
+  padding: 3px 8px;
   border-radius: 8px;
   border: 1px solid rgba(251, 191, 36, 0.4);
   background: rgba(255, 255, 255, 0.06);
@@ -121,31 +117,78 @@
   border: 1px solid rgba(251, 191, 36, 0.28);
 }
 
-.task-suggestion-meta {
+.task-suggestion-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-.task-suggestion-chip {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: calc(10.5px * var(--font-scale, 1));
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-.task-suggestion-conf {
-  margin-left: auto;
-  font-size: calc(10.5px * var(--font-scale, 1));
-  color: rgba(255, 255, 255, 0.45);
-  white-space: nowrap;
+  gap: 8px;
+  min-width: 0;
 }
 
-.task-suggestion-dest {
-  font-size: calc(11px * var(--font-scale, 1));
-  color: rgba(255, 255, 255, 0.55);
+.task-suggestion-apps {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.task-suggestion-app {
+  width: 17px;
+  height: 17px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.task-suggestion-apps-empty {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.task-suggestion-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.task-suggestion-action {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+.task-suggestion-card:hover .task-suggestion-action {
+  opacity: 1;
+}
+.task-suggestion-action:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.95);
+}
+.task-suggestion-action.accept:hover {
+  background: rgba(139, 92, 246, 0.18);
+  color: var(--accent);
+}
+.task-suggestion-action.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+.task-suggestion-action:disabled {
+  opacity: 0.3;
+  pointer-events: none;
 }
 
 .task-suggestion-why {
@@ -156,9 +199,9 @@
   padding: 0;
   border: none;
   background: none;
-  font-size: calc(11px * var(--font-scale, 1));
+  font-size: calc(10.5px * var(--font-scale, 1));
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.45);
   cursor: pointer;
 }
 .task-suggestion-why:hover {

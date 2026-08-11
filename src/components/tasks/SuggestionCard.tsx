@@ -1,12 +1,9 @@
 /**
- * SuggestionCard — one AI task suggestion (t19).
+ * SuggestionCard — one AI task suggestion (t19), two-line layout (t23).
  *
- * Interactive surface for the suggestion lifecycle: editable title, app
- * chips, confidence (+ "needs review" flag for the low zone), expandable
- * reason (algorithm evidence + optional LLM rationale) and the three
- * actions. [确认] accepts with the current title, [编辑] swaps the title
- * into an input (accept then carries the override), [忽略] writes the
- * signature into the local ignore table so this kind never resurfaces.
+ * Line 1: editable title (+ low-confidence badge). Line 2: app icons
+ * (no names) on the left, three icon actions on the right. The "why"
+ * toggle folds out the algorithm evidence + optional LLM rationale.
  * Everything delegates to main — the card is a view of the pushed
  * `state:suggestions` payload.
  */
@@ -20,6 +17,8 @@ interface Props {
   suggestion: Suggestion
 }
 
+const MAX_APPS = 5
+
 function formatDuration(ms: number): string {
   const minutes = Math.max(1, Math.round(ms / 60_000))
   return minutes < 60 ? `${minutes}m` : `${Math.round(minutes / 60)}h`
@@ -32,20 +31,20 @@ export function SuggestionCard({ suggestion }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(suggestion.title)
   const [expanded, setExpanded] = useState(false)
+  const [brokenIcons, setBrokenIcons] = useState<ReadonlySet<string>>(new Set())
 
   const confirm = (): void => {
     const title = editing ? draft.trim() : ''
     void acceptSuggestion(suggestion.id, title || undefined)
   }
 
-  const pct = Math.round(suggestion.confidence * 100)
+  const apps = (suggestion.appIcons ?? [])
+    .filter((app) => !brokenIcons.has(app.iconUrl))
+    .slice(0, MAX_APPS)
 
   return (
     <div className="task-suggestion-card">
       <div className="task-suggestion-head">
-        <div className="task-suggest-icon">
-          <SparklesIcon width={13} height={13} />
-        </div>
         {editing ? (
           <input
             className="task-suggestion-input"
@@ -67,17 +66,61 @@ export function SuggestionCard({ suggestion }: Props) {
         )}
       </div>
 
-      <div className="task-suggestion-meta">
-        {suggestion.appNames.map((app) => (
-          <span key={app} className="task-suggestion-chip">{app}</span>
-        ))}
-        <span className="task-suggestion-conf">
-          {t('tasks.suggestionConfidence', { value: pct })}
-        </span>
-      </div>
+      <div className="task-suggestion-row">
+        <div className="task-suggestion-apps">
+          {apps.length > 0 ? (
+            apps.map((app, i) => (
+              <img
+                key={`${app.name}:${app.iconUrl}:${i}`}
+                className="task-suggestion-app"
+                src={app.iconUrl}
+                alt=""
+                draggable={false}
+                onError={() => setBrokenIcons((prev) => new Set(prev).add(app.iconUrl))}
+              />
+            ))
+          ) : (
+            <span className="task-suggestion-apps-empty" title={suggestion.appNames.join(', ')}>
+              <SparklesIcon width={12} height={12} />
+            </span>
+          )}
+        </div>
 
-      <div className="task-suggestion-dest">
-        {suggestion.taskId ? t('tasks.suggestionMergeHint') : t('tasks.suggestionNewHint')}
+        <div className="task-suggestion-actions">
+          <button
+            type="button"
+            className="task-suggestion-action accept"
+            title={t('tasks.suggestionAccept')}
+            onClick={confirm}
+            disabled={editing && draft.trim().length === 0}
+          >
+            <CheckIcon width={14} height={14} />
+          </button>
+          <button
+            type="button"
+            className="task-suggestion-action"
+            title={editing ? t('tasks.cancel') : t('tasks.suggestionEdit')}
+            onClick={() => {
+              if (editing) {
+                setDraft(suggestion.title)
+                setEditing(false)
+              } else {
+                setDraft(suggestion.title)
+                setEditing(true)
+              }
+            }}
+          >
+            {editing ? <CloseIcon width={13} height={13} /> : <EditIcon width={13} height={13} />}
+          </button>
+          <button
+            type="button"
+            className="task-suggestion-action danger"
+            title={t('tasks.suggestionIgnore')}
+            onClick={() => void ignoreSuggestion(suggestion.id)}
+          >
+            <CloseIcon width={13} height={13} />
+          </button>
+        </div>
       </div>
 
       <button
@@ -86,7 +129,7 @@ export function SuggestionCard({ suggestion }: Props) {
         onClick={() => setExpanded((v) => !v)}
       >
         {t('tasks.suggestionReason')}
-        {expanded ? <ChevronUpIcon width={12} height={12} /> : <ChevronDownIcon width={12} height={12} />}
+        {expanded ? <ChevronUpIcon width={11} height={11} /> : <ChevronDownIcon width={11} height={11} />}
       </button>
 
       {expanded && (
@@ -109,41 +152,6 @@ export function SuggestionCard({ suggestion }: Props) {
           )}
         </div>
       )}
-
-      <div className="task-suggestion-actions">
-        <button
-          type="button"
-          className="task-btn primary"
-          onClick={confirm}
-          disabled={editing && draft.trim().length === 0}
-        >
-          <CheckIcon width={12} height={12} />
-          {editing ? t('tasks.save') : t('tasks.suggestionAccept')}
-        </button>
-        <button
-          type="button"
-          className="task-btn"
-          onClick={() => {
-            if (editing) {
-              setDraft(suggestion.title)
-              setEditing(false)
-            } else {
-              setDraft(suggestion.title)
-              setEditing(true)
-            }
-          }}
-        >
-          {editing ? <CloseIcon width={12} height={12} /> : <EditIcon width={12} height={12} />}
-          {editing ? t('tasks.cancel') : t('tasks.edit')}
-        </button>
-        <button
-          type="button"
-          className="task-btn danger"
-          onClick={() => void ignoreSuggestion(suggestion.id)}
-        >
-          {t('tasks.suggestionIgnore')}
-        </button>
-      </div>
     </div>
   )
 }

@@ -89,10 +89,14 @@
 - 拖拽图标：`@resvg/resvg-js` 渲染 SVG（文件栈卡片、文本玻璃卡片、图片缩略图），64 项内存缓存 + 启动预暖。
 
 ### 其他 main 模块
-- `powershell.ts` — PowerShell 调用封装（模拟 Ctrl+V 粘贴、HDROP 文件列表）。
+- `powershell.ts` — PowerShell 调用封装（模拟 Ctrl+V 粘贴、HDROP 文件列表、`runOutput` 捕获 stdout 供 OCR）。**多行脚本在常驻会话 stdin 会卡死**——给常驻通道的脚本必须写成单行（`;` 连接，OCR 脚本即如此）。
 - `fullscreen.ts` — koffi 全屏应用检测（决定面板 z-order/收回行为）。
 - `onboardingWindow.ts` — 首次启动引导窗口，独立 frameless 窗口，加载 `#/onboarding` 路由。
 - `config.ts` — `APP_CONFIG`（应用名、`tracelocal://` 图片协议）与 `runtime` 可变标志。
+- `focus.ts` — 输入框焦点桥（见注意事项"输入框焦点（t21）"）。
+- `appIcons.ts` — APP 图标通道：`app.getFileIcon` → dataURL，LRU 缓存；`attachAppIcons`/`attachSuggestionIcons` 在 `pushState.tasks/suggestions` 推送前批量填充（`AppRef.iconUrl` / `Suggestion.appIcons`）。`appIconCore.ts` 是纯逻辑（缓存/占位），可注入测试。
+- `ocr.ts` — Windows.Media.Ocr（WinRT，经 PowerShell 单行脚本）识别前台窗口文字，作为 LLM 建议的 `ocrContext` 输入。**只作 AI 资料不进 UI、不持久化**；隐私三开关（incognito/L0/总开关）任一关闭即跳过；分析触发时才跑，超时放弃。
+- `suggestionDrop.ts` — 拖到备选卡"自动建任务并绑定"的纯逻辑组合（`acceptWithResource`），IPC 层薄封装。
 
 ### 设置（`electron/store/settings.ts`）
 - 扁平 JSON，读取时深合并到 `DEFAULT_SETTINGS` 并**钳制数值**（hotZoneHeight 0.2–0.6、historyLimit 50–2000、autoDeleteHours ≥ 0、uiStyle 枚举）。新加设置字段要同时登记 `shared/types.ts` 的 `Settings`/`DEFAULT_SETTINGS` 和这里的 `merge()`。
@@ -101,6 +105,7 @@
 - `src/main.tsx` 按 hash 路由：`#/onboarding` → Onboarding，否则 App。
 - 组件树：App → Panel（Header / ItemList / Settings / ToastStack），Settings 内嵌 ChangelogView 子视图；i18n 30 语言（`src/i18n/`）。
 - `src/components/PreviewFlyout.tsx` 是 upstream 遗留死文件（无人引用），别动。
+- 任务层 UI：`tasks/` 下 TaskView（备选卡 + 分割线 + 任务列表同一滚动栏）、SuggestionCard（两行卡）、TaskDetail（全页详情：应用/窗口名/置信度/创建原因）、TaskDropPanel（拖入绑定面板：保存区 + 任务列表 + 备选卡落点）、dropActions.ts（`linkDraggedItem`/`linkFiles`/`acceptWithResource` 的 renderer 侧薄封装）；`data-drop-task-id`/`data-drop-suggestion-id`/`.drop-save-zone` 是 Panel `onInternalDrop` 的解析锚点。
 - 样式分层：tokens.css（主题变量）→ global → panel/item/settings。
 
 ## 注意事项
@@ -109,5 +114,6 @@
 - **feature/tasks 已删除（2026-08-09）**：任务系统设计作废（上游大更新后决策推翻重建）。旧设计要点（Task 聚合根、四层面板、Alt-Tab 窗口切换、koffi 键盘轮询、C# 窗口枚举 helper）仅存于 git 历史（`3dc9b07`、`f146a96`），重建时可参考但不要恢复代码。
 - userData 目录：`%APPDATA%\Trace`（rebrand 后），旧 `edge-drop` 数据不迁移。
 - **输入框焦点（t21）**：面板窗口 `focusable:false`（upstream 遗留，**禁止改 true**）。输入框聚焦链：renderer 全局 `focusin`（App.tsx，捕获阶段，匹配 `input, textarea, [contenteditable]`）→ `ui:input-focus` 即发即弃 IPC → main `electron/main/focus.ts` 调 `win.setFocusable(true)+win.focus()` 真正激活窗口（仅 OS 层 SetFocus/剥 WS_EX_NOACTIVATE 不够——Chromium 内部激活状态在创建时缓存，实测按键仍被吞；必须走 Electron 的 focus 机制）。blur（focusout → `ui:input-blur`）→ `setFocusable(false)` + koffi 显式加回 WS_EX_NOACTIVATE（实测 setFocusable(false) 不动 OS 样式）。仅点输入框才激活窗口；其余点击不抢焦点。输入框聚焦时 Escape 只 blur 不关面板（useEdgeHover onKeyDown）。
+- **0.2.6 合并丢失了三个 IPC handler（2026-08-11 恢复）**：`file:reveal`、`displays:list`、`window:set-preview-mode` 在 `shared/ipc.ts`/preload 有声明但 main 从未注册（真机报 `No handler registered`）。已恢复并注释。**教训：四文件契约靠 typecheck 校验签名，但"声明了没注册"typecheck 查不出**——新增通道后跑一次真机或 grep 确认 `handle('channel'` 存在。
 - `drag_debug.txt` 是 OLE 拖拽排障日志，已被 gitignore（upstream 加的），运行时生成不提交。
 - `features_and_architecture.md` 是旧架构文档（fork 前写的），可能滞后于代码；`scratch/` 用途不明，别动。

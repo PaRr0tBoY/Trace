@@ -1,13 +1,19 @@
 /**
  * useFilteredItems — derives the visible, grouped item list from raw state.
  *
- * Split into Pinned (favorites) and Recent (everything else), then apply the
- * search query. Kept as a selector so components stay presentational.
+ * Serves three views (ADR-0004):
+ * - clipboard: pinned/recent split, filtered by clipboardFilter ('all'
+ *   excludes file entries — files live in the files view).
+ * - files:    'all' keeps the grouped file entries; an extension tab or
+ *             'other' returns single file *members* for the member list.
+ *
+ * Kept as a selector so components stay presentational.
  */
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useStore } from '../store/appStore'
-import type { ClipboardItemDto, TypeFilter } from '../../shared/types'
+import type { ClipboardItemDto, ClipboardFilter, FilesFilter } from '../../shared/types'
 import { basename } from '../lib/format'
+import { collectFileMembers, deriveFileTabs, filterMembersByTab, isFileTabAlive, isImageItem, MAX_EXT_TABS, type FileMember } from '../lib/fileTabs'
 
 function matches(it: ClipboardItemDto, q: string): boolean {
   if (!q) return true
@@ -18,35 +24,23 @@ function matches(it: ClipboardItemDto, q: string): boolean {
     case 'files':
       return it.data.paths.some((p) => basename(p).toLowerCase().includes(needle))
     case 'image':
+    case 'image-collection':
       // images have no searchable text; hidden by query
       return false
-    case 'image-collection':
-      // image collections have no searchable text; hidden by query
-      return false
   }
 }
 
-import { isImagePath } from '../lib/format'
-
-function isImageItem(it: ClipboardItemDto): boolean {
-  if (it.data.kind === 'image' || it.data.kind === 'image-collection') return true
-  if (it.data.kind === 'files' && it.data.paths.length > 0) {
-    return it.data.paths.every((p) => isImagePath(p))
-  }
-  return false
-}
-
-function matchesType(it: ClipboardItemDto, filter: TypeFilter): boolean {
-  if (filter === 'all') return true
+function matchesClipboardFilter(it: ClipboardItemDto, filter: ClipboardFilter): boolean {
   switch (filter) {
+    case 'all':
+      // 'all' never includes file entries (ADR-0004).
+      return it.data.kind !== 'files' || isImageItem(it)
     case 'text':
       return it.data.kind === 'text' && !it.data.isUrl
     case 'links':
       return it.data.kind === 'text' && !!it.data.isUrl
     case 'images':
       return isImageItem(it)
-    case 'files':
-      return it.data.kind === 'files' && !isImageItem(it)
   }
 }
 
@@ -55,10 +49,11 @@ export interface GroupedItems {
   recent: ClipboardItemDto[]
 }
 
+/** Clipboard-view filtering (grouped). */
 export function useFilteredItems(): GroupedItems {
   const items = useStore((s) => s.items)
   const query = useStore((s) => s.query)
-  const typeFilter = useStore((s) => s.typeFilter)
+  const clipboardFilter = useStore((s) => s.clipboardFilter)
   const tutorialStep = useStore((s) => s.tutorialStep)
 
   return useMemo(() => {
@@ -75,7 +70,8 @@ export function useFilteredItems(): GroupedItems {
         case 3:
           return it.id === 'onboarding-image' || !it.id.startsWith('onboarding-')
         case 4:
-          return it.id === 'onboarding-files'
+          // The files card lives in the files view (useFileMembers handles it).
+          return false
         case 5:
           return true
         default:
@@ -85,9 +81,69 @@ export function useFilteredItems(): GroupedItems {
 
     for (const it of filteredByTutorial) {
       if (!matches(it, query.trim())) continue
-      if (!matchesType(it, typeFilter)) continue
+      if (!matchesClipboardFilter(it, clipboardFilter)) continue
       ;(it.pinned ? pinned : recent).push(it)
     }
     return { pinned, recent }
-  }, [items, query, typeFilter, tutorialStep])
+  }, [items, query, clipboardFilter, tutorialStep])
+}
+
+export interface FileViewData {
+  /** Every non-image file member (after search), in item order. */
+  members: FileMember[]
+  /**
+   * Members under the active tab; null when the active filter is 'all'
+   * (the caller renders grouped entries instead).
+   */
+  tabMembers: FileMember[] | null
+  /** Extension tabs, count desc then alphabetical. */
+  tabs: { ext: string; count: number }[]
+  /** Number of extension-less members (the 'other' bucket). */
+  otherCount: number
+  /** The active filter — falls back to 'all' when the tab vanished. */
+  activeFilter: FilesFilter
+}
+
+/**
+ * Files-view data: extension tabs + the members under the active tab.
+ * A vanished tab (its files were deleted) falls back to 'all'.
+ */
+export function useFileMembers(): FileViewData {
+  const items = useStore((s) => s.items)
+  const query = useStore((s) => s.query)
+  const filesFilter = useStore((s) => s.filesFilter)
+  const setFilesFilter = useStore((s) => s.setFilesFilter)
+  const tutorialStep = useStore((s) => s.tutorialStep)
+
+  const data = useMemo(() => {
+    const filteredByTutorial = items.filter((it) => {
+      if (tutorialStep <= 0) return true
+      switch (tutorialStep) {
+        case 4:
+          return it.id === 'onboarding-files'
+        default:
+          return true
+      }
+    })
+    const members = collectFileMembers(filteredByTutorial)
+    const q = query.trim().toLowerCase()
+    const searched = q ? members.filter((m) => m.name.toLowerCase().includes(q)) : members
+    const tabs = deriveFileTabs(searched, MAX_EXT_TABS)
+    const activeFilter = isFileTabAlive(searched, filesFilter, MAX_EXT_TABS) ? filesFilter : 'all'
+    return {
+      members: searched,
+      tabMembers: activeFilter === 'all' ? null : filterMembersByTab(searched, activeFilter),
+      tabs: tabs.tabs,
+      otherCount: tabs.otherCount,
+      activeFilter
+    }
+  }, [items, query, filesFilter, tutorialStep])
+
+  // A vanished tab falls back to 'all' (ADR-0004); sync the store so the
+  // header highlight matches what is rendered.
+  useEffect(() => {
+    if (data.activeFilter !== filesFilter) setFilesFilter(data.activeFilter)
+  }, [data.activeFilter, filesFilter, setFilesFilter])
+
+  return data
 }

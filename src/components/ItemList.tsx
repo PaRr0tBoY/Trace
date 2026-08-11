@@ -30,7 +30,19 @@ export function ItemList() {
   const isDraggingAny = useStore((s) => !!s.dragActive || !!s.internalDragReq)
   const open = useStore((s) => s.open)
   
-  const typeFilter = useStore((s) => s.typeFilter) || 'all'
+  const clipboardFilter = useStore((s) => s.clipboardFilter) || 'all'
+  // When the type filter or search query changes, newly-mounted cards skip
+  // their enter animation — the list swaps in place instead of the old batch
+  // clearing out and the new one springing back in (jank + blank gap).
+  const filterKey = `${clipboardFilter}|${query}`
+  const [filterInstant, setFilterInstant] = useState<{ key: string; instant: boolean }>({ key: filterKey, instant: true })
+  if (filterInstant.key !== filterKey) {
+    setFilterInstant({ key: filterKey, instant: true })
+  }
+  useEffect(() => {
+    if (filterInstant.instant) setFilterInstant((s) => ({ ...s, instant: false }))
+  }, [filterInstant])
+
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [collapsedMap, setCollapsedMap] = useState<Record<string, boolean>>(() => {
     try {
@@ -40,11 +52,11 @@ export function ItemList() {
     return { all: true, text: true, image: true, file: true, link: true }
   })
 
-  const pinnedCollapsed = collapsedMap[typeFilter] ?? true
+  const pinnedCollapsed = collapsedMap[clipboardFilter] ?? true
 
   const setPinnedCollapsed = (val: boolean) => {
     setCollapsedMap((prev) => {
-      const next = { ...prev, [typeFilter]: val }
+      const next = { ...prev, [clipboardFilter]: val }
       localStorage.setItem('trace_pinned_collapsed_map', JSON.stringify(next))
       return next
     })
@@ -138,6 +150,9 @@ export function ItemList() {
 
   const startScrolling = () => {
     if (scrollRaf.current !== null) return
+    // The rAF loop assigns scrollTop every frame; scroll-behavior: smooth
+    // would interpolate each assignment and lag behind the pointer.
+    listRef.current?.classList.add('drag-scrolling')
 
     let lastTime = performance.now()
     const loop = (time: number) => {
@@ -161,6 +176,7 @@ export function ItemList() {
       cancelAnimationFrame(scrollRaf.current)
       scrollRaf.current = null
     }
+    listRef.current?.classList.remove('drag-scrolling')
   }
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -233,7 +249,7 @@ export function ItemList() {
                     style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}
                   >
                     {pinned.map((it) => (
-                      <ClipboardItemCard key={it.id} item={it} />
+                      <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant} />
                     ))}
                   </motion.div>
                 )}
@@ -246,7 +262,7 @@ export function ItemList() {
               {pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
               <AnimatePresence initial={false}>
                 {recent.map((it) => (
-                  <ClipboardItemCard key={it.id} item={it} />
+                  <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant} />
                 ))}
               </AnimatePresence>
             </section>

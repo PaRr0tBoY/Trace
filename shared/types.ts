@@ -20,7 +20,37 @@ export type ItemData =
 
 export type ItemKind = ItemData['kind']
 
-export type TypeFilter = 'all' | 'text' | 'links' | 'images' | 'files'
+/**
+ * Second-level filter inside the clipboard view (ADR-0004).
+ * 'all' never includes file entries — files live in the files view.
+ */
+export type ClipboardFilter = 'all' | 'text' | 'links' | 'images'
+
+/**
+ * Second-level filter inside the files view (ADR-0004): the dynamic
+ * extension tabs ('.pdf', …) are added by the renderer; 'other' holds
+ * extension-less members. The value is the raw `path.extname` result.
+ */
+export type FilesFilter = 'all' | 'other' | (string & {})
+
+/** Second-level filter inside the tasks view (ADR-0004). */
+export type TasksFilter = 'existing' | 'candidates'
+
+/** Top-level panel views (ADR-0004). */
+export type View = 'clipboard' | 'files' | 'tasks'
+
+/** Restore-time preset: how long the panel keeps its last page after closing. */
+export type RestoreTime = 'instant' | 'relaxed' | 'delayed' | 'forever'
+
+/**
+ * Landing page applied on first launch and after the restore time expires
+ * (ADR-0004). The files view has no second level — it always lands on 'all'
+ * because dynamic extension tabs may not exist.
+ */
+export type LandingPage =
+  | { view: 'clipboard'; filter: ClipboardFilter }
+  | { view: 'files' }
+  | { view: 'tasks'; filter: TasksFilter }
 
 /**
  * A single clipboard entry. `id` is stable across the lifetime of the entry;
@@ -353,6 +383,16 @@ export interface Settings {
   memoryCleanupScore: number
   /** Provider chain in priority order (first = primary, auto-failover within the list). */
   aiProviders: ProviderConfig[]
+  /**
+   * Landing page applied on first launch and after the restore time expires
+   * (ADR-0004). The files view has no second level.
+   */
+  landing: LandingPage
+  /**
+   * How long the panel keeps its last page after closing before restoring
+   * the landing page (ADR-0004). 'forever' disables restoring entirely.
+   */
+  restoreTime: RestoreTime
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -394,7 +434,9 @@ export const DEFAULT_SETTINGS: Settings = {
   memoryLambda: 0.25,
   memoryStaleDays: 60,
   memoryCleanupScore: 0.1,
-  aiProviders: []
+  aiProviders: [],
+  landing: { view: 'tasks', filter: 'existing' },
+  restoreTime: 'relaxed'
 }
 
 

@@ -142,7 +142,9 @@ export function useEdgeHover(): void {
     const closePanelNow = () => {
       const s = useStore.getState()
       if (s.styleFlyoutOpen) s.setStyleFlyoutOpen(false)
-      if (s.settingsOpen) s.setSettingsOpen(false)
+      // NOTE: the settings sheet stays open — the restore mechanism
+      // (ADR-0004) remembers it within the restore time and resets it when
+      // the time expires.
       s.setOpen(false)
       if (interactiveTimer !== undefined) window.clearTimeout(interactiveTimer)
       interactiveTimer = window.setTimeout(() => {
@@ -518,8 +520,11 @@ export function useEdgeHover(): void {
     document.addEventListener('dragenter', onDocDragEnter)
     document.addEventListener('dragover', onDocDragOver)
     document.addEventListener('dragleave', onDocDragLeave)
-    document.addEventListener('drop', onDocDrop)
-    document.addEventListener('dragend', onDocDragEnd)
+    // Capture phase: drop handlers inside the panel (save zone, task rows)
+    // stopPropagation on their own drops — the drag-active flag must still
+    // reset so the drop-binding panel hides after the drop (t25).
+    document.addEventListener('drop', onDocDrop, true)
+    document.addEventListener('dragend', onDocDragEnd, true)
 
     return () => {
       unsubCursorEdge()
@@ -530,8 +535,8 @@ export function useEdgeHover(): void {
       document.removeEventListener('dragenter', onDocDragEnter)
       document.removeEventListener('dragover', onDocDragOver)
       document.removeEventListener('dragleave', onDocDragLeave)
-      document.removeEventListener('drop', onDocDrop)
-      document.removeEventListener('dragend', onDocDragEnd)
+      document.removeEventListener('drop', onDocDrop, true)
+      document.removeEventListener('dragend', onDocDragEnd, true)
       window.clearTimeout(dwellTimer)
       window.clearTimeout(graceTimer)
       window.clearTimeout(interactiveTimer)

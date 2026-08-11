@@ -85,12 +85,23 @@
 }
 
 /* CSS transition for clip-path (Framer Motion can't interpolate calc() properly).
-   cubic-bezier(0.22, 1, 0.36, 1) is an exponential ease-out — fast initial
-   velocity that decelerates to zero, giving the panel a crisp "snapping open"
-   feel without overshoot or bounce. 0.46s is just long enough to be readable
-   at 60Hz without feeling sluggish on fast hardware. */
+   Opening uses exponential ease-out (0.22, 1, 0.36, 1) — fast start that
+   decelerates into place, 0.26s. Closing is linear at 0.1s: constant speed,
+   very quick retreat when the cursor leaves.
+
+   The transition is the single driver of clip-path (Framer only sets the
+   target value). will-change promotes the layer up front so Chromium animates
+   the clip on the compositor instead of repainting every frame; the layer
+   stays resident because the panel opens/closes on every edge hover. */
 .blade-container {
-  transition: clip-path 0.46s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: clip-path;
+  /* Opening: 0.26s fast-then-slow (exponential ease-out) — the blade bursts
+     out of the edge and decelerates into place. Closing (`.closing` class) is
+     a very fast linear 0.1s sweep: constant speed, no curve, gone in a blink. */
+  transition: clip-path 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.blade-container.closing {
+  transition: clip-path 0.1s linear;
 }
 
 /* Parent container solid block extension to prevent screen edge blur transparency */
@@ -199,6 +210,12 @@
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
+}
+
+/* rAF-driven auto-scroll during drag-over assigns scrollTop every frame;
+   scroll-behavior: smooth would interpolate each assignment and lag. */
+.list.drag-scrolling {
+  scroll-behavior: auto;
 }
 .list::-webkit-scrollbar {
   display: none; /* Chrome/Safari */

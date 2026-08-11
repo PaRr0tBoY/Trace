@@ -1,12 +1,13 @@
 /**
  * TaskView — the task layer root inside the panel.
  *
- * List mode is ONE scroll column (t24): suggestion cards on top when any are
- * pending, a hairline divider, then the grouped task list — no more split
- * panes. Detail and create/edit forms are full-page sub-views. Delete is
- * always a confirmed hard delete.
+ * Two second-level tabs (ADR-0004): "existing tasks" (the grouped task list,
+ * completed last) and "candidate tasks" (suggestion cards). Detail and
+ * create/edit forms are full-page sub-views. Delete is always a confirmed
+ * hard delete. All navigation state lives in the store so the restore
+ * mechanism (ADR-0004) can remember/reset it and edit protection can see it.
  */
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import type { TaskDto } from '../../../shared/types'
@@ -21,35 +22,49 @@ export function TaskView() {
   const { t } = useTranslation()
   const tasks = useStore((s) => s.tasks)
   const suggestions = useStore((s) => s.suggestions)
+  const tasksFilter = useStore((s) => s.tasksFilter)
   const createTask = useStore((s) => s.createTask)
   const updateTask = useStore((s) => s.updateTask)
   const deleteTask = useStore((s) => s.deleteTask)
 
-  /** Task whose detail is open (null = list). */
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  /** 'new' = create form; a task id = edit form; null = no form. */
-  const [editing, setEditing] = useState<string | 'new' | null>(null)
-  /** Task awaiting hard-delete confirmation. */
-  const [confirmDelete, setConfirmDelete] = useState<TaskDto | null>(null)
-  /** Task whose content picker (add content) is open. */
-  const [pickerTaskId, setPickerTaskId] = useState<string | null>(null)
+  const selectedId = useStore((s) => s.selectedTaskId)
+  const setSelectedTaskId = useStore((s) => s.setSelectedTaskId)
+  const editing = useStore((s) => s.editingTask)
+  const setEditingTask = useStore((s) => s.setEditingTask)
+  const confirmDeleteTaskId = useStore((s) => s.confirmDeleteTaskId)
+  const setConfirmDeleteTaskId = useStore((s) => s.setConfirmDeleteTaskId)
+  const pickerTaskId = useStore((s) => s.pickerTaskId)
+  const setPickerTaskId = useStore((s) => s.setPickerTaskId)
 
   const selected = selectedId ? (tasks.find((task) => task.id === selectedId) ?? null) : null
+  const confirmDelete = confirmDeleteTaskId ? (tasks.find((task) => task.id === confirmDeleteTaskId) ?? null) : null
 
   // The selected task vanished (deleted here or elsewhere): fall back to the list.
   useEffect(() => {
     if (selectedId && !selected) {
-      setSelectedId(null)
-      setEditing((e) => (e !== null && e !== 'new' ? null : e))
+      setSelectedTaskId(null)
+      const s = useStore.getState()
+      if (s.editingTask !== null && s.editingTask !== 'new') s.setEditingTask(null)
     }
-  }, [selectedId, selected])
+  }, [selectedId, selected, setSelectedTaskId])
+
+  // The suggestion being edited vanished (accepted/ignored via any path,
+  // including drag-drop): clear the flag so edit protection can't stick
+  // forever (ADR-0004).
+  const editingSuggestionId = useStore((s) => s.editingSuggestionId)
+  const setEditingSuggestionId = useStore((s) => s.setEditingSuggestionId)
+  useEffect(() => {
+    if (editingSuggestionId && !suggestions.some((s) => s.id === editingSuggestionId)) {
+      setEditingSuggestionId(null)
+    }
+  }, [editingSuggestionId, suggestions, setEditingSuggestionId])
 
   const handleDeleteConfirm = async () => {
     if (!confirmDelete) return
     await deleteTask(confirmDelete.id)
-    if (selectedId === confirmDelete.id) setSelectedId(null)
-    if (editing === confirmDelete.id) setEditing(null)
-    setConfirmDelete(null)
+    if (selectedId === confirmDelete.id) setSelectedTaskId(null)
+    if (editing === confirmDelete.id) setEditingTask(null)
+    setConfirmDeleteTaskId(null)
   }
 
   return (
@@ -63,36 +78,41 @@ export function TaskView() {
             } else if (selected) {
               await updateTask(selected.id, { title, note })
             }
-            setEditing(null)
+            setEditingTask(null)
           }}
-          onCancel={() => setEditing(null)}
+          onCancel={() => setEditingTask(null)}
         />
       ) : selected ? (
         <TaskDetail
           task={selected}
-          onBack={() => setSelectedId(null)}
-          onEdit={() => setEditing(selected.id)}
-          onDeleteRequest={setConfirmDelete}
+          onBack={() => setSelectedTaskId(null)}
+          onEdit={() => setEditingTask(selected.id)}
+          onDeleteRequest={(task) => setConfirmDeleteTaskId(task.id)}
           onAddContent={() => setPickerTaskId(selected.id)}
         />
       ) : (
         <div className="task-scroll">
-          {suggestions.length > 0 && (
-            <>
+          {tasksFilter === 'candidates' ? (
+            suggestions.length > 0 ? (
               <div className="task-suggest-list">
                 {suggestions.map((s) => (
                   <SuggestionCard key={s.id} suggestion={s} />
                 ))}
               </div>
-              <div className="task-suggest-divider" />
-            </>
+            ) : (
+              <div className="task-empty">
+                <div className="title">{t('tasks.candidatesEmpty')}</div>
+                <div className="hint">{t('tasks.candidatesEmptyHint')}</div>
+              </div>
+            )
+          ) : (
+            <TaskList
+              tasks={tasks}
+              onOpen={(task) => setSelectedTaskId(task.id)}
+              onCreate={() => setEditingTask('new')}
+              onDeleteRequest={(task) => setConfirmDeleteTaskId(task.id)}
+            />
           )}
-          <TaskList
-            tasks={tasks}
-            onOpen={(task) => setSelectedId(task.id)}
-            onCreate={() => setEditing('new')}
-            onDeleteRequest={setConfirmDelete}
-          />
         </div>
       )}
 
@@ -112,9 +132,11 @@ export function TaskView() {
           description={t('tasks.deleteDesc')}
           confirmLabel={t('tasks.deleteConfirm')}
           onConfirm={handleDeleteConfirm}
-          onCancel={() => setConfirmDelete(null)}
+          onCancel={() => setConfirmDeleteTaskId(null)}
         />
       )}
     </div>
   )
 }
+
+export type { TaskDto }

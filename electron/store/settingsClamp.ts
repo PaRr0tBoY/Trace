@@ -5,7 +5,7 @@
  * so the clamp rules live here, keeping the merge/load/persist glue in
  * settings.ts thin. Behaviour is identical to the pre-t11 inline clamps.
  */
-import type { Settings } from '../../shared/types'
+import { DEFAULT_SETTINGS, type Settings } from '../../shared/types'
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = Number(value)
@@ -52,5 +52,26 @@ export function clampSettings(input: Settings): Settings {
   out.memoryCleanupScore = clampNum(out.memoryCleanupScore, 0, 1, 0.1)
   // Provider chain: must stay an array (priority order = array order).
   out.aiProviders = Array.isArray(out.aiProviders) ? out.aiProviders : []
+  // Landing page (ADR-0004): view must be a valid top-level view, filters
+  // must match the view's second level; anything else falls back to defaults.
+  const landing = out.landing
+  if (!landing || typeof landing !== 'object') {
+    out.landing = { ...DEFAULT_SETTINGS.landing }
+  } else if (landing.view === 'clipboard') {
+    const ok = ['all', 'text', 'links', 'images'].includes(landing.filter as string)
+    out.landing = ok ? { view: 'clipboard', filter: landing.filter } : { view: 'clipboard', filter: 'all' }
+  } else if (landing.view === 'tasks') {
+    const ok = landing.filter === 'existing' || landing.filter === 'candidates'
+    out.landing = ok ? { view: 'tasks', filter: landing.filter } : { view: 'tasks', filter: 'existing' }
+  } else if (landing.view === 'files') {
+    out.landing = { view: 'files' }
+  } else {
+    out.landing = { ...DEFAULT_SETTINGS.landing }
+  }
+  // Restore time (ADR-0004): enum only.
+  const restoreTime = out.restoreTime
+  out.restoreTime = restoreTime === 'instant' || restoreTime === 'relaxed' || restoreTime === 'delayed' || restoreTime === 'forever'
+    ? restoreTime
+    : 'relaxed'
   return out
 }

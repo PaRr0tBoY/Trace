@@ -29,7 +29,10 @@ export function SuggestionCard({ suggestion }: Props) {
   const { t } = useTranslation()
   const acceptSuggestion = useStore((s) => s.acceptSuggestion)
   const ignoreSuggestion = useStore((s) => s.ignoreSuggestion)
-  const [editing, setEditing] = useState(false)
+  // Inline-edit flag lives in the store so the restore mechanism's edit
+  // protection can see it (ADR-0004).
+  const editing = useStore((s) => s.editingSuggestionId) === suggestion.id
+  const setEditingSuggestionId = useStore((s) => s.setEditingSuggestionId)
   const [draft, setDraft] = useState(suggestion.title)
   const [expanded, setExpanded] = useState(false)
   const [brokenIcons, setBrokenIcons] = useState<ReadonlySet<string>>(new Set())
@@ -38,6 +41,7 @@ export function SuggestionCard({ suggestion }: Props) {
 
   const confirm = (): void => {
     const title = editing ? draft.trim() : ''
+    setEditingSuggestionId(null)
     void acceptSuggestion(suggestion.id, title || undefined)
   }
 
@@ -80,7 +84,10 @@ export function SuggestionCard({ suggestion }: Props) {
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') confirm()
-              if (e.key === 'Escape') setEditing(false)
+              if (e.key === 'Escape') {
+                setDraft(suggestion.title)
+                setEditingSuggestionId(null)
+              }
             }}
             autoFocus
             maxLength={80}
@@ -131,10 +138,10 @@ export function SuggestionCard({ suggestion }: Props) {
             onClick={() => {
               if (editing) {
                 setDraft(suggestion.title)
-                setEditing(false)
+                setEditingSuggestionId(null)
               } else {
                 setDraft(suggestion.title)
-                setEditing(true)
+                setEditingSuggestionId(suggestion.id)
               }
             }}
           >
@@ -144,7 +151,10 @@ export function SuggestionCard({ suggestion }: Props) {
             type="button"
             className="task-suggestion-action danger"
             title={t('tasks.suggestionIgnore')}
-            onClick={() => void ignoreSuggestion(suggestion.id)}
+            onClick={() => {
+              setEditingSuggestionId(null)
+              void ignoreSuggestion(suggestion.id)
+            }}
           >
             <CloseIcon width={13} height={13} />
           </button>

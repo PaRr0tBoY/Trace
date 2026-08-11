@@ -32,6 +32,9 @@ import { t } from '../i18n'
 
 interface Props {
   item: ClipboardItemDto
+  /** Skip the enter animation (used when the type filter/search changes —
+      cards swap instantly instead of "clearing then falling back in"). */
+  instant?: boolean
 }
 
 
@@ -42,7 +45,7 @@ interface Props {
 /* Main item card                                                      */
 /* ------------------------------------------------------------------ */
 
-function ClipboardItemBase({ item }: Props) {
+function ClipboardItemBase({ item, instant }: Props) {
   const copy = useStore.getState().copy
   const paste = useStore.getState().paste
   const togglePin = useStore.getState().togglePin
@@ -116,7 +119,7 @@ function ClipboardItemBase({ item }: Props) {
   return (
     <motion.div
       layout="position"
-      initial={open ? { opacity: 0, scale: 0.96, y: 6 } : false}
+      initial={!instant && open ? { opacity: 0, scale: 0.96, y: 6 } : false}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: -4, transition: { duration: 0.12, ease: [0.32, 0, 0.67, 0] } }}
       transition={{
@@ -128,7 +131,6 @@ function ClipboardItemBase({ item }: Props) {
         restDelta: 0.001,
         restSpeed: 0.001
       }}
-      style={{ willChange: 'transform, opacity' }}
       className={`item${item.pinned ? ' pinned' : ''}${isBundle ? ' bundle' : ''}`}
     >
       {copied && (

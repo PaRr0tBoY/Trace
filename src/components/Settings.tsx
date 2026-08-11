@@ -1,16 +1,17 @@
 import { useEffect, useState, useRef, type CSSProperties } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useStore } from '../store/appStore'
-import type { DisplayInfo, Memory, MemoryAction, ProviderConfig } from '../../shared/types'
+import { useStore, type SettingsTab } from '../store/appStore'
+import type { DisplayInfo, Memory, MemoryAction, ProviderConfig, ClipboardFilter, RestoreTime } from '../../shared/types'
 import { LiquidOctopusLoader } from './LiquidOctopusLoader'
 import { TickIndicatorIcon, CopyIndicatorIcon, SparkleIndicatorIcon } from './CopyIndicatorCurve'
-import { ChevronRightIcon, CloseIcon, LogOutIcon, StarIcon, GithubOctocatLogo } from './icons'
+import { ChevronRightIcon, CloseIcon, LogOutIcon, StarIcon, GithubOctocatLogo, ChevronDownIcon } from './icons'
 import { ChangelogView } from './ChangelogView'
+import kofiSupportImg from '../assets/kofi-support.webp'
 import { playDialTickSound, playToggleSound, playButtonClickSound } from '../lib/soundEffects'
 import { useTranslation } from '../i18n'
 import '../styles/settings.css'
 
-type SettingsTab = 'behaviour' | 'position' | 'appearance'
+export type { SettingsTab }
 
 export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: boolean }) {
   const { t } = useTranslation()
@@ -20,6 +21,7 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
     { id: 'behaviour',  label: t('tabs.behaviour') },
     { id: 'position',   label: t('tabs.position') },
     { id: 'appearance', label: t('tabs.appearance') },
+    { id: 'tasks',      label: t('tabs.tasks') },
   ]
   const patch = useStore((s) => s.patchSettings)
   const currentVersion = useStore((s) => s.currentVersion)
@@ -70,12 +72,16 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
   }, [])
 
   // ── Tab state & Independent Scroll Memory per section ──────────────────────
-  const [activeTab, setActiveTab] = useState<SettingsTab>('behaviour')
+  // activeTab lives in the store so the restore mechanism can remember it
+  // across panel opens (ADR-0004).
+  const activeTab = useStore((s) => s.settingsTab)
+  const setActiveTab = useStore((s) => s.setSettingsTab)
   const scrollListRef = useRef<HTMLDivElement>(null)
   const tabScrollPositions = useRef<Record<SettingsTab, number>>({
     behaviour: 0,
     position: 0,
-    appearance: 0
+    appearance: 0,
+    tasks: 0
   })
 
   const handleTabSwitch = (newTab: SettingsTab) => {
@@ -97,10 +103,74 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
   }, [activeTab])
 
   // ── Persistent footer shared across all tabs ───────────────────────────
+  const [footerOpen, setFooterOpen] = useState(false)
+  const footerContentRef = useRef<HTMLDivElement>(null)
+  // Auto-expand: scrolling past the bottom of the settings list opens the
+  // collapsed Community & Support section. Damped: the overscroll distance
+  // must accumulate past 600px (several wheel notches) — a single nudge or
+  // trackpad inertia at the bottom won't trigger. Any upward scroll or
+  // leaving the bottom resets the accumulator.
+  const footerOverscrollAcc = useRef(0)
+  const handleFooterOverscroll = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (footerOpen) return
+    const el = scrollListRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8
+    if (atBottom && e.deltaY > 0) {
+      // Normalize wheel units (line/page) to pixels
+      const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1
+      footerOverscrollAcc.current += e.deltaY * scale
+      if (footerOverscrollAcc.current >= 600) {
+        footerOverscrollAcc.current = 0
+        playButtonClickSound()
+        setFooterOpen(true)
+      }
+    } else {
+      footerOverscrollAcc.current = 0
+    }
+  }
+  // Auto-collapse: once the expanded footer content has scrolled fully out of
+  // the settings list's viewport above, fold it back up. Compare against the
+  // container's top — the scroll area sits below the fixed header, so the
+  // window coordinate 0 is never reached.
+  const handleFooterScroll = () => {
+    if (!footerOpen) return
+    const el = footerContentRef.current
+    const container = scrollListRef.current
+    if (!el || !container) return
+    const containerRect = container.getBoundingClientRect()
+    if (el.getBoundingClientRect().bottom <= containerRect.top) {
+      footerOverscrollAcc.current = 0
+      setFooterOpen(false)
+    }
+  }
   const PersistentFooter = (
     <>
-      {/* Community & Support */}
-      <div className="setting-group-label" style={{ marginTop: 20 }}>{t('footer.communityAndSupport')}</div>
+      {/* Community & Support — collapsible */}
+      <button
+        type="button"
+        className="settings-collapse-header"
+        onClick={() => { playButtonClickSound(); setFooterOpen(!footerOpen) }}
+      >
+        <span>{t('footer.communityAndSupport')}</span>
+        <ChevronDownIcon
+          width={13}
+          height={13}
+          style={{ transform: footerOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.22s ease', flexShrink: 0 }}
+        />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {footerOpen && (
+        <motion.div
+          key="footer-content"
+          ref={footerContentRef}
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          style={{ overflow: 'hidden' }}
+        >
 
       <div className="setting-row vertical" style={{ gap: 10 }}>
         <div className="setting-info">
@@ -127,20 +197,19 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
           {t('footer.supportPromo')}
         </div>
         <div className="support-buttons-group">
-          {/* Primary Action: Support via Ko-fi / UPI */}
+          {/* Primary Action: Support via Ko-fi (image button) */}
           <button
             className="kofi-support-btn"
             onClick={() => {
               playButtonClickSound()
-              window.open('https://edgedrop.vercel.app/supportedgedrop', '_blank')
+              window.open('https://acidev.cc', '_blank')
             }}
           >
-            <div className="support-btn-heart-badge">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="#ff5252" stroke="none">
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-              </svg>
-            </div>
-            <span>{t('footer.supportOnKofi')}</span>
+            <img
+              src={kofiSupportImg}
+              alt={t('footer.supportOnKofi')}
+              style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 12 }}
+            />
           </button>
 
           {/* Secondary Action: GitHub Star */}
@@ -174,6 +243,9 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
           <span>{t('tray.quit')}</span>
         </button>
       </div>
+        </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 
@@ -227,7 +299,7 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
           </div>
 
           {/* ── Scrollable Content Area (Independent per section) ───────── */}
-          <div className="settings-scroll-list" ref={scrollListRef}>
+          <div className="settings-scroll-list" ref={scrollListRef} onWheel={handleFooterOverscroll} onScroll={handleFooterScroll}>
 
             {/* ── Tab 1: Behaviour (First) ──────────────────────────────── */}
             <AnimatePresence mode="wait">
@@ -241,6 +313,115 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                 >
                   {/* ── GROUP: Behaviour ─────────────────────────────────── */}
                   <div className="setting-group-label">{t('tabs.behaviour')}</div>
+
+                  {/* ── Landing page & restore time (ADR-0004) ── */}
+                  <div className="setting-row vertical" style={{ gap: 8 }}>
+                    <div className="setting-info">
+                      <div className="setting-title">{t('behaviour.landingTitle')}</div>
+                      <div className="setting-desc">{t('behaviour.landingDesc')}</div>
+                    </div>
+                    {/* Level 1: top-level view, one row. */}
+                    <div className="setting-pills" style={{ opacity: settings.restoreTime === 'forever' ? 0.45 : 1, transition: 'opacity 0.2s ease' }}>
+                      {([
+                        { id: 'clipboard' as const, label: t('filters.clipboard') },
+                        { id: 'tasks' as const, label: t('filters.tasks') },
+                        { id: 'files' as const, label: t('filters.files') }
+                      ]).map((opt) => (
+                        <button
+                          key={opt.id}
+                          className={`pill ${settings.landing.view === opt.id ? 'active' : ''}`}
+                          disabled={settings.restoreTime === 'forever'}
+                          onClick={() => {
+                            playButtonClickSound()
+                            // Switching the level-1 view resets the level-2
+                            // filter to that view's default.
+                            if (opt.id === 'clipboard') patch({ landing: { view: 'clipboard', filter: 'all' } })
+                            else if (opt.id === 'tasks') patch({ landing: { view: 'tasks', filter: 'existing' } })
+                            else patch({ landing: { view: 'files' } })
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Level 2: follows the selected view. Files has no
+                        second level — always 'all' (ADR-0004). */}
+                    <div className="setting-pills" style={{ opacity: settings.restoreTime === 'forever' ? 0.45 : 1, transition: 'opacity 0.2s ease' }}>
+                      {settings.landing.view === 'clipboard' && (
+                        ([
+                          { id: 'all', label: t('filters.all') },
+                          { id: 'text', label: t('filters.text') },
+                          { id: 'links', label: t('filters.links') },
+                          { id: 'images', label: t('filters.images') }
+                        ]).map((opt) => (
+                          <button
+                            key={opt.id}
+                            className={`pill ${settings.landing.view === 'clipboard' && settings.landing.filter === opt.id ? 'active' : ''}`}
+                            disabled={settings.restoreTime === 'forever'}
+                            onClick={() => { playButtonClickSound(); patch({ landing: { view: 'clipboard', filter: opt.id as ClipboardFilter } }) }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))
+                      )}
+                      {settings.landing.view === 'tasks' && (
+                        ([
+                          { id: 'existing', label: t('filters.existingTasks') },
+                          { id: 'candidates', label: t('filters.candidateTasks') }
+                        ]).map((opt) => (
+                          <button
+                            key={opt.id}
+                            className={`pill ${settings.landing.view === 'tasks' && settings.landing.filter === opt.id ? 'active' : ''}`}
+                            disabled={settings.restoreTime === 'forever'}
+                            onClick={() => { playButtonClickSound(); patch({ landing: { view: 'tasks', filter: opt.id as 'existing' | 'candidates' } }) }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))
+                      )}
+                      {settings.landing.view === 'files' && (
+                        <button
+                          className="pill active"
+                          disabled
+                        >
+                          {t('filters.all')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="setting-divider" />
+
+                  <div className="setting-row vertical" style={{ gap: 8 }}>
+                    <div className="setting-info">
+                      <div className="setting-title">{t('behaviour.restoreTimeTitle')}</div>
+                      <div className="setting-desc">{t('behaviour.restoreTimeDesc')}</div>
+                    </div>
+                    <div className="setting-pills">
+                      {([
+                        { id: 'instant' as const, label: t('behaviour.restoreInstant') },
+                        { id: 'relaxed' as const, label: t('behaviour.restoreRelaxed') },
+                        { id: 'delayed' as const, label: t('behaviour.restoreDelayed') },
+                        { id: 'forever' as const, label: t('behaviour.restoreForever') }
+                      ]).map((opt) => (
+                        <button
+                          key={opt.id}
+                          className={`pill ${settings.restoreTime === opt.id ? 'active' : ''}`}
+                          onClick={() => { playButtonClickSound(); patch({ restoreTime: opt.id as RestoreTime }) }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="setting-desc" style={{ fontSize: 11 }}>
+                      {settings.restoreTime === 'instant' ? t('behaviour.restoreInstantDesc')
+                        : settings.restoreTime === 'relaxed' ? t('behaviour.restoreRelaxedDesc')
+                        : settings.restoreTime === 'delayed' ? t('behaviour.restoreDelayedDesc')
+                        : t('behaviour.restoreForeverDesc')}
+                    </div>
+                  </div>
+
+                  <div className="setting-divider" />
 
                   {/* ── Language Selector ── */}
                   <div style={{
@@ -391,12 +572,6 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                   </div>
 
                   <div className="setting-divider" />
-
-                  <AIProviderSection />
-
-                  <div className="setting-divider" />
-
-                  <MemorySection />
 
                   {PersistentFooter}
                 </motion.div>
@@ -908,6 +1083,28 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                       }}
                     />
                   </div>
+
+                  {PersistentFooter}
+                </motion.div>
+              )}
+
+              {/* ── Tab 4: Tasks (fork additions: AI providers & memory) ── */}
+              {activeTab === 'tasks' && (
+                <motion.div
+                  key="tab-tasks"
+                  initial={{ opacity: 0, scale: 0.98, y: 4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: -4 }}
+                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  {/* ── GROUP: Tasks ──────────────────────────────────────── */}
+                  <div className="setting-group-label">{t('tabs.tasks')}</div>
+
+                  <AIProviderSection />
+
+                  <div className="setting-divider" />
+
+                  <MemorySection />
 
                   {PersistentFooter}
                 </motion.div>

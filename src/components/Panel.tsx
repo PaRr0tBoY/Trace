@@ -1,10 +1,12 @@
 /**
  * Panel — the blade that grows out of the left edge.
  *
- * Motion: when `open` flips true the blade slides in from x = -100% (fully off
- * the left edge) to x = 0 with a spring, and its opacity/blur animate together
- * for the "extending from the screen" feel. A faint ambient glow leads the
- * edge. When closed, the whole blade sits off-screen so the window stays
+ * Motion: when `open` flips true the blade's clip-path releases from the edge
+ * strip (the "spoke") to the full panel while the scale animates up. Both are
+ * compositor-friendly: scale is a transform (Framer-driven), clip-path is a
+ * promoted compositor clip driven by the CSS transition in panel.css. No
+ * filter/blur — repainting the whole blade every frame was the jank source.
+ * When closed, the clip-path keeps only the spoke visible so the window stays
  * transparent and click-through.
  */
 import { motion, AnimatePresence } from 'framer-motion'
@@ -15,6 +17,7 @@ import { Header } from './Header'
 import { ItemList } from './ItemList'
 import { Settings } from './Settings'
 import { TaskView } from './tasks/TaskView'
+import { FileListView } from './FileListView'
 import { TaskDropPanel } from './tasks/TaskDropPanel'
 import { linkDraggedItem, acceptSuggestionDrop } from './tasks/dropActions'
 import { ToastStack } from './Toast'
@@ -27,16 +30,11 @@ export function Panel() {
   const clear = useStore((s) => s.clear)
   const settings = useStore((s) => s.settings)
   const settingsOpen = useStore((s) => s.settingsOpen)
-  const setSettingsOpen = useStore((s) => s.setSettingsOpen)
   const view = useStore((s) => s.view)
-  const setQuery = useStore((s) => s.setQuery)
 
-  useEffect(() => {
-    if (!open) {
-      setSettingsOpen(false)
-      setQuery('')
-    }
-  }, [open, setSettingsOpen, setQuery])
+  // NOTE: closing the panel intentionally keeps the settings sheet, its sub
+  // view, and the search query — the restore mechanism (ADR-0004) decides
+  // whether they survive the re-open based on the restore time.
 
   const topOffset = '50%'
 
@@ -235,7 +233,7 @@ export function Panel() {
   return (
     <div className="root">
       <motion.div
-        className="blade-container"
+        className={`blade-container${open ? '' : ' closing'}`}
         initial={false}
         onDragEnter={onDragEnter}
         onDragOver={onDragOver}
@@ -255,22 +253,15 @@ export function Panel() {
           clipPath: open
             ? 'inset(calc(0% - 100px) calc(0% - 100px) calc(0% - 100px) 0px round 0px 24px 24px 0px)'
             : `inset(calc(50% - ${halfTrigger}px) calc(100% - ${settings.hotZoneWidth || 3}px) calc(50% - ${halfTrigger}px) 0px round 0px 24px 24px 0px)`,
-          scale: open ? 1 : 0.92,
-          filter: open ? 'blur(0px)' : 'blur(16px)'
+          scale: open ? 1 : 0.92
         }}
         transition={{
           scale: {
-            duration: 0.35,
-            ease: [0.16, 1, 0.3, 1]
-          },
-          clipPath: {
-            type: 'spring',
-            bounce: 0,
-            duration: 0.5
-          },
-          filter: {
-            duration: open ? 0.5 : 0.35,
-            ease: open ? [0.16, 1, 0.3, 1] : [0.4, 0, 0.2, 1]
+            // Scale keeps the original ratio to clip-path (~0.76x: it finished
+            // ahead of the clip in the initial 0.46/0.35 pairing). Opening 0.2s
+            // fast-then-slow, closing 0.08s linear, both ahead of the clip.
+            duration: open ? 0.2 : 0.08,
+            ease: open ? [0.22, 1, 0.36, 1] : [0, 0, 1, 1]
           }
         }}
       >
@@ -317,6 +308,19 @@ export function Panel() {
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
                 <TaskView />
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to top, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
+              </motion.div>
+            ) : view === 'files' ? (
+              <motion.div
+                key="files"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                transition={{ duration: 0.15 }}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
+              >
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
+                <FileListView />
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to top, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
               </motion.div>
             ) : (

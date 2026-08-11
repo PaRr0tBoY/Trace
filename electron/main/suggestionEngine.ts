@@ -339,9 +339,11 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
     try {
       const settings = getSettings()
       const tasks = [...store.list()]
+      // OCR only when a provider exists to consume it — no AI config means
+      // no screen capture at all (performance guard, t30).
       const [result, ocrText] = await Promise.all([
         clusterEvents(newEvents, tasks, buildParams(settings)),
-        runOcrOnce()
+        chat ? runOcrOnce() : Promise.resolve(null)
       ])
 
       const built: Array<{ suggestion: Suggestion; meta: SuggestionMeta }> = []

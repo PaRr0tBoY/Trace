@@ -523,6 +523,15 @@ describe('OCR context in LLM annotation (t30)', () => {
     expect(payload.ocrContext).toBeUndefined()
   })
 
+  it('does not run OCR without a provider (no consumer, no capture)', async () => {
+    const h = makeHarness()
+    const ocr = vi.fn(async () => 'should not run')
+    h.engine.setOcr(ocr as unknown as OcrFn)
+    h.engine.start()
+    await trigger(h, batch())
+    expect(ocr).not.toHaveBeenCalled()
+  })
+
   it('runs without OCR wired (no ocrContext, no errors)', async () => {
     const h = makeHarness()
     h.chat = vi.fn(async () => ({

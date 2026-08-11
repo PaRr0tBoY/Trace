@@ -1,13 +1,22 @@
 import { spawn, ChildProcess } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 
 export function getSystemPowerShellPath(): string {
   const systemRoot = process.env.SystemRoot || 'C:\\Windows'
   return `${systemRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`
 }
 
+/** One queued command; `marker` is the stdout sentinel that closes it. */
+interface QueueItem {
+  command: string
+  marker: string
+  resolve: (output?: string) => void
+  reject: (err: Error) => void
+}
+
 class PersistentPowerShell {
   private proc: ChildProcess | null = null
-  private queue: { command: string; resolve: () => void; reject: (err: Error) => void }[] = []
+  private queue: QueueItem[] = []
   private running = false
   private outputBuffer = ''
   private powershellPath: string
@@ -28,9 +37,14 @@ class PersistentPowerShell {
 
       this.proc.stdout?.on('data', (data) => {
         this.outputBuffer += data.toString()
-        if (this.outputBuffer.includes('__CLIPBOARD_DONE__')) {
+        // Commands run strictly serialized, so the buffer only ever holds the
+        // active command's output; its own marker ends it.
+        const active = this.queue[0]
+        if (active && this.outputBuffer.includes(active.marker)) {
+          const idx = this.outputBuffer.indexOf(active.marker)
+          const output = this.outputBuffer.slice(0, idx)
           this.outputBuffer = ''
-          this.onCommandFinished(null)
+          this.onCommandFinished(null, output)
         }
       })
 
@@ -54,11 +68,11 @@ class PersistentPowerShell {
     }
   }
 
-  private onCommandFinished(err: Error | null) {
+  private onCommandFinished(err: Error | null, output?: string) {
     const active = this.queue.shift()
     if (active) {
       if (err) active.reject(err)
-      else active.resolve()
+      else active.resolve(output)
     }
     this.running = false
     this.processQueue()
@@ -66,7 +80,7 @@ class PersistentPowerShell {
 
   public run(script: string, timeoutMs = 3000): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.queue.push({ command: script, resolve, reject })
+      this.queue.push({ command: script, marker: '__CLIPBOARD_DONE__', resolve: () => resolve(), reject })
       this.processQueue()
 
       // Fallback timeout to prevent hanging the app if powershell hangs
@@ -87,13 +101,40 @@ class PersistentPowerShell {
     })
   }
 
+  /**
+   * Run a script and capture its stdout text (trimmed trailing newline).
+   * Same queue/timeout discipline as run(); the completion marker is unique
+   * per call so output can never collide with a queued sibling.
+   */
+  public runOutput(script: string, timeoutMs = 10000): Promise<string> {
+    const marker = `__TRACE_OUT_${randomBytes(4).toString('hex')}__`
+    return new Promise((resolve, reject) => {
+      this.queue.push({ command: script, marker, resolve: (out) => resolve((out ?? '').trim()), reject })
+      this.processQueue()
+
+      setTimeout(() => {
+        const idx = this.queue.findIndex(q => q.marker === marker)
+        if (idx !== -1) {
+          const removed = this.queue.splice(idx, 1)[0]
+          removed.reject(new Error('TIMEOUT'))
+          this.running = false
+          if (this.proc) {
+            this.proc.kill()
+            this.proc = null
+          }
+          this.processQueue()
+        }
+      }, timeoutMs)
+    })
+  }
+
   private processQueue() {
     if (this.running || !this.proc || this.queue.length === 0) return
     this.running = true
     const active = this.queue[0]
-    
+
     try {
-      const fullCmd = `${active.command}; Write-Host "__CLIPBOARD_DONE__"\n`
+      const fullCmd = `${active.command}; Write-Host "${active.marker}"\n`
       this.proc.stdin?.write(fullCmd, 'utf8')
     } catch (err) {
       this.onCommandFinished(err as Error)

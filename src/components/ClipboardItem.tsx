@@ -413,6 +413,8 @@ function BundleFluidPreview({
                     src={img.preview}
                     style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 4, background: 'rgba(0,0,0,0.5)' }}
                     draggable={false}
+                    loading="lazy"
+                    decoding="async"
                   />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)' }}>
@@ -450,6 +452,8 @@ function BundleFluidPreview({
                       key={img.imageId}
                       src={img.preview}
                       className="bundle-stack-card"
+                      loading="lazy"
+                      decoding="async"
                       animate={{ 
                         x: realIndex * 20 - 20, 
                         y: realIndex * 6, 
@@ -528,6 +532,8 @@ function BundleFluidPreview({
                           src={entry.preview} 
                           alt="" 
                           draggable={false} 
+                          loading="lazy" 
+                          decoding="async" 
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} 
                         />
                       </div>
@@ -591,6 +597,8 @@ function BundleFluidPreview({
                           src={entry.preview} 
                           alt="" 
                           draggable={false} 
+                          loading="lazy" 
+                          decoding="async" 
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} 
                         />
                       ) : (
@@ -641,6 +649,8 @@ function Preview({ item }: { item: ClipboardItemDto }) {
               src={item.data.preview}
               alt=""
               draggable={false}
+              loading="lazy"
+              decoding="async"
             />
           ) : (
             <div className="preview">[{t('item.imageItem')}]</div>
@@ -667,6 +677,8 @@ function Preview({ item }: { item: ClipboardItemDto }) {
                   src={entry.preview}
                   alt=""
                   draggable={false}
+                  loading="lazy"
+                  decoding="async"
                 />
               ) : (
                 <div className="preview">[image: {displayName}]</div>

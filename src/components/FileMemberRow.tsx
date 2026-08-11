@@ -54,6 +54,8 @@ export function FileMemberRow({ member }: { member: FileMember }) {
             src={member.preview}
             alt=""
             draggable={false}
+            loading="lazy"
+            decoding="async"
             style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }}
           />
         </div>

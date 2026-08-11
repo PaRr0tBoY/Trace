@@ -137,7 +137,8 @@ const api = {
 
   /* Task domain */
   loadTasks: () => invoke('task:load'),
-  createTask: (title: string, note?: string) => invoke('task:create', title, note),
+  createTask: (title: string, opts?: { note?: string; apps?: import('../../shared/types').AppRef[]; clipboardItemIds?: string[] }) =>
+    invoke('task:create', title, opts),
   updateTask: (id: string, patch: import('../../shared/types').TaskPatch) => invoke('task:update', id, patch),
   deleteTask: (id: string) => invoke('task:delete', id),
   mergeTasks: (targetId: string, sourceId: string) => invoke('task:merge', targetId, sourceId),
@@ -145,6 +146,8 @@ const api = {
   linkFilesToTask: (taskId: string, paths: string[]) => invoke('task:link-files', taskId, paths),
   unlinkItemFromTask: (taskId: string, target: import('../../shared/types').UnlinkTarget) => invoke('task:unlink-item', taskId, target),
   suggestTaskTitle: (ctx: SuggestTitleContext) => invoke('task:suggest-title', ctx),
+  getTaskAppOptions: () => invoke('task:app-options'),
+  getAppIcons: (exePaths: string[]) => invoke('app:icons', exePaths),
 
   /* AI provider */
   testProvider: (config: import('../../shared/types').ProviderConfig) => invoke('ai:test-provider', config),

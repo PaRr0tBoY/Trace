@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { appKeyFromEvent, createAttributor } from '../electron/main/attributor'
+import { createAttributor } from '../electron/main/attributor'
+import { appKeyFromIdentity } from '../shared/appKey'
 import { TaskStore, type TaskIndex } from '../electron/store/TaskStore'
 import type { AppRef, AppSwitchEvent, UsageEvent } from '../shared/types'
 
@@ -53,17 +54,17 @@ function makeAttributor(store: TaskStore) {
   return { attributor, bus, onAttributed }
 }
 
-describe('appKeyFromEvent', () => {
+describe('appKeyFromIdentity (shared AppRef.id rule)', () => {
   it('lowercases and slash-normalizes the exePath', () => {
-    expect(appKeyFromEvent(ev())).toBe('c:/program files/microsoft vs code/code.exe')
-    expect(appKeyFromEvent(ev({ exePath: 'C:\\Users\\Acid\\AppData\\Local\\Code\\Code.EXE' }))).toBe(
+    expect(appKeyFromIdentity({ name: 'Code', exePath: ev().exePath })).toBe('c:/program files/microsoft vs code/code.exe')
+    expect(appKeyFromIdentity({ name: 'Code', exePath: 'C:\\Users\\Acid\\AppData\\Local\\Code\\Code.EXE' })).toBe(
       'c:/users/acid/appdata/local/code/code.exe'
     )
   })
 
   it('falls back to the process name when no exePath is known', () => {
-    expect(appKeyFromEvent(ev({ exePath: '' }))).toBe('code')
-    expect(appKeyFromEvent(ev({ exePath: '   ', appName: 'Chrome' }))).toBe('chrome')
+    expect(appKeyFromIdentity({ name: 'Code', exePath: '' })).toBe('code')
+    expect(appKeyFromIdentity({ name: 'Chrome', exePath: '   ' })).toBe('chrome')
   })
 })
 

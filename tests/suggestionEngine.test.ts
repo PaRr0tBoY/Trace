@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createSuggestionEngine, type SuggestionEngine } from '../electron/main/suggestionEngine'
 import { createIgnoredTable, suggestionSignature, type IgnoredTable } from '../electron/main/ignored'
 import { TaskStore } from '../electron/store/TaskStore'
-import type { AppSwitchEvent, Suggestion, UsageEvent } from '../shared/types'
+import type { AppSwitchEvent, Memory, Suggestion, UsageEvent } from '../shared/types'
 import type { ChatFn, ChatResult } from '../electron/main/provider'
 
 /** Single-app event batch; gaps are small so the whole batch is one segment. */
@@ -511,6 +511,60 @@ describe('suggestTitle (task:suggest-title)', () => {
     expect(titles).toEqual(['Only app names'])
     const req = (h.chat as ReturnType<typeof vi.fn>).mock.calls[0][0]
     expect(JSON.parse(req.messages[1].content.slice('Task: '.length))).toEqual({ appNames: ['Code'] })
+  })
+
+  it('injects confirmed project/workflow memories overlapping the draft as memoryContext (ADR-0003)', async () => {
+    const memories: Memory[] = [
+      { id: 'm1', type: 'project', content: 'CAD drawings', userState: 'confirmed', confidence: 1, hitCount: 2, lastSeenAt: 1, createdAt: 1, source: 'user' },
+      { id: 'm2', type: 'tool', content: 'Chrome', userState: 'confirmed', confidence: 1, hitCount: 1, lastSeenAt: 1, createdAt: 1, source: 'user' },
+      { id: 'm3', type: 'project', content: 'polish the CAD drawings', userState: 'suggested', confidence: 1, hitCount: 1, lastSeenAt: 1, createdAt: 1, source: 'ai-suggest' }
+    ]
+    const store = new TaskStore({ load: () => null, save: () => {} })
+    const engine = createSuggestionEngine({
+      now: () => 1_000_000,
+      readEvents: () => [],
+      store,
+      getSettings: () => ({ suggestionMinEvents: 5, suggestionSilenceSeconds: 60, confidenceHigh: 0.7, confidenceLow: 0.45 }),
+      ignored: createIgnoredTable({ load: () => null, save: () => {} }),
+      onSuggestions: () => {},
+      readMemories: () => memories
+    })
+    const chat = vi.fn(async () => ({
+      ok: true,
+      content: 'x',
+      parsed: { titles: ['Finish CAD work'] }
+    })) as unknown as ChatFn
+    engine.setChat(chat)
+    await engine.suggestTitle({ title: '', note: 'polish the CAD drawings', appNames: ['Code'], resourcePreviews: [] })
+    const payload = JSON.parse(chat.mock.calls[0][0].messages[1].content.slice('Task: '.length))
+    // 'CAD drawings' sits inside the draft note (memory → text direction); m2
+    // is a tool (never injected), m3 is not user-confirmed (never injected).
+    expect(payload.memoryContext).toEqual(['CAD drawings'])
+  })
+
+  it('omits memoryContext when no memory overlaps the draft', async () => {
+    const memories: Memory[] = [
+      { id: 'm1', type: 'project', content: 'CAD Agent', userState: 'confirmed', confidence: 1, hitCount: 1, lastSeenAt: 1, createdAt: 1, source: 'user' }
+    ]
+    const store = new TaskStore({ load: () => null, save: () => {} })
+    const engine = createSuggestionEngine({
+      now: () => 1_000_000,
+      readEvents: () => [],
+      store,
+      getSettings: () => ({ suggestionMinEvents: 5, suggestionSilenceSeconds: 60, confidenceHigh: 0.7, confidenceLow: 0.45 }),
+      ignored: createIgnoredTable({ load: () => null, save: () => {} }),
+      onSuggestions: () => {},
+      readMemories: () => memories
+    })
+    const chat = vi.fn(async () => ({
+      ok: true,
+      content: 'x',
+      parsed: { titles: ['Unrelated title'] }
+    })) as unknown as ChatFn
+    engine.setChat(chat)
+    await engine.suggestTitle({ title: 'Tax filing', note: '', appNames: ['Excel'], resourcePreviews: [] })
+    const payload = JSON.parse(chat.mock.calls[0][0].messages[1].content.slice('Task: '.length))
+    expect(payload.memoryContext).toBeUndefined()
   })
 })
 

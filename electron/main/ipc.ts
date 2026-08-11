@@ -9,18 +9,20 @@ import { app, ipcMain, clipboard, nativeImage, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { psHost } from './powershell'
-import { requestPanelFocus, releasePanelFocus } from './focus'
+import { requestPanelFocus, releasePanelFocus, releasePanelFocusNow } from './focus'
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
 import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore } from './state'
 import { getMainWindow } from './window'
-import { setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData } from './drag'
 import { clipboardSignature } from '../clipboard/formats'
 import { buildClipboardRef } from '../store/TaskStore'
+import { mergeAppOptions } from './appOptions'
+import { resolveAppIcon } from './appIcons'
+import { recentEvents } from './eventBus'
 import { acceptWithResource } from './suggestionDrop'
 import { ProviderChain, buildLocalProvider, detectOllama, testProvider } from './provider'
-import type { ItemData, MergeResult, MemoryListPayload, ResourceRef } from '../../shared/types'
+import type { ItemData, MergeResult, MemoryListPayload, ResourceRef, Task } from '../../shared/types'
 
 /**
  * Returns true if the current system clipboard content matches the given item data.
@@ -151,6 +153,27 @@ function handle<C extends InvokeChannel>(
   ipcMain.handle(channel, (_e, ...args) => fn(...(args as InvokeMap[C]['args'])))
 }
 
+/**
+ * Build clipboard resource refs for the given item ids, snapshotting each
+ * still-alive item (ADR-0002). Missing items are skipped silently — unless
+ * the task already links them, in which case the existing snapshot survives
+ * (evicted/dead resources must not vanish just because the form was saved).
+ */
+function buildResourcesFromIds(itemIds: string[] | undefined, existing?: Task): ResourceRef[] | undefined {
+  if (itemIds === undefined) return undefined
+  const refs: ResourceRef[] = []
+  for (const itemId of itemIds) {
+    const item = getStore().get(itemId)
+    if (item) {
+      refs.push(buildClipboardRef(item))
+    } else {
+      const old = existing?.resources.find((r) => r.kind === 'clipboard' && r.itemId === itemId)
+      if (old) refs.push(old)
+    }
+  }
+  return refs
+}
+
 export function registerIpc(): void {
   handle('state:load', () => {
     return {
@@ -173,14 +196,25 @@ export function registerIpc(): void {
     return getTaskStore().toDto()
   })
 
-  handle('task:create', (title, note) => {
-    getTaskStore().create(title, note !== undefined ? { note } : undefined)
+  handle('task:create', (title, opts) => {
+    getTaskStore().create(title, {
+      note: opts?.note,
+      apps: opts?.apps,
+      resources: buildResourcesFromIds(opts?.clipboardItemIds)
+    })
     pushState.tasks()
     return getTaskStore().toDto()
   })
 
   handle('task:update', (id, patch) => {
-    getTaskStore().update(id, patch)
+    // Clipboard resources are snapshotted main-side (the renderer only sends
+    // item ids); files resources are untouched by the form. Evicted items the
+    // task already links keep their old snapshot instead of vanishing.
+    const clipboardRefs =
+      patch.clipboardItemIds !== undefined
+        ? buildResourcesFromIds(patch.clipboardItemIds, getTaskStore().get(id))
+        : undefined
+    getTaskStore().update(id, { ...patch, clipboardRefs })
     pushState.tasks()
     return getTaskStore().toDto()
   })
@@ -220,6 +254,22 @@ export function registerIpc(): void {
 
   handle('task:suggest-title', (ctx: SuggestTitleContext) => {
     return getSuggestionEngine().suggestTitle(ctx)
+  })
+
+  handle('task:app-options', () => {
+    // L0-tracked apps (event bus) ∪ clipboard sourceApps (persisted) — same
+    // foreground tracker, two views (ADR-0002).
+    return mergeAppOptions(recentEvents(), getStore().list())
+  })
+
+  handle('app:icons', (exePaths) => {
+    const unique = [...new Set(exePaths)]
+    const icons: Record<string, string | null> = {}
+    return Promise.all(
+      unique.map(async (p) => {
+        icons[p] = await resolveAppIcon(p)
+      })
+    ).then(() => icons)
   })
 
   /* --------------------------- suggestions --------------------------- */

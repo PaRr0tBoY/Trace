@@ -340,8 +340,14 @@ export class TaskStore {
     return task
   }
 
-  /** Edit title/note/status or the t27 evidence fields (windowTitles/confidence/reason). Returns false when invalid. */
-  update(id: string, patch: TaskPatch): boolean {
+  /**
+   * Edit title/note/status, the t27 evidence fields (windowTitles/confidence/
+   * reason), or the guided-form selections (ADR-0002): `apps` replaces the
+   * whole app list; `clipboardRefs` replaces the clipboard resources
+   * (files resources are kept) — refs are built by the IPC layer, which owns
+   * the ItemStore. Returns false when invalid.
+   */
+  update(id: string, patch: TaskPatch & { clipboardRefs?: ResourceRef[] }): boolean {
     const task = this.tasks.find((t) => t.id === id)
     if (!task) return false
     if (patch.title !== undefined && !nonEmptyString(patch.title)) return false
@@ -349,12 +355,27 @@ export class TaskStore {
     if (patch.windowTitles !== undefined && !Array.isArray(patch.windowTitles)) return false
     if (patch.confidence !== undefined && sanitizeConfidence(patch.confidence) === undefined) return false
     if (patch.reason !== undefined && typeof patch.reason !== 'string') return false
+    if (patch.apps !== undefined && !Array.isArray(patch.apps)) return false
+    if (patch.clipboardRefs !== undefined && !Array.isArray(patch.clipboardRefs)) return false
 
     if (patch.title !== undefined) task.title = patch.title.trim()
     if (patch.note !== undefined) task.note = patch.note.trim() || undefined
     if (patch.windowTitles !== undefined) task.windowTitles = dedupeStrings(patch.windowTitles)
     if (patch.confidence !== undefined) task.confidence = patch.confidence
     if (patch.reason !== undefined) task.reason = patch.reason.trim() || undefined
+    if (patch.apps !== undefined) task.apps = dedupeApps(patch.apps)
+    if (patch.clipboardRefs !== undefined) {
+      // The selection may include kind:'files' clipboard items — those build
+      // files refs (buildClipboardRef), so merge them into the kept files
+      // resources instead of dropping them.
+      const selected = dedupeResources(patch.clipboardRefs)
+      const clipboard = selected.filter((r) => r.kind === 'clipboard')
+      const files = mergeResources(
+        selected.filter((r) => r.kind === 'files'),
+        task.resources.filter((r) => r.kind === 'files')
+      )
+      task.resources = [...clipboard, ...files]
+    }
     if (patch.status !== undefined) {
       task.status = patch.status
       // A manual resume is fresh activity; other transitions keep idle history.

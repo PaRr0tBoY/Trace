@@ -31,3 +31,8 @@ export function attachAppIcons(tasks: TaskDto[]): Promise<TaskDto[]> {
 export function attachSuggestionIcons(suggestions: Suggestion[]): Promise<Suggestion[]> {
   return service.attachToSuggestions(suggestions)
 }
+
+/** Resolve one exePath to a dataURL (cache-first, never rejects) — the app:icons IPC. */
+export function resolveAppIcon(exePath: string): Promise<string | null> {
+  return service.resolve(exePath)
+}

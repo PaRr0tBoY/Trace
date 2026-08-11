@@ -19,6 +19,7 @@ import {
   type ItemData,
   type MergeResult,
   type FileEntry,
+  type SourceApp,
   MAX_STACK
 } from '../../shared/types'
 import { PATHS } from './paths'
@@ -175,8 +176,12 @@ export class ItemStore {
   /**
    * Add or refresh a piece of content.
    * Returns true if the list actually changed (so callers can decide to push).
+   * `sourceApp` is the foreground app at capture time (ADR-0001), gated by
+   * the same privacy settings as t14 attribution — pass undefined when the
+   * gate is off. A refreshed item keeps its existing attribution unless a new
+   * one is provided (re-copies refresh it, matching capturedAt).
    */
-  add(data: ItemData, limit: number): boolean {
+  add(data: ItemData, limit: number, sourceApp?: SourceApp): boolean {
     const sig = signature(data)
     const existingId = this.sigToId.get(sig)
     const now = Date.now()
@@ -186,7 +191,12 @@ export class ItemStore {
       if (idx >= 0) {
         const it = this.items[idx]
         // Bump count and move to front.
-        const updated: ClipboardItem = { ...it, hitCount: it.hitCount + 1, capturedAt: now }
+        const updated: ClipboardItem = {
+          ...it,
+          hitCount: it.hitCount + 1,
+          capturedAt: now,
+          ...(sourceApp ? { sourceApp } : {})
+        }
         this.items.splice(idx, 1)
         this.items.unshift(updated)
         this.persist()
@@ -195,7 +205,7 @@ export class ItemStore {
     }
 
     const id = createId()
-    const item: ClipboardItem = { id, data, capturedAt: now, hitCount: 1, pinned: false }
+    const item: ClipboardItem = { id, data, capturedAt: now, hitCount: 1, pinned: false, ...(sourceApp ? { sourceApp } : {}) }
     this.items.unshift(item)
     this.sigToId.set(sig, id)
     if (data.kind === 'image') this.writeImageFile(data.imageId)

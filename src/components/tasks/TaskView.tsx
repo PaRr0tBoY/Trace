@@ -57,11 +57,11 @@ export function TaskView() {
       {editing !== null ? (
         <TaskEditor
           task={editing === 'new' ? null : selected}
-          onSave={async (title, note) => {
+          onSave={async ({ title, note, apps, clipboardItemIds }) => {
             if (editing === 'new') {
-              await createTask(title, note)
+              await createTask(title, { note, apps, clipboardItemIds })
             } else if (selected) {
-              await updateTask(selected.id, { title, note })
+              await updateTask(selected.id, { title, note, apps, clipboardItemIds })
             }
             setEditing(null)
           }}

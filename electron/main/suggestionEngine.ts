@@ -45,6 +45,7 @@
 import { clusterEvents, type ClusterParams } from './clusterer'
 import type { ChatRequest, ChatResult } from './provider'
 import type { SuggestTitleContext } from '../../shared/ipc'
+import { algorithmicTitle } from '../../shared/titles'
 import { createId } from '../store/ids'
 import { suggestionSignature, type IgnoredTable } from './ignored'
 import type { TaskStore } from '../store/TaskStore'
@@ -229,11 +230,6 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       refs.push({ id: appKeys[i], name: appNames[i] ?? appKeys[i] })
     }
     return refs
-  }
-
-  function algorithmicTitle(appNames: string[]): string {
-    const names = appNames.slice(0, 2).join(' + ')
-    return names.length > 0 ? `${names} task` : 'Untitled task'
   }
 
   function algorithmReason(attr: { zone: string; confidence: number; evidence: { appCombination: string; durationMs: number; overlappingTasks: string[] } }, target: Task | undefined): string {
@@ -511,6 +507,19 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       if (ctx.note && ctx.note.trim().length > 0) details.note = ctx.note.trim()
       if (ctx.appNames.length > 0) details.appNames = ctx.appNames
       if (ctx.resourcePreviews.length > 0) details.resourcePreviews = ctx.resourcePreviews
+      // Memory context (ADR-0003): same context-prior rule as the analysis
+      // pass — confirmed project/workflow memories overlapping the draft
+      // text (apps + previews + title + note) travel as memoryContext.
+      if (options.readMemories) {
+        const draftParts = [ctx.title, ctx.note, ...ctx.resourcePreviews].filter(
+          (s): s is string => typeof s === 'string' && s.trim().length > 0
+        )
+        const hits = matchMemories(
+          [{ appNames: ctx.appNames, windowTitles: draftParts }],
+          options.readMemories()
+        )
+        if (hits[0] && hits[0].length > 0) details.memoryContext = hits[0]
+      }
       const req: ChatRequest = {
         messages: [
           {

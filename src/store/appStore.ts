@@ -9,7 +9,7 @@
 import { create } from 'zustand'
 import { edge } from '../lib/edge'
 import type { SuggestTitleContext, DropResource } from '../../shared/ipc'
-import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, Suggestion, MemoryAction, MemoryListPayload } from '../../shared/types'
+import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, Suggestion, MemoryAction, MemoryListPayload, AppRef } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
@@ -99,11 +99,18 @@ interface AppState {
   setTutorialStep: (step: number) => void
 
   /* task mutations (delegate to main; authoritative list comes back) */
-  createTask: (title: string, note?: string) => Promise<void>
+  createTask: (
+    title: string,
+    opts?: { note?: string; apps?: AppRef[]; clipboardItemIds?: string[] }
+  ) => Promise<void>
   updateTask: (id: string, patch: TaskPatch) => Promise<void>
   deleteTask: (id: string) => Promise<void>
   linkItemToTask: (taskId: string, itemId: string) => Promise<void>
   linkFilesToTask: (taskId: string, paths: string[]) => Promise<void>
+  /** Apps selectable in the task editor (L0-tracked ∪ clipboard sourceApps). */
+  getTaskAppOptions: () => Promise<AppRef[]>
+  /** Resolve exePaths to icon dataURLs (cache-first; null = extraction failed). */
+  getAppIcons: (exePaths: string[]) => Promise<Record<string, string | null>>
 
   /* suggestion actions (delegate to main; pending list comes back via event) */
   acceptSuggestion: (id: string, titleOverride?: string) => Promise<void>
@@ -313,12 +320,20 @@ export const useStore = create<AppState>((set, get) => ({
     edge.broadcastTutorialStep(step)
   },
 
-  async createTask(title, note) {
-    set({ tasks: await edge.createTask(title, note) })
+  async createTask(title, opts) {
+    set({ tasks: await edge.createTask(title, opts) })
   },
 
   async updateTask(id, patch) {
     set({ tasks: await edge.updateTask(id, patch) })
+  },
+
+  async getTaskAppOptions() {
+    return edge.getTaskAppOptions()
+  },
+
+  async getAppIcons(exePaths) {
+    return edge.getAppIcons(exePaths)
   },
 
   async deleteTask(id) {

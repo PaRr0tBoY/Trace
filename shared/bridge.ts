@@ -51,7 +51,10 @@ export interface EdgeApi {
 
   /* Task domain */
   loadTasks: () => Promise<TaskDto[]>
-  createTask: (title: string, note?: string) => Promise<TaskDto[]>
+  createTask: (
+    title: string,
+    opts?: { note?: string; apps?: import('./types').AppRef[]; clipboardItemIds?: string[] }
+  ) => Promise<TaskDto[]>
   updateTask: (id: string, patch: TaskPatch) => Promise<TaskDto[]>
   deleteTask: (id: string) => Promise<TaskDto[]>
   mergeTasks: (targetId: string, sourceId: string) => Promise<TaskDto[]>
@@ -59,6 +62,10 @@ export interface EdgeApi {
   linkFilesToTask: (taskId: string, paths: string[]) => Promise<TaskDto[]>
   unlinkItemFromTask: (taskId: string, target: UnlinkTarget) => Promise<TaskDto[]>
   suggestTaskTitle: (ctx: SuggestTitleContext) => Promise<string[] | null>
+  /** Apps selectable in the task editor (L0-tracked ∪ clipboard sourceApps). */
+  getTaskAppOptions: () => Promise<import('./types').AppRef[]>
+  /** Resolve exePaths to icon dataURLs (cache-first; null = extraction failed). */
+  getAppIcons: (exePaths: string[]) => Promise<Record<string, string | null>>
 
   /* AI provider */
   testProvider: (config: ProviderConfig) => Promise<ProviderTestResult>

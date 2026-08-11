@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { appKeyFromEvent, buildClipboardEvent, decideClipboardAttribution } from '../electron/main/attributor'
+import { buildClipboardEvent, decideClipboardAttribution } from '../electron/main/attributor'
 import { TaskStore, type TaskIndex } from '../electron/store/TaskStore'
 import type { AppRef, ClipboardEvent } from '../shared/types'
 

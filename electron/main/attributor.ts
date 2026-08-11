@@ -22,23 +22,15 @@
  * them into the clipboard capture callback.
  */
 import type { AppSwitchEvent, ClipboardEvent, Task, UsageEvent } from '../../shared/types'
+import { appKeyFromIdentity } from '../../shared/appKey'
 import type { TaskStore } from '../store/TaskStore'
 
 /** App identity carried by L0 events; app-switch and clipboard events share it. */
 type AppIdentity = Pick<AppSwitchEvent, 'appName' | 'exePath'>
 
-/** Lowercase + slash-normalize an app identity string (same rule as the clusterer). */
-function normalize(s: string): string {
-  return s.trim().toLowerCase().replace(/\\/g, '/')
-}
-
-/**
- * App identity key for an L0 event: lowercase exePath, falling back to the
- * process name when no exePath is known. Must equal AppRef.id semantics.
- */
-export function appKeyFromEvent(event: AppIdentity): string {
-  const exe = normalize(event.exePath)
-  return exe.length > 0 ? exe : normalize(event.appName)
+/** App identity key for an L0 event (AppRef.id semantics, shared rule). */
+function appKeyFromEvent(event: AppIdentity): string {
+  return appKeyFromIdentity({ name: event.appName, exePath: event.exePath })
 }
 
 export interface AttributorOptions {

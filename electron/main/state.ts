@@ -20,7 +20,7 @@ import { PATHS } from '../store/paths'
 import { prefetchFileIcons } from './drag'
 import { attachAppIcons, attachSuggestionIcons } from './appIcons'
 import { runtime } from './config'
-import { queryForegroundSnapshot } from './foreground'
+import { queryForegroundSnapshot, type ForegroundSnapshot } from './foreground'
 import { emit, recentEvents } from './eventBus'
 import { buildClipboardEvent, decideClipboardAttribution } from './attributor'
 import { createSuggestionEngine, TICK_INTERVAL_MS, type ChatFn, type OcrFn, type SuggestionEngine } from './suggestionEngine'
@@ -204,9 +204,18 @@ export function initState(): void {
     if (data.kind === 'files' && data.paths) {
       prefetchFileIcons(data.paths)
     }
-    store.add(data, loadSettings().historyLimit)
+    // One foreground read per capture, shared by the item's sourceApp
+    // (ADR-0001) and the t14 attribution event — same source, same gate.
+    const settings = loadSettings()
+    const foreground =
+      settings.taskCaptureEnabled && settings.l0CaptureEnabled ? queryForegroundSnapshot() : null
+    store.add(
+      data,
+      settings.historyLimit,
+      foreground ? { name: foreground.appName, exePath: foreground.exePath } : undefined
+    )
     pushState.items()
-    attributeClipboardCapture(store.list()[0])
+    attributeClipboardCapture(store.list()[0], foreground)
   })
   watcher.setPaused(loadSettings().incognito)
   console.log(`[Attributor] clipboard auto-attribution ${loadSettings().autoAttributionEnabled ? 'on' : 'off'}`)
@@ -260,21 +269,18 @@ export function initState(): void {
  * so this module reads the OS directly — same Win32 call, nothing added to
  * the clipboard poll loop). The clipboard event is logged on the bus, then
  * the item links to the attributed task when auto-attribution is on. Both
- * steps share the L0 collector's gate: with task capture or L0 capture off
- * there is no foreground identity, so nothing is recorded or linked
- * (incognito is already gated at the watcher before this runs).
+ * steps share the L0 collector's gate: the caller only reads a foreground
+ * snapshot when task capture and L0 capture are both on, so with the gate
+ * off nothing is recorded or linked (incognito is already gated at the
+ * watcher before this runs).
  */
-function attributeClipboardCapture(item: ClipboardItem | undefined): void {
-  if (!item) return
-  const settings = loadSettings()
-  if (!settings.taskCaptureEnabled || !settings.l0CaptureEnabled) return
-  const foreground = queryForegroundSnapshot()
-  if (!foreground) return
+function attributeClipboardCapture(item: ClipboardItem | undefined, foreground: ForegroundSnapshot | null): void {
+  if (!item || !foreground) return
 
   const event = buildClipboardEvent(foreground, item.capturedAt)
   emit(event)
 
-  const taskId = decideClipboardAttribution(event, taskStore.list(), settings.autoAttributionEnabled)
+  const taskId = decideClipboardAttribution(event, taskStore.list(), loadSettings().autoAttributionEnabled)
   if (!taskId) return
   if (taskStore.linkItem(taskId, buildClipboardRef(item))) pushState.tasks()
 }

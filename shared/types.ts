@@ -20,6 +20,16 @@ export type ItemData =
 
 export type ItemKind = ItemData['kind']
 
+/**
+ * The foreground app at capture time (ADR-0001). Same source and privacy gate
+ * as the t14 clipboard attribution event; absent when the gate was off or the
+ * foreground could not be read. `exePath` is what AppRef.id normalizes.
+ */
+export interface SourceApp {
+  name: string
+  exePath?: string
+}
+
 export type TypeFilter = 'all' | 'text' | 'links' | 'images' | 'files'
 
 /**
@@ -35,6 +45,8 @@ export interface ClipboardItem {
   hitCount: number
   /** Pinned items never scroll off and survive app restarts. */
   pinned: boolean
+  /** App in the foreground when this content was captured (ADR-0001); absent for legacy/unattributed items. */
+  sourceApp?: SourceApp
 }
 
 /**
@@ -160,8 +172,17 @@ export interface Task {
   lastActiveAt: number
 }
 
-/** Editable surface exposed to the renderer (title/note edits + manual status transitions). */
-export type TaskPatch = Partial<Pick<Task, 'title' | 'note' | 'status' | 'windowTitles' | 'confidence' | 'reason'>>
+/**
+ * Editable surface exposed to the renderer (title/note edits + manual status
+ * transitions + guided-form selections, ADR-0002).
+ * `apps` replaces the whole app list. `clipboardItemIds` is the full desired
+ * set of linked clipboard items — main snapshots each id and replaces the
+ * task's clipboard resources (files resources are untouched); absent = no
+ * change, `[]` = clear them.
+ */
+export type TaskPatch = Partial<Pick<Task, 'title' | 'note' | 'status' | 'windowTitles' | 'confidence' | 'reason' | 'apps'>> & {
+  clipboardItemIds?: string[]
+}
 
 /** Locator for a resource to unlink: clipboard refs by itemId, files refs by exact path list. */
 export type UnlinkTarget =

@@ -132,7 +132,19 @@ export interface InvokeMap {
   'task:load': { args: []; result: TaskDto[] }
 
   /** Create a task (title required and non-empty). Returns the full task list. */
-  'task:create': { args: [title: string, note?: string]; result: TaskDto[] }
+  'task:create': {
+    args: [
+      title: string,
+      opts?: {
+        note?: string
+        /** Selected apps (AppRef identity: id/name/exePath). Deduped main-side. */
+        apps?: import('./types').AppRef[]
+        /** Selected clipboard items; snapshots are built main-side. */
+        clipboardItemIds?: string[]
+      }
+    ]
+    result: TaskDto[]
+  }
 
   /** Edit title/note or apply a manual status transition. Returns the full task list. */
   'task:update': { args: [id: string, patch: TaskPatch]; result: TaskDto[] }
@@ -157,6 +169,20 @@ export interface InvokeMap {
    * or edited. Returns null when no provider is configured or the chain fails.
    */
   'task:suggest-title': { args: [ctx: SuggestTitleContext]; result: string[] | null }
+
+  /**
+   * Apps the task editor can select from (ADR-0002): the union of apps seen
+   * by L0 window tracking (event bus) and apps that produced clipboard items
+   * (sourceApp). AppRef.id follows the standard identity rule.
+   */
+  'task:app-options': { args: []; result: import('./types').AppRef[] }
+
+  /**
+   * Resolve Windows app icons to dataURLs, cache-first (appIconService 128
+   * entry cache). Each input exePath is a key in the result; null means the
+   * icon could not be extracted. On-demand only — never attached at push time.
+   */
+  'app:icons': { args: [exePaths: string[]]; result: Record<string, string | null> }
 
   /* --------------------------- ai provider --------------------------- */
 

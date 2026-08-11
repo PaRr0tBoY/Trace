@@ -86,6 +86,72 @@ describe('TaskStore — create/update/delete', () => {
     expect(store.get(task.id)!.title).toBe('标题')
   })
 
+  it('replaces the app list wholesale (ADR-0002 guided form)', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务', { apps: [app('a'), app('b')] })!
+    expect(store.update(task.id, { apps: [app('a'), app('c'), app('c')] })).toBe(true)
+    expect(store.get(task.id)!.apps.map((a) => a.id)).toEqual(['a', 'c'])
+  })
+
+  it('rejects a non-array apps patch without touching the task', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务', { apps: [app('a')] })!
+    expect(store.update(task.id, { apps: 'nope' as never })).toBe(false)
+    expect(store.get(task.id)!.apps.map((a) => a.id)).toEqual(['a'])
+  })
+
+  it('replaces clipboard resources while keeping files resources (ADR-0002)', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务', {
+      resources: [
+        { kind: 'clipboard', itemId: 'old', snapshot: { type: 'text', preview: 'x', capturedAt: 1 } },
+        { kind: 'files', paths: ['keep.txt'] }
+      ]
+    })!
+    const refs = [
+      { kind: 'clipboard' as const, itemId: 'new1', snapshot: { type: 'text' as const, preview: 'y', capturedAt: 2 } },
+      { kind: 'clipboard' as const, itemId: 'new2', snapshot: { type: 'text' as const, preview: 'z', capturedAt: 3 } },
+      { kind: 'clipboard' as const, itemId: 'new1', snapshot: { type: 'text' as const, preview: 'dup', capturedAt: 4 } }
+    ]
+    expect(store.update(task.id, { clipboardRefs: refs })).toBe(true)
+    const resources = store.get(task.id)!.resources
+    expect(resources.filter((r) => r.kind === 'clipboard').map((r) => r.itemId)).toEqual(['new1', 'new2'])
+    expect(resources.filter((r) => r.kind === 'files')).toEqual([{ kind: 'files', paths: ['keep.txt'] }])
+  })
+
+  it('clears clipboard resources with an empty ref list', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务', {
+      resources: [{ kind: 'clipboard', itemId: 'a', snapshot: { type: 'text', preview: 'x', capturedAt: 1 } }]
+    })!
+    expect(store.update(task.id, { clipboardRefs: [] })).toBe(true)
+    expect(store.get(task.id)!.resources).toEqual([])
+  })
+
+  it('merges files refs from the selection into the kept files resources', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务', {
+      resources: [
+        { kind: 'files', paths: ['keep.txt'] },
+        { kind: 'clipboard', itemId: 'old', snapshot: { type: 'text', preview: 'x', capturedAt: 1 } }
+      ]
+    })!
+    // A kind:'files' clipboard item selected in the form builds a files ref
+    // (buildClipboardRef) — it must survive update like the kept files do.
+    expect(
+      store.update(task.id, {
+        clipboardRefs: [
+          { kind: 'files', paths: ['pick.txt', 'keep.txt'] },
+          { kind: 'clipboard', itemId: 'new', snapshot: { type: 'text', preview: 'y', capturedAt: 2 } }
+        ]
+      })
+    ).toBe(true)
+    const resources = store.get(task.id)!.resources
+    expect(resources.filter((r) => r.kind === 'clipboard').map((r) => r.itemId)).toEqual(['new'])
+    const filePaths = resources.filter((r) => r.kind === 'files').flatMap((r) => r.paths)
+    expect(filePaths.sort()).toEqual(['keep.txt', 'pick.txt'])
+  })
+
   it('returns false for unknown tasks', () => {
     const { store } = makeHarness()
     expect(store.update('t_nope', { title: 'x' })).toBe(false)

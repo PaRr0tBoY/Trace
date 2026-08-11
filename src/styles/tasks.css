@@ -1148,34 +1148,140 @@
 .task-editor-textarea::placeholder {
   color: rgba(255, 255, 255, 0.35);
 }
-.task-editor-title-row {
+
+/* ---------- guided form sections (ADR-0002) ---------- */
+
+.task-editor-section {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
+}
+.task-editor-section-title {
+  font-size: calc(10px * var(--font-scale, 1));
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+}
+.task-editor-empty {
+  font-size: calc(12px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.35);
+  padding: 4px 2px;
+}
+
+/* App grid: icon + name tiles, multi-select, accent ring when picked. */
+.task-editor-apps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 6px;
+}
+.task-editor-app {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-}
-.task-editor-title-row .task-editor-input {
-  flex: 1;
-  min-width: 0;
-}
-.task-editor-suggest {
-  flex-shrink: 0;
-  border: 1px solid rgba(139, 92, 246, 0.4);
-  background: rgba(139, 92, 246, 0.12);
-  color: #a78bfa;
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: calc(11px * var(--font-scale, 1));
+  gap: 4px;
+  padding: 8px 4px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  border-radius: 10px;
   cursor: pointer;
+  color: rgba(255, 255, 255, 0.75);
+  min-width: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.task-editor-app:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.task-editor-app.selected {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.55);
+}
+.task-editor-app-name {
+  font-size: calc(10px * var(--font-scale, 1));
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  transition: background 0.15s ease, opacity 0.15s ease;
 }
-.task-editor-suggest:hover:not(:disabled) {
-  background: rgba(139, 92, 246, 0.22);
+
+/* Clipboard rows: icon + preview + time/check, capped height with scroll. */
+.task-editor-clipboard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
-.task-editor-suggest:disabled {
+.task-editor-clipboard::-webkit-scrollbar {
+  display: none;
+}
+.task-editor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.task-editor-row:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+.task-editor-row.checked {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.55);
+}
+.task-editor-row.dead {
   opacity: 0.45;
   cursor: default;
 }
+.task-editor-row-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  width: 16px;
+  height: 16px;
+  color: rgba(255, 255, 255, 0.5);
+}
+.task-editor-row-preview {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(12px * var(--font-scale, 1));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-editor-row-meta {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: calc(10px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.45);
+}
+.task-editor-more {
+  align-self: flex-start;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: calc(11px * var(--font-scale, 1));
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.task-editor-more:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .task-editor-actions {
   display: flex;
   justify-content: flex-end;

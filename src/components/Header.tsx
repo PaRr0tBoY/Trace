@@ -66,7 +66,7 @@ export function Header() {
   const filterLetterSpacing = maxFilterLen >= 7 ? '-0.025em' : maxFilterLen >= 5 ? '-0.015em' : '0'
 
   return (
-    <div className="header" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', height: 40, padding: '0 10px 0 4px', boxSizing: 'border-box' }}>
+    <div className="header" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', height: 40, padding: '0 10px 0 4px', boxSizing: 'border-box', gap: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 2, minWidth: 0, flex: 1, overflow: 'hidden' }}>
         {settingsOpen ? (
           <span style={{ fontSize: 13, fontWeight: 600, color: '#8e8e93', letterSpacing: '0.01em', paddingLeft: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>
@@ -111,7 +111,7 @@ export function Header() {
             />
 
             {FILTERS.map((f) => {
-              const active = f.id === 'tasks' ? view === 'tasks' : typeFilter === f.id
+              const active = view === 'tasks' ? f.id === 'tasks' : f.id !== 'tasks' && typeFilter === f.id
               return (
                 <button
                   key={f.id}

@@ -12,6 +12,7 @@ import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import type { Suggestion } from '../../../shared/types'
 import { CheckIcon, EditIcon, CloseIcon, ChevronDownIcon, ChevronUpIcon, SparklesIcon } from '../icons'
+import { acceptSuggestionDrop } from './dropActions'
 
 interface Props {
   suggestion: Suggestion
@@ -32,10 +33,25 @@ export function SuggestionCard({ suggestion }: Props) {
   const [draft, setDraft] = useState(suggestion.title)
   const [expanded, setExpanded] = useState(false)
   const [brokenIcons, setBrokenIcons] = useState<ReadonlySet<string>>(new Set())
+  /** Drop-hover highlight (t25): the whole card is a drop target. */
+  const [over, setOver] = useState(false)
 
   const confirm = (): void => {
     const title = editing ? draft.trim() : ''
     void acceptSuggestion(suggestion.id, title || undefined)
+  }
+
+  /** Drop the in-panel drag onto the card: accept + bind in one main-side step. */
+  const onDrop = (e: React.DragEvent): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    setOver(false)
+    const req = useStore.getState().internalDragReq
+    if (req) {
+      useStore.getState().setInternalDragReq(null)
+      void acceptSuggestionDrop(suggestion.id, req)
+    }
+    // OS file drops were routed by preload (trace-os-drop).
   }
 
   const apps = (suggestion.appIcons ?? [])
@@ -43,7 +59,19 @@ export function SuggestionCard({ suggestion }: Props) {
     .slice(0, MAX_APPS)
 
   return (
-    <div className="task-suggestion-card">
+    <div
+      className={`task-suggestion-card${over ? ' drop-over' : ''}`}
+      data-drop-suggestion-id={suggestion.id}
+      onDragOver={(e) => {
+        e.preventDefault()
+        setOver(true)
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return
+        setOver(false)
+      }}
+      onDrop={onDrop}
+    >
       <div className="task-suggestion-head">
         {editing ? (
           <input

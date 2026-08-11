@@ -8,7 +8,7 @@
  */
 import { create } from 'zustand'
 import { edge } from '../lib/edge'
-import type { SuggestTitleContext } from '../../shared/ipc'
+import type { SuggestTitleContext, DropResource } from '../../shared/ipc'
 import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, Suggestion, MemoryAction, MemoryListPayload } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 
@@ -103,9 +103,12 @@ interface AppState {
   updateTask: (id: string, patch: TaskPatch) => Promise<void>
   deleteTask: (id: string) => Promise<void>
   linkItemToTask: (taskId: string, itemId: string) => Promise<void>
+  linkFilesToTask: (taskId: string, paths: string[]) => Promise<void>
 
   /* suggestion actions (delegate to main; pending list comes back via event) */
   acceptSuggestion: (id: string, titleOverride?: string) => Promise<void>
+  /** Accept a suggestion and attach the dragged resource to the resulting task (t25). */
+  acceptSuggestionWithResource: (id: string, titleOverride: string | undefined, resource: DropResource) => Promise<void>
   ignoreSuggestion: (id: string) => Promise<void>
   /** Ask the provider chain for 1-3 title candidates for a task draft (null = no AI/failure). */
   suggestTaskTitle: (ctx: SuggestTitleContext) => Promise<string[] | null>
@@ -326,8 +329,16 @@ export const useStore = create<AppState>((set, get) => ({
     set({ tasks: await edge.linkItemToTask(taskId, itemId) })
   },
 
+  async linkFilesToTask(taskId, paths) {
+    set({ tasks: await edge.linkFilesToTask(taskId, paths) })
+  },
+
   async acceptSuggestion(id, titleOverride) {
     set({ tasks: await edge.acceptSuggestion(id, titleOverride) })
+  },
+
+  async acceptSuggestionWithResource(id, titleOverride, resource) {
+    set({ tasks: await edge.acceptSuggestionWithResource(id, titleOverride, resource) })
   },
 
   async ignoreSuggestion(id) {

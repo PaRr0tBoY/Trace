@@ -16,32 +16,19 @@
   position: relative;
 }
 
-/* Reserved suggestion-card slot (filled by t19). */
-.task-suggest {
-  flex-shrink: 0;
+/* Single scroll column (t24): suggestions -> divider -> task list. */
+.task-scroll {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 10px 12px 2px;
-  padding: 10px 12px;
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
-.task-suggest-icon {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.45);
-  flex-shrink: 0;
-}
-.task-suggest-text {
-  font-size: calc(11.5px * var(--font-scale, 1));
-  line-height: 1.4;
-  color: rgba(255, 255, 255, 0.38);
+.task-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 /* ---------- suggestion cards (t19) ---------- */
@@ -52,13 +39,13 @@
   flex-direction: column;
   gap: 8px;
   margin: 10px 12px 2px;
-  max-height: 42%;
-  overflow-y: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
 }
-.task-suggest-list::-webkit-scrollbar {
-  display: none;
+
+/* Hairline between the suggestion cards and the task list (t24). */
+.task-suggest-divider {
+  flex-shrink: 0;
+  margin: 6px 12px 2px;
+  border-top: 1px solid var(--divider);
 }
 
 .task-suggestion-card {
@@ -69,6 +56,13 @@
   border: 1px solid rgba(251, 191, 36, 0.22);
   border-radius: var(--radius-card);
   background: linear-gradient(180deg, rgba(251, 191, 36, 0.05), rgba(255, 255, 255, 0.02));
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+/* Whole card is a drop target (t25). */
+.task-suggestion-card.drop-over {
+  border-color: var(--accent);
+  background: rgba(139, 92, 246, 0.12);
 }
 
 .task-suggestion-head {
@@ -250,17 +244,14 @@
 
 /* ---------- list ---------- */
 
+/* Non-scrolling block inside .task-scroll (t24); fills leftover height so
+   the empty state can center. */
 .task-list {
-  flex: 1;
+  flex: 1 0 auto;
   min-height: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   padding: 8px 12px 16px;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
-}
-.task-list::-webkit-scrollbar {
-  display: none;
 }
 
 .task-list-header {
@@ -757,91 +748,157 @@
   cursor: grabbing;
 }
 
-/* ---------- in-panel drop bar (clipboard -> task) ---------- */
+/* ---------- drop-binding panel (t25) ---------- */
 
-.task-drop-bar {
+/* Full-blade glass layer shown while dragging (OS files or in-panel items). */
+.task-drop-panel {
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 56px;
-  z-index: 190;
+  inset: 0;
+  z-index: 100;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px dashed rgba(139, 92, 246, 0.45);
-  border-radius: 14px;
-  background: rgba(12, 10, 20, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
-  pointer-events: none;
-  user-select: none;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(6, 6, 8, 0.82);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
 }
-.task-drop-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: calc(11px * var(--font-scale, 1));
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.55);
-}
-.task-drop-label svg {
-  color: rgba(139, 92, 246, 0.8);
-}
-.task-drop-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.task-drop-chip {
-  pointer-events: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  cursor: copy;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.task-drop-chip:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-.task-drop-chip.over {
-  background: rgba(139, 92, 246, 0.22);
-  border-color: rgba(139, 92, 246, 0.6);
-  transform: translateY(-1px);
-}
-.task-drop-dot {
+
+/* Fixed save zone on top: drop = save into the clipboard shelf. */
+.drop-save-zone {
   flex-shrink: 0;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px dashed var(--edge-strong);
+  border-radius: 12px;
+  background: var(--bg-2);
+  cursor: copy;
+  user-select: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
-.task-drop-dot.active {
-  background: #4ade80;
+.drop-save-zone.over {
+  border-color: var(--accent);
+  border-style: solid;
+  background: rgba(139, 92, 246, 0.12);
 }
-.task-drop-dot.waiting {
-  background: #fbbf24;
+.drop-save-zone-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(139, 92, 246, 0.14);
+  color: #a78bfa;
 }
-.task-drop-dot.paused {
-  background: #94a3b8;
+.drop-save-zone-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
-.task-drop-dot.completed {
-  background: var(--accent);
-}
-.task-drop-title {
-  font-size: calc(11.5px * var(--font-scale, 1));
+.drop-save-zone-title {
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.92);
+}
+.drop-save-zone-hint {
+  font-size: calc(10.5px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Scrollable targets below the save zone: task rows + suggestion cards. */
+.task-drop-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.task-drop-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.task-drop-row {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: copy;
+  user-select: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.task-drop-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.task-drop-row.over {
+  border-color: var(--accent);
+  background: rgba(139, 92, 246, 0.12);
+}
+.task-drop-row-title {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(12px * var(--font-scale, 1));
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.task-drop-row .app-icon {
+  flex-shrink: 0;
+}
+
+/* Fallback when there are no tasks and no suggestions: centered save hint. */
+.task-drop-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  pointer-events: none;
+  background: rgba(6, 6, 8, 0.82);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  text-align: center;
+  padding: 24px;
+}
+.task-drop-fallback-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.9);
+}
+.task-drop-fallback-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  letter-spacing: 0.01em;
+}
+.task-drop-fallback-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
 }
 
 /* ---------- content picker (add content) ---------- */

@@ -15,9 +15,11 @@ import { Header } from './Header'
 import { ItemList } from './ItemList'
 import { Settings } from './Settings'
 import { TaskView } from './tasks/TaskView'
-import { TaskDropBar, linkDraggedItem } from './tasks/TaskDropBar'
+import { TaskDropPanel } from './tasks/TaskDropPanel'
+import { linkDraggedItem, acceptSuggestionDrop } from './tasks/dropActions'
 import { ToastStack } from './Toast'
 import { TrashIcon } from './icons'
+import { t } from '../i18n'
 
 export function Panel() {
   const open = useStore((s) => s.open)
@@ -78,35 +80,45 @@ export function Panel() {
     const unsubInternalDrop = window.edge.onInternalDrop((pos) => {
       // The OS drag ended inside our window, but Electron/Windows swallowed the drop event.
       if (!internalDragReq) return
-      
+
       const req = { ...internalDragReq }
       setInternalDragReq(null)
       setDragActive(false)
-      
+
+      const splitSubitem = (): void => {
+        if (req.imageId || (req.paths && req.paths.length > 0)) window.edge.splitItem(req)
+      }
+
       const el = document.elementFromPoint(pos.x, pos.y)
       if (!el) {
-        if (req.imageId || (req.paths && req.paths.length > 0)) window.edge.splitItem(req)
+        splitSubitem()
         return
       }
 
-      const taskChip = el.closest('.task-drop-chip')
-      if (taskChip) {
-        const taskId = taskChip.getAttribute('data-task-id')
+      // Drop-binding panel targets (t25).
+      const taskRow = el.closest('[data-drop-task-id]')
+      if (taskRow) {
+        const taskId = taskRow.getAttribute('data-drop-task-id')
         if (taskId) void linkDraggedItem(taskId, req)
+        return
+      }
+
+      const sugCard = el.closest('[data-drop-suggestion-id]')
+      if (sugCard) {
+        const sugId = sugCard.getAttribute('data-drop-suggestion-id')
+        if (sugId) void acceptSuggestionDrop(sugId, req)
+        return
+      }
+
+      // Save zone = shelf-level drop: split sub-items out.
+      if (el.closest('.drop-save-zone, .split-dropzone')) {
+        splitSubitem()
         return
       }
 
       // Task-layer drop targets: dropping a task resource back onto the task
       // layer is a no-op (no merge/split semantics apply).
       if (el.closest('.task-view, .task-card, .task-detail, .task-list, .task-editor')) {
-        return
-      }
-
-      if (el.closest('.split-dropzone')) {
-        console.log('[Panel] Dropped in split dropzone, splitting')
-        if (req.imageId || (req.paths && req.paths.length > 0)) {
-          window.edge.splitItem(req)
-        }
         return
       }
 
@@ -121,19 +133,65 @@ export function Panel() {
         }
       } else {
         // Dropped on empty space (e.g. padding): split
-        if (req.imageId || (req.paths && req.paths.length > 0)) {
-          window.edge.splitItem(req)
-        }
+        splitSubitem()
       }
     })
+
+    /**
+     * OS file drops: preload resolved the paths (File objects die at the
+     * bridge) and forwards them here with the drop coordinates. Pick the
+     * target the same way internal drops do, then act per target.
+     */
+    window.addEventListener('trace-os-drop', handleOsFileDrop)
 
     return () => {
       unsubDragEnd()
       unsubInternalDrop()
+      window.removeEventListener('trace-os-drop', handleOsFileDrop)
     }
   }, [internalDragReq, setInternalDragReq, setDragActive])
 
   const hasFiles = (e: React.DragEvent) => e.dataTransfer.types.includes('Files')
+
+  /**
+   * Route an OS file drop by its coordinates: task row -> link files,
+   * suggestion card -> accept + bind, anywhere else -> save into the shelf.
+   */
+  const handleOsFileDrop = (e: Event): void => {
+    const detail = (e as CustomEvent<{ paths: string[]; x: number; y: number }>).detail
+    if (!detail || detail.paths.length === 0) return
+    // Claim the drop so preload skips its save-to-shelf fallback (onboarding
+    // window has no Panel listener and must not lose the files).
+    document.documentElement.setAttribute('data-trace-drop-claimed', '')
+
+    const el = document.elementFromPoint(detail.x, detail.y)
+    const taskRow = el?.closest('[data-drop-task-id]')
+    if (taskRow) {
+      const taskId = taskRow.getAttribute('data-drop-task-id')
+      if (taskId) void window.edge.linkFilesToTask(taskId, detail.paths)
+      return
+    }
+
+    const sugCard = el?.closest('[data-drop-suggestion-id]')
+    if (sugCard) {
+      const sugId = sugCard.getAttribute('data-drop-suggestion-id')
+      if (sugId) {
+        void useStore
+          .getState()
+          .acceptSuggestionWithResource(sugId, undefined, { kind: 'files', paths: detail.paths })
+          .then(() => {
+            useStore.getState().pushToast({
+              id: `sug-${Date.now()}`,
+              message: t('tasks.suggestionCreated'),
+              tone: 'info'
+            })
+          })
+      }
+      return
+    }
+
+    void window.edge.addFiles(detail.paths)
+  }
 
   const onDragEnter = (e: React.DragEvent) => {
     if (hasFiles(e)) {
@@ -293,9 +351,8 @@ export function Panel() {
               </motion.div>
             )}
           </AnimatePresence>
-          <DropOverlay />
+          <TaskDropPanel />
           <SplitDropZone />
-          <TaskDropBar />
         </div>
       </motion.div>
     </div>
@@ -320,68 +377,6 @@ function getTutorialText(step: number): string {
   }
 }
 */
-
-function DropOverlay() {
-  const dragActive = useStore((s) => s.dragActive)
-  const internalDragReq = useStore((s) => s.internalDragReq)
-
-  return (
-    <AnimatePresence>
-      {dragActive && !internalDragReq && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 100,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '14px',
-            pointerEvents: 'none',
-            background: 'rgba(6, 6, 8, 0.82)',
-            backdropFilter: 'blur(28px)',
-            WebkitBackdropFilter: 'blur(28px)',
-            textAlign: 'center',
-            padding: '24px'
-          }}
-        >
-          <div
-            style={{
-              width: '52px',
-              height: '52px',
-              borderRadius: '16px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'rgba(255, 255, 255, 0.9)'
-            }}
-          >
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3v13"></path>
-              <path d="m8 12 4 4 4-4"></path>
-              <path d="M4 20h16"></path>
-            </svg>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div style={{ fontSize: '15px', fontWeight: 600, color: 'rgba(255, 255, 255, 0.95)', letterSpacing: '0.01em' }}>
-              Drop to save
-            </div>
-            <div style={{ fontSize: '12px', fontWeight: 400, color: 'rgba(255, 255, 255, 0.5)', lineHeight: 1.4 }}>
-              Any file, image, link, or text
-            </div>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  )
-}
 
 function SplitDropZone() {
   const internalDragReq = useStore((s) => s.internalDragReq)

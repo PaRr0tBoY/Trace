@@ -1,15 +1,15 @@
 /**
  * TaskView — the task layer root inside the panel.
  *
- * Layout: suggestion cards on top (t19 fills the reserved slot), then either
- * the grouped list, the detail view, or the create/edit form. Delete is always
- * a confirmed hard delete.
+ * List mode is ONE scroll column (t24): suggestion cards on top when any are
+ * pending, a hairline divider, then the grouped task list — no more split
+ * panes. Detail and create/edit forms are full-page sub-views. Delete is
+ * always a confirmed hard delete.
  */
 import { useEffect, useState } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import type { TaskDto } from '../../../shared/types'
-import { SparklesIcon } from '../icons'
 import { TaskList } from './TaskList'
 import { TaskDetail } from './TaskDetail'
 import { TaskEditor } from './TaskEditor'
@@ -17,32 +17,10 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { ContentPicker } from './ContentPicker'
 import { SuggestionCard } from './SuggestionCard'
 
-/** Reserved suggestion-card slot (t19): live cards when pending, hint when empty. */
-function SuggestionArea() {
-  const { t } = useTranslation()
-  const suggestions = useStore((s) => s.suggestions)
-  if (suggestions.length === 0) {
-    return (
-      <div className="task-suggest">
-        <div className="task-suggest-icon">
-          <SparklesIcon width={14} height={14} />
-        </div>
-        <div className="task-suggest-text">{t('tasks.suggestionsHint')}</div>
-      </div>
-    )
-  }
-  return (
-    <div className="task-suggest-list">
-      {suggestions.map((s) => (
-        <SuggestionCard key={s.id} suggestion={s} />
-      ))}
-    </div>
-  )
-}
-
 export function TaskView() {
   const { t } = useTranslation()
   const tasks = useStore((s) => s.tasks)
+  const suggestions = useStore((s) => s.suggestions)
   const createTask = useStore((s) => s.createTask)
   const updateTask = useStore((s) => s.updateTask)
   const deleteTask = useStore((s) => s.deleteTask)
@@ -76,8 +54,6 @@ export function TaskView() {
 
   return (
     <div className="task-view">
-      <SuggestionArea />
-
       {editing !== null ? (
         <TaskEditor
           task={editing === 'new' ? null : selected}
@@ -100,12 +76,24 @@ export function TaskView() {
           onAddContent={() => setPickerTaskId(selected.id)}
         />
       ) : (
-        <TaskList
-          tasks={tasks}
-          onOpen={(task) => setSelectedId(task.id)}
-          onCreate={() => setEditing('new')}
-          onDeleteRequest={setConfirmDelete}
-        />
+        <div className="task-scroll">
+          {suggestions.length > 0 && (
+            <>
+              <div className="task-suggest-list">
+                {suggestions.map((s) => (
+                  <SuggestionCard key={s.id} suggestion={s} />
+                ))}
+              </div>
+              <div className="task-suggest-divider" />
+            </>
+          )}
+          <TaskList
+            tasks={tasks}
+            onOpen={(task) => setSelectedId(task.id)}
+            onCreate={() => setEditing('new')}
+            onDeleteRequest={setConfirmDelete}
+          />
+        </div>
       )}
 
       {pickerTaskId && selected && (

@@ -90,6 +90,22 @@ export default function App() {
     }
   }, [hydrate, setItems, setSettings, pushToast])
 
+  // The panel window is created focusable:false (upstream legacy), so clicking
+  // an input never hands the renderer keyboard focus. Whenever an editable
+  // element gains focus, ask main to SetFocus the window (user32) so keystrokes
+  // land here instead of the previously active app. Mounted only in App — the
+  // onboarding window is a normal focusable window and needs no such nudge.
+  useEffect(() => {
+    const onFocusIn = (e: FocusEvent) => {
+      const target = e.target
+      if (target instanceof HTMLElement && target.matches('input, textarea, [contenteditable]')) {
+        edge.requestInputFocus()
+      }
+    }
+    document.addEventListener('focusin', onFocusIn, true)
+    return () => document.removeEventListener('focusin', onFocusIn, true)
+  }, [])
+
   // Apply theme whenever settings change.
   useEffect(() => {
     applyReduceMotion(settings.reduceMotion)

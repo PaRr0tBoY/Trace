@@ -448,7 +448,16 @@ export function useEdgeHover(): void {
 
     // ── keyboard ───────────────────────────────────────────────────────────
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && useStore.getState().open) scheduleClose(0)
+      if (e.key !== 'Escape' || !useStore.getState().open) return
+      // Escape inside an editable field (search box, task editor, …) leaves the
+      // field instead of collapsing the panel; a second Escape closes it.
+      // Without this, pressing Escape while typing would yank the panel shut.
+      const active = document.activeElement
+      if (active instanceof HTMLElement && active.matches('input, textarea, [contenteditable]')) {
+        active.blur()
+        return
+      }
+      scheduleClose(0)
     }
 
     // ── window blur (Alt+Tab / OS focus stolen) ────────────────────────────

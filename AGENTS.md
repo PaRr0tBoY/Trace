@@ -108,5 +108,6 @@
 - **upstream 同步（2026-08-09）**：已合并 Deepender25/Edge-Drop 到 v0.2.6（63 提交 / 3 万行：i18n 30 语言、设置 3-tab 重构、Web Audio 音效、多显示器持久化、性能优化、vitest）。**自动更新（electron-updater）已整体剔除**——silent auto-update 会下载 upstream 的包覆盖 Trace，合并后删除了 updater.ts、相关 IPC 通道、设置 UI 与 i18n 键；保留 `app:get-releases`（What's New 视图，指向 PaRr0tBoY/Trace releases，离线回退静态 changelog）。品牌已全部替换为 Trace；ChangelogView.tsx 与 ipc.ts 的静态 changelog 保留 Edge-Drop 历史原文；AppX 证书身份（Deepender.EdgeDrop）保留（证书绑定）。
 - **feature/tasks 已删除（2026-08-09）**：任务系统设计作废（上游大更新后决策推翻重建）。旧设计要点（Task 聚合根、四层面板、Alt-Tab 窗口切换、koffi 键盘轮询、C# 窗口枚举 helper）仅存于 git 历史（`3dc9b07`、`f146a96`），重建时可参考但不要恢复代码。
 - userData 目录：`%APPDATA%\Trace`（rebrand 后），旧 `edge-drop` 数据不迁移。
+- **输入框焦点（t21）**：面板窗口 `focusable:false`（upstream 遗留，**禁止改 true**）。输入框聚焦靠 renderer 全局 `focusin`（App.tsx，捕获阶段，匹配 `input, textarea, [contenteditable]`）→ `ui:input-focus` 即发即弃 IPC → main `electron/main/focus.ts` 用 koffi 调 user32 `SetFocus` 给面板窗口键盘焦点。仅点输入框才抢焦点；blur 不主动归还（OS 自然转移）。输入框聚焦时 Escape 只 blur 不关面板（useEdgeHover onKeyDown）。
 - `drag_debug.txt` 是 OLE 拖拽排障日志，已被 gitignore（upstream 加的），运行时生成不提交。
 - `features_and_architecture.md` 是旧架构文档（fork 前写的），可能滞后于代码；`scratch/` 用途不明，别动。

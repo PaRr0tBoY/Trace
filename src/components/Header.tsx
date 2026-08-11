@@ -18,8 +18,9 @@ import { taskBadgeCount } from '../lib/taskGroups'
 import { useFileMembers } from '../hooks/useFilteredItems'
 import { useTranslation } from '../i18n'
 
-/** Primary chips: 270px panel − padding (14) − right buttons (34) ≈ 200px track. */
-const PRIMARY_CHIP_WIDTH = 66
+/** Primary chips: centered in the 256px content area; 58px keeps the group
+ * (184px) clear of the 34px right buttons (222px) with a 2px gap. */
+const PRIMARY_CHIP_WIDTH = 58
 const PRIMARY_GAP = 2
 const TRACK_LEFT = 3
 
@@ -182,14 +183,22 @@ export function Header() {
         alignItems: 'stretch',
         height: 'auto',
         minHeight: 62,
-        padding: '6px 10px 6px 4px',
+        padding: '6px 7px 6px 7px',
         boxSizing: 'border-box',
         gap: 4,
         flexShrink: 0
       }}
     >
       {/* ── Row 1: primary view chips / settings title + right buttons ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', gap: 0, flexShrink: 0 }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: settingsOpen ? 'space-between' : 'center',
+        width: '100%',
+        alignItems: 'center',
+        gap: 0,
+        flexShrink: 0,
+        position: 'relative'
+      }}>
         {settingsOpen ? (
           <span style={{ fontSize: 13, fontWeight: 600, color: '#8e8e93', letterSpacing: '0.01em', paddingLeft: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>
             {settingsSubView === 'changelog' ? t('header.whatsNew') : t('header.settings')}
@@ -206,7 +215,6 @@ export function Header() {
               borderRadius: 999,
               padding: '2px 3px',
               gap: PRIMARY_GAP,
-              marginLeft: 2,
               boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05)',
               maxWidth: '100%',
               overflow: 'hidden'
@@ -260,7 +268,16 @@ export function Header() {
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, paddingRight: 2 }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          flexShrink: 0,
+          paddingRight: 2,
+          // When the chips are centered the buttons float at the right edge
+          // (they'd otherwise push the row's center off by half their width).
+          ...(settingsOpen ? {} : { position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' })
+        }}>
           {settingsOpen && (
             <button
               type="button"

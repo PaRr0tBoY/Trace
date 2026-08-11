@@ -233,7 +233,7 @@ export function Panel() {
   return (
     <div className="root">
       <motion.div
-        className={`blade-container${open ? '' : ' closing'}`}
+        className={`blade-container${open ? '' : ' closing'}${settings.stickPosition === 'right' ? ' blade-right' : ''}`}
         initial={false}
         onDragEnter={onDragEnter}
         onDragOver={onDragOver}
@@ -243,16 +243,23 @@ export function Panel() {
           top: topOffset,
           y: '-50%',
           position: 'absolute',
-          left: 0,
+          left: settings.stickPosition === 'right' ? 'auto' : 0,
+          right: settings.stickPosition === 'right' ? 0 : 'auto',
           zIndex: 10,
           pointerEvents: open ? 'auto' : 'none',
-          originX: 0,
+          originX: settings.stickPosition === 'right' ? 1 : 0,
           originY: 0.5
         }}
         animate={{
+          // Mirror the clip for the right edge: the blade hugs the window's
+          // right edge and the collapsed hot-zone strip stays on that side.
           clipPath: open
-            ? 'inset(calc(0% - 100px) calc(0% - 100px) calc(0% - 100px) 0px round 0px 24px 24px 0px)'
-            : `inset(calc(50% - ${halfTrigger}px) calc(100% - ${settings.hotZoneWidth || 3}px) calc(50% - ${halfTrigger}px) 0px round 0px 24px 24px 0px)`,
+            ? settings.stickPosition === 'right'
+              ? 'inset(calc(0% - 100px) 0px calc(0% - 100px) calc(0% - 100px) round 24px 0px 0px 24px)'
+              : 'inset(calc(0% - 100px) calc(0% - 100px) calc(0% - 100px) 0px round 0px 24px 24px 0px)'
+            : settings.stickPosition === 'right'
+              ? `inset(calc(50% - ${halfTrigger}px) 0px calc(50% - ${halfTrigger}px) calc(100% - ${settings.hotZoneWidth || 3}px) round 24px 0px 0px 24px)`
+              : `inset(calc(50% - ${halfTrigger}px) calc(100% - ${settings.hotZoneWidth || 3}px) calc(50% - ${halfTrigger}px) 0px round 0px 24px 24px 0px)`,
           scale: open ? 1 : 0.92
         }}
         transition={{
@@ -265,12 +272,12 @@ export function Panel() {
           }
         }}
       >
-        <div className="flare-top">
+        <div className={`flare-top${settings.stickPosition === 'right' ? ' flare-right' : ''}`}>
           <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M 0 0 L 0 30 L 30 30 A 30 30 0 0 1 0 0 Z" fill="#000000" />
           </svg>
         </div>
-        <div className="flare-bottom">
+        <div className={`flare-bottom${settings.stickPosition === 'right' ? ' flare-right' : ''}`}>
           <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M 0 30 L 0 0 L 30 0 A 30 30 0 0 0 0 30 Z" fill="#000000" />
           </svg>

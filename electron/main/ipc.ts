@@ -13,7 +13,7 @@ import { requestPanelFocus, releasePanelFocus } from './focus'
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
 import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore } from './state'
 import { getMainWindow } from './window'
-import { setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions } from './window'
+import { setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData } from './drag'
 import { clipboardSignature } from '../clipboard/formats'
@@ -535,6 +535,12 @@ export function registerIpc(): void {
     }
     if (patch.hotZoneWidth !== undefined) {
       setHotZoneWidth(patch.hotZoneWidth)
+    }
+    if (patch.stickPosition !== undefined) {
+      // The window anchors to the opposite edge — move it now, not on the
+      // next pop-up (the setting was persisted but the window stayed put
+      // until a display event or restart).
+      repositionWindow()
     }
     if (patch.taskPauseThresholdMinutes !== undefined) {
       // A changed threshold may immediately flip Active tasks; re-evaluate now.

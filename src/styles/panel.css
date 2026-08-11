@@ -72,6 +72,11 @@
   background: linear-gradient(to left, #000000 30px, transparent 30px);
   justify-content: flex-start;
 }
+/* The SVG paths are drawn for the left edge (square side at the screen
+   edge, arc at the blade); mirror them when anchored right. */
+.flare-top.flare-right svg, .flare-bottom.flare-right svg {
+  transform: scaleX(-1);
+}
 .flare-top {
   top: -30px;
 }

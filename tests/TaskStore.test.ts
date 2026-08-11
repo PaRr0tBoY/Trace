@@ -536,3 +536,89 @@ describe('TaskStore — persistence round-trip', () => {
     expect(byId.get('t_badRes')!.resources).toEqual([])
   })
 })
+
+describe('TaskStore — t27 evidence fields (windowTitles/confidence/reason)', () => {
+  it('round-trips window titles, confidence and reason through persistence', () => {
+    const harness = makeHarness()
+    const { store } = harness
+    store.create('任务', {
+      windowTitles: ['App.tsx — Trace', 'docs.example.com'],
+      confidence: 0.82,
+      reason: 'Writing docs'
+    })
+
+    const reloaded = new TaskStore({ load: harness.storage.load, save: harness.storage.save, now: harness.now })
+    reloaded.load()
+    const task = reloaded.list()[0]!
+    expect(task.windowTitles).toEqual(['App.tsx — Trace', 'docs.example.com'])
+    expect(task.confidence).toBe(0.82)
+    expect(task.reason).toBe('Writing docs')
+  })
+
+  it('tolerates legacy tasks without the t27 fields and sanitizes garbage evidence', () => {
+    const legacy = [
+      { id: 't_old', title: '旧任务', status: 'active', createdAt: 1, updatedAt: 2, lastActiveAt: 3, apps: [], resources: [] },
+      {
+        id: 't_garbage',
+        title: '坏证据',
+        status: 'paused',
+        windowTitles: ['a', 5, '', 'a'],
+        confidence: 1.5,
+        reason: 42,
+        createdAt: 1,
+        updatedAt: 2,
+        lastActiveAt: 3,
+        apps: [],
+        resources: []
+      }
+    ]
+    const store = new TaskStore({ load: () => ({ version: 1, tasks: legacy as never }), save: () => {} })
+    store.load()
+
+    const old = store.get('t_old')!
+    expect(old.windowTitles).toEqual([])
+    expect(old.confidence).toBeUndefined()
+    expect(old.reason).toBeUndefined()
+
+    const garbage = store.get('t_garbage')!
+    expect(garbage.windowTitles).toEqual(['a']) // non-strings and dupes dropped
+    expect(garbage.confidence).toBeUndefined() // out of the 0-1 domain
+    expect(garbage.reason).toBeUndefined() // non-string
+  })
+
+  it('sanitizes evidence fields at creation', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务', {
+      windowTitles: ['  A  ', '', 'A', 5] as unknown as string[],
+      confidence: 2,
+      reason: '   '
+    })!
+    expect(task.windowTitles).toEqual(['A'])
+    expect(task.confidence).toBeUndefined()
+    expect(task.reason).toBeUndefined()
+  })
+
+  it('applies evidence patches and clears reason with an empty string', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务')!
+    expect(store.update(task.id, { windowTitles: ['W1', 'W1', 'W2'], confidence: 0.9, reason: '  R  ' })).toBe(true)
+    expect(store.get(task.id)!.windowTitles).toEqual(['W1', 'W2'])
+    expect(store.get(task.id)!.confidence).toBe(0.9)
+    expect(store.get(task.id)!.reason).toBe('R')
+
+    expect(store.update(task.id, { reason: '' })).toBe(true)
+    expect(store.get(task.id)!.reason).toBeUndefined()
+  })
+
+  it('rejects invalid evidence patches without touching the task', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务')!
+    expect(store.update(task.id, { windowTitles: 'nope' as never })).toBe(false)
+    expect(store.update(task.id, { confidence: 1.5 })).toBe(false)
+    expect(store.update(task.id, { confidence: NaN })).toBe(false)
+    expect(store.update(task.id, { reason: 7 as never })).toBe(false)
+    expect(store.get(task.id)!.windowTitles).toEqual([])
+    expect(store.get(task.id)!.confidence).toBeUndefined()
+    expect(store.get(task.id)!.reason).toBeUndefined()
+  })
+})

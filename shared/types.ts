@@ -149,13 +149,19 @@ export interface Task {
   note?: string
   apps: AppRef[]
   resources: ResourceRef[]
+  /** Recent window titles captured at creation (t27); empty for tasks built outside the suggestion flow. */
+  windowTitles: string[]
+  /** 0-1 acceptance confidence at creation (t27); absent for manually created tasks. */
+  confidence?: number
+  /** Human-readable creation reason — LLM rationale or algorithm evidence summary, never raw OCR (t27). */
+  reason?: string
   createdAt: number
   updatedAt: number
   lastActiveAt: number
 }
 
 /** Editable surface exposed to the renderer (title/note edits + manual status transitions). */
-export type TaskPatch = Partial<Pick<Task, 'title' | 'note' | 'status'>>
+export type TaskPatch = Partial<Pick<Task, 'title' | 'note' | 'status' | 'windowTitles' | 'confidence' | 'reason'>>
 
 /** Locator for a resource to unlink: clipboard refs by itemId, files refs by exact path list. */
 export type UnlinkTarget =

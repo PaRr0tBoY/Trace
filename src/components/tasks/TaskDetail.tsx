@@ -1,6 +1,8 @@
 /**
- * TaskDetail — full task view: editable title/note, linked apps, resource
- * list (text preview / image thumbnail / file paths) with eviction placeholders.
+ * TaskDetail — full task view (t27): back + status pill on top, title with a
+ * hover-revealed edit button, per-app rows (icon + name + open), recent
+ * window titles, the resource list (text preview / image thumbnail / file
+ * paths), and a confidence + creation-reason block. No OCR/algorithm raw.
  */
 import { useState } from 'react'
 import { useStore } from '../../store/appStore'
@@ -8,7 +10,7 @@ import { useTranslation } from '../../i18n'
 import { basename } from '../../lib/format'
 import { useDragOut } from '../../hooks/useDragOut'
 import { AppIcon } from './AppIcon'
-import type { ResourceRef, TaskDto, TaskStatus } from '../../../shared/types'
+import type { AppRef, ResourceRef, TaskDto, TaskStatus } from '../../../shared/types'
 import {
   ChevronLeftIcon,
   EditIcon,
@@ -37,6 +39,9 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   paused: 'groupPaused',
   completed: 'groupCompleted'
 }
+
+/** Confidence floor below which the bar turns amber (settings θ_low, t27). */
+const DEFAULT_CONFIDENCE_LOW = 0.45
 
 function ResourceRow({ resource }: { resource: ResourceRef & { alive: boolean } }) {
   const { t } = useTranslation()
@@ -149,9 +154,30 @@ function ResourceRow({ resource }: { resource: ResourceRef & { alive: boolean } 
   )
 }
 
+function AppRow({ app, onOpen }: { app: AppRef; onOpen: (app: AppRef) => void }) {
+  const { t } = useTranslation()
+  const clickable = Boolean(app.exePath)
+  return (
+    <div
+      className={`task-detail-app${clickable ? ' clickable' : ''}`}
+      title={app.exePath ?? app.name}
+      onClick={clickable ? () => onOpen(app) : undefined}
+    >
+      <AppIcon app={app} size={20} />
+      <span className="task-detail-app-name">{app.name}</span>
+      {clickable && (
+        <button type="button" className="task-detail-app-open" tabIndex={-1}>
+          {t('tasks.openApp')}
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent }: Props) {
   const { t } = useTranslation()
   const updateTask = useStore((s) => s.updateTask)
+  const confidenceLow = useStore((s) => s.settings.confidenceLow ?? DEFAULT_CONFIDENCE_LOW)
 
   const actions: { key: string; label: string; icon: JSX.Element; next: TaskStatus }[] = []
   if (task.status === 'active') {
@@ -164,6 +190,12 @@ export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent
     actions.push({ key: 'restore', label: t('tasks.restore'), icon: <RestoreIcon width={13} height={13} />, next: 'active' })
   }
 
+  const confidencePct =
+    task.confidence === undefined ? undefined : Math.round(Math.min(1, Math.max(0, task.confidence)) * 100)
+  const confidenceTone =
+    task.confidence === undefined || task.confidence >= confidenceLow ? 'high' : 'low'
+  const showMeta = confidencePct !== undefined || Boolean(task.reason)
+
   return (
     <div className="task-detail">
       <div className="task-detail-header">
@@ -172,46 +204,92 @@ export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent
           {t('tasks.back')}
         </button>
         <span className={`task-status-pill ${task.status}`}>{t(`tasks.${STATUS_LABEL[task.status]}`)}</span>
-        <button type="button" className="task-btn ghost" onClick={onEdit}>
-          <EditIcon width={13} height={13} />
-          {t('tasks.edit')}
-        </button>
-        <button type="button" className="task-btn ghost danger" onClick={() => onDeleteRequest(task)}>
+        <button
+          type="button"
+          className="task-btn ghost danger task-detail-header-del"
+          onClick={() => onDeleteRequest(task)}
+          title={t('tasks.delete')}
+        >
           <TrashIcon width={13} height={13} />
-          {t('tasks.delete')}
         </button>
       </div>
 
-      <div className="task-detail-title">{task.title}</div>
+      <div className="task-detail-title-row">
+        <div className="task-detail-title" title={task.title}>
+          {task.title}
+        </div>
+        <button type="button" className="task-btn ghost task-detail-title-edit" onClick={onEdit} title={t('tasks.edit')}>
+          <EditIcon width={14} height={14} />
+        </button>
+      </div>
       {task.note && <div className="task-detail-note">{task.note}</div>}
 
       {task.apps.length > 0 && (
-        <div className="task-app-chips">
+        <div className="task-detail-section">
           {task.apps.map((a) => (
-            <span className="task-app-chip" key={a.id} title={a.exePath ?? a.name}>
-              <AppIcon app={a} />
-              <span>{a.name}</span>
-            </span>
+            <AppRow
+              key={a.id}
+              app={a}
+              onOpen={(app) => {
+                if (app.exePath) void window.edge.revealFile(app.exePath)
+              }}
+            />
           ))}
         </div>
       )}
 
-      <div className="task-resources-head">
-        <span className="task-resources-title">{t('tasks.resourcesTitle')}</span>
-        <button type="button" className="task-btn ghost" onClick={onAddContent}>
-          <PlusIcon width={12} height={12} />
-          {t('tasks.addContent')}
-        </button>
-      </div>
-      {task.resources.length === 0 ? (
-        <div className="task-empty">
-          <div className="hint">{t('tasks.noResources')}</div>
+      {task.windowTitles.length > 0 && (
+        <div className="task-detail-section">
+          <div className="task-resources-title">{t('tasks.windowTitles')}</div>
+          <div className="task-detail-windows">
+            {task.windowTitles.map((w, i) => (
+              <div className="task-detail-window" key={`${w}-${i}`} title={w}>
+                <span className="task-window-dot" />
+                <span>{w}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      ) : (
-        <div className="task-resources">
-          {task.resources.map((r, i) => (
-            <ResourceRow key={`${r.kind}-${i}`} resource={r} />
-          ))}
+      )}
+
+      <div className="task-detail-section">
+        <div className="task-resources-head">
+          <span className="task-resources-title">{t('tasks.resourcesTitle')}</span>
+          <button type="button" className="task-btn ghost" onClick={onAddContent}>
+            <PlusIcon width={12} height={12} />
+            {t('tasks.addContent')}
+          </button>
+        </div>
+        {task.resources.length === 0 ? (
+          <div className="task-empty">
+            <div className="hint">{t('tasks.noResources')}</div>
+          </div>
+        ) : (
+          <div className="task-resources">
+            {task.resources.map((r, i) => (
+              <ResourceRow key={`${r.kind}-${i}`} resource={r} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {showMeta && (
+        <div className="task-detail-section">
+          {confidencePct !== undefined && (
+            <div className="task-detail-conf">
+              <span className="task-detail-conf-label">{t('tasks.confidence')}</span>
+              <div className="task-detail-conf-track">
+                <div className={`task-detail-conf-fill ${confidenceTone}`} style={{ width: `${confidencePct}%` }} />
+              </div>
+              <span className="task-detail-conf-value">{confidencePct}%</span>
+            </div>
+          )}
+          {task.reason && (
+            <>
+              <div className="task-resources-title task-detail-block-title">{t('tasks.createdReason')}</div>
+              <p className="task-detail-reason">{task.reason}</p>
+            </>
+          )}
         </div>
       )}
 

@@ -498,6 +498,16 @@
   margin-right: auto;
 }
 
+/* Destructive header action: hover-revealed like row actions. */
+.task-detail-header .task-detail-header-del {
+  padding: 5px 7px;
+  opacity: 0.35;
+}
+.task-detail-header:hover .task-detail-header-del,
+.task-detail-header:focus-within .task-detail-header-del {
+  opacity: 1;
+}
+
 .task-status-pill {
   display: inline-flex;
   align-items: center;
@@ -527,13 +537,32 @@
   color: #b79cf7;
 }
 
+.task-detail-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 8px;
+}
 .task-detail-title {
+  flex: 1;
+  min-width: 0;
   font-size: calc(16px * var(--font-scale, 1));
   font-weight: 650;
   line-height: 1.35;
   color: #ffffff;
-  word-break: break-word;
-  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-detail-title-edit {
+  flex-shrink: 0;
+  padding: 4px 5px;
+  margin-top: 1px;
+  opacity: 0.35;
+}
+.task-detail-title-row:hover .task-detail-title-edit,
+.task-detail-title-row:focus-within .task-detail-title-edit {
+  opacity: 1;
 }
 .task-detail-note {
   font-size: calc(12.5px * var(--font-scale, 1));
@@ -542,6 +571,136 @@
   white-space: pre-wrap;
   word-break: break-word;
   margin-bottom: 10px;
+}
+
+/* t27 sections: hairline-separated blocks below the title. */
+.task-detail-section {
+  border-top: 1px solid var(--divider);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+/* One app per row: 20px icon + name + hover-revealed open action. */
+.task-detail-app {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: default;
+}
+.task-detail-app.clickable {
+  cursor: pointer;
+}
+.task-detail-app.clickable:hover {
+  background: rgba(255, 255, 255, 0.06); /* .task-card:hover mask */
+}
+.task-detail-app-name {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(12.5px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-detail-app-open {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: calc(10.5px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.65);
+  background: transparent;
+  border: 1px solid transparent;
+  opacity: 0.35;
+  transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.task-detail-app:hover .task-detail-app-open {
+  opacity: 1;
+}
+.task-detail-app-open:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+/* Recent window titles: one line each, dot prefix. */
+.task-detail-windows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.task-detail-window {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: calc(10.5px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.6);
+}
+.task-detail-window > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-window-dot {
+  flex-shrink: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Confidence row: label + 3px status-colored track + percent. */
+.task-detail-conf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: calc(10.5px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.6);
+}
+.task-detail-conf-label {
+  flex-shrink: 0;
+}
+.task-detail-conf-track {
+  flex: 1;
+  min-width: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.task-detail-conf-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+.task-detail-conf-fill.high {
+  background: #4ade80;
+}
+.task-detail-conf-fill.low {
+  background: #fbbf24;
+}
+.task-detail-conf-value {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Creation-reason paragraph under a .task-resources-title block title. */
+.task-detail-block-title {
+  margin-top: 10px;
+}
+.task-detail-block-title:first-child {
+  margin-top: 0;
+}
+.task-detail-reason {
+  margin-top: 6px;
+  font-size: calc(11.5px * var(--font-scale, 1));
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.62);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .task-app-chips {

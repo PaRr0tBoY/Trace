@@ -48,7 +48,7 @@ import type { SuggestTitleContext } from '../../shared/ipc'
 import { createId } from '../store/ids'
 import { suggestionSignature, type IgnoredTable } from './ignored'
 import type { TaskStore } from '../store/TaskStore'
-import type { AppRef, AppSwitchEvent, Memory, MemoryType, Suggestion, Task, UsageEvent } from '../../shared/types'
+import type { AppRef, AppSwitchEvent, Memory, MemoryType, Suggestion, Task, TaskPatch, UsageEvent } from '../../shared/types'
 
 /** Segmenting defaults are fixed for V1 (settings carry only the confidence thresholds). */
 const SEGMENT_PARAMS = { hardGapMs: 600_000, transientMs: 2_500, overlapThreshold: 0.3 } as const
@@ -458,6 +458,14 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       onSuggestions(pending)
 
       const title = titleOverride?.trim() || suggestion.title
+      // Evidence captured at accept time (t27): the segment's recent window
+      // titles, the confidence shown on the card, and a human-readable reason
+      // — LLM rationale when present, else the algorithm evidence summary.
+      const evidence: TaskPatch = {
+        windowTitles: m?.windowTitles ?? [],
+        confidence: suggestion.confidence,
+        reason: suggestion.reason?.trim() || suggestion.algorithmReason
+      }
       const emitMemoryCandidate = (): void => {
         // Feedback distillation (spec decision 7): a confirmed work pattern
         // becomes a suggested memory candidate — never live without the user.
@@ -465,7 +473,8 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         if (candidate) options.onMemorySuggestion?.(candidate)
       }
       if (suggestion.taskId && store.get(suggestion.taskId)) {
-        if (titleOverride?.trim()) store.update(suggestion.taskId, { title })
+        if (titleOverride?.trim()) evidence.title = titleOverride.trim()
+        store.update(suggestion.taskId, evidence)
         // Absorb the segment's apps through the type-safe merge path: create a
         // temp task carrying them, then merge it into the candidate (source is
         // deleted; apps/timestamps are combined by TaskStore.merge).
@@ -475,7 +484,7 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         emitMemoryCandidate()
         return suggestion.taskId
       }
-      const created = store.create(title, { apps: m?.appRefs ?? [] })
+      const created = store.create(title, { apps: m?.appRefs ?? [], ...evidence })
       console.log(`[Suggestion] accepted ${id} -> new task ${created?.id ?? '(none)'}`)
       emitMemoryCandidate()
       return created?.id ?? null

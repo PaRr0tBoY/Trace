@@ -5,7 +5,7 @@
  * renderer calls them through the typed preload bridge, so a signature mismatch
  * is a compile-time error rather than a runtime one.
  */
-import { app, ipcMain, clipboard, nativeImage } from 'electron'
+import { app, ipcMain, clipboard, nativeImage, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { psHost } from './powershell'
@@ -530,6 +530,20 @@ export function registerIpc(): void {
 
   handle('window:set-interactive', (value) => {
     setInteractive(value)
+  })
+
+  handle('file:reveal', (filePath) => {
+    // Restored from upstream (lost in the 0.2.6 merge): reveal an existing
+    // path in Explorer; false for missing paths so the UI stays silent.
+    if (typeof filePath === 'string' && existsSync(filePath)) {
+      try {
+        shell.showItemInFolder(filePath)
+        return true
+      } catch (err) {
+        console.error('[IPC] file:reveal failed:', err)
+      }
+    }
+    return false
   })
 
   handle('window:minimize', () => {

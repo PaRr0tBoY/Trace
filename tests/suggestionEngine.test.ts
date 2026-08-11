@@ -283,6 +283,54 @@ describe('accept', () => {
     h.engine.start()
     expect(h.engine.accept('s_unknown')).toBeNull()
   })
+
+  it('writes the segment window titles, confidence and reason into a created task', async () => {
+    const h = makeHarness()
+    h.engine.start()
+    await trigger(h, batch())
+    const [s] = h.pushed[0]
+    h.engine.accept(s.id)
+    const task = h.store.list()[0]!
+    // Both window titles from the batch survive, trimmed and deduped.
+    expect([...task.windowTitles].sort()).toEqual(['docs.example.com', 'report.md — Code'])
+    expect(task.confidence).toBe(s.confidence)
+    // No provider configured: the stored reason is the algorithm evidence summary.
+    expect(task.reason).toBe(s.algorithmReason)
+  })
+
+  it('writes window titles, confidence and reason into the merged target', async () => {
+    const h = makeHarness()
+    h.store.create('Writing report', {
+      apps: [{ id: 'c:/apps/code.exe', name: 'Code' }]
+    })
+    h.engine.start()
+    await trigger(h, singleTitleBatch('writing report draft'))
+    const [s] = h.pushed[0]
+    const targetId = s.taskId!
+    h.engine.accept(s.id)
+    const task = h.store.get(targetId)!
+    expect(task.windowTitles).toEqual(['writing report draft'])
+    expect(task.confidence).toBe(s.confidence)
+    expect(task.reason).toBe(s.algorithmReason)
+  })
+
+  it('stores the LLM reason when annotation succeeded', async () => {
+    const h = makeHarness()
+    h.chat = vi.fn(async () => ({
+      ok: true,
+      content: '{"items":[{"title":"Doc writing","reason":"You switched between an editor and a browser for research."}]}',
+      parsed: { items: [{ title: 'Doc writing', reason: 'You switched between an editor and a browser for research.' }] }
+    })) as unknown as ChatFn
+    h.engine.setChat(h.chat)
+    h.engine.start()
+    await trigger(h, batch())
+    const [s] = h.pushed[0]
+    h.engine.accept(s.id)
+    const task = h.store.list()[0]!
+    expect(task.title).toBe('Doc writing')
+    expect(task.reason).toBe('You switched between an editor and a browser for research.')
+    expect(task.confidence).toBe(s.confidence)
+  })
 })
 
 describe('ignore', () => {

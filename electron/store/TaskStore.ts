@@ -60,6 +60,26 @@ function nonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.trim().length > 0
 }
 
+/** Confidence is a 0-1 domain value; anything else is rejected at the boundary. */
+function sanitizeConfidence(v: unknown): number | undefined {
+  return isFiniteNumber(v) && v >= 0 && v <= 1 ? v : undefined
+}
+
+/** Trim, drop empties, dedupe — the windowTitles shape both on the way in and out. */
+function dedupeStrings(list: unknown): string[] {
+  if (!Array.isArray(list)) return []
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const v of list) {
+    if (typeof v !== 'string') continue
+    const s = v.trim()
+    if (s.length === 0 || seen.has(s)) continue
+    seen.add(s)
+    out.push(s)
+  }
+  return out
+}
+
 /**
  * Build the resource reference for a clipboard item, snapshotting at link
  * time. Text keeps a bounded preview (never the full body); images keep
@@ -223,6 +243,9 @@ function sanitizeTask(raw: unknown): Task | null {
     note: typeof t.note === 'string' && t.note.trim() ? t.note.trim() : undefined,
     apps,
     resources,
+    windowTitles: dedupeStrings(t.windowTitles),
+    confidence: sanitizeConfidence(t.confidence),
+    reason: typeof t.reason === 'string' && t.reason.trim() ? t.reason.trim() : undefined,
     createdAt: isFiniteNumber(t.createdAt) ? t.createdAt : 0,
     updatedAt: isFiniteNumber(t.updatedAt) ? t.updatedAt : 0,
     lastActiveAt: isFiniteNumber(t.lastActiveAt) ? t.lastActiveAt : 0
@@ -291,7 +314,10 @@ export class TaskStore {
     return best.id
   }
 
-  create(title: string, opts?: { note?: string; apps?: AppRef[]; resources?: ResourceRef[] }): Task | null {
+  create(
+    title: string,
+    opts?: { note?: string; apps?: AppRef[]; resources?: ResourceRef[]; windowTitles?: string[]; confidence?: number; reason?: string }
+  ): Task | null {
     const clean = title.trim()
     if (!clean) return null
     const now = this.now()
@@ -302,6 +328,9 @@ export class TaskStore {
       note: opts?.note?.trim() || undefined,
       apps: dedupeApps(opts?.apps ?? []),
       resources: dedupeResources(opts?.resources ?? []),
+      windowTitles: dedupeStrings(opts?.windowTitles ?? []),
+      confidence: sanitizeConfidence(opts?.confidence),
+      reason: opts?.reason?.trim() || undefined,
       createdAt: now,
       updatedAt: now,
       lastActiveAt: now
@@ -311,15 +340,21 @@ export class TaskStore {
     return task
   }
 
-  /** Edit title/note or apply a manual status transition. Returns false when invalid. */
+  /** Edit title/note/status or the t27 evidence fields (windowTitles/confidence/reason). Returns false when invalid. */
   update(id: string, patch: TaskPatch): boolean {
     const task = this.tasks.find((t) => t.id === id)
     if (!task) return false
     if (patch.title !== undefined && !nonEmptyString(patch.title)) return false
     if (patch.status !== undefined && !isTaskStatus(patch.status)) return false
+    if (patch.windowTitles !== undefined && !Array.isArray(patch.windowTitles)) return false
+    if (patch.confidence !== undefined && sanitizeConfidence(patch.confidence) === undefined) return false
+    if (patch.reason !== undefined && typeof patch.reason !== 'string') return false
 
     if (patch.title !== undefined) task.title = patch.title.trim()
     if (patch.note !== undefined) task.note = patch.note.trim() || undefined
+    if (patch.windowTitles !== undefined) task.windowTitles = dedupeStrings(patch.windowTitles)
+    if (patch.confidence !== undefined) task.confidence = patch.confidence
+    if (patch.reason !== undefined) task.reason = patch.reason.trim() || undefined
     if (patch.status !== undefined) {
       task.status = patch.status
       // A manual resume is fresh activity; other transitions keep idle history.

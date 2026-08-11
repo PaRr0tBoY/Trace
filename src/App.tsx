@@ -10,6 +10,7 @@
  */
 import { useEffect } from 'react'
 import { Panel } from './components/Panel'
+import { CopyIndicatorCurve } from './components/CopyIndicatorCurve'
 import { useStore } from './store/appStore'
 import { edge } from './lib/edge'
 import { applyReduceMotion } from './lib/theme'
@@ -122,5 +123,10 @@ export default function App() {
     document.documentElement.style.setProperty('--font-scale', String(scale))
   }, [settings.reduceMotion, settings.fontSizeScale])
 
-  return <Panel />
+  return (
+    <>
+      <Panel />
+      <CopyIndicatorCurve />
+    </>
+  )
 }

@@ -18,6 +18,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PATHS } from '../store/paths'
 import { prefetchFileIcons } from './drag'
+import { attachAppIcons, attachSuggestionIcons } from './appIcons'
 import { runtime } from './config'
 import { queryForegroundSnapshot } from './foreground'
 import { emit, recentEvents } from './eventBus'
@@ -366,12 +367,13 @@ export const pushState = {
     const dto: ClipboardItemDto[] = store.toDto()
     send('state:items', dto)
   },
-  tasks(): void {
-    const dto: TaskDto[] = taskStore.toDto()
+  async tasks(): Promise<void> {
+    const dto: TaskDto[] = await attachAppIcons(taskStore.toDto())
     send('state:tasks', dto)
   },
-  suggestions(suggestions: Suggestion[]): void {
-    send('state:suggestions', suggestions)
+  async suggestions(suggestions: Suggestion[]): Promise<void> {
+    const dto: Suggestion[] = await attachSuggestionIcons(suggestions)
+    send('state:suggestions', dto)
   },
   settings(next: Settings): void {
     send('state:settings', next)

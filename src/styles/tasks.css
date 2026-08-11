@@ -962,3 +962,53 @@
   gap: 8px;
   margin-top: 8px;
 }
+
+/* ---------- app icon badges (t26) ---------- */
+
+.app-icon {
+  flex-shrink: 0;
+  display: block;
+  border-radius: 4px;
+  object-fit: contain;
+}
+.app-icon-fallback {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+
+.task-app-icons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.task-app-icons-more {
+  padding: 1px 5px;
+  min-width: 16px;
+  text-align: center;
+  border-radius: 999px;
+  font-size: calc(10px * var(--font-scale, 1));
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Icon + name inside a detail chip (existing pill keeps its look). */
+.task-app-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: middle;
+}
+.task-app-chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

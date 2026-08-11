@@ -115,6 +115,8 @@ export interface AppRef {
   id: string
   name: string
   exePath?: string
+  /** Windows app icon as a dataURL; filled by main at push time (t26), absent when extraction failed. */
+  iconUrl?: string
   lastContext?: {
     windowTitle?: string
     url?: string
@@ -217,6 +219,10 @@ export interface Suggestion {
   reason?: string
   /** Candidate task id for merges; absent = new-candidate suggestion (t19). */
   taskId?: string
+  /** exePaths parallel to appNames; filled by the suggestion engine so main can fetch icons (t26). */
+  appExePaths?: string[]
+  /** Resolved app icons, one entry per app with an extractable exePath; filled by main at push time (t26). */
+  appIcons?: { name: string; iconUrl: string }[]
 }
 
 export type MemoryType = 'identity' | 'tool' | 'project' | 'workflow'

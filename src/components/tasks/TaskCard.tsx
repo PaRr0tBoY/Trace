@@ -9,6 +9,10 @@ import { useTranslation } from '../../i18n'
 import { relativeTime, previewText } from '../../lib/format'
 import type { TaskDto, TaskStatus } from '../../../shared/types'
 import { PauseIcon, ResumeIcon, CompleteIcon, RestoreIcon, TrashIcon } from '../icons'
+import { AppIcon } from './AppIcon'
+
+/** Max app icons shown on a card before collapsing into "+N". */
+const MAX_APP_ICONS = 5
 
 interface Props {
   task: TaskDto
@@ -21,15 +25,12 @@ export function TaskCard({ task, onOpen, onDeleteRequest }: Props) {
   const updateTask = useStore((s) => s.updateTask)
 
   const apps = task.apps
-  const appNames = apps.slice(0, 3).map((a) => a.name)
-  const moreApps = apps.length > 3 ? apps.length - 3 : 0
+  const visibleApps = apps.slice(0, MAX_APP_ICONS)
+  const overflowApps = apps.slice(MAX_APP_ICONS)
 
   const meta: string[] = []
   if (task.resources.length > 0) {
     meta.push(t('tasks.resourceCount', { count: task.resources.length }))
-  }
-  if (appNames.length > 0) {
-    meta.push(moreApps > 0 ? `${appNames.join(' · ')} +${moreApps}` : appNames.join(' · '))
   }
 
   const statusAction = (status: TaskStatus): { key: string; label: string; icon: JSX.Element; next: TaskStatus } | null => {
@@ -62,6 +63,18 @@ export function TaskCard({ task, onOpen, onDeleteRequest }: Props) {
             <div className="task-time">{t('tasks.activeAt', { time: relativeTime(task.lastActiveAt) })}</div>
           )}
           {meta.length > 0 && <div className="task-meta">{meta.join(' · ')}</div>}
+          {apps.length > 0 && (
+            <div className="task-app-icons">
+              {visibleApps.map((a) => (
+                <AppIcon key={a.id} app={a} />
+              ))}
+              {overflowApps.length > 0 && (
+                <span className="task-app-icons-more" title={overflowApps.map((a) => a.name).join(', ')}>
+                  +{overflowApps.length}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="task-actions" onClick={(e) => e.stopPropagation()}>
           {action && (

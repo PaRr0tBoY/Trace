@@ -7,6 +7,7 @@ import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import { basename } from '../../lib/format'
 import { useDragOut } from '../../hooks/useDragOut'
+import { AppIcon } from './AppIcon'
 import type { ResourceRef, TaskDto, TaskStatus } from '../../../shared/types'
 import {
   ChevronLeftIcon,
@@ -188,7 +189,8 @@ export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent
         <div className="task-app-chips">
           {task.apps.map((a) => (
             <span className="task-app-chip" key={a.id} title={a.exePath ?? a.name}>
-              {a.name}
+              <AppIcon app={a} />
+              <span>{a.name}</span>
             </span>
           ))}
         </div>

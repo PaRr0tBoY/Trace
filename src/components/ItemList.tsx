@@ -31,6 +31,9 @@ export function ItemList() {
   const listRef = useRef<HTMLDivElement>(null)
 
   const total = pinned.length + recent.length
+  // FLIP reorder animation costs an O(n) layout pass + spring per card;
+  // past ~30 cards it degrades the very moment it should feel smooth.
+  const animateLayout = total <= 30
   
   const isDraggingAny = useStore((s) => !!s.dragActive || !!s.internalDragReq)
   const open = useStore((s) => s.open)
@@ -254,7 +257,7 @@ export function ItemList() {
                     style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}
                   >
                     {pinned.map((it, idx) => (
-                      <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} />
+                      <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} />
                     ))}
                   </motion.div>
                 )}
@@ -267,7 +270,7 @@ export function ItemList() {
               {pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
               <AnimatePresence initial={false}>
                 {recent.map((it, idx) => (
-                  <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} />
+                  <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} />
                 ))}
               </AnimatePresence>
             </section>

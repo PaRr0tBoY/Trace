@@ -35,6 +35,9 @@ interface Props {
   /** Skip the enter animation (used when the type filter/search changes —
       cards swap instantly instead of "clearing then falling back in"). */
   instant?: boolean
+  /** FLIP position animation on list reorder; disabled on long lists (the
+      O(n) layout pass + spring on every card is the reorder-frame cost). */
+  animateLayout?: boolean
 }
 
 
@@ -45,7 +48,7 @@ interface Props {
 /* Main item card                                                      */
 /* ------------------------------------------------------------------ */
 
-function ClipboardItemBase({ item, instant }: Props) {
+function ClipboardItemBase({ item, instant, animateLayout }: Props) {
   const copy = useStore.getState().copy
   const paste = useStore.getState().paste
   const togglePin = useStore.getState().togglePin
@@ -118,7 +121,7 @@ function ClipboardItemBase({ item, instant }: Props) {
 
   return (
     <motion.div
-      layout="position"
+      layout={animateLayout ? 'position' : false}
       initial={!instant && open ? { opacity: 0, scale: 0.96, y: 6 } : false}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: -4, transition: { duration: 0.12, ease: [0.32, 0, 0.67, 0] } }}
@@ -128,8 +131,8 @@ function ClipboardItemBase({ item, instant }: Props) {
         stiffness: 300,
         damping: 30,
         mass: 0.8,
-        restDelta: 0.001,
-        restSpeed: 0.001
+        restDelta: 0.05,
+        restSpeed: 0.05
       }}
       className={`item${item.pinned ? ' pinned' : ''}${isBundle ? ' bundle' : ''}`}
     >
@@ -305,8 +308,8 @@ const rowVariants = {
     y: 0,
     scale: 1,
     transition: {
-      y: { type: 'spring', stiffness: 500, damping: 38, mass: 0.6, restDelta: 0.001 },
-      scale: { type: 'spring', stiffness: 500, damping: 38, mass: 0.6, restDelta: 0.001 },
+      y: { type: 'spring', stiffness: 500, damping: 38, mass: 0.6, restDelta: 0.05 },
+      scale: { type: 'spring', stiffness: 500, damping: 38, mass: 0.6, restDelta: 0.05 },
       opacity: { duration: 0.16, ease: 'easeOut' }
     }
   },
@@ -328,7 +331,7 @@ const stackVariants = {
     opacity: 1,
     scale: 1,
     transition: {
-      scale: { type: 'spring', stiffness: 480, damping: 38, mass: 0.6, restDelta: 0.001 },
+      scale: { type: 'spring', stiffness: 480, damping: 38, mass: 0.6, restDelta: 0.05 },
       opacity: { duration: 0.18, ease: 'easeOut' }
     }
   },

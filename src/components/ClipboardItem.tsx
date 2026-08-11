@@ -98,26 +98,17 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
   }, [])
 
   const handleDragStart = useCallback((e: React.DragEvent, req: DragRequest) => {
-    if (item.data.kind === 'text') {
-      // In-panel HTML5 drag: lets the user drop the item onto a task (drop
-      // bar) to link it. Text never OLE-drags out of the app, so the payload
-      // only matters inside the panel. The drag itself must run (no
-      // preventDefault) for dragover/drop to fire on the drop targets.
-      setInternalDragReq(req)
-      e.dataTransfer.setData('application/x-trace-item', item.id)
-      e.dataTransfer.setData('text/plain', previewText(item.data.text, 200))
-      return
-    } else {
-      // Images and files need OS-level file handles via Electron's startDrag.
-      // Cancel the HTML5 drag (preventDefault) so the browser doesn't run its
-      // own ghost in parallel; Electron's startDrag starts an independent OLE
-      // drag managed by the OS. Fire the IPC synchronously so main calls
-      // event.sender.startDrag(...) on the same tick.
-      setInternalDragReq(req)
-      e.preventDefault()
-      startDrag(req)
-    }
-  }, [item.data, startDrag, setInternalDragReq])
+    // Every kind OLE-drags out of the app from the main process — text via a
+    // real IDataObject (oleDrag.ts), images/files via Electron's startDrag.
+    // Cancel the HTML5 drag (preventDefault) so the browser doesn't run its
+    // own ghost in parallel, and fire the IPC synchronously so main starts
+    // the OS drag on the same tick. In-panel drops still work: the drop
+    // target resolves `item:internal-drop` against internalDragReq (set
+    // below), the same path images/files already use.
+    setInternalDragReq(req)
+    e.preventDefault()
+    startDrag(req)
+  }, [startDrag, setInternalDragReq])
 
   return (
     <motion.div

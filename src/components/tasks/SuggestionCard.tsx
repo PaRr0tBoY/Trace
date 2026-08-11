@@ -10,6 +10,7 @@
 import { useState } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
+import { formatDuration } from '../../lib/format'
 import type { Suggestion } from '../../../shared/types'
 import { CheckIcon, EditIcon, CloseIcon, ChevronDownIcon, ChevronUpIcon, SparklesIcon } from '../icons'
 import { acceptSuggestionDrop } from './dropActions'
@@ -19,11 +20,6 @@ interface Props {
 }
 
 const MAX_APPS = 5
-
-function formatDuration(ms: number): string {
-  const minutes = Math.max(1, Math.round(ms / 60_000))
-  return minutes < 60 ? `${minutes}m` : `${Math.round(minutes / 60)}h`
-}
 
 export function SuggestionCard({ suggestion }: Props) {
   const { t } = useTranslation()
@@ -58,9 +54,9 @@ export function SuggestionCard({ suggestion }: Props) {
     // OS file drops were routed by preload (trace-os-drop).
   }
 
-  const apps = (suggestion.appIcons ?? [])
-    .filter((app) => !brokenIcons.has(app.iconUrl))
-    .slice(0, MAX_APPS)
+  const allApps = (suggestion.appIcons ?? []).filter((app) => !brokenIcons.has(app.iconUrl))
+  const apps = allApps.slice(0, MAX_APPS)
+  const overflowApps = allApps.slice(MAX_APPS)
 
   return (
     <div
@@ -104,16 +100,23 @@ export function SuggestionCard({ suggestion }: Props) {
       <div className="task-suggestion-row">
         <div className="task-suggestion-apps">
           {apps.length > 0 ? (
-            apps.map((app, i) => (
-              <img
-                key={`${app.name}:${app.iconUrl}:${i}`}
-                className="task-suggestion-app"
-                src={app.iconUrl}
-                alt=""
-                draggable={false}
-                onError={() => setBrokenIcons((prev) => new Set(prev).add(app.iconUrl))}
-              />
-            ))
+            <>
+              {apps.map((app, i) => (
+                <img
+                  key={`${app.name}:${app.iconUrl}:${i}`}
+                  className="task-suggestion-app"
+                  src={app.iconUrl}
+                  alt=""
+                  draggable={false}
+                  onError={() => setBrokenIcons((prev) => new Set(prev).add(app.iconUrl))}
+                />
+              ))}
+              {overflowApps.length > 0 && (
+                <span className="task-app-icons-more" title={overflowApps.map((a) => a.name).join(', ')}>
+                  +{overflowApps.length}
+                </span>
+              )}
+            </>
           ) : (
             <span className="task-suggestion-apps-empty" title={suggestion.appNames.join(', ')}>
               <SparklesIcon width={12} height={12} />

@@ -190,6 +190,12 @@ function sanitizeTask(raw: unknown): Task | null {
         }
         if (Object.keys(lastContext).length > 0) ref.lastContext = lastContext
       }
+      if (app.linkedWindow && typeof app.linkedWindow === 'object') {
+        const lw = app.linkedWindow as Record<string, unknown>
+        if (isFiniteNumber(lw.pid) && isFiniteNumber(lw.ts) && lw.ts > 0) {
+          ref.linkedWindow = { pid: lw.pid, title: typeof lw.title === 'string' ? lw.title : '', ts: lw.ts }
+        }
+      }
       apps.push(ref)
     }
   }
@@ -248,7 +254,8 @@ function sanitizeTask(raw: unknown): Task | null {
     reason: typeof t.reason === 'string' && t.reason.trim() ? t.reason.trim() : undefined,
     createdAt: isFiniteNumber(t.createdAt) ? t.createdAt : 0,
     updatedAt: isFiniteNumber(t.updatedAt) ? t.updatedAt : 0,
-    lastActiveAt: isFiniteNumber(t.lastActiveAt) ? t.lastActiveAt : 0
+    lastActiveAt: isFiniteNumber(t.lastActiveAt) ? t.lastActiveAt : 0,
+    activeMs: isFiniteNumber(t.activeMs) ? Math.max(0, t.activeMs) : 0
   }
 }
 
@@ -333,7 +340,8 @@ export class TaskStore {
       reason: opts?.reason?.trim() || undefined,
       createdAt: now,
       updatedAt: now,
-      lastActiveAt: now
+      lastActiveAt: now,
+      activeMs: 0
     }
     this.tasks.push(task)
     this.finish()
@@ -356,9 +364,15 @@ export class TaskStore {
     if (patch.confidence !== undefined) task.confidence = patch.confidence
     if (patch.reason !== undefined) task.reason = patch.reason.trim() || undefined
     if (patch.status !== undefined) {
+      const now = this.now()
+      // Leaving active settles the in-flight segment (ADR-0006); a resume
+      // keeps the accumulated time and starts a fresh segment.
+      if (task.status === 'active' && patch.status !== 'active') {
+        this.settleActiveSegment(task, now)
+      }
       task.status = patch.status
       // A manual resume is fresh activity; other transitions keep idle history.
-      if (patch.status === 'active') task.lastActiveAt = this.now()
+      if (patch.status === 'active') task.lastActiveAt = now
     }
     task.updatedAt = this.now()
     this.finish()
@@ -388,6 +402,9 @@ export class TaskStore {
     target.apps.push(...sourceApps)
     target.resources = mergeResources(target.resources, source.resources)
     target.lastActiveAt = Math.max(target.lastActiveAt, source.lastActiveAt)
+    // Summing would double-count (a temp candidate task is ~0 anyway);
+    // the larger settled value wins (ADR-0006).
+    target.activeMs = Math.max(target.activeMs, source.activeMs)
     target.updatedAt = this.now()
     this.tasks = this.tasks.filter((t) => t.id !== sourceId)
     this.finish()
@@ -499,6 +516,7 @@ export class TaskStore {
     for (const t of this.tasks) {
       // Elapsed >= threshold: idle exactly AT the threshold counts as overdue.
       if (t.status === 'active' && t.lastActiveAt <= cutoff) {
+        this.settleActiveSegment(t, now)
         t.status = 'paused'
         t.updatedAt = now
         changed++
@@ -511,6 +529,15 @@ export class TaskStore {
   private finish(): void {
     this.applyIdleTimeout()
     this.persist()
+  }
+
+  /**
+   * Fold the current active segment into activeMs (ADR-0006). Idempotent —
+   * a task that already left active has nothing left to settle.
+   */
+  private settleActiveSegment(task: Task, now: number): void {
+    if (task.status !== 'active' || task.lastActiveAt <= 0) return
+    task.activeMs = Math.max(0, task.activeMs + (now - task.lastActiveAt))
   }
 
   private persist(): void {

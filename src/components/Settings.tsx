@@ -2,9 +2,10 @@ import { useEffect, useState, useRef, type CSSProperties } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore, type SettingsTab } from '../store/appStore'
 import type { DisplayInfo, Memory, MemoryAction, ProviderConfig, ClipboardFilter, RestoreTime } from '../../shared/types'
+import { THEME_ACCENTS, THEME_COLORS } from '../../shared/themes'
 import { LiquidOctopusLoader } from './LiquidOctopusLoader'
 import { TickIndicatorIcon, CopyIndicatorIcon, SparkleIndicatorIcon } from './CopyIndicatorCurve'
-import { ChevronRightIcon, CloseIcon, LogOutIcon, StarIcon, GithubOctocatLogo, ChevronDownIcon } from './icons'
+import { ChevronRightIcon, CloseIcon, LogOutIcon, StarIcon, GithubOctocatLogo, ChevronDownIcon, PlusIcon } from './icons'
 import { ChangelogView } from './ChangelogView'
 import kofiSupportImg from '../assets/kofi-support.webp'
 import { playDialTickSound, playToggleSound, playButtonClickSound } from '../lib/soundEffects'
@@ -872,6 +873,64 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                   exit={{ opacity: 0, scale: 0.98, y: -4 }}
                   transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                 >
+                  {/* ── GROUP: Theme color ──────────────────────────────── */}
+                  <div className="setting-group-label">{t('appearance.themeTitle')}</div>
+
+                  <div className="setting-row vertical">
+                    <div className="setting-info">
+                      <div className="setting-title">{t('appearance.themeTitle')}</div>
+                      <div className="setting-desc">{t('appearance.themeDesc')}</div>
+                    </div>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(5, 1fr)',
+                        gap: 8,
+                        marginTop: 10
+                      }}
+                    >
+                      {THEME_COLORS.map((color) => {
+                        const selected = (settings.themeColor ?? 'graphite') === color
+                        const name = 'theme' + color.charAt(0).toUpperCase() + color.slice(1)
+                        return (
+                          <div
+                            key={color}
+                            onClick={() => {
+                              playButtonClickSound()
+                              patch({ themeColor: color })
+                            }}
+                            style={{
+                              cursor: 'pointer',
+                              borderRadius: 10,
+                              padding: '10px 4px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: 6,
+                              background: selected ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                              border: selected ? '1px solid rgba(255,255,255,0.3)' : '1px solid rgba(255,255,255,0.06)'
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 22,
+                                height: 22,
+                                borderRadius: '50%',
+                                background: THEME_ACCENTS[color].color
+                              }}
+                            />
+                            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#fff', textAlign: 'center' }}>
+                              {t(`appearance.${name}`)}
+                            </div>
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.3 }}>
+                              {t(`appearance.${name}Desc`)}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
                   {/* ── GROUP: Copy Indicator ────────────────────────────── */}
                   <div className="setting-group-label">{t('appearance.copyIndicatorTitle')}</div>
 
@@ -1363,20 +1422,71 @@ function AIProviderSection() {
     setProviders(next)
   }
 
-  const addProvider = (kind: 'local' | 'cloud') => {
-    const provider: ProviderConfig = kind === 'local'
-      ? { id: `local-${Date.now().toString(36)}`, baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen3:8b', kind, supportsSchemaOutput: true }
-      : { id: `cloud-${Date.now().toString(36)}`, baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-v4-flash', kind, supportsSchemaOutput: false }
+  /** Add a blank custom cloud provider and open it for editing right away. */
+  const addCloudProvider = () => {
+    const provider: ProviderConfig = {
+      id: `cloud-${Date.now().toString(36)}`,
+      baseUrl: '',
+      model: '',
+      apiKey: '',
+      kind: 'cloud',
+      supportsSchemaOutput: false
+    }
     playButtonClickSound()
     setProviders([...providers, provider])
     setExpandedId(provider.id)
     setDraft({ ...provider })
   }
 
-  const commitDraft = () => {
-    if (draft && draft.id === expandedId) {
-      setProviders(providers.map((p) => (p.id === draft.id ? { ...draft, baseUrl: draft.baseUrl.trim() } : p)))
+  /**
+   * Add local model = detect Ollama on the machine, then wire it up. When a
+   * local provider already exists the card is revealed instead of duplicated.
+   */
+  const addLocalModel = async () => {
+    playButtonClickSound()
+    setDetectState({ status: 'detecting' })
+    const res = await window.edge.detectOllama()
+    if (!res.found) {
+      setDetectState({ status: 'fail', detail: res.error ?? '' })
+      return
     }
+    const existing = providers.find((p) => p.kind === 'local' && p.baseUrl.includes('127.0.0.1:11434'))
+    if (existing) {
+      setDetectState({ status: 'ok', detail: res.models?.join(', ') ?? '' })
+      setExpandedId(existing.id)
+      setDraft({ ...existing })
+      return
+    }
+    const model = res.models?.find((m) => /qwen3/i.test(m)) ?? res.models?.[0] ?? 'qwen3:8b'
+    const provider: ProviderConfig = {
+      id: `local-${Date.now().toString(36)}`,
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      model,
+      kind: 'local',
+      supportsSchemaOutput: true
+    }
+    setProviders([...providers, provider])
+    setExpandedId(provider.id)
+    setDraft({ ...provider })
+    setDetectState({ status: 'ok', detail: model })
+  }
+
+  /** Click a card to open/close its editor; reopening syncs the draft. */
+  const toggleExpand = (id: string) => {
+    playButtonClickSound()
+    if (expandedId === id) {
+      setExpandedId(null)
+      setDraft(null)
+      return
+    }
+    const provider = providers.find((p) => p.id === id)
+    setExpandedId(id)
+    setDraft(provider ? { ...provider } : null)
+  }
+
+  const commitDraft = () => {
+    if (!draft || draft.id !== expandedId) return
+    setProviders(providers.map((p) => (p.id === draft.id ? { ...draft, baseUrl: draft.baseUrl.trim() } : p)))
   }
 
   const testProvider = async (p: ProviderConfig) => {
@@ -1388,23 +1498,6 @@ function AIProviderSection() {
         ? { status: 'ok', detail: String(res.latencyMs ?? 0) }
         : { status: 'fail', detail: res.error ?? '' }
     }))
-  }
-
-  const detectOllama = async () => {
-    setDetectState({ status: 'detecting' })
-    const res = await window.edge.detectOllama()
-    if (!res.found) {
-      setDetectState({ status: 'fail', detail: res.error ?? '' })
-      return
-    }
-    const existing = providers.find((p) => p.kind === 'local' && p.baseUrl.includes('127.0.0.1:11434'))
-    if (existing) {
-      setDetectState({ status: 'ok', detail: res.models?.join(', ') ?? '' })
-      return
-    }
-    const model = res.models?.find((m) => /qwen3/i.test(m)) ?? res.models?.[0] ?? 'qwen3:8b'
-    setProviders([...providers, { id: `local-ollama-${Date.now().toString(36)}`, baseUrl: 'http://127.0.0.1:11434/v1', model, kind: 'local', supportsSchemaOutput: true }])
-    setDetectState({ status: 'ok', detail: model })
   }
 
   const inputStyle: CSSProperties = {
@@ -1451,8 +1544,29 @@ function AIProviderSection() {
         const isDraft = draft && draft.id === p.id ? draft : p
         return (
           <div key={p.id} className="setting-row vertical" style={{ gap: 8 }}>
-            {/* Layer 1: status dot + model name (own line) + reorder/remove */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+            {/* Layer 1: click-to-edit summary (chevron + status + model + actions) */}
+            <div
+              className="provider-summary"
+              role="button"
+              tabIndex={0}
+              aria-expanded={isExpanded}
+              title={t('ai.edit')}
+              onClick={() => toggleExpand(p.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  toggleExpand(p.id)
+                }
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', cursor: 'pointer', outline: 'none' }}
+            >
+              <motion.span
+                animate={{ rotate: isExpanded ? 90 : 0 }}
+                transition={{ duration: 0.15 }}
+                style={{ display: 'flex', alignItems: 'center', flexShrink: 0, color: 'rgba(255, 255, 255, 0.5)' }}
+              >
+                <ChevronRightIcon width={12} height={12} />
+              </motion.span>
               <span
                 style={{
                   width: 8,
@@ -1463,20 +1577,50 @@ function AIProviderSection() {
                 }}
                 title={p.kind === 'local' ? t('ai.kindLocal') : t('ai.kindCloud')}
               />
-              <div
+              <span
                 className="setting-title"
-                style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                title={isDraft.model}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: 13,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  ...(isDraft.model ? {} : { color: 'rgba(255, 255, 255, 0.45)', fontWeight: 500 })
+                }}
+                title={isDraft.model || t('ai.unnamedModel')}
               >
-                {isDraft.model}
-              </div>
-              <button style={{ ...iconBtn, ...(i === 0 ? { opacity: 0.35, cursor: 'default' } : {}) }} disabled={i === 0} title={t('ai.moveUp')} onClick={() => moveProvider(i, -1)}>
+                {isDraft.model || t('ai.unnamedModel')}
+              </span>
+              <button
+                style={{ ...iconBtn, ...(i === 0 ? { opacity: 0.35, cursor: 'default' } : {}) }}
+                disabled={i === 0}
+                title={t('ai.moveUp')}
+                onClick={(e) => { e.stopPropagation(); moveProvider(i, -1) }}
+              >
                 <ChevronRightIcon width={12} height={12} style={{ transform: 'rotate(-90deg)' }} />
               </button>
-              <button style={{ ...iconBtn, ...(i === providers.length - 1 ? { opacity: 0.35, cursor: 'default' } : {}) }} disabled={i === providers.length - 1} title={t('ai.moveDown')} onClick={() => moveProvider(i, 1)}>
+              <button
+                style={{ ...iconBtn, ...(i === providers.length - 1 ? { opacity: 0.35, cursor: 'default' } : {}) }}
+                disabled={i === providers.length - 1}
+                title={t('ai.moveDown')}
+                onClick={(e) => { e.stopPropagation(); moveProvider(i, 1) }}
+              >
                 <ChevronRightIcon width={12} height={12} style={{ transform: 'rotate(90deg)' }} />
               </button>
-              <button style={iconBtn} title={t('ai.remove')} onClick={() => { playButtonClickSound(); setProviders(providers.filter((x) => x.id !== p.id)); if (expandedId === p.id) { setExpandedId(null); setDraft(null) } }}>
+              <button
+                style={iconBtn}
+                title={t('ai.remove')}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  playButtonClickSound()
+                  setProviders(providers.filter((x) => x.id !== p.id))
+                  if (expandedId === p.id) {
+                    setExpandedId(null)
+                    setDraft(null)
+                  }
+                }}
+              >
                 <CloseIcon width={10} height={10} />
               </button>
             </div>
@@ -1484,10 +1628,10 @@ function AIProviderSection() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', flexWrap: 'wrap' }}>
               <div
                 className="setting-desc"
-                style={{ flex: 1, minWidth: 0, fontSize: 10.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                style={{ flex: 1, minWidth: 0, fontSize: 10.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...(p.baseUrl ? {} : { color: 'rgba(255, 255, 255, 0.35)' }) }}
                 title={p.baseUrl}
               >
-                {p.baseUrl}
+                {p.baseUrl || 'https://api.example.com/v1'}
               </div>
               <button
                 className="pill display-pill"
@@ -1501,46 +1645,57 @@ function AIProviderSection() {
               {test?.status === 'fail' && <span style={{ fontSize: 11, color: '#ff6b6b', overflowWrap: 'anywhere' }}>✗ {t('ai.testFailed', { error: test.detail ?? '' })}</span>}
             </div>
 
-            {isExpanded && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
-                  {t('ai.baseUrl')}
-                  <input
-                    style={{ ...inputStyle, marginTop: 4 }}
-                    value={isDraft.baseUrl}
-                    onChange={(e) => setDraft({ ...isDraft, baseUrl: e.target.value })}
-                    onBlur={commitDraft}
-                  />
-                </label>
-                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
-                  {t('ai.apiKey')}
-                  <input
-                    style={{ ...inputStyle, marginTop: 4 }}
-                    value={isDraft.apiKey ?? ''}
-                    onChange={(e) => setDraft({ ...isDraft, apiKey: e.target.value })}
-                    onBlur={commitDraft}
-                  />
-                </label>
-                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
-                  {t('ai.model')}
-                  <input
-                    style={{ ...inputStyle, marginTop: 4 }}
-                    value={isDraft.model}
-                    onChange={(e) => setDraft({ ...isDraft, model: e.target.value })}
-                    onBlur={commitDraft}
-                  />
-                </label>
-                <div className="setting-row" style={{ width: '100%' }}>
-                  <div className="setting-info">
-                    <div className="setting-title" style={{ fontSize: 12 }}>{t('ai.schemaOutput')}</div>
+            <AnimatePresence initial={false}>
+              {isExpanded && (
+                <motion.div
+                  className="provider-editor"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.16, ease: 'easeOut' }}
+                >
+                  <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                    {t('ai.baseUrl')}
+                    <input
+                      style={{ ...inputStyle, marginTop: 4 }}
+                      value={isDraft.baseUrl}
+                      placeholder="https://api.example.com/v1"
+                      onChange={(e) => setDraft({ ...isDraft, baseUrl: e.target.value })}
+                      onBlur={commitDraft}
+                    />
+                  </label>
+                  <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                    {t('ai.apiKey')}
+                    <input
+                      style={{ ...inputStyle, marginTop: 4 }}
+                      value={isDraft.apiKey ?? ''}
+                      placeholder="sk-…"
+                      onChange={(e) => setDraft({ ...isDraft, apiKey: e.target.value })}
+                      onBlur={commitDraft}
+                    />
+                  </label>
+                  <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                    {t('ai.model')}
+                    <input
+                      style={{ ...inputStyle, marginTop: 4 }}
+                      value={isDraft.model}
+                      placeholder="model-name"
+                      onChange={(e) => setDraft({ ...isDraft, model: e.target.value })}
+                      onBlur={commitDraft}
+                    />
+                  </label>
+                  <div className="setting-row" style={{ width: '100%' }}>
+                    <div className="setting-info">
+                      <div className="setting-title" style={{ fontSize: 12 }}>{t('ai.schemaOutput')}</div>
+                    </div>
+                    <Toggle
+                      checked={isDraft.supportsSchemaOutput !== false}
+                      onChange={(v) => { setDraft({ ...isDraft, supportsSchemaOutput: v }); setProviders(providers.map((x) => (x.id === p.id ? { ...x, supportsSchemaOutput: v } : x))) }}
+                    />
                   </div>
-                  <Toggle
-                    checked={isDraft.supportsSchemaOutput !== false}
-                    onChange={(v) => { setDraft({ ...isDraft, supportsSchemaOutput: v }); setProviders(providers.map((x) => (x.id === p.id ? { ...x, supportsSchemaOutput: v } : x))) }}
-                  />
-                </div>
-              </div>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )
       })}
@@ -1548,24 +1703,19 @@ function AIProviderSection() {
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         <button
           className="pill display-pill"
-          style={{ padding: '6px 12px', cursor: 'pointer', fontSize: 12 }}
-          onClick={() => addProvider('local')}
+          style={{ flex: '1 1 auto', minWidth: 'max-content', flexDirection: 'row', gap: 6, padding: '8px 12px', cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}
+          onClick={() => void addLocalModel()}
         >
-          {t('ai.addLocal')}
+          <PlusIcon width={12} height={12} />
+          {t('ai.addLocalModel')}
         </button>
         <button
           className="pill display-pill"
-          style={{ padding: '6px 12px', cursor: 'pointer', fontSize: 12 }}
-          onClick={() => addProvider('cloud')}
+          style={{ flex: '1 1 auto', minWidth: 'max-content', flexDirection: 'row', gap: 6, padding: '8px 12px', cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}
+          onClick={addCloudProvider}
         >
-          {t('ai.addCloud')}
-        </button>
-        <button
-          className="pill display-pill"
-          style={{ padding: '6px 12px', cursor: 'pointer', fontSize: 12 }}
-          onClick={() => { playButtonClickSound(); void detectOllama() }}
-        >
-          {t('ai.detectOllama')}
+          <PlusIcon width={12} height={12} />
+          {t('ai.addCloudProvider')}
         </button>
       </div>
 

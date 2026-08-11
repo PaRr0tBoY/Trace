@@ -649,3 +649,88 @@ describe('TaskStore — t27 evidence fields (windowTitles/confidence/reason)', (
     expect(store.get(task.id)!.reason).toBeUndefined()
   })
 })
+
+describe('TaskStore — activeMs cumulative active duration (ADR-0006)', () => {
+  it('starts at zero and settles the active segment on manual pause', () => {
+    const { store, tick } = makeHarness()
+    const task = store.create('任务')!
+    expect(task!.activeMs).toBe(0)
+
+    tick(90_000)
+    expect(store.update(task.id, { status: 'paused' })).toBe(true)
+    expect(store.get(task.id)!.activeMs).toBe(90_000)
+    expect(store.get(task.id)!.status).toBe('paused')
+  })
+
+  it('settles on complete and waiting too, not only pause', () => {
+    const { store, tick } = makeHarness()
+    const task = store.create('任务')!
+    tick(45_000)
+    store.update(task.id, { status: 'completed' })
+    expect(store.get(task.id)!.activeMs).toBe(45_000)
+
+    const other = store.create('另一个')!
+    tick(10_000)
+    store.update(other.id, { status: 'waiting' })
+    expect(store.get(other.id)!.activeMs).toBe(10_000)
+  })
+
+  it('settles on the idle-timeout auto-pause', () => {
+    const { store, tick } = makeHarness()
+    const task = store.create('任务')!
+    tick(15 * 60_000) // exactly at the default threshold
+    expect(store.sweep()).toBe(1)
+    expect(store.get(task.id)!.status).toBe('paused')
+    expect(store.get(task.id)!.activeMs).toBe(15 * 60_000)
+  })
+
+  it('accumulates across pause/resume cycles without resetting', () => {
+    const { store, tick } = makeHarness()
+    const task = store.create('任务')!
+    tick(60_000)
+    store.update(task.id, { status: 'paused' })
+    expect(store.get(task.id)!.activeMs).toBe(60_000)
+
+    tick(60_000) // paused time is NOT counted
+    store.update(task.id, { status: 'active' })
+    tick(30_000)
+    store.update(task.id, { status: 'paused' })
+    expect(store.get(task.id)!.activeMs).toBe(90_000)
+
+    // active -> completed settles too, and a restored task keeps its history.
+    tick(60_000) // still paused: nothing settles
+    store.update(task.id, { status: 'active' })
+    tick(60_000)
+    store.update(task.id, { status: 'completed' })
+    expect(store.get(task.id)!.activeMs).toBe(150_000)
+    store.update(task.id, { status: 'active' })
+    expect(store.get(task.id)!.activeMs).toBe(150_000)
+  })
+
+  it('merge keeps the larger settled value instead of summing', () => {
+    const { store, tick } = makeHarness()
+    const target = store.create('目标')!
+    tick(60_000)
+    store.update(target.id, { status: 'paused' })
+
+    const source = store.create('临时')! // temp candidate ≈ 0 active
+    tick(5_000)
+    store.update(source.id, { status: 'paused' })
+
+    expect(store.merge(target.id, source.id)).toBe(true)
+    expect(store.get(target.id)!.activeMs).toBe(60_000)
+    expect(store.get(source.id)).toBeUndefined()
+  })
+
+  it('sanitize defaults missing activeMs to 0 and clamps negatives', () => {
+    const { store, storage } = makeHarness()
+    store.create('任务')
+    const index = storage.load()!
+    const raw = JSON.parse(JSON.stringify(index)) // strip the type guarantees
+    raw.tasks[0].activeMs = -5
+    delete raw.tasks[0].apps[0] // exercise nothing app-related; keep shape valid
+    storage.save(raw)
+    store.load()
+    expect(store.list()[0].activeMs).toBe(0)
+  })
+})

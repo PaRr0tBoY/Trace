@@ -24,9 +24,10 @@
   --text-secondary: rgba(255, 255, 255, 0.88);
   --text-tertiary: rgba(255, 255, 255, 0.68);
 
-  /* Accent (overridden at runtime by theme.ts) */
-  --accent: #8b5cf6;
-  --accent-glow: rgba(139, 92, 246, 0.55);
+  /* Accent — graphite default; overridden at runtime by applyTheme in src/lib/theme.ts */
+  --accent: #9ca3af;
+  --accent-glow: rgba(156, 163, 175, 0.55);
+  --accent-rgb: 156, 163, 175;
 
   /* Shape & depth */
   --radius-blade: 22px;

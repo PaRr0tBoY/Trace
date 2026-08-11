@@ -43,6 +43,12 @@ export type View = 'clipboard' | 'files' | 'tasks'
 export type RestoreTime = 'instant' | 'relaxed' | 'delayed' | 'forever'
 
 /**
+ * Accent theme id (values in shared/themes.ts). Color names are not
+ * translated; localized labels live in i18n under `appearance.theme*`.
+ */
+export type ThemeColor = 'graphite' | 'cobalt' | 'verdigris' | 'amber' | 'violet'
+
+/**
  * Landing page applied on first launch and after the restore time expires
  * (ADR-0004). The files view has no second level — it always lands on 'all'
  * because dynamic extension tabs may not exist.
@@ -153,6 +159,12 @@ export interface AppRef {
     workspace?: string
     cwd?: string
   }
+  /**
+   * Foreground-window snapshot recorded when the app first joined a task
+   * (ADR-0005): the detail view's "open app" button switches to this window.
+   * Unlike `lastContext` it is never refreshed after being set.
+   */
+  linkedWindow?: { pid: number; title: string; ts: number }
 }
 
 /**
@@ -188,6 +200,12 @@ export interface Task {
   createdAt: number
   updatedAt: number
   lastActiveAt: number
+  /**
+   * Cumulative time the task has spent in 'active' (ms, ADR-0006). Settled
+   * whenever the task leaves active (manual pause/complete + idle timeout);
+   * never reset on resume. Displayed as "Running {duration}".
+   */
+  activeMs: number
 }
 
 /** Editable surface exposed to the renderer (title/note edits + manual status transitions). */
@@ -314,6 +332,11 @@ export interface Settings {
   autoDeleteHours: number
   /** UI visual style density ('modern' | 'compact'). */
   uiStyle: 'modern' | 'compact'
+  /**
+   * Accent theme for the panel UI, drag ghosts, and the copy indicator
+   * (ADR-0007/Ticket 3). The five color values live in shared/themes.ts.
+   */
+  themeColor: ThemeColor
   /** Flag to track if the onboarding tutorial is completed. */
   tutorialCompleted: boolean
   stickPosition: StickPosition
@@ -406,6 +429,7 @@ export const DEFAULT_SETTINGS: Settings = {
   clearUnpinnedOnRestart: false,
   autoDeleteHours: 0,
   uiStyle: 'modern',
+  themeColor: 'graphite',
   tutorialCompleted: false,
   stickPosition: 'left',
   stickDisplayId: undefined,

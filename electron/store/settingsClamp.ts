@@ -6,6 +6,7 @@
  * settings.ts thin. Behaviour is identical to the pre-t11 inline clamps.
  */
 import { DEFAULT_SETTINGS, type Settings } from '../../shared/types'
+import { isThemeColor } from '../../shared/themes'
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = Number(value)
@@ -27,6 +28,9 @@ export function clampSettings(input: Settings): Settings {
   out.verticalOffset = Math.min(1.0, Math.max(0.0, typeof out.verticalOffset === 'number' ? out.verticalOffset : 0.5))
   if (out.uiStyle !== 'modern' && out.uiStyle !== 'compact') {
     out.uiStyle = 'modern'
+  }
+  if (!isThemeColor(out.themeColor)) {
+    out.themeColor = DEFAULT_SETTINGS.themeColor
   }
   if (out.triggerAlignment !== 'top' && out.triggerAlignment !== 'center' && out.triggerAlignment !== 'bottom') {
     out.triggerAlignment = 'center'

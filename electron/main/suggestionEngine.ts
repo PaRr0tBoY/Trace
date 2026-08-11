@@ -42,7 +42,7 @@
  * Logging: `[Suggestion]` tag, one line per analysis (with mode), one line
  * per accept/ignore. No per-event noise.
  */
-import { clusterEvents, type ClusterParams } from './clusterer'
+import { clusterEvents, normalizeAppKey, type ClusterParams } from './clusterer'
 import type { ChatRequest, ChatResult } from './provider'
 import type { SuggestTitleContext } from '../../shared/ipc'
 import { createId } from '../store/ids'
@@ -222,11 +222,31 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
     }
   }
 
+  /**
+   * Most recent app-switch event whose normalized exePath or appName matches
+   * the segment appKey; the "open app" action's linked-window snapshot
+   * (ADR-0005). Newest-first scan; events are chronological in the ring buffer.
+   */
+  function latestSwitchFor(appKey: string): { pid: number; title: string; ts: number } | undefined {
+    const events = readEvents()
+    for (let i = events.length - 1; i >= 0; i--) {
+      const e = events[i]
+      if (e.type !== 'app-switch') continue
+      if (normalizeAppKey(e.exePath) === appKey || normalizeAppKey(e.appName) === appKey) {
+        return { pid: e.pid, title: e.windowTitle, ts: e.ts }
+      }
+    }
+    return undefined
+  }
+
   /** AppRefs from a segment: id = normalized exePath (attributor key space), name = display name. */
   function appRefsFromSegment(appKeys: string[], appNames: string[]): AppRef[] {
     const refs: AppRef[] = []
     for (let i = 0; i < appKeys.length; i++) {
-      refs.push({ id: appKeys[i], name: appNames[i] ?? appKeys[i] })
+      const ref: AppRef = { id: appKeys[i], name: appNames[i] ?? appKeys[i] }
+      const linked = latestSwitchFor(appKeys[i])
+      if (linked) ref.linkedWindow = linked
+      refs.push(ref)
     }
     return refs
   }

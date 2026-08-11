@@ -390,6 +390,29 @@
   opacity: 0.7;
 }
 
+/* AI provider cards (settings → tasks): the summary row is the click-to-edit
+   target; the editor sheet appears below it while open. */
+.provider-summary {
+  border-radius: 8px;
+  margin: -3px -4px;
+  padding: 3px 4px;
+  transition: background 0.12s ease;
+}
+.provider-summary:hover,
+.provider-summary:focus-visible {
+  background: rgba(255, 255, 255, 0.05);
+}
+.provider-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
+}
+
 /* Sleek Minimalist Toggle Switch */
 .setting-toggle {
   flex-shrink: 0;

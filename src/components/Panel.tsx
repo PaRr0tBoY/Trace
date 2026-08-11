@@ -15,6 +15,7 @@ import { useStore } from '../store/appStore'
 import { PANEL_LEAVE_EVENT, PANEL_ENTER_EVENT } from '../hooks/useEdgeHover'
 import { Header } from './Header'
 import { ItemList } from './ItemList'
+import { SearchBar } from './SearchBar'
 import { Settings } from './Settings'
 import { TaskView } from './tasks/TaskView'
 import { FileListView } from './FileListView'
@@ -288,6 +289,8 @@ export function Panel() {
           style={{ height: panelHeightStr }}
         >
           <Header />
+
+          {!settingsOpen && view !== 'tasks' && <SearchBar />}
 
           <ToastStack />
           <AnimatePresence mode="wait">

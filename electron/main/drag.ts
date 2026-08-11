@@ -6,20 +6,23 @@
  * handler) so `event.sender` is the exact webContents that initiated the drag.
  * This ensures the OLE drag gesture flows correctly on Windows.
  *
- * Before dragging we stage the item's content as a temp file:
+ * Text items are dragged through a real OLE data object from the main
+ * process instead (see oleDrag.ts): a temp .txt would hand other apps a
+ * sanitized file rather than the copied text. For everything else we stage
+ * the item's content as a temp file:
  *   - image  -> <id>.png (its persisted bytes, copied to temp)
- *   - text   -> <id>.txt
  *   - files  -> the *original* file paths (drag the real thing, not a copy)
  *
  * The temp files are cleaned up on the next app start (see cleanTemp).
  */
 import { app, nativeImage, type WebContents } from 'electron'
 import { Resvg } from '@resvg/resvg-js'
-import { copyFileSync, writeFileSync, existsSync } from 'node:fs'
+import { copyFileSync, existsSync } from 'node:fs'
 import { join, extname } from 'node:path'
 import { PATHS } from '../store/paths'
 import type { DragRequest, ItemData } from '../../shared/types'
-import { getStore } from './state'
+import { THEME_ACCENTS } from '../../shared/themes'
+import { getStore, loadSettings } from './state'
 import { getFileKind } from '../../src/lib/fileType'
 
 /**
@@ -133,16 +136,9 @@ function stageDragFile(data: ItemData): Staged | null {
       if (!paths.length) return null
       return { file: paths[0], files: paths }
     }
-    case 'text': {
-      const id = `${Date.now().toString(36)}`
-      const dest = join(temp, `${id}.txt`)
-      try {
-        writeFileSync(dest, data.text, 'utf8')
-      } catch {
-        return null
-      }
-      return { file: dest }
-    }
+    default:
+      // Text never reaches staging: the IPC layer routes it to OLE drag-out.
+      return null
   }
 }
 
@@ -204,10 +200,6 @@ function dragIcon(data: ItemData): Electron.NativeImage {
       if (count === 0) return getFileDragIcon()
       return createFileStackDragIcon(data.paths)
     }
-
-    if (data.kind === 'text') {
-      return createTextDragIcon(data.text)
-    }
   } catch (err: any) {
     logDrag(`dragIcon exception: ${err?.stack || err}`)
   }
@@ -247,7 +239,10 @@ function createFileStackDragIcon(paths: string[]): Electron.NativeImage {
   if (count === 0) return getFileDragIcon()
 
   const kinds = paths.slice(0, 3).map((p) => getFileKind(p))
-  const cacheKey = `stack|solid-black|${kinds.map((k) => k.kind).join('-')}|${count}`
+  // clampSettings normalizes themeColor, so indexing is always valid.
+  const accentColor = THEME_ACCENTS[loadSettings().themeColor].color
+  // The accent is part of the key so a theme switch rebuilds the icon.
+  const cacheKey = `stack|${accentColor}|${kinds.map((k) => k.kind).join('-')}|${count}`
   const cached = iconCache.get(cacheKey)
   if (cached && !cached.isEmpty()) {
     logDrag(`createFileStackDragIcon returning cached for ${cacheKey}`)
@@ -274,7 +269,7 @@ function createFileStackDragIcon(paths: string[]): Electron.NativeImage {
   }
 
   const badgeSvg = count > 1 ? `
-    <circle cx="18" cy="18" r="14" fill="#FF3B30" stroke="#FFFFFF" stroke-width="2" />
+    <circle cx="18" cy="18" r="14" fill="${accentColor}" stroke="#FFFFFF" stroke-width="2" />
     <text x="18" y="23" font-family="sans-serif" font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">+${count}</text>
   ` : ''
 
@@ -300,74 +295,6 @@ function createFileStackDragIcon(paths: string[]): Electron.NativeImage {
     }
   } catch (err: any) {
     logDrag(`createFileStackDragIcon resvg error: ${err?.stack || err}`)
-  }
-  return getFileDragIcon()
-}
-
-function escapeXml(unsafe: string): string {
-  return unsafe.replace(/[<>&'"]/g, (c) => {
-    switch (c) {
-      case '<': return '&lt;'
-      case '>': return '&gt;'
-      case '&': return '&amp;'
-      case "'": return '&apos;'
-      case '"': return '&quot;'
-    }
-    return c
-  })
-}
-
-/** Generate a custom quote card PNG icon for text dragging. */
-function createTextDragIcon(text: string): Electron.NativeImage {
-  const cleaned = text.replace(/[\r\n]+/g, ' ').trim()
-  let line1 = cleaned.substring(0, 28)
-  let line2 = cleaned.substring(28, 56)
-  
-  if (cleaned.length > 28 && !cleaned.charAt(28).match(/\s/)) {
-    const lastSpace = line1.lastIndexOf(' ')
-    if (lastSpace > 15) {
-      line1 = cleaned.substring(0, lastSpace)
-      line2 = cleaned.substring(lastSpace + 1, lastSpace + 29)
-    }
-  }
-  if (cleaned.length > line1.length + line2.length) {
-    line2 = line2.replace(/.{3}$/, '...')
-  }
-
-  const defsSvg = `
-    <defs>
-      <clipPath id="textClip">
-        <rect x="48" y="0" width="200" height="72" />
-      </clipPath>
-    </defs>
-  `
-  
-  const width = 260
-  const height = 72
-  
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-    ${defsSvg}
-    <rect x="2" y="2" width="${width - 4}" height="${height - 4}" rx="12" fill="#000000" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" />
-    
-    <!-- Accent Icon -->
-    <svg x="14" y="24" width="24" height="24" viewBox="0 0 24 24">
-      ${getGlyphSvg('text', '#8E8E93')}
-    </svg>
-
-    <!-- Text Content -->
-    <g clip-path="url(#textClip)">
-      <text x="48" y="32" font-family="sans-serif" font-size="14" font-weight="600" fill="#FFFFFF">${escapeXml(line1)}</text>
-      ${line2 ? `<text x="48" y="52" font-family="sans-serif" font-size="13" font-weight="400" fill="#A0A0A5">${escapeXml(line2)}</text>` : ''}
-    </g>
-  </svg>`
-
-  try {
-    const resvg = new Resvg(svg, { fitTo: { mode: 'zoom', value: 2 } })
-    const pngData = resvg.render().asPng()
-    const img = nativeImage.createFromBuffer(pngData, { scaleFactor: 2 })
-    if (!img.isEmpty()) return img
-  } catch (err: any) {
-    logDrag(`createTextDragIcon exception: ${err?.stack || err}`)
   }
   return getFileDragIcon()
 }

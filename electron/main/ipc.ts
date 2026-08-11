@@ -16,6 +16,8 @@ import { getMainWindow } from './window'
 import { setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData } from './drag'
+import { startTextOleDrag } from './oleDrag'
+import { activateAppWindow } from './windowSwitch'
 import { clipboardSignature } from '../clipboard/formats'
 import { buildClipboardRef } from '../store/TaskStore'
 import { acceptWithResource } from './suggestionDrop'
@@ -220,6 +222,10 @@ export function registerIpc(): void {
 
   handle('task:suggest-title', (ctx: SuggestTitleContext) => {
     return getSuggestionEngine().suggestTitle(ctx)
+  })
+
+  handle('app:open-linked-window', (appRef) => {
+    return activateAppWindow(appRef)
   })
 
   /* --------------------------- suggestions --------------------------- */
@@ -661,12 +667,21 @@ export function registerSendListeners(): void {
     // dragged item appear to vanish ~0.5 s into any drag gesture.
     setHeartbeatPaused(true)
 
-    startDragOut(sender, data)
-    console.log('[IPC] start-drag returned, sending drag-end')
-    sender.send('item:drag-end')
+    try {
+      // Text cannot ride the DWM drag-out (transparent panel window), so it
+      // drags through a native OLE DoDragDrop from the main process instead.
+      if (data.kind === 'text') {
+        startTextOleDrag(data.text)
+      } else {
+        startDragOut(sender, data)
+      }
+    } finally {
+      console.log('[IPC] start-drag returned, sending drag-end')
+      sender.send('item:drag-end')
 
-    // Re-enable the heartbeat now that the drag is over.
-    setHeartbeatPaused(false)
+      // Re-enable the heartbeat now that the drag is over.
+      setHeartbeatPaused(false)
+    }
 
     // Workaround for Electron/Windows not firing drop events on the source window:
     // Check if the user dropped the item back onto our window!

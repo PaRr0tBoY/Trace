@@ -33,6 +33,8 @@ export interface EdgeApi {
   setInteractive: (value: boolean) => Promise<void>
   setPreviewMode: (active: boolean) => Promise<void>
   revealFile: (path: string) => Promise<boolean>
+  /** Switch to the app's linked window (ADR-0005); degrades to the app's current window, then launching the exe. */
+  openLinkedWindow: (app: import('./types').AppRef) => Promise<{ ok: boolean; method: 'window' | 'launch' }>
   minimizeWindow: () => Promise<void>
   getDisplays: () => Promise<import('./types').DisplayInfo[]>
   getReleases: () => Promise<Array<{

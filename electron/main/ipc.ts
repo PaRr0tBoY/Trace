@@ -9,7 +9,8 @@ import { app, ipcMain, clipboard, nativeImage } from 'electron'
 import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { psHost } from './powershell'
-import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel } from '../../shared/ipc'
+import { requestPanelFocus } from './focus'
+import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
 import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore } from './state'
 import { getMainWindow } from './window'
 import { setInteractive, setHeartbeatPaused, setHotZoneWidth } from './window'
@@ -208,6 +209,10 @@ export function registerIpc(): void {
     getTaskStore().unlinkItem(taskId, target)
     pushState.tasks()
     return getTaskStore().toDto()
+  })
+
+  handle('task:suggest-title', (ctx: SuggestTitleContext) => {
+    return getSuggestionEngine().suggestTitle(ctx)
   })
 
   /* --------------------------- suggestions --------------------------- */
@@ -577,6 +582,10 @@ function on<C extends SendChannel>(
 }
 
 export function registerSendListeners(): void {
+  on('ui:input-focus', () => {
+    requestPanelFocus()
+  })
+
   on('item:start-drag', (sender, req) => {
     console.log('[IPC] item:start-drag req=', JSON.stringify(req))
     const data = resolveDragData(req)

@@ -15,7 +15,8 @@ import type {
   InvokeChannel,
   InvokeResult,
   SendArgs,
-  SendChannel
+  SendChannel,
+  SuggestTitleContext
 } from '../../shared/ipc'
 import type { EdgeApi } from '../../shared/bridge'
 import type { DragRequest } from '../../shared/types'
@@ -115,6 +116,7 @@ const api = {
   minimizeWindow: () => invoke('window:minimize'),
   setInternalDrag: (active: boolean) => { internalDrag = active },
   broadcastTutorialStep: (step: number) => send('tutorial:set-step', step),
+  requestInputFocus: () => send('ui:input-focus'),
 
   /* Task domain */
   loadTasks: () => invoke('task:load'),
@@ -124,6 +126,7 @@ const api = {
   mergeTasks: (targetId: string, sourceId: string) => invoke('task:merge', targetId, sourceId),
   linkItemToTask: (taskId: string, itemId: string) => invoke('task:link-item', taskId, itemId),
   unlinkItemFromTask: (taskId: string, target: import('../../shared/types').UnlinkTarget) => invoke('task:unlink-item', taskId, target),
+  suggestTaskTitle: (ctx: SuggestTitleContext) => invoke('task:suggest-title', ctx),
 
   /* AI provider */
   testProvider: (config: import('../../shared/types').ProviderConfig) => invoke('ai:test-provider', config),

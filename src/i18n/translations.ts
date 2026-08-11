@@ -5,6 +5,7 @@ export interface TranslationKeys {
     links: string
     images: string
     files: string
+    tasks: string
   }
   tabs: {
     behaviour: string
@@ -288,6 +289,18 @@ export interface TranslationKeys {
     suggestionConfidence: string
     suggestionNearTasks: string
     suggestionBadge: string
+    suggestionEdit: string
+    windowTitles: string
+    confidence: string
+    createdReason: string
+    openApp: string
+    suggestTitle: string
+    suggestTitleWorking: string
+    suggestTitleFailed: string
+    saveZone: string
+    saveZoneHint: string
+    dragHint: string
+    suggestionCreated: string
   }
   memory: {
     sectionTitle: string
@@ -507,7 +520,8 @@ export const en: TranslationKeys = {
     "text": "Text",
     "links": "Links",
     "images": "Images",
-    "files": "Files"
+    "files": "Files",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Behaviour",
@@ -789,7 +803,19 @@ export const en: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -843,7 +869,8 @@ export const es: TranslationKeys = {
     "text": "Texto",
     "links": "Enlaces",
     "images": "Imágenes",
-    "files": "Archivos"
+    "files": "Archivos",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Comportamiento",
@@ -1125,7 +1152,19 @@ export const es: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -1179,7 +1218,8 @@ export const fr: TranslationKeys = {
     "text": "Texte",
     "links": "Liens",
     "images": "Images",
-    "files": "Fichiers"
+    "files": "Fichiers",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Comportement",
@@ -1461,7 +1501,19 @@ export const fr: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -1515,7 +1567,8 @@ export const de: TranslationKeys = {
     "text": "Text",
     "links": "Links",
     "images": "Bilder",
-    "files": "Dateien"
+    "files": "Dateien",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Verhalten",
@@ -1797,7 +1850,19 @@ export const de: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -1851,7 +1916,8 @@ export const it: TranslationKeys = {
     "text": "Testo",
     "links": "Link",
     "images": "Immagini",
-    "files": "File"
+    "files": "File",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Comportamento",
@@ -2133,7 +2199,19 @@ export const it: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -2187,7 +2265,8 @@ export const pt: TranslationKeys = {
     "text": "Texto",
     "links": "Links",
     "images": "Imagens",
-    "files": "Arquivos"
+    "files": "Arquivos",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Comportamento",
@@ -2469,7 +2548,19 @@ export const pt: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -2523,7 +2614,8 @@ export const ru: TranslationKeys = {
     "text": "Текст",
     "links": "Лінки",
     "images": "Фото",
-    "files": "Файлы"
+    "files": "Файлы",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Поведение",
@@ -2805,7 +2897,19 @@ export const ru: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -2859,7 +2963,8 @@ export const ja: TranslationKeys = {
     "text": "テキスト",
     "links": "リンク",
     "images": "画像",
-    "files": "ファイル"
+    "files": "ファイル",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "動作",
@@ -3141,7 +3246,19 @@ export const ja: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -3195,7 +3312,8 @@ export const ko: TranslationKeys = {
     "text": "텍스트",
     "links": "링크",
     "images": "이미지",
-    "files": "파일"
+    "files": "파일",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "동작",
@@ -3477,7 +3595,19 @@ export const ko: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -3531,7 +3661,8 @@ export const zhCN: TranslationKeys = {
     "text": "文本",
     "links": "链接",
     "images": "图片",
-    "files": "文件"
+    "files": "文件",
+    "tasks": "任务",
   },
   "tabs": {
     "behaviour": "行为",
@@ -3813,7 +3944,19 @@ export const zhCN: TranslationKeys = {
     "linkToast": "已添加到任务",
     "pinBackToast": "已复制并置顶",
     "dropBarHint": "拖到任务上",
-    "resourceHint": "可拖出到桌面，或点击复制到剪贴板"
+    "resourceHint": "可拖出到桌面，或点击复制到剪贴板",
+    "suggestionEdit": "编辑标题",
+    "windowTitles": "窗口",
+    "confidence": "置信度",
+    "createdReason": "创建原因",
+    "openApp": "打开应用",
+    "suggestTitle": "✨ AI 建议标题",
+    "suggestTitleWorking": "生成中…",
+    "suggestTitleFailed": "AI 标题建议失败",
+    "saveZone": "保存区",
+    "saveZoneHint": "拖入即存入剪贴板栈",
+    "dragHint": "拖到任务绑定，拖到备选创建任务",
+    "suggestionCreated": "已创建任务并绑定",
   },
 
   "memory": {
@@ -3867,7 +4010,8 @@ export const zhTW: TranslationKeys = {
     "text": "文字",
     "links": "連結",
     "images": "圖片",
-    "files": "檔案"
+    "files": "檔案",
+    "tasks": "任務",
   },
   "tabs": {
     "behaviour": "行為",
@@ -4149,7 +4293,19 @@ export const zhTW: TranslationKeys = {
     "linkToast": "已新增至任務",
     "pinBackToast": "已複製並置頂",
     "dropBarHint": "拖到任務上",
-    "resourceHint": "可拖出到桌面，或點擊複製到剪貼簿"
+    "resourceHint": "可拖出到桌面，或點擊複製到剪貼簿",
+    "suggestionEdit": "編輯標題",
+    "windowTitles": "視窗",
+    "confidence": "置信度",
+    "createdReason": "建立原因",
+    "openApp": "開啟應用",
+    "suggestTitle": "✨ AI 建議標題",
+    "suggestTitleWorking": "產生中…",
+    "suggestTitleFailed": "AI 標題建議失敗",
+    "saveZone": "儲存區",
+    "saveZoneHint": "拖入即存入剪貼板堆疊",
+    "dragHint": "拖到任務繫結，拖到備選建立任務",
+    "suggestionCreated": "已建立任務並繫結",
   },
 
   "memory": {
@@ -4203,7 +4359,8 @@ export const hi: TranslationKeys = {
     "text": "टेक्स्ट",
     "links": "लिंक",
     "images": "छवियाँ",
-    "files": "फ़ाइलें"
+    "files": "फ़ाइलें",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "व्यवहार",
@@ -4485,7 +4642,19 @@ export const hi: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -4539,7 +4708,8 @@ export const ar: TranslationKeys = {
     "text": "نص",
     "links": "روابط",
     "images": "صور",
-    "files": "ملفات"
+    "files": "ملفات",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "السلوك",
@@ -4821,7 +4991,19 @@ export const ar: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -4875,7 +5057,8 @@ export const bn: TranslationKeys = {
     "text": "টেক্সট",
     "links": "লিংক",
     "images": "ছবি",
-    "files": "ফাইল"
+    "files": "ফাইল",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "আচরণ",
@@ -5157,7 +5340,19 @@ export const bn: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -5211,7 +5406,8 @@ export const tr: TranslationKeys = {
     "text": "Metin",
     "links": "Bağlantılar",
     "images": "Görseller",
-    "files": "Dosyalar"
+    "files": "Dosyalar",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Davranış",
@@ -5493,7 +5689,19 @@ export const tr: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -5547,7 +5755,8 @@ export const vi: TranslationKeys = {
     "text": "Văn bản",
     "links": "Liên kết",
     "images": "Hình ảnh",
-    "files": "Tệp"
+    "files": "Tệp",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Hành vi",
@@ -5829,7 +6038,19 @@ export const vi: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -5883,7 +6104,8 @@ export const pl: TranslationKeys = {
     "text": "Tekst",
     "links": "Linki",
     "images": "Obrazy",
-    "files": "Pliki"
+    "files": "Pliki",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Zachowanie",
@@ -6165,7 +6387,19 @@ export const pl: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -6219,7 +6453,8 @@ export const nl: TranslationKeys = {
     "text": "Tekst",
     "links": "Links",
     "images": "Foto's",
-    "files": "Bestanden"
+    "files": "Bestanden",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Gedrag",
@@ -6501,7 +6736,19 @@ export const nl: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -6555,7 +6802,8 @@ export const sv: TranslationKeys = {
     "text": "Text",
     "links": "Länkar",
     "images": "Bilder",
-    "files": "Filer"
+    "files": "Filer",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Beteende",
@@ -6837,7 +7085,19 @@ export const sv: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -6891,7 +7151,8 @@ export const id: TranslationKeys = {
     "text": "Teks",
     "links": "Tautan",
     "images": "Gambar",
-    "files": "Berkas"
+    "files": "Berkas",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Perilaku",
@@ -7173,7 +7434,19 @@ export const id: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -7227,7 +7500,8 @@ export const uk: TranslationKeys = {
     "text": "Текст",
     "links": "Лінки",
     "images": "Фото",
-    "files": "Файли"
+    "files": "Файли",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Поведінка",
@@ -7509,7 +7783,19 @@ export const uk: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -7563,7 +7849,8 @@ export const el: TranslationKeys = {
     "text": "Κείμενο",
     "links": "Σύνδ.",
     "images": "Φωτό",
-    "files": "Αρχεία"
+    "files": "Αρχεία",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Συμπεριφορά",
@@ -7845,7 +8132,19 @@ export const el: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -7899,7 +8198,8 @@ export const cs: TranslationKeys = {
     "text": "Text",
     "links": "Odkazy",
     "images": "Fotky",
-    "files": "Soubory"
+    "files": "Soubory",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Chování",
@@ -8181,7 +8481,19 @@ export const cs: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -8235,7 +8547,8 @@ export const ro: TranslationKeys = {
     "text": "Text",
     "links": "Linkuri",
     "images": "Poze",
-    "files": "Fișiere"
+    "files": "Fișiere",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Comportament",
@@ -8517,7 +8830,19 @@ export const ro: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -8571,7 +8896,8 @@ export const hu: TranslationKeys = {
     "text": "Szöveg",
     "links": "Hivatkozások",
     "images": "Képek",
-    "files": "Fájlok"
+    "files": "Fájlok",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Viselkedés",
@@ -8853,7 +9179,19 @@ export const hu: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -8907,7 +9245,8 @@ export const da: TranslationKeys = {
     "text": "Tekst",
     "links": "Links",
     "images": "Billeder",
-    "files": "Filer"
+    "files": "Filer",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Adfærd",
@@ -9189,7 +9528,19 @@ export const da: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -9243,7 +9594,8 @@ export const fi: TranslationKeys = {
     "text": "Teksti",
     "links": "Linkit",
     "images": "Kuvat",
-    "files": "Tiedostot"
+    "files": "Tiedostot",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Toiminta",
@@ -9525,7 +9877,19 @@ export const fi: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -9579,7 +9943,8 @@ export const th: TranslationKeys = {
     "text": "ข้อความ",
     "links": "ลิงก์",
     "images": "รูปภาพ",
-    "files": "ไฟล์"
+    "files": "ไฟล์",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "พฤติกรรม",
@@ -9861,7 +10226,19 @@ export const th: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -9915,7 +10292,8 @@ export const he: TranslationKeys = {
     "text": "טקסט",
     "links": "קישורים",
     "images": "תמונות",
-    "files": "קבצים"
+    "files": "קבצים",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "התנהגות",
@@ -10197,7 +10575,19 @@ export const he: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {
@@ -10251,7 +10641,8 @@ export const no: TranslationKeys = {
     "text": "Tekst",
     "links": "Lenker",
     "images": "Bilder",
-    "files": "Filer"
+    "files": "Filer",
+    "tasks": "Tasks",
   },
   "tabs": {
     "behaviour": "Oppførsel",
@@ -10533,7 +10924,19 @@ export const no: TranslationKeys = {
     "linkToast": "Linked to task",
     "pinBackToast": "Copied & pinned to top",
     "dropBarHint": "Drop onto a task",
-    "resourceHint": "Drag out, or click to copy to clipboard"
+    "resourceHint": "Drag out, or click to copy to clipboard",
+    "suggestionEdit": "Edit title",
+    "windowTitles": "Windows",
+    "confidence": "Confidence",
+    "createdReason": "Created for",
+    "openApp": "Open app",
+    "suggestTitle": "✨ AI suggest title",
+    "suggestTitleWorking": "Generating…",
+    "suggestTitleFailed": "AI title suggestion failed",
+    "saveZone": "Save zone",
+    "saveZoneHint": "Drop to save into clipboard shelf",
+    "dragHint": "Drop on a task to link it, on a suggestion to create one",
+    "suggestionCreated": "Task created and linked",
   },
 
   "memory": {

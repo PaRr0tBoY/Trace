@@ -7,7 +7,7 @@
  */
 import type { Settings, Suggestion, TaskDto, TaskPatch, UnlinkTarget } from './types'
 import type { DragRequest, ProviderConfig } from './types'
-import type { OllamaDetectionResult, ProviderTestResult } from './ipc'
+import type { OllamaDetectionResult, ProviderTestResult, SuggestTitleContext } from './ipc'
 
 export interface EdgeApi {
   /* Renderer -> Main */
@@ -44,6 +44,8 @@ export interface EdgeApi {
   }>>
   setInternalDrag: (active: boolean) => void
   broadcastTutorialStep: (step: number) => void
+  /** Give the panel window keyboard focus (only called when an input is focused). */
+  requestInputFocus: () => void
 
   /* Task domain */
   loadTasks: () => Promise<TaskDto[]>
@@ -53,6 +55,7 @@ export interface EdgeApi {
   mergeTasks: (targetId: string, sourceId: string) => Promise<TaskDto[]>
   linkItemToTask: (taskId: string, itemId: string) => Promise<TaskDto[]>
   unlinkItemFromTask: (taskId: string, target: UnlinkTarget) => Promise<TaskDto[]>
+  suggestTaskTitle: (ctx: SuggestTitleContext) => Promise<string[] | null>
 
   /* AI provider */
   testProvider: (config: ProviderConfig) => Promise<ProviderTestResult>

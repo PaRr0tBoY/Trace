@@ -29,6 +29,19 @@ export interface OllamaDetectionResult {
   error?: string
 }
 
+/**
+ * Context for one AI title suggestion (task:suggest-title): whatever the
+ * renderer knows about the task being created/edited. All fields optional;
+ * main decides how much it can use.
+ */
+export interface SuggestTitleContext {
+  title?: string
+  note?: string
+  appNames: string[]
+  /** Short previews of linked resources (text head / file names / image summary). */
+  resourcePreviews: string[]
+}
+
 /* ------------------------------------------------------------------ */
 /* Renderer -> Main  (ipcMain.handle / ipcRenderer.invoke)            */
 /* ------------------------------------------------------------------ */
@@ -127,6 +140,12 @@ export interface InvokeMap {
   /** Unlink a resource from a task (clipboard by itemId, files by exact path list). */
   'task:unlink-item': { args: [taskId: string, target: UnlinkTarget]; result: TaskDto[] }
 
+  /**
+   * Ask the provider chain for 1-3 title candidates for a task being created
+   * or edited. Returns null when no provider is configured or the chain fails.
+   */
+  'task:suggest-title': { args: [ctx: SuggestTitleContext]; result: string[] | null }
+
   /* --------------------------- ai provider --------------------------- */
 
   /** Test a provider connection (one 1-token chat completion). */
@@ -214,6 +233,12 @@ export interface SendMap {
   'item:start-drag': { args: [req: DragRequest] }
   /** Synchronize tutorial step */
   'tutorial:set-step': { args: [step: number] }
+  /**
+   * A panel input just gained focus; main gives the panel window keyboard
+   * focus via user32 SetFocus (window is focusable:false, so it never
+   * activates; only explicit input clicks steal the keyboard).
+   */
+  'ui:input-focus': { args: [] }
 }
 
 /* ------------------------------------------------------------------ */

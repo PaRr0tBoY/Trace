@@ -234,11 +234,16 @@ export interface SendMap {
   /** Synchronize tutorial step */
   'tutorial:set-step': { args: [step: number] }
   /**
-   * A panel input just gained focus; main gives the panel window keyboard
-   * focus via user32 SetFocus (window is focusable:false, so it never
-   * activates; only explicit input clicks steal the keyboard).
+   * A panel input just gained focus; main activates the panel window so
+   * Chromium forwards keyboard input (window is focusable:false, so it never
+   * activates on its own; only explicit input clicks steal the keyboard).
    */
   'ui:input-focus': { args: [] }
+  /**
+   * A panel input just lost focus; main restores WS_EX_NOACTIVATE so plain
+   * clicks (cards, buttons, tabs) never activate the panel again.
+   */
+  'ui:input-blur': { args: [] }
 }
 
 /* ------------------------------------------------------------------ */

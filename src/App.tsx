@@ -92,18 +92,27 @@ export default function App() {
 
   // The panel window is created focusable:false (upstream legacy), so clicking
   // an input never hands the renderer keyboard focus. Whenever an editable
-  // element gains focus, ask main to SetFocus the window (user32) so keystrokes
-  // land here instead of the previously active app. Mounted only in App — the
-  // onboarding window is a normal focusable window and needs no such nudge.
+  // element gains focus, ask main to activate the window (user32: strip
+  // WS_EX_NOACTIVATE + SetForegroundWindow) so keystrokes land here instead of
+  // the previously active app; on blur, ask main to restore WS_EX_NOACTIVATE so
+  // plain clicks (cards, buttons, tabs) never activate the panel. Mounted only
+  // in App — the onboarding window is a normal focusable window and needs none
+  // of this.
   useEffect(() => {
+    const isEditable = (target: EventTarget | null): target is HTMLElement =>
+      target instanceof HTMLElement && target.matches('input, textarea, [contenteditable]')
     const onFocusIn = (e: FocusEvent) => {
-      const target = e.target
-      if (target instanceof HTMLElement && target.matches('input, textarea, [contenteditable]')) {
-        edge.requestInputFocus()
-      }
+      if (isEditable(e.target)) edge.requestInputFocus()
+    }
+    const onFocusOut = (e: FocusEvent) => {
+      if (isEditable(e.target)) edge.requestInputBlur()
     }
     document.addEventListener('focusin', onFocusIn, true)
-    return () => document.removeEventListener('focusin', onFocusIn, true)
+    document.addEventListener('focusout', onFocusOut, true)
+    return () => {
+      document.removeEventListener('focusin', onFocusIn, true)
+      document.removeEventListener('focusout', onFocusOut, true)
+    }
   }, [])
 
   // Apply theme whenever settings change.

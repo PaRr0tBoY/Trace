@@ -9,7 +9,7 @@ import { app, ipcMain, clipboard, nativeImage } from 'electron'
 import { existsSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { psHost } from './powershell'
-import { requestPanelFocus } from './focus'
+import { requestPanelFocus, releasePanelFocus } from './focus'
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
 import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore } from './state'
 import { getMainWindow } from './window'
@@ -584,6 +584,10 @@ function on<C extends SendChannel>(
 export function registerSendListeners(): void {
   on('ui:input-focus', () => {
     requestPanelFocus()
+  })
+
+  on('ui:input-blur', () => {
+    releasePanelFocus()
   })
 
   on('item:start-drag', (sender, req) => {

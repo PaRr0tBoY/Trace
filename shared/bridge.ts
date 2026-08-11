@@ -44,8 +44,10 @@ export interface EdgeApi {
   }>>
   setInternalDrag: (active: boolean) => void
   broadcastTutorialStep: (step: number) => void
-  /** Give the panel window keyboard focus (only called when an input is focused). */
+  /** Activate the panel window for keyboard input (only called while an input is focused). */
   requestInputFocus: () => void
+  /** Restore the panel to non-activatable after the input lost focus. */
+  requestInputBlur: () => void
 
   /* Task domain */
   loadTasks: () => Promise<TaskDto[]>

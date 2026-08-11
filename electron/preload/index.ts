@@ -117,6 +117,7 @@ const api = {
   setInternalDrag: (active: boolean) => { internalDrag = active },
   broadcastTutorialStep: (step: number) => send('tutorial:set-step', step),
   requestInputFocus: () => send('ui:input-focus'),
+  requestInputBlur: () => send('ui:input-blur'),
 
   /* Task domain */
   loadTasks: () => invoke('task:load'),

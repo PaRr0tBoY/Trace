@@ -14,7 +14,13 @@
  *   3. Context-prior (spec 实现决策 7): confirmed project/workflow memories
  *      matching a segment nudge its confidence up and travel as
  *      memoryContext into the LLM annotation.
- *   4. LLM annotation — only for low-confidence and new-candidate
+ *   4. LLM annotation — for every built suggestion (bounded by
+ *      MAX_LLM_CANDIDATES): title + rationale, never the attribution
+ *      decision. One batched call for the whole analysis; an OCR pass on the
+ *      foreground window (t30) may add screen text as ocrContext when a
+ *      provider is available. When no provider is configured or the chain
+ *      fails, the pass degrades silently to pure algorithm: temporary titles
+ *      like "Code + Chrome task", no rationale.
  *      suggestions, and only for title + rationale (never the attribution
  *      decision). One batched call for the whole analysis; when no provider
  *      is configured or the chain fails, the pass degrades silently to pure
@@ -38,6 +44,7 @@
  */
 import { clusterEvents, type ClusterParams } from './clusterer'
 import type { ChatRequest, ChatResult } from './provider'
+import type { SuggestTitleContext } from '../../shared/ipc'
 import { createId } from '../store/ids'
 import { suggestionSignature, type IgnoredTable } from './ignored'
 import type { TaskStore } from '../store/TaskStore'
@@ -125,6 +132,12 @@ export interface SuggestionSettings {
 /** Chat surface of the provider chain (injected; absent = algorithmic only). */
 export type ChatFn = (req: ChatRequest) => Promise<ChatResult>
 
+/**
+ * OCR capture of the foreground window (t30). Returns recognized text or
+ * null; absent = the analysis runs without OCR context. Never throws.
+ */
+export type OcrFn = () => Promise<string | null>
+
 export interface SuggestionEngineOptions {
   now: () => number
   /** Ring-buffer read (eventBus.recentEvents in prod). */
@@ -180,11 +193,20 @@ export interface SuggestionEngine {
   ignore(id: string): boolean
   /** Wire the provider chain after construction (index.ts). */
   setChat(chat: ChatFn): void
+  /** Wire the OCR capture after construction (index.ts); optional, silent when absent. */
+  setOcr(ocr: OcrFn): void
+  /**
+   * Ask the provider chain for 1-3 title candidates for a task draft
+   * (task:suggest-title). Null when no provider is configured, the chain
+   * fails, or the reply doesn't validate.
+   */
+  suggestTitle(ctx: SuggestTitleContext): Promise<string[] | null>
 }
 
 export function createSuggestionEngine(options: SuggestionEngineOptions): SuggestionEngine {
   const { now, readEvents, store, getSettings, ignored, onSuggestions } = options
   let chat: ChatFn | undefined = options.chat
+  let ocr: OcrFn | undefined = undefined
   let running = false
   let analyzing = false
   /** Max event ts covered by the last analysis; only newer events re-trigger. */
@@ -223,8 +245,11 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
     return overlaps.length > 0 ? `${basis}; also near ${overlaps.join(', ')}` : basis
   }
 
-  /** Batched LLM annotation for low-confidence + new-candidate suggestions. */
-  async function annotateWithLlm(candidates: Array<{ suggestion: Suggestion; meta: SuggestionMeta }>): Promise<boolean> {
+  /** Batched LLM annotation for the built suggestions (bounded by MAX_LLM_CANDIDATES). */
+  async function annotateWithLlm(
+    candidates: Array<{ suggestion: Suggestion; meta: SuggestionMeta }>,
+    ocrText: string | null
+  ): Promise<boolean> {
     if (!chat || candidates.length === 0) return false
     const segments = candidates.map((c) => ({
       apps: c.suggestion.appNames,
@@ -233,6 +258,9 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       ...(c.meta.memoryContext.length > 0 ? { memoryContext: c.meta.memoryContext } : {}),
       similarTasks: c.suggestion.evidence.overlappingTasks
     }))
+    // OCR screen text (t30) rides alongside the segments; omitted when absent.
+    const payload: Record<string, unknown> = { segments }
+    if (ocrText && ocrText.length > 0) payload.ocrContext = ocrText
     const req: ChatRequest = {
       messages: [
         {
@@ -242,9 +270,11 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
             '{"items": [{"title": "...", "reason": "..."}]}, one item per segment in the same order. ' +
             'title: a concise task title, at most 8 words, no quotes, written in the same language as the window titles. ' +
             'When a segment has "memoryContext", prefer those familiar phrases in the title when they fit. ' +
+            'When the payload carries "ocrContext" (OCR text of the foreground screen during the session), ' +
+            'use it to disambiguate what the user was doing. ' +
             'reason: one plain sentence explaining what this session looks like.'
         },
-        { role: 'user', content: `Segments: ${JSON.stringify(segments)}` }
+        { role: 'user', content: `Segments: ${JSON.stringify(payload)}` }
       ],
       schema: {
         type: 'object',
@@ -291,13 +321,28 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
     return trimmed.length > max ? trimmed.slice(0, max) : trimmed
   }
 
+  /** One OCR attempt for the analysis; silent on any failure. */
+  async function runOcrOnce(): Promise<string | null> {
+    if (!ocr) return null
+    try {
+      const text = await ocr()
+      return typeof text === 'string' && text.length > 0 ? text : null
+    } catch (err) {
+      console.log(`[Ocr] capture failed: ${err instanceof Error ? err.message : String(err)}`)
+      return null
+    }
+  }
+
   /** One analysis pass: cluster the new batch, dedupe, annotate, push. */
   async function runAnalysis(newEvents: AppSwitchEvent[]): Promise<Suggestion[]> {
     analyzing = true
     try {
       const settings = getSettings()
       const tasks = [...store.list()]
-      const result = await clusterEvents(newEvents, tasks, buildParams(settings))
+      const [result, ocrText] = await Promise.all([
+        clusterEvents(newEvents, tasks, buildParams(settings)),
+        runOcrOnce()
+      ])
 
       const built: Array<{ suggestion: Suggestion; meta: SuggestionMeta }> = []
       for (const attr of result.attributions) {
@@ -307,10 +352,15 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         if (ignored.has(signature)) continue
 
         const target = attr.taskId ? tasks.find((t) => t.id === attr.taskId) : undefined
+        // exePaths are the segment's identity keys (lowercase exePath,
+        // fallback appName), index-aligned with appNames — t26 fetches icons
+        // from them at push time.
+        const appExePaths = attr.segment.appKeys.slice(0, 5)
         const suggestion: Suggestion = {
           id: `s_${createId()}`,
           title: target ? target.title : algorithmicTitle(attr.segment.appNames),
           appNames: attr.segment.appNames.slice(0, 5),
+          appExePaths,
           confidence: attr.confidence,
           lowConfidence: attr.zone === 'low',
           algorithmReason: algorithmReason(attr, target),
@@ -338,17 +388,20 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         }
       }
 
-      const llmCandidates = built.filter((b) => b.suggestion.taskId === undefined || b.suggestion.lowConfidence)
-      const llmOk = llmCandidates.length > 0 ? await annotateWithLlm(llmCandidates.slice(0, MAX_LLM_CANDIDATES)) : false
+      // All built suggestions go through the LLM (bounded); algorithmic titles
+      // are only the no-AI fallback.
+      const llmCandidates = built.slice(0, MAX_LLM_CANDIDATES)
+      const llmOk = llmCandidates.length > 0 ? await annotateWithLlm(llmCandidates, ocrText) : false
 
       pending = built.map((b) => b.suggestion)
       meta.clear()
       for (const b of built) meta.set(b.suggestion.id, b.meta)
       lastAnalyzedTs = newEvents.length > 0 ? newEvents[newEvents.length - 1].ts : lastAnalyzedTs
 
-      const mode = llmCandidates.length === 0 ? 'algorithm' : llmOk ? 'llm' : 'algorithm'
+      const mode = llmOk ? 'llm' : 'algorithm'
+      const ocrNote = ocrText ? `, ocr: ${ocrText.length} chars` : ''
       console.log(
-        `[Suggestion] analysis: ${newEvents.length} events -> ${result.attributions.length} segments -> ${pending.length} suggestions (mode: ${mode})`
+        `[Suggestion] analysis: ${newEvents.length} events -> ${result.attributions.length} segments -> ${pending.length} suggestions (mode: ${mode}${ocrNote})`
       )
       onSuggestions(pending)
       return pending
@@ -435,6 +488,59 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
     },
     setChat(fn: ChatFn): void {
       chat = fn
+    },
+    setOcr(fn: OcrFn): void {
+      ocr = fn
+    },
+    async suggestTitle(ctx: SuggestTitleContext): Promise<string[] | null> {
+      if (!chat) return null
+      // Only the fields the draft actually carries travel to the provider.
+      const details: Record<string, unknown> = {}
+      if (ctx.title && ctx.title.trim().length > 0) details.title = ctx.title.trim()
+      if (ctx.note && ctx.note.trim().length > 0) details.note = ctx.note.trim()
+      if (ctx.appNames.length > 0) details.appNames = ctx.appNames
+      if (ctx.resourcePreviews.length > 0) details.resourcePreviews = ctx.resourcePreviews
+      const req: ChatRequest = {
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You suggest titles for a task tracker. Given a task draft, reply with JSON only: ' +
+              '{"titles": ["...", "..."]} with 1 to 3 concise titles, at most 8 words each, no quotes, ' +
+              'written in the same language as the draft. The first title is the best; every candidate must be distinct.'
+          },
+          { role: 'user', content: `Task: ${JSON.stringify(details)}` }
+        ],
+        schema: {
+          type: 'object',
+          properties: { titles: { type: 'array', items: { type: 'string' } } },
+          required: ['titles']
+        },
+        maxTokens: 200,
+        timeoutMs: LLM_TIMEOUT_MS
+      }
+
+      let result: ChatResult
+      try {
+        result = await chat(req)
+      } catch (err) {
+        console.log(`[Suggestion] title suggestion failed: ${err instanceof Error ? err.message : String(err)}`)
+        return null
+      }
+      if (!result.ok || !result.parsed || typeof result.parsed !== 'object' || Array.isArray(result.parsed)) return null
+      const parsed = result.parsed as { titles?: unknown }
+      if (!Array.isArray(parsed.titles)) return null
+
+      const seen = new Set<string>()
+      const titles: string[] = []
+      for (const raw of parsed.titles) {
+        const title = sanitizeString(raw, MAX_TITLE_CHARS)
+        if (title.length === 0 || seen.has(title.toLowerCase())) continue
+        seen.add(title.toLowerCase())
+        titles.push(title)
+        if (titles.length >= 3) break
+      }
+      return titles.length > 0 ? titles : null
     }
   }
 }

@@ -889,6 +889,34 @@
 .task-editor-textarea::placeholder {
   color: rgba(255, 255, 255, 0.35);
 }
+.task-editor-title-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.task-editor-title-row .task-editor-input {
+  flex: 1;
+  min-width: 0;
+}
+.task-editor-suggest {
+  flex-shrink: 0;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.12);
+  color: #a78bfa;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: calc(11px * var(--font-scale, 1));
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.task-editor-suggest:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.22);
+}
+.task-editor-suggest:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
 .task-editor-actions {
   display: flex;
   justify-content: flex-end;

@@ -23,7 +23,7 @@ import { runtime } from './config'
 import { queryForegroundSnapshot } from './foreground'
 import { emit, recentEvents } from './eventBus'
 import { buildClipboardEvent, decideClipboardAttribution } from './attributor'
-import { createSuggestionEngine, TICK_INTERVAL_MS, type ChatFn, type SuggestionEngine } from './suggestionEngine'
+import { createSuggestionEngine, TICK_INTERVAL_MS, type ChatFn, type OcrFn, type SuggestionEngine } from './suggestionEngine'
 import { createIgnoredTable } from './ignored'
 
 const store = new ItemStore()
@@ -350,6 +350,11 @@ export function getSuggestionEngine(): SuggestionEngine {
 /** Wire the provider chain into the engine (index.ts, after registerIpc). */
 export function setSuggestionChat(chat: ChatFn): void {
   getSuggestionEngine().setChat(chat)
+}
+
+/** Wire the OCR capture into the engine (index.ts, after registerIpc). */
+export function setSuggestionOcr(ocrFn: OcrFn): void {
+  getSuggestionEngine().setOcr(ocrFn)
 }
 
 /** Push updates to all open windows (main window, onboarding window, etc.). */

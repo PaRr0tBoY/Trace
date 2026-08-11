@@ -15,10 +15,11 @@ import { createWindow, getMainWindow, setInteractive, setVisible, startCursorPol
 import { createTray, registerIncognitoApplier } from './tray'
 import { registerIpc, registerSendListeners, getProviderChain } from './ipc'
 import { prewarmDragIcons } from './drag'
-import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushState, stopStateTimers, setSuggestionChat } from './state'
+import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushState, stopStateTimers, setSuggestionChat, setSuggestionOcr } from './state'
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
 import { ForegroundWatcher } from './foreground'
+import { ocrFromForeground } from './ocr'
 import { createAttributor, type Attributor } from './attributor'
 import { subscribe as subscribeEvents } from './eventBus'
 import { extname, normalize } from 'node:path'
@@ -122,6 +123,9 @@ app.whenReady().then(() => {
   // engine's singletons exist; the 30s+ silence floor guarantees the chain is
   // in place long before any analysis can trigger).
   setSuggestionChat((req) => getProviderChain().callChat(req))
+  // OCR context for LLM annotations (t30): one capture per analysis trigger,
+  // silent degradation — the engine treats it as optional input.
+  setSuggestionOcr(ocrFromForeground)
 
   // Reflect settings immediately.
   let settings = loadSettings()

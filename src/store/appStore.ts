@@ -8,6 +8,7 @@
  */
 import { create } from 'zustand'
 import { edge } from '../lib/edge'
+import type { SuggestTitleContext } from '../../shared/ipc'
 import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, Suggestion, MemoryAction, MemoryListPayload } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 
@@ -106,6 +107,8 @@ interface AppState {
   /* suggestion actions (delegate to main; pending list comes back via event) */
   acceptSuggestion: (id: string, titleOverride?: string) => Promise<void>
   ignoreSuggestion: (id: string) => Promise<void>
+  /** Ask the provider chain for 1-3 title candidates for a task draft (null = no AI/failure). */
+  suggestTaskTitle: (ctx: SuggestTitleContext) => Promise<string[] | null>
 
   /* memory panel (delegate to main; the refreshed buckets come back) */
   memories: MemoryListPayload | null
@@ -329,6 +332,10 @@ export const useStore = create<AppState>((set, get) => ({
 
   async ignoreSuggestion(id) {
     await edge.ignoreSuggestion(id)
+  },
+
+  async suggestTaskTitle(ctx) {
+    return edge.suggestTaskTitle(ctx)
   },
 
   memories: null,

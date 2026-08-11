@@ -229,8 +229,8 @@ describe('context-prior in the engine (boost + LLM input)', () => {
     await trigger(h, singleTitleBatch('cad agent'))
 
     const userMsg = (h.chat as ReturnType<typeof vi.fn>).mock.calls[0][0].messages[1].content as string
-    const parsed = JSON.parse(userMsg.slice('Segments: '.length)) as Array<{ memoryContext?: string[] }>
-    expect(parsed[0].memoryContext).toEqual(['CAD Agent'])
+    const parsed = JSON.parse(userMsg.slice('Segments: '.length)) as { segments: Array<{ memoryContext?: string[] }> }
+    expect(parsed.segments[0].memoryContext).toEqual(['CAD Agent'])
   })
 
   it('omits memoryContext when nothing matched', async () => {
@@ -248,8 +248,8 @@ describe('context-prior in the engine (boost + LLM input)', () => {
     await trigger(h, batch())
 
     const userMsg = (h.chat as ReturnType<typeof vi.fn>).mock.calls[0][0].messages[1].content as string
-    const parsed = JSON.parse(userMsg.slice('Segments: '.length)) as Array<{ memoryContext?: string[] }>
-    expect(parsed[0].memoryContext).toBeUndefined()
+    const parsed = JSON.parse(userMsg.slice('Segments: '.length)) as { segments: Array<{ memoryContext?: string[] }> }
+    expect(parsed.segments[0].memoryContext).toBeUndefined()
   })
 })
 

@@ -166,6 +166,8 @@ describe('analysis output', () => {
     expect(s.title).toBe(ALGO_TITLE)
     expect(s.lowConfidence).toBe(false) // no candidate at all -> 'new' zone, not the low band
     expect(s.appNames).toEqual(['Chrome', 'Code'])
+    // appExePaths parallel appNames (t28 fills them for t26's icon fetch).
+    expect(s.appExePaths).toEqual(['c:/apps/chrome.exe', 'c:/apps/code.exe'])
     expect(s.algorithmReason).toContain('New activity pattern')
     expect(s.reason).toBeUndefined()
   })
@@ -357,18 +359,23 @@ describe('LLM annotation and degradation', () => {
     expect(s.reason).toBeUndefined()
   })
 
-  it('does not call the LLM for high-confidence merges', async () => {
+  it('annotates high-confidence merges too (all built candidates go to the LLM)', async () => {
     const h = makeHarness()
     h.store.create('Writing report', {
       apps: [{ id: 'c:/apps/code.exe', name: 'Code' }, { id: 'c:/apps/chrome.exe', name: 'Chrome' }]
     })
-    h.chat = vi.fn(async () => ({ ok: true, content: 'x', parsed: { items: [] } })) as unknown as ChatFn
+    h.chat = vi.fn(async () => ({
+      ok: true,
+      content: '{"items":[{"title":"LLM merge title","reason":"r"}]}',
+      parsed: { items: [{ title: 'LLM merge title', reason: 'r' }] }
+    })) as unknown as ChatFn
     h.engine.setChat(h.chat)
     h.engine.start()
     await trigger(h, batch())
     const [s] = h.pushed[0]
     expect(s.lowConfidence).toBe(false)
-    expect(h.chat).not.toHaveBeenCalled()
+    expect(h.chat).toHaveBeenCalledOnce()
+    expect(s.title).toBe('LLM merge title')
   })
 
   it('sanitizes malformed LLM payloads (garbage dropped)', async () => {
@@ -384,5 +391,150 @@ describe('LLM annotation and degradation', () => {
     const [s] = h.pushed[0]
     expect(s.title).toBe(ALGO_TITLE)
     expect(s.reason).toBeUndefined()
+  })
+})
+
+describe('suggestTitle (task:suggest-title)', () => {
+  const ctx = {
+    title: 'draft',
+    note: 'polish the CAD drawings',
+    appNames: ['Code', 'Chrome'],
+    resourcePreviews: ['report.md']
+  }
+
+  it('returns 1-3 sanitized candidates when the chain succeeds', async () => {
+    const h = makeHarness()
+    h.chat = vi.fn(async () => ({
+      ok: true,
+      content: 'x',
+      parsed: { titles: ['Finish CAD drawings', '   ', 'CAD polish', 'CAD polish', 'A very long title that exceeds the sixty character cap for a suggestion title and should be cut', 'Extra'] }
+    })) as unknown as ChatFn
+    h.engine.setChat(h.chat)
+    const titles = await h.engine.suggestTitle(ctx)
+    expect(titles).toEqual(['Finish CAD drawings', 'CAD polish', 'A very long title that exceeds the sixty character cap for a']) // 去空、去重、截断、上限 3
+    const req = (h.chat as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(JSON.parse(req.messages[1].content.slice('Task: '.length))).toEqual({
+      title: 'draft',
+      note: 'polish the CAD drawings',
+      appNames: ['Code', 'Chrome'],
+      resourcePreviews: ['report.md']
+    })
+  })
+
+  it('returns null without a provider', async () => {
+    const h = makeHarness()
+    expect(await h.engine.suggestTitle(ctx)).toBeNull()
+  })
+
+  it('returns null when the chain reports failure', async () => {
+    const h = makeHarness()
+    h.chat = vi.fn(async () => ({ ok: false, error: 'all providers failed', attempts: [] })) as unknown as ChatFn
+    h.engine.setChat(h.chat)
+    expect(await h.engine.suggestTitle(ctx)).toBeNull()
+  })
+
+  it('returns null when the chain throws', async () => {
+    const h = makeHarness()
+    h.chat = vi.fn(async () => {
+      throw new Error('network down')
+    }) as unknown as ChatFn
+    h.engine.setChat(h.chat)
+    expect(await h.engine.suggestTitle(ctx)).toBeNull()
+  })
+
+  it('returns null when the reply fails validation', async () => {
+    const h = makeHarness()
+    for (const parsed of [null, { nope: [] }, { titles: 'x' }, { titles: [] }, { titles: ['   '] }]) {
+      h.chat = vi.fn(async () => ({ ok: true, content: 'x', parsed })) as unknown as ChatFn
+      h.engine.setChat(h.chat)
+      expect(await h.engine.suggestTitle(ctx)).toBeNull()
+    }
+  })
+
+  it('omits empty draft fields from the request', async () => {
+    const h = makeHarness()
+    h.chat = vi.fn(async () => ({
+      ok: true,
+      content: 'x',
+      parsed: { titles: ['Only app names'] }
+    })) as unknown as ChatFn
+    h.engine.setChat(h.chat)
+    const titles = await h.engine.suggestTitle({ title: '', note: '  ', appNames: ['Code'], resourcePreviews: [] })
+    expect(titles).toEqual(['Only app names'])
+    const req = (h.chat as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(JSON.parse(req.messages[1].content.slice('Task: '.length))).toEqual({ appNames: ['Code'] })
+  })
+})
+
+describe('OCR context in LLM annotation (t30)', () => {
+  it('includes foreground OCR text in the LLM request when available', async () => {
+    const h = makeHarness()
+    h.chat = vi.fn(async () => ({
+      ok: true,
+      content: 'x',
+      parsed: { items: [{ title: 'OCR-aware', reason: 'r' }] }
+    })) as unknown as ChatFn
+    const ocr = vi.fn(async () => '装配图纸 检查清单 final-v3')
+    h.engine.setChat(h.chat)
+    h.engine.setOcr(ocr as unknown as OcrFn)
+    h.engine.start()
+    await trigger(h, batch())
+    expect(ocr).toHaveBeenCalledOnce()
+    const req = (h.chat as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    const payload = JSON.parse(req.messages[1].content.slice('Segments: '.length))
+    expect(payload.ocrContext).toBe('装配图纸 检查清单 final-v3')
+    expect(Array.isArray(payload.segments)).toBe(true)
+  })
+
+  it('omits ocrContext when OCR returns null', async () => {
+    const h = makeHarness()
+    h.chat = vi.fn(async () => ({
+      ok: true,
+      content: 'x',
+      parsed: { items: [{ title: 'No OCR', reason: 'r' }] }
+    })) as unknown as ChatFn
+    h.engine.setChat(h.chat)
+    h.engine.setOcr((async () => null) as unknown as OcrFn)
+    h.engine.start()
+    await trigger(h, batch())
+    const req = (h.chat as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    const payload = JSON.parse(req.messages[1].content.slice('Segments: '.length))
+    expect(payload.ocrContext).toBeUndefined()
+    expect(Array.isArray(payload.segments)).toBe(true)
+  })
+
+  it('degrades silently when OCR throws', async () => {
+    const h = makeHarness()
+    h.chat = vi.fn(async () => ({
+      ok: true,
+      content: 'x',
+      parsed: { items: [{ title: 'Still works', reason: 'r' }] }
+    })) as unknown as ChatFn
+    h.engine.setChat(h.chat)
+    h.engine.setOcr((async () => {
+      throw new Error('ocr engine unavailable')
+    }) as unknown as OcrFn)
+    h.engine.start()
+    await trigger(h, batch())
+    const [s] = h.pushed[0]
+    expect(s.title).toBe('Still works')
+    const req = (h.chat as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    const payload = JSON.parse(req.messages[1].content.slice('Segments: '.length))
+    expect(payload.ocrContext).toBeUndefined()
+  })
+
+  it('runs without OCR wired (no ocrContext, no errors)', async () => {
+    const h = makeHarness()
+    h.chat = vi.fn(async () => ({
+      ok: true,
+      content: 'x',
+      parsed: { items: [{ title: 'Plain', reason: 'r' }] }
+    })) as unknown as ChatFn
+    h.engine.setChat(h.chat)
+    h.engine.start()
+    await trigger(h, batch())
+    const req = (h.chat as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    const payload = JSON.parse(req.messages[1].content.slice('Segments: '.length))
+    expect(payload.ocrContext).toBeUndefined()
   })
 })

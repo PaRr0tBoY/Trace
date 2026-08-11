@@ -98,7 +98,7 @@ export function TaskEditor({ task, onSave, onCancel }: Props) {
           disabled={!hasProvider || suggesting}
           onClick={suggestTitle}
         >
-          ✨ {suggesting ? t('tasks.suggestTitleWorking') : t('tasks.suggestTitle')}
+          {suggesting ? t('tasks.suggestTitleWorking') : t('tasks.suggestTitle')}
         </button>
       </div>
       <textarea

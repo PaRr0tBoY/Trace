@@ -1,7 +1,7 @@
 /** Panel header: title + settings toggle. */
 import { motion } from 'framer-motion'
 import { useStore } from '../store/appStore'
-import { GearIcon, CloseIcon, InfoIcon, TaskIcon } from './icons'
+import { GearIcon, CloseIcon, InfoIcon } from './icons'
 import { playButtonClickSound } from '../lib/soundEffects'
 import { taskBadgeCount } from '../lib/taskGroups'
 
@@ -41,17 +41,27 @@ export function Header() {
   const typeFilter = useStore((s) => s.typeFilter)
   const setTypeFilter = useStore((s) => s.setTypeFilter)
 
-  const FILTERS: { id: import('../../shared/types').TypeFilter; label: string }[] = [
+  type FilterId = import('../../shared/types').TypeFilter | 'tasks'
+  const FILTERS: { id: FilterId; label: string }[] = [
     { id: 'all', label: t('filters.all') },
     { id: 'text', label: t('filters.text') },
     { id: 'links', label: t('filters.links') },
     { id: 'images', label: t('filters.images') },
-    { id: 'files', label: t('filters.files') }
+    { id: 'files', label: t('filters.files') },
+    { id: 'tasks', label: t('filters.tasks') }
   ]
 
-  const activeIndex = Math.max(0, FILTERS.findIndex((f) => f.id === typeFilter))
+  // The tasks chip is the active chip whenever the task layer is showing;
+  // typeFilter only drives the clipboard chips (it survives view switches).
+  const activeIndex = view === 'tasks'
+    ? Math.max(0, FILTERS.findIndex((f) => f.id === 'tasks'))
+    : Math.max(0, FILTERS.findIndex((f) => f.id === typeFilter))
   const maxFilterLen = Math.max(...FILTERS.map((f) => f.label.length))
-  const filterChipWidth = 37
+  // Fixed chip geometry shared by pill and chips: 270px panel − header
+  // padding (14) − right buttons (34) − track border/padding/gaps (18)
+  // leaves 200px for 6 chips. Chips must never shrink, or the pill (which
+  // uses the same constant) drifts right of its chip.
+  const filterChipWidth = 33
   const filterFontSize = maxFilterLen >= 8 ? 7.8 : maxFilterLen >= 6 ? 8.5 : maxFilterLen >= 5 ? 9.2 : 10.2
   const filterLetterSpacing = maxFilterLen >= 7 ? '-0.025em' : maxFilterLen >= 5 ? '-0.015em' : '0'
 
@@ -61,10 +71,6 @@ export function Header() {
         {settingsOpen ? (
           <span style={{ fontSize: 13, fontWeight: 600, color: '#8e8e93', letterSpacing: '0.01em', paddingLeft: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>
             {settingsSubView === 'changelog' ? t('header.whatsNew') : t('header.settings')}
-          </span>
-        ) : view === 'tasks' ? (
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#8e8e93', letterSpacing: '0.01em', paddingLeft: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 }}>
-            {t('tasks.viewTitle')}
           </span>
         ) : (
           <div 
@@ -105,21 +111,33 @@ export function Header() {
             />
 
             {FILTERS.map((f) => {
-              const active = typeFilter === f.id
+              const active = f.id === 'tasks' ? view === 'tasks' : typeFilter === f.id
               return (
                 <button
                   key={f.id}
+                  title={f.id === 'tasks' ? t('tasks.viewTitle') : undefined}
                   type="button"
                   className={`filter-chip${active ? ' active' : ''}`}
                   onClick={() => {
                     playButtonClickSound()
-                    setTypeFilter(f.id)
+                    if (f.id === 'tasks') {
+                      // Leave the shelf cleanly: no item preview / style flyout may
+                      // linger over the task layer.
+                      const state = useStore.getState()
+                      state.setPreviewItemId(null)
+                      state.setStyleFlyoutOpen(false)
+                      setView('tasks')
+                    } else {
+                      setTypeFilter(f.id)
+                      if (view === 'tasks') setView('clipboard')
+                    }
                   }}
                   style={{
                     position: 'relative',
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    flexShrink: 0,
                     width: filterChipWidth,
                     height: 22,
                     padding: '0 1px',
@@ -139,6 +157,49 @@ export function Header() {
                   }}
                 >
                   <span>{f.label}</span>
+                  {f.id === 'tasks' && (
+                    <>
+                      {badge > 0 && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: 2,
+                            right: 2,
+                            minWidth: 11,
+                            height: 11,
+                            padding: '0 2px',
+                            borderRadius: 999,
+                            backgroundColor: '#f87171',
+                            color: '#000000',
+                            fontSize: 8,
+                            fontWeight: 700,
+                            lineHeight: '11px',
+                            textAlign: 'center',
+                            boxShadow: '0 0 6px rgba(0, 0, 0, 0.5)',
+                            pointerEvents: 'none'
+                          }}
+                        >
+                          {badge > 9 ? '9+' : badge}
+                        </span>
+                      )}
+                      {suggestions.length > 0 && (
+                        <span
+                          title={t('tasks.suggestionBadge', { count: suggestions.length })}
+                          style={{
+                            position: 'absolute',
+                            bottom: 3,
+                            right: 3,
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            backgroundColor: '#fbbf24',
+                            boxShadow: '0 0 6px rgba(0, 0, 0, 0.5)',
+                            pointerEvents: 'none'
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
                 </button>
               )
             })}
@@ -188,91 +249,6 @@ export function Header() {
                   pointerEvents: 'none'
                 }}
               />
-            )}
-          </button>
-        )}
-
-        {!settingsOpen && (
-          <button
-            type="button"
-            className={`icon-btn${view === 'tasks' ? ' active' : ''}`}
-            title={view === 'tasks' ? t('tasks.back') : t('tasks.viewTitle')}
-            onClick={() => {
-              playButtonClickSound()
-              if (view === 'tasks') {
-                setView('clipboard')
-                return
-              }
-              // Leave the shelf cleanly: no item preview / style flyout may
-              // linger over the task layer.
-              const state = useStore.getState()
-              state.setPreviewItemId(null)
-              state.setStyleFlyoutOpen(false)
-              setView('tasks')
-            }}
-            style={{
-              color: view === 'tasks' ? '#ffffff' : 'rgba(255, 255, 255, 0.75)',
-              background: view === 'tasks' ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
-              border: 'none',
-              boxShadow: 'none',
-              flexShrink: 0,
-              cursor: 'pointer',
-              width: 32,
-              height: 32,
-              display: 'grid',
-              placeItems: 'center',
-              position: 'relative',
-              borderRadius: 8,
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <TaskIcon width={16} height={16} />
-            {badge > 0 && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: 4,
-                  right: 4,
-                  minWidth: 13,
-                  height: 13,
-                  padding: '0 3px',
-                  borderRadius: 999,
-                  backgroundColor: '#f87171',
-                  color: '#000000',
-                  fontSize: 9,
-                  fontWeight: 700,
-                  lineHeight: '13px',
-                  textAlign: 'center',
-                  boxShadow: '0 0 6px rgba(0, 0, 0, 0.5)',
-                  pointerEvents: 'none'
-                }}
-              >
-                {badge > 9 ? '9+' : badge}
-              </span>
-            )}
-            {suggestions.length > 0 && (
-              <span
-                title={t('tasks.suggestionBadge', { count: suggestions.length })}
-                style={{
-                  position: 'absolute',
-                  bottom: 4,
-                  right: 4,
-                  minWidth: 13,
-                  height: 13,
-                  padding: '0 3px',
-                  borderRadius: 999,
-                  backgroundColor: '#fbbf24',
-                  color: '#000000',
-                  fontSize: 9,
-                  fontWeight: 700,
-                  lineHeight: '13px',
-                  textAlign: 'center',
-                  boxShadow: '0 0 6px rgba(0, 0, 0, 0.5)',
-                  pointerEvents: 'none'
-                }}
-              >
-                {suggestions.length > 9 ? '9+' : suggestions.length}
-              </span>
             )}
           </button>
         )}

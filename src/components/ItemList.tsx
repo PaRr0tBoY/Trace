@@ -20,6 +20,11 @@ import { playExpandSound } from '../lib/soundEffects'
 import { useTranslation } from '../i18n'
 
 export function ItemList() {
+  // Only the first screenful of cards plays the enter animation on panel
+  // open; the rest mount instantly. With historyLimit up to 500, animating
+  // every card simultaneously is the dominant open-panel frame cost.
+  const ENTER_ANIM_LIMIT = 12
+
   const { t } = useTranslation()
   const { pinned, recent } = useFilteredItems()
   const query = useStore((s) => s.query)
@@ -248,8 +253,8 @@ export function ItemList() {
                     transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                     style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}
                   >
-                    {pinned.map((it) => (
-                      <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant} />
+                    {pinned.map((it, idx) => (
+                      <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} />
                     ))}
                   </motion.div>
                 )}
@@ -261,8 +266,8 @@ export function ItemList() {
             <section>
               {pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
               <AnimatePresence initial={false}>
-                {recent.map((it) => (
-                  <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant} />
+                {recent.map((it, idx) => (
+                  <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} />
                 ))}
               </AnimatePresence>
             </section>

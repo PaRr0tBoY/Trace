@@ -2,6 +2,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { attachTraceDebug } from './lib/traceDebug'
+
+// Dev-only: window.__traceDebug for CDP-driven UI control (no OS cursor).
+attachTraceDebug()
 
 // Stylesheet order matters: tokens first, then globals, then components.
 import './styles/tokens.css'

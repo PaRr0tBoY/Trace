@@ -26,6 +26,19 @@ export function normalizeIconKey(exePath: string): string {
   return exePath.toLowerCase()
 }
 
+/**
+ * The path to resolve an app icon from: the recorded exePath, or — for
+ * tasks persisted before exePath existed — the AppRef.id, which lives in
+ * the attributor key space (a normalized exePath when one was known).
+ * Non-path ids (bare process names) return null; getFileIcon can't resolve
+ * them, so they keep the letter fallback instead of failing loudly.
+ */
+export function iconSourceOf(app: { exePath?: string; id: string }): string | null {
+  if (app.exePath) return app.exePath
+  const id = app.id
+  return /[\\/]/.test(id) || /\.exe$/i.test(id) ? id : null
+}
+
 export function createAppIconService(fetcher: IconFetcher, max = APP_ICON_CACHE_MAX): AppIconService {
   // exePath (normalized) -> dataURL, or null for a failed extraction (negative
   // cache: a dead path must not be re-probed on every push).
@@ -58,12 +71,15 @@ export function createAppIconService(fetcher: IconFetcher, max = APP_ICON_CACHE_
     const paths = new Map<string, string>()
     for (const task of tasks) {
       for (const app of task.apps) {
-        if (app.exePath) paths.set(normalizeIconKey(app.exePath), app.exePath)
+        const src = iconSourceOf(app)
+        if (src) paths.set(normalizeIconKey(src), src)
       }
     }
     for (const s of suggestions) {
       for (const p of s.appExePaths ?? []) {
-        if (p) paths.set(normalizeIconKey(p), p)
+        // Bare process names (no path) can't be resolved by getFileIcon;
+        // skip them instead of failing and negative-caching every push.
+        if (p && (/[\\/]/.test(p) || /\.exe$/i.test(p))) paths.set(normalizeIconKey(p), p)
       }
     }
     return paths
@@ -78,8 +94,9 @@ export function createAppIconService(fetcher: IconFetcher, max = APP_ICON_CACHE_
     for (const task of tasks) {
       if (task.apps.length === 0) continue
       task.apps = task.apps.map((app) => {
-        if (!app.exePath) return app
-        const iconUrl = byPath.get(app.exePath)
+        const src = iconSourceOf(app)
+        if (!src) return app
+        const iconUrl = byPath.get(src)
         return iconUrl ? { ...app, iconUrl } : app
       })
     }
@@ -97,8 +114,10 @@ export function createAppIconService(fetcher: IconFetcher, max = APP_ICON_CACHE_
       if (exePaths.length === 0) continue
       const icons: { name: string; iconUrl: string }[] = []
       for (let i = 0; i < exePaths.length; i++) {
-        const iconUrl = byPath.get(exePaths[i])
-        if (iconUrl) icons.push({ name: s.appNames[i] ?? exePaths[i], iconUrl })
+        const p = exePaths[i]
+        if (!p || !(/[\\/]/.test(p) || /\.exe$/i.test(p))) continue
+        const iconUrl = byPath.get(p)
+        if (iconUrl) icons.push({ name: s.appNames[i] ?? p, iconUrl })
       }
       if (icons.length > 0) s.appIcons = icons
     }

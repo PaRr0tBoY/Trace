@@ -10,10 +10,10 @@
  *
  * OS file drops never reach the DOM onDrop handlers with usable paths (File
  * objects die at the contextBridge) — preload forwards them as a
- * `trace-os-drop` event and Panel resolves the target. The handlers here
- * serve in-panel HTML5 text drags; OLE drags (image/files) never fire DOM
- * drop events either, so Panel's `item:internal-drop` resolution calls the
- * same shared actions in dropActions.ts.
+ * `trace-os-drop` event and Panel resolves the target. Native drags (every
+ * item kind, via Electron's startDrag) never fire DOM drop events either,
+ * so Panel's `item:internal-drop` resolution calls the same shared actions
+ * in dropActions.ts.
  */
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'

@@ -387,7 +387,7 @@
 .task-card-badges {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
   min-width: 0;
 }

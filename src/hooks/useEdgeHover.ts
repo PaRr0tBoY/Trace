@@ -156,6 +156,7 @@ export function useEdgeHover(): void {
     const closePanel = () => {
       const state = useStore.getState()
       if (!state.open) return
+      if (state.debugHoldOpen) return
       if (state.sliderActive) return
       if (state.dragActive && !state.internalDragReq) return
 
@@ -191,6 +192,7 @@ export function useEdgeHover(): void {
 
     const scheduleClose = (delay = GRACE_MS) => {
       const state = useStore.getState()
+      if (state.debugHoldOpen) return
       if (state.sliderActive) return
       if (state.dragActive && !state.internalDragReq) return
       if (graceTimer !== undefined) return // already closing

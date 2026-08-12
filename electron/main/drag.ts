@@ -6,10 +6,13 @@
  * handler) so `event.sender` is the exact webContents that initiated the drag.
  * This ensures the OLE drag gesture flows correctly on Windows.
  *
- * Text items are dragged through a real OLE data object from the main
- * process instead (see oleDrag.ts): a temp .txt would hand other apps a
- * sanitized file rather than the copied text. For everything else we stage
- * the item's content as a temp file:
+ * Text items ride the same DWM file drag-out as the other kinds: the text is
+ * staged as a temp .txt so the gesture works everywhere. (An earlier attempt
+ * dragged text through a hand-rolled OLE IDataObject from the main process —
+ * see git history for oleDrag.ts — but DoDragDrop failed with
+ * RPC_E_CALL_REJECTED because a koffi-backed IDataObject cannot be marshaled
+ * to out-of-process drop targets.) For everything else we stage the item's
+ * content as a temp file:
  *   - image  -> <id>.png (its persisted bytes, copied to temp)
  *   - files  -> the *original* file paths (drag the real thing, not a copy)
  *
@@ -17,7 +20,7 @@
  */
 import { app, nativeImage, type WebContents } from 'electron'
 import { Resvg } from '@resvg/resvg-js'
-import { copyFileSync, existsSync } from 'node:fs'
+import { copyFileSync, existsSync, writeFileSync } from 'node:fs'
 import { join, extname } from 'node:path'
 import { PATHS } from '../store/paths'
 import type { DragRequest, ItemData } from '../../shared/types'
@@ -136,8 +139,22 @@ function stageDragFile(data: ItemData): Staged | null {
       if (!paths.length) return null
       return { file: paths[0], files: paths }
     }
+    case 'text': {
+      // Text rides the same DWM file drag-out as the other kinds, staged as a
+      // temp .txt. (OLE DoDragDrop from the main process cannot marshal a
+      // koffi-backed IDataObject to out-of-process drop targets, so this path
+      // is the reliable one.) The temp dir is wiped at startup (PATHS.tempDir).
+      const dest = join(temp, `text-${Date.now()}.txt`)
+      try {
+        // UTF-8 BOM so Notepad/Word recognize the encoding on open.
+        const bom = Buffer.from([0xef, 0xbb, 0xbf])
+        writeFileSync(dest, Buffer.concat([bom, Buffer.from(data.text, 'utf8')]))
+      } catch {
+        return null
+      }
+      return { file: dest }
+    }
     default:
-      // Text never reaches staging: the IPC layer routes it to OLE drag-out.
       return null
   }
 }

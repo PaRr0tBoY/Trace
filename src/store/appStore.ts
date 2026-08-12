@@ -45,6 +45,9 @@ interface AppState {
   setTasksFilter: (filter: TasksFilter) => void
   /** Whether the panel blade is expanded. */
   open: boolean
+  /** Dev/debug: keep the panel open against hover auto-close (CDP-driven UI work). */
+  debugHoldOpen: boolean
+  setDebugHoldOpen: (hold: boolean) => void
   /** Settings sheet visibility. */
   settingsOpen: boolean
   /** Active panel layer (ADR-0004). */
@@ -172,6 +175,8 @@ export const useStore = create<AppState>((set, get) => ({
   tasksFilter: 'existing',
   setTasksFilter: (tasksFilter) => set({ tasksFilter }),
   open: false,
+  debugHoldOpen: false,
+  setDebugHoldOpen: (debugHoldOpen) => set({ debugHoldOpen }),
   settingsOpen: false,
   view: 'clipboard',
   setView: (view) => set({ view }),

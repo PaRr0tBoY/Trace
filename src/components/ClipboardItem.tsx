@@ -98,11 +98,11 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
   }, [])
 
   const handleDragStart = useCallback((e: React.DragEvent, req: DragRequest) => {
-    // Every kind OLE-drags out of the app from the main process — text via a
-    // real IDataObject (oleDrag.ts), images/files via Electron's startDrag.
-    // Cancel the HTML5 drag (preventDefault) so the browser doesn't run its
-    // own ghost in parallel, and fire the IPC synchronously so main starts
-    // the OS drag on the same tick. In-panel drops still work: the drop
+    // Every kind OLE-drags out of the app from the main process via
+    // Electron's startDrag (text is staged as a temp .txt in main). Cancel
+    // the HTML5 drag (preventDefault) so the browser doesn't run its own
+    // ghost in parallel, and fire the IPC synchronously so main starts the
+    // OS drag on the same tick. In-panel drops still work: the drop
     // target resolves `item:internal-drop` against internalDragReq (set
     // below), the same path images/files already use.
     setInternalDragReq(req)

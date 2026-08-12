@@ -22,6 +22,12 @@ export const PATHS = {
   tasksFile: () => join(root(), 'tasks.json'),
   /** Path to the long-term memory index JSON. */
   memoriesFile: () => join(root(), 'memories.json'),
+  /**
+   * Path to the SQLite canonical store (events / episodes / entities / facts /
+   * task_sessions / trace / recommendation_history, ticket 33). WAL mode writes
+   * `trace.db-wal` and `trace.db-shm` sidecars next to it.
+   */
+  dbFile: () => join(root(), 'trace.db'),
   /** JSONL observability log: AI calls + algorithm outputs + memory writes. */
   aiLogFile: () => join(root(), 'ai-log.jsonl'),
   /** Path to the settings JSON. */

@@ -41,7 +41,7 @@ import type {
   RecommendationRecord
 } from '../../shared/types'
 
-export { recommendationFingerprint, FINGERPRINT_VERSION } from './activityLedger'
+export { recommendationFingerprint, recommendationPatternKey, FINGERPRINT_VERSION } from './activityLedger'
 
 /** 分级冷却时长：L1 未采纳 24h / L2 忽略 48h / L3 同类 7 天（spec 决策 9）。 */
 export const COOLDOWN_LEVEL_MS: Record<RecommendationLevel, number> = {
@@ -159,6 +159,8 @@ export function derivePatternScore(fingerprint: string, records: readonly Recomm
 /** 写入侧：id 与 shownAt 由 store 落（注入时钟），调用方不伪造时间戳。 */
 export interface RecommendationRecordInput {
   fingerprint: string
+  /** 跨小时桶的"同类"模式键（t47 评级消费；缺省 = 无同类历史）。 */
+  patternKey?: string
   level: RecommendationLevel
   outcome?: RecommendationOutcome
   actionReason?: RecommendationActionReason
@@ -166,8 +168,10 @@ export interface RecommendationRecordInput {
 
 export interface RecommendationHistory {
   /**
-   * 记录或回填：该指纹存在最新未决（noop）行则回填 outcome/actionReason
-   * （保留原 shownAt），否则插入新行（shownAt = 注入时钟的 now）。
+   * 记录或回填：该指纹存在最新未决（noop）行则回填 outcome/actionReason 与
+   * level（t47 分级结果落 RecommendationRecord.level：展示时落 noop 行，后续
+   * accept/ignore 回填保持展示分级；保留原 shownAt = 展示时刻），否则插入
+   * 新行（shownAt = 注入时钟的 now）。
    */
   record(input: RecommendationRecordInput): RecommendationRecord
   /** 该指纹的冷却剩余毫秒（注入时钟的 now；0 = 不在冷却；Infinity = 已采纳）。 */
@@ -218,6 +222,8 @@ export function createMemoryRecommendationHistory(options: RecommendationHistory
       if (open) {
         open.outcome = input.outcome ?? 'noop'
         open.actionReason = input.actionReason
+        open.level = input.level
+        if (input.patternKey !== undefined) open.patternKey = input.patternKey
         return open
       }
       const row: RecommendationRecord = {
@@ -226,7 +232,8 @@ export function createMemoryRecommendationHistory(options: RecommendationHistory
         level: input.level,
         shownAt: now(),
         outcome: input.outcome ?? 'noop',
-        ...(input.actionReason !== undefined ? { actionReason: input.actionReason } : {})
+        ...(input.actionReason !== undefined ? { actionReason: input.actionReason } : {}),
+        ...(input.patternKey !== undefined ? { patternKey: input.patternKey } : {})
       }
       rows.push(row)
       return row
@@ -252,13 +259,14 @@ export function createMemoryRecommendationHistory(options: RecommendationHistory
 interface RecommendationRow {
   id: string
   fingerprint: string
+  patternKey: string | null
   level: RecommendationLevel
   shownAt: number
   outcome: RecommendationOutcome | null
   actionReason: RecommendationActionReason | null
 }
 
-const SELECT_COLUMNS = `id, fingerprint, level, shownAt, outcome, actionReason`
+const SELECT_COLUMNS = `id, fingerprint, patternKey, level, shownAt, outcome, actionReason`
 
 function toRecord(row: RecommendationRow): RecommendationRecord {
   return {
@@ -266,6 +274,7 @@ function toRecord(row: RecommendationRow): RecommendationRecord {
     fingerprint: row.fingerprint,
     level: row.level,
     shownAt: row.shownAt,
+    ...(row.patternKey !== null && row.patternKey.length > 0 ? { patternKey: row.patternKey } : {}),
     ...(row.outcome !== null ? { outcome: row.outcome } : {}),
     ...(row.actionReason !== null ? { actionReason: row.actionReason } : {})
   }
@@ -280,18 +289,20 @@ export function createSqliteRecommendationHistory(
   const nextId = options.createId ?? createId
 
   const insert = db.prepare(
-    `INSERT INTO recommendation_history (id, fingerprint, level, shownAt, outcome, actionReason)
-     VALUES (@id, @fingerprint, @level, @shownAt, @outcome, @actionReason)`
+    `INSERT INTO recommendation_history (id, fingerprint, patternKey, level, shownAt, outcome, actionReason)
+     VALUES (@id, @fingerprint, @patternKey, @level, @shownAt, @outcome, @actionReason)`
   )
   const selectByFingerprint = db.prepare(
     `SELECT ${SELECT_COLUMNS} FROM recommendation_history WHERE fingerprint = ?`
   )
   const selectLatestOpen = db.prepare(
     `SELECT ${SELECT_COLUMNS} FROM recommendation_history
-     WHERE fingerprint = ? AND (outcome IS NULL OR outcome = 'noop')
-     ORDER BY shownAt DESC, id DESC LIMIT 1`
+    WHERE fingerprint = ? AND (outcome IS NULL OR outcome = 'noop')
+    ORDER BY shownAt DESC, id DESC LIMIT 1`
   )
-  const updateOutcome = db.prepare(`UPDATE recommendation_history SET outcome = ?, actionReason = ? WHERE id = ?`)
+  const updateOutcome = db.prepare(
+    `UPDATE recommendation_history SET outcome = ?, actionReason = ?, level = ?, patternKey = ? WHERE id = ?`
+  )
   const selectAll = db.prepare(
     `SELECT ${SELECT_COLUMNS} FROM recommendation_history ORDER BY shownAt DESC, id DESC`
   )
@@ -303,12 +314,19 @@ export function createSqliteRecommendationHistory(
     record(input): RecommendationRecord {
       const open = selectLatestOpen.get(input.fingerprint) as RecommendationRow | undefined
       if (open) {
-        updateOutcome.run(input.outcome ?? 'noop', input.actionReason ?? null, open.id)
-        return toRecord({ ...open, outcome: input.outcome ?? 'noop', actionReason: input.actionReason ?? null })
+        updateOutcome.run(input.outcome ?? 'noop', input.actionReason ?? null, input.level, input.patternKey ?? '', open.id)
+        return toRecord({
+          ...open,
+          level: input.level,
+          outcome: input.outcome ?? 'noop',
+          actionReason: input.actionReason ?? null,
+          patternKey: input.patternKey ?? ''
+        })
       }
       const row: RecommendationRow = {
         id: nextId(),
         fingerprint: input.fingerprint,
+        patternKey: input.patternKey ?? '',
         level: input.level,
         shownAt: now(),
         // 无 outcome 时统一落 'noop'（与 memory 实现同形状，回读一致）。

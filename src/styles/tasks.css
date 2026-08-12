@@ -99,6 +99,18 @@
   border: 1px solid rgba(251, 191, 36, 0.28);
 }
 
+/* L1 主动建议角标（t47 分级展示）：与 low 徽章同形、主色区分。 */
+.task-suggestion-l1 {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: calc(10px * var(--font-scale, 1));
+  font-weight: 600;
+  color: #6ee7b7;
+  background: rgba(110, 231, 183, 0.12);
+  border: 1px solid rgba(110, 231, 183, 0.3);
+}
+
 .task-suggestion-row {
   display: flex;
   align-items: center;
@@ -327,6 +339,14 @@
 }
 .task-group:first-of-type .task-group-label {
   margin-top: 8px;
+}
+
+/* L1 主动建议组（t47）：绿色系分组标签与徽章呼应。 */
+.task-group-l1 .task-group-label span:first-child {
+  color: #6ee7b7;
+}
+.task-group-l1 .task-group-count {
+  color: #6ee7b7;
 }
 .task-group-count {
   font-size: calc(10.5px * var(--font-scale, 1));

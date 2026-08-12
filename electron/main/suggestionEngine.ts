@@ -24,6 +24,15 @@
  *      provider is available. When no provider is configured or the chain
  *      fails, the pass degrades silently to pure algorithm: temporary titles
  *      like "Code + Chrome task", no rationale.
+ *   5. Grading tail (t47, spec 实现决策 9): batch semantic dedup (deterministic
+ *      fingerprint when the local model is off), task comparison (app-set
+ *      coverage ≥ 0.6: hit on the attributed task → L2 reinforcement, coverage
+ *      by another active task → obvious-duplicate L3 drop; never touches
+ *      confidence), per-candidate level via the injected getLevel
+ *      (proposalGrading.ts), L1 cap, and a noop row recorded per displayed
+ *      L1/L2 + dropped L3. Pattern matches (task ∩ current activity) fire
+ *      onPatternMatch so the glue sinks them into memoryGraph as 'pattern'
+ *      facts (t50 API area untouched).
  *
  * TaskProposal lifecycle: pending proposals are transient and in-memory
  * only — never persisted (restart clears them). Accept merges into the
@@ -42,8 +51,20 @@
  * per accept/ignore. No per-event noise.
  */
 import type { ActivityLedger } from '../store/activityLedger'
-import { recommendationFingerprint } from '../store/activityLedger'
-import { ignoreReasonToActionReason, type RecommendationHistory } from '../store/recommendationHistory'
+import { recommendationFingerprint, recommendationPatternKey } from '../store/activityLedger'
+import {
+  derivePatternScore,
+  ignoreReasonToActionReason,
+  type PatternScore,
+  type RecommendationHistory
+} from '../store/recommendationHistory'
+import {
+  appCoverage,
+  capL1,
+  dedupBatch,
+  TASK_COVERAGE_THRESHOLD,
+  TIME_OVERLAP_WINDOW_MS
+} from '../store/proposalGrading'
 import type { ChatRequest, ChatResult } from './provider'
 import type { SuggestTitleContext } from '../../shared/ipc'
 import { algorithmicTitle } from '../../shared/titles'
@@ -60,6 +81,7 @@ import type {
   Memory,
   MemoryType,
   RecommendationLevel,
+  RecommendationRecord,
   ResourceRef,
   TaskProposal,
   Task,
@@ -139,6 +161,9 @@ export function matchMemories(segments: SegmentText[], memories: readonly Memory
 export interface SuggestionSettings {
   suggestionMinEvents: number
   suggestionSilenceSeconds: number
+  /** 高/低置信阈值（t47 评级证据稳定判据的边距下限推导源，与聚类参数同源）。 */
+  confidenceHigh: number
+  confidenceLow: number
 }
 
 /** Chat surface of the provider chain (injected; absent = algorithmic only). */
@@ -197,10 +222,18 @@ export interface SuggestionEngineOptions {
    */
   history?: RecommendationHistory
   /**
-   * 建议的展示分级（L1/L2/L3）解析，随历史记录落库。缺省按 1（当前全部卡片
-   * 都是 L1 主动建议）；t47 评级接入后在此注入真实分级。
+   * 展示分级解析（t47 评级接入，46 预留位）：runAnalysis 对每个候选调用，
+   * 返回 L1/L2/L3（L3 丢弃不展示）。输入携带全部确定性判据（聚类证据、
+   * 任务比对、模式学习得分、最近记录），真实实现 = proposalGrading 的
+   * gradeProposal（state.ts 注入）。缺省按 1（当前全部卡片都是 L1 主动建议）。
    */
-  getLevel?: (suggestion: TaskProposal) => RecommendationLevel
+  getLevel?: (input: LevelInput) => RecommendationLevel
+  /**
+   * 模式记忆沉淀（t47，spec 决策 9）：任务比对命中（候选应用集被现有任务
+   * 覆盖 ≥ TASK_COVERAGE_THRESHOLD）时回调，调用方（state.ts）经既有
+   * memoryGraph.addFact(type='pattern') 落库。Absent = 不沉淀。
+   */
+  onPatternMatch?: (match: PatternMatch) => void
   /**
    * Local model candidate optimizer (t54, spec 决策 6/11): 聚类候选 →
    * CandidateActivity → 过滤 ≤3 / 标题草稿 / 排序（接入点 = runAnalysis
@@ -208,6 +241,46 @@ export interface SuggestionEngineOptions {
    * null（关闭 / 失败）时算法候选原样传递，绝不污染决策数据。
    */
   localModel?: CandidateOptimizer
+}
+
+/**
+ * 分级决策输入（getLevel 的实参）：引擎组装全部确定性判据，决策函数（缺省
+ * 是 proposalGrading.gradeProposal 的直通）只做规则表判断。pattern/lastRecord
+ * 按 recommendationPatternKey 跨小时桶累积（"同类"历史），冷却仍按指纹逐桶。
+ */
+export interface LevelInput {
+  suggestion: TaskProposal
+  /** 聚类证据带（'high' | 'low' | 'new'）。 */
+  zone: 'high' | 'low' | 'new'
+  /** 最佳聚类边距（best − second）。 */
+  margin: number
+  /** 边距下限 = θ_high − θ_low。 */
+  marginFloor: number
+  /** 任务池大小（0 = 新工作无竞争）。 */
+  taskPoolSize: number
+  /** 被现有任务应用集覆盖（含归属目标 taskId）。 */
+  coveredByTask: boolean
+  /** 被活跃任务覆盖（时段重叠）—— 明显重复。 */
+  coveredByActiveTask: boolean
+  /** 确定性指纹（含小时桶）。 */
+  fingerprint: string
+  /** 模式学习得分（同类累积）。 */
+  pattern: PatternScore
+  /** 该模式最近一条记录（无 = 从未展示/无同类历史）。 */
+  lastRecord?: RecommendationRecord
+  now: number
+}
+
+/** 任务比对命中（模式记忆沉淀载荷，spec 决策 9 匹配信号）。 */
+export interface PatternMatch {
+  /** 被覆盖的现有任务标题。 */
+  taskTitle: string
+  /** 候选的应用组合串（证据串，事实 content 的主语侧）。 */
+  appCombination: string
+  /** 应用显示名（事实实体）。 */
+  appNames: string[]
+  /** 命中时刻（注入时钟）。 */
+  now: number
 }
 
 /** Per-suggestion engine-side material the renderer never needs. */
@@ -221,6 +294,22 @@ interface TaskProposalMeta {
   windowTitles: string[]
   /** Confirmed project/workflow memories this segment matched (LLM material). */
   memoryContext: string[]
+  /** 聚类证据带与最佳边距（t47 分级输入）。 */
+  zone: 'high' | 'low' | 'new'
+  margin: number
+  /** 任务比对结果（t47）：被现有任务应用集覆盖 / 被活跃任务覆盖。 */
+  coveredByTask: boolean
+  coveredByActiveTask: boolean
+  /** 展示分级（t47）：accept/ignore 记录用展示时刻的分级，随卡片落库。 */
+  level: RecommendationLevel
+  /**
+   * 落库/分级键快照（t47）：去重合并会吸收败者应用集（语义合并下 A∪B 是
+   * "幻影键"，冷却永不命中）；键固定为该条自身吸收前的原始应用集。
+   */
+  recordFingerprint: string
+  recordPatternKey: string
+  /** 本地模型草稿标题（t47 语义去重键）；无草稿 = undefined。 */
+  drafted?: string
 }
 
 /**
@@ -274,6 +363,36 @@ export interface SuggestionEngine {
    * fails, or the reply doesn't validate.
    */
   suggestTitle(ctx: SuggestTitleContext): Promise<string[] | null>
+}
+
+/**
+ * 批内去重合并（t47）：胜者吸收败者的应用集（appNames/appExePaths 平行数组
+ * 按名去重）、剪贴板材料、时长与置信度（取高）。合并只发生在后处理区，归因
+ * 决策数据（zone/置信度语义）仍以胜者为主。
+ */
+function absorbCandidate(
+  winner: { suggestion: TaskProposal; meta: TaskProposalMeta },
+  loser: { suggestion: TaskProposal; meta: TaskProposalMeta }
+): void {
+  const w = winner.suggestion
+  const l = loser.suggestion
+  const names = new Set(w.appNames)
+  for (let i = 0; i < l.appNames.length; i++) {
+    if (names.has(l.appNames[i])) continue
+    names.add(l.appNames[i])
+    w.appNames.push(l.appNames[i])
+    if (l.appExePaths && l.appExePaths.length > i) {
+      w.appExePaths = w.appExePaths ?? []
+      w.appExePaths.push(l.appExePaths[i])
+    }
+  }
+  if (l.clipboardRefs) w.clipboardRefs = [...(w.clipboardRefs ?? []), ...l.clipboardRefs]
+  w.evidence.durationMs += l.evidence.durationMs
+  w.confidence = Math.max(w.confidence, l.confidence)
+  for (const t of loser.meta.windowTitles) if (!winner.meta.windowTitles.includes(t)) winner.meta.windowTitles.push(t)
+  for (const ref of loser.meta.appRefs) {
+    if (!winner.meta.appRefs.some((r) => r.id === ref.id)) winner.meta.appRefs.push(ref)
+  }
 }
 
 export function createSuggestionEngine(options: SuggestionEngineOptions): SuggestionEngine {
@@ -510,7 +629,26 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
           // a task's resources — the card and the convert panel show these).
           clipboardRefs: resolveClipboardRefs(activity.clipboardRefs)
         }
-        built.push({ suggestion, meta: { appRefs, activityId: activity.id, segmentStartTs: activity.startAt, signature, windowTitles: detail.windowTitles.slice(0, 3), memoryContext: [] } })
+        built.push({
+          suggestion,
+          meta: {
+            appRefs,
+            activityId: activity.id,
+            segmentStartTs: activity.startAt,
+            signature,
+            windowTitles: detail.windowTitles.slice(0, 3),
+            memoryContext: [],
+            zone: detail.zone,
+            margin: detail.evidence.margin,
+            coveredByTask: false,
+            coveredByActiveTask: false,
+            level: 1,
+            // 去重合并会吸收败者应用集（语义合并下 A∪B 是"幻影键"，冷却永不
+            // 命中）；键在合并前按本条自身应用集固定（absorbCandidate 不改）。
+            recordFingerprint: recommendationFingerprint(appRefs.map((a) => a.id), activity.startAt),
+            recordPatternKey: recommendationPatternKey(appRefs.map((a) => a.id))
+          }
+        })
       }
 
       // Context-prior: confirmed project/workflow memories matching a segment
@@ -555,7 +693,10 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
               const entry = built.find((b) => b.meta.activityId === c.activityId)
               if (!entry) continue
               const draft = sanitizeString(c.semanticLabel, MAX_TITLE_CHARS)
-              if (draft) entry.suggestion.title = draft
+              if (draft) {
+                entry.suggestion.title = draft
+                entry.meta.drafted = draft
+              }
               ordered.push(entry)
               if (ordered.length >= MAX_LOCAL_CANDIDATES) break
             }
@@ -574,14 +715,178 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         }
       }
 
-      pending = finalBuilt.map((b) => b.suggestion)
+      /* ── t47 分级应用区（spec 决策 9）：批内去重 → 任务比对 → 分级 →
+           L1 上限 → 展示 noop 落库 → L1 优先排序。本区是本票最后一次触碰
+           suggestionEngine（t55 将重构），只改候选后处理，不动上游。 ── */
+
+      // ① 批内去重（决策 9 两路）：本地模型开 → 语义键（草稿标题归一化相等）；
+      //    关/降级 → 确定性指纹相等。合并保留先到者（优化器重排后的首位），
+      //    败者字段吸收进胜者。落库/分级键在构建时已按各条自身应用集固定。
+      const merges = dedupBatch(
+        finalBuilt.map((b) => ({
+          id: b.suggestion.id,
+          fingerprint: recommendationFingerprint(b.meta.appRefs.map((a) => a.id), b.meta.segmentStartTs),
+          semanticLabel: b.meta.drafted
+        })),
+        { semantic: localModelMode === 'ok' }
+      )
+      let dedupMerged = 0
+      if (merges.size > 0) {
+        const alive = new Set(finalBuilt.map((b) => b.suggestion.id))
+        for (const [winnerId, loserIds] of merges) {
+          const winner = finalBuilt.find((b) => b.suggestion.id === winnerId)
+          if (!winner) continue
+          for (const loserId of loserIds) {
+            const loser = finalBuilt.find((b) => b.suggestion.id === loserId)
+            if (!loser) continue
+            absorbCandidate(winner, loser)
+            alive.delete(loserId)
+            dedupMerged++
+          }
+        }
+        finalBuilt = finalBuilt.filter((b) => alive.has(b.suggestion.id))
+      }
+
+      // ② 任务比对（确定性，永远生效）：候选应用键集 × 现有任务应用集覆盖率
+      //    ≥ 0.6 → 覆盖；任务活跃（running/waiting，或 lastActiveAt 在候选
+      //    开始前 1h 内 = 时段重叠）→ 明显重复。归属目标 taskId 的任务只算
+      //    覆盖不算活跃。命中触发 onPatternMatch（匹配信号沉淀进模式记忆）。
+      const tasksNow = [...store.list()]
+      const marginFloor = Math.max(0, getSettings().confidenceHigh - getSettings().confidenceLow)
+      const history = options.history
+      const patternMatches: PatternMatch[] = []
+      // 同类历史（跨小时桶）按 recommendationPatternKey 累积：最近记录取
+      // list() 最新在前的首个；模式得分按该模式全部记录推导（t47 消费 t46）。
+      const lastByPattern = new Map<string, RecommendationRecord>()
+      if (history) {
+        for (const r of history.list()) {
+          if (r.patternKey !== undefined && r.patternKey.length > 0 && !lastByPattern.has(r.patternKey)) {
+            lastByPattern.set(r.patternKey, r)
+          }
+        }
+      }
+      const patternRecordsOf = (patternKey: string): RecommendationRecord[] =>
+        history ? history.list().filter((r) => r.patternKey === patternKey) : []
+
+      for (const b of finalBuilt) {
+        const appKeys = b.meta.appRefs.map((a) => a.id)
+        let coveredByTask = false
+        let coveredByActiveTask = false
+        let bestTask: Task | undefined
+        let bestCoverage = 0
+        for (const t of tasksNow) {
+          const cov = appCoverage(appKeys, t)
+          if (cov < TASK_COVERAGE_THRESHOLD) continue
+          if (cov > bestCoverage) {
+            bestCoverage = cov
+            bestTask = t
+          }
+          if (t.id === b.suggestion.taskId) {
+            coveredByTask = true
+            continue
+          }
+          const active =
+            t.status === 'running' ||
+            t.status === 'waiting' ||
+            t.lastActiveAt >= b.meta.segmentStartTs - TIME_OVERLAP_WINDOW_MS
+          if (active) coveredByActiveTask = true
+          else coveredByTask = true
+        }
+        b.meta.coveredByTask = coveredByTask
+        b.meta.coveredByActiveTask = coveredByActiveTask
+        if (bestTask) {
+          patternMatches.push({
+            taskTitle: bestTask.title,
+            appCombination: b.suggestion.evidence.appCombination,
+            appNames: b.suggestion.appNames,
+            now: now()
+          })
+        }
+
+        // ③ 分级（46 预留的 getLevel 注入点）：引擎组装确定性判据，决策函数
+        //    （prod = proposalGrading.gradeProposal）返回 L1/L2/L3。无
+        //    getLevel → 缺省 L1（既有行为；prod 始终注入真实分级）。
+        const level: RecommendationLevel = options.getLevel
+          ? options.getLevel({
+              suggestion: b.suggestion,
+              zone: b.meta.zone,
+              margin: b.meta.margin,
+              marginFloor,
+              taskPoolSize: tasksNow.length,
+              coveredByTask,
+              coveredByActiveTask,
+              fingerprint: b.meta.recordFingerprint,
+              pattern: derivePatternScore(b.meta.recordPatternKey, patternRecordsOf(b.meta.recordPatternKey)),
+              lastRecord: lastByPattern.get(b.meta.recordPatternKey),
+              now: now()
+            })
+          : 1
+        b.meta.level = level
+        b.suggestion.level = level
+      }
+
+      // ④ L3 丢弃（不展示；noop L3 落库 → 该指纹 7 天冷却）+ 不变量 G：
+      //    L1 数量 ≤ 上限（超出降回 L2 候选区，不丢弃）。
+      interface GradedEntry {
+        id: string
+        suggestion: TaskProposal
+        meta: TaskProposalMeta
+        level: RecommendationLevel
+        confidence: number
+        segmentStartTs: number
+      }
+      const survivors: GradedEntry[] = []
+      const dropped: Array<{ fingerprint: string; patternKey: string }> = []
+      for (const b of finalBuilt) {
+        if (b.meta.level === 3) {
+          dropped.push({
+            fingerprint: b.meta.recordFingerprint,
+            patternKey: b.meta.recordPatternKey
+          })
+          continue
+        }
+        survivors.push({
+          id: b.suggestion.id,
+          suggestion: b.suggestion,
+          meta: b.meta,
+          level: b.meta.level,
+          confidence: b.suggestion.confidence,
+          segmentStartTs: b.meta.segmentStartTs
+        })
+      }
+      const droppedByGrading = dropped.length
+      capL1(survivors)
+      for (const s of survivors) {
+        s.meta.level = s.level
+        s.suggestion.level = s.level
+      }
+      const l1Count = survivors.filter((s) => s.level === 1).length
+
+      // ⑤ 展示：L1 优先（级别升序稳定分区，组内保持原序）；分级结果随 noop
+      //    记录落 RecommendationRecord.level（展示时刻分级，冷却按指纹逐桶）。
+      const ordered = [...survivors].sort((a, b) => a.level - b.level)
+      pending = ordered.map((s) => s.suggestion)
       meta.clear()
-      for (const b of finalBuilt) meta.set(b.suggestion.id, b.meta)
+      for (const s of ordered) meta.set(s.id, s.meta)
+      if (history) {
+        for (const s of ordered) {
+          history.record({
+            fingerprint: s.meta.recordFingerprint,
+            patternKey: s.meta.recordPatternKey,
+            level: s.level,
+            outcome: 'noop'
+          })
+        }
+        for (const d of dropped) {
+          history.record({ fingerprint: d.fingerprint, patternKey: d.patternKey, level: 3, outcome: 'noop' })
+        }
+      }
+      for (const pm of patternMatches) options.onPatternMatch?.(pm)
 
       const mode = llmOk ? 'llm' : 'algorithm'
       const ocrNote = ocrText ? `, ocr: ${ocrText.length} chars` : ''
       console.log(
-        `[Suggestion] analysis: ${analysis.activities.length} activities -> ${pending.length} suggestions (mode: ${mode}${ocrNote})`
+        `[Suggestion] analysis: ${analysis.activities.length} activities -> ${pending.length} suggestions (mode: ${mode}${ocrNote}, L1: ${l1Count})`
       )
       log({
         kind: 'analysis',
@@ -591,6 +896,9 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         mode,
         localModelMode,
         ocrChars: ocrText?.length,
+        dedupMerged,
+        droppedByGrading,
+        l1Count,
         segments: analysis.activities.map((a, idx) => ({
           apps: a.apps.slice(0, 5).map((app) => app.name),
           durationMs: a.endAt - a.startAt,
@@ -599,14 +907,15 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
           zone: analysis.details[idx].zone,
           taskId: a.attribution?.taskId ?? null
         })),
-        suggestions: finalBuilt.map((b) => ({
-          id: b.suggestion.id,
-          title: b.suggestion.title,
+        suggestions: survivors.map((s) => ({
+          id: s.id,
+          title: s.suggestion.title,
           llmTitle: llmOk,
-          confidence: b.suggestion.confidence,
-          apps: b.suggestion.appNames,
-          clipboardRefs: b.suggestion.clipboardRefs?.length ?? 0,
-          reason: b.suggestion.reason
+          confidence: s.suggestion.confidence,
+          level: s.level,
+          apps: s.suggestion.appNames,
+          clipboardRefs: s.suggestion.clipboardRefs?.length ?? 0,
+          reason: s.suggestion.reason
         }))
       })
       onSuggestions(pending)
@@ -691,10 +1000,13 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       log({ kind: 'accept', suggestionId: id, title, taskId: taskId ?? null, merged, apps: apps.length, clipboardRefs: resources.length, titleEdited })
       // t46 record point: accepted outcome + actionReason (user_confirmed, or
       // user_edited_title when the user rewrote the title — strongest signal).
+      // t47: level = 展示时刻分级（随 noop 落库后回填，分级结果落记录）；patternKey
+      // 携带跨小时桶的"同类"键供评级消费。
       if (m && options.history) {
         options.history.record({
           fingerprint: recommendationFingerprint(m.appRefs.map((a) => a.id), m.segmentStartTs),
-          level: options.getLevel ? options.getLevel(suggestion) : 1,
+          patternKey: recommendationPatternKey(m.appRefs.map((a) => a.id)),
+          level: m.level,
           outcome: 'accepted',
           actionReason: titleEdited ? 'user_edited_title' : 'user_confirmed'
         })
@@ -702,7 +1014,6 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       return taskId
     },
     ignore(id: string, reason?: IgnoreReason): boolean {
-      const suggestion = pending.find((s) => s.id === id)
       const m = meta.get(id)
       pending = pending.filter((s) => s.id !== id)
       meta.delete(id)
@@ -710,10 +1021,12 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         ledger.dismiss(m.signature)
         // t46 record point: ignored outcome + actionReason（忽略原因，缺省
         // 视为不感兴趣）。忽略仍走既有 LRU（ledger.dismiss），行为不回归。
+        // t47: level = 展示时刻分级（回填保持展示分级），patternKey 同类键。
         if (options.history) {
           options.history.record({
             fingerprint: recommendationFingerprint(m.appRefs.map((a) => a.id), m.segmentStartTs),
-            level: suggestion && options.getLevel ? options.getLevel(suggestion) : 1,
+            patternKey: recommendationPatternKey(m.appRefs.map((a) => a.id)),
+            level: m.level,
             outcome: 'ignored',
             actionReason: reason ? ignoreReasonToActionReason(reason) : 'user_manually_dismissed'
           })

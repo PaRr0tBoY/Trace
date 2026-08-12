@@ -51,6 +51,8 @@ export function TaskView() {
   const selected = selectedId ? (tasks.find((task) => task.id === selectedId) ?? null) : null
   const converting = convertId ? (suggestions.find((s) => s.id === convertId) ?? null) : null
   const confirmDelete = confirmDeleteTaskId ? (tasks.find((task) => task.id === confirmDeleteTaskId) ?? null) : null
+  /** L1 主动建议（t47 分级展示）：任务列表顶部固定区，位于状态分组之前。 */
+  const l1Suggestions = suggestions.filter((s) => s.level === 1)
 
   // The selected task vanished (deleted here or elsewhere): fall back to the list.
   useEffect(() => {
@@ -128,12 +130,30 @@ export function TaskView() {
               </div>
             )
           ) : (
-            <TaskList
-              tasks={tasks}
-              onOpen={(task) => setSelectedTaskId(task.id)}
-              onCreate={() => setEditingTask('new')}
-              onDeleteRequest={(task) => setConfirmDeleteTaskId(task.id)}
-            />
+            <>
+              {l1Suggestions.length > 0 && (
+                <section className="task-group task-group-l1">
+                  <div className="task-group-label">
+                    <span>{t('tasks.activeSuggestions')}</span>
+                    <span className="task-group-count">{l1Suggestions.length}</span>
+                  </div>
+                  {l1Suggestions.map((s) => (
+                    <TaskProposalCard
+                      key={s.id}
+                      suggestion={s}
+                      onOpen={setConvertId}
+                      onTrace={(id) => setTraceTarget({ kind: 'proposal', id })}
+                    />
+                  ))}
+                </section>
+              )}
+              <TaskList
+                tasks={tasks}
+                onOpen={(task) => setSelectedTaskId(task.id)}
+                onCreate={() => setEditingTask('new')}
+                onDeleteRequest={(task) => setConfirmDeleteTaskId(task.id)}
+              />
+            </>
           )}
         </div>
       )}

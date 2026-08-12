@@ -56,6 +56,7 @@ import { LocalModelManager, shouldLoadLocalModel } from '../store/localModelMana
 import { LocalModelRuntime } from '../store/localModelRuntime'
 import { createWorkerModelEngine } from '../store/localModelWorkerEngine'
 import { createCandidateOptimizer, type CandidateOptimizer } from '../store/localModelOptimizer'
+import { gradeProposal } from '../store/proposalGrading'
 
 const store = new ItemStore()
 const watcher = new ClipboardWatcher(600)
@@ -698,9 +699,31 @@ export function getSuggestionEngine(): SuggestionEngine {
         getMemoryStore().suggestMemory({ ...candidate, source: 'task-feedback' })
       },
       // Recommendation history (t46): accept/ignore 记录与回填；DB 故障时用
-      // 内存实现，冷却/模式学习本会话内仍生效。getLevel 未在此注入（缺省 L1）
-      // —— L2/L3 分级由 t47 评级接入后经 engine 的 getLevel 选项注入。
+      // 内存实现，冷却/模式学习本会话内仍生效。
       history: getRecommendationHistory() ?? undefined,
+      // t47 评级接入（46 预留位注入）：真实分级 = proposalGrading 纯模块的
+      // gradeProposal。引擎已把聚类证据、任务比对、模式学习得分与最近记录
+      // （recommendationPatternKey 跨小时桶同类累积）组装进 LevelInput，
+      // 此处即决策函数直通。缺省 L1 的旧行为只在不注入时存在（prod 始终注入）。
+      getLevel: (input) => gradeProposal(input),
+      // t47 匹配信号沉淀（spec 决策 9）：任务比对命中 → 既有 memoryGraph
+      // addFact(type='pattern')，不碰 t50 的检索区。记忆主开关关 → 不写
+      // （与 onMemorySuggestion 同门）；DB 故障降级（null）→ 丢弃。
+      onPatternMatch: (match) => {
+        if (!memoryAllowed(policyFromSettings(loadSettings()), {}).allowed) return
+        const graph = getMemoryGraph()
+        if (!graph) return
+        graph.addFact({
+          type: 'pattern',
+          content: `${match.appCombination} → ${match.taskTitle}`,
+          source: 'inferred',
+          userState: 'suggested',
+          intent: 'system-infer',
+          entities: match.appNames.map((name) => ({ name, type: 'app' })),
+          validAt: match.now,
+          lastSeenAt: match.now
+        })
+      },
       // Local model candidate optimizer (t54, spec 决策 6/11): 候选后处理
       // 过滤 ≤3 / 标题草稿 / 排序。内部按设置与模型可用性逐次判定 — 关闭 /
       // 未就绪 / 失败一律返回 null，算法候选原样传递（不变量 H）。

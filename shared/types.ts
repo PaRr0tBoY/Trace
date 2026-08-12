@@ -369,6 +369,8 @@ export interface TaskProposal {
   decisionId?: string
   /** exePaths parallel to appNames; filled by the suggestion engine so main can fetch icons (t26). */
   appExePaths?: string[]
+  /** 展示分级 L1/L2/L3（t47 评级产出，runAnalysis 时随卡片写入；UI 与 accept/ignore 记录消费）。 */
+  level?: RecommendationLevel
   /** Resolved app icons, one entry per app with an extractable exePath; filled by main at push time (t26). */
   appIcons?: { name: string; iconUrl: string }[]
   /**
@@ -475,6 +477,8 @@ export type IgnoreReason = (typeof IGNORE_REASONS)[number]
 export interface RecommendationRecord {
   id: string
   fingerprint: string
+  /** 跨小时桶的"同类"模式键（t47）：级别/拒绝历史按它累积；旧行/外部写入可为空。 */
+  patternKey?: string
   level: RecommendationLevel
   /** Unix epoch ms：展示时刻（store 以注入时钟落）。 */
   shownAt: number

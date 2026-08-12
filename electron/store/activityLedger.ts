@@ -553,6 +553,17 @@ export function recommendationFingerprint(appKeys: string[], segmentStartTs: num
   return `${FINGERPRINT_VERSION}:${suggestionSignature(appKeys, segmentStartTs, bucketMs)}`
 }
 
+/**
+ * 模式键（spec 决策 9 的"同类"）：排序应用键集合的语义簇散列，无时段成分。
+ * 与 recommendationFingerprint 同源（同 FNV 材料、去掉小时桶），因此同一应用
+ * 组合跨小时桶映射到同一模式键；冷却仍按指纹（含时段）逐小时桶生效，而级别/
+ * 拒绝历史按模式键跨桶累积 —— L1 只能从 L2 升级、近期同类拒绝都以此为键
+ * （t47 评级接入）。t46 推荐历史模块 re-export 本函数与指纹。
+ */
+export function recommendationPatternKey(appKeys: string[], bucketMs = 3_600_000): string {
+  return `${FINGERPRINT_VERSION}:${suggestionSignature(appKeys, 0, bucketMs)}`
+}
+
 /** Version of the attribution classifier stamped on every activity (t40). */
 export const CLASSIFIER_VERSION = 'clusterer@1'
 
@@ -616,6 +627,8 @@ export interface ActivityDetail {
     appCombination: string
     durationMs: number
     overlappingTasks: string[]
+    /** best − second 聚类边距（t47 评级证据稳定判据；卡片不渲染）。 */
+    margin: number
   }
 }
 
@@ -763,7 +776,8 @@ function buildActivity(
     evidence: {
       appCombination: attr.evidence.appCombination,
       durationMs: attr.evidence.durationMs,
-      overlappingTasks: attr.evidence.overlappingTasks
+      overlappingTasks: attr.evidence.overlappingTasks,
+      margin: attr.evidence.margin
     }
   }
   return { activity, detail }

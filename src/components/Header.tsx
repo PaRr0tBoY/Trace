@@ -97,6 +97,8 @@ export function Header() {
   const tasks = useStore((s) => s.tasks)
   const suggestions = useStore((s) => s.suggestions)
   const badge = taskBadgeCount(tasks)
+  /** L1 主动建议数（t47 边缘指示器：任务层折叠时在 tasks 芯片上亮琥珀点）。 */
+  const l1Count = suggestions.filter((s) => s.level === 1).length
 
   const files = useFileMembers()
 
@@ -210,13 +212,13 @@ export function Header() {
     </span>
   )
 
-  const amberDot = (title: string) => (
+  const amberDot = (title: string, right = -3) => (
     <span
       title={title}
       style={{
         position: 'absolute',
         top: -3,
-        right: -3,
+        right,
         width: 6,
         height: 6,
         borderRadius: '50%',
@@ -323,6 +325,7 @@ export function Header() {
                 >
                   <span>{f.label}</span>
                   {f.id === 'tasks' && badge > 0 && redBadge(badge)}
+                  {f.id === 'tasks' && view !== 'tasks' && l1Count > 0 && amberDot(t('tasks.activeSuggestions'), badge > 0 ? 8 : -3)}
                 </button>
               )
             })}

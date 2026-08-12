@@ -108,6 +108,11 @@ export function TaskProposalCard({ suggestion, onOpen, onTrace }: Props) {
     >
       <div className="task-suggestion-head">
         <div className="task-suggestion-title">{suggestion.title}</div>
+        {suggestion.level === 1 && (
+          <span className="task-suggestion-l1" title={t('tasks.suggestionLevel1')}>
+            {t('tasks.suggestionLevel1')}
+          </span>
+        )}
         {suggestion.lowConfidence && (
           <span className="task-suggestion-low">{t('tasks.suggestionLowConfidence')}</span>
         )}

@@ -201,6 +201,19 @@ const MIGRATIONS: readonly Migration[] = [
         ALTER TABLE facts ADD COLUMN intent TEXT NOT NULL DEFAULT 'system-infer';
       `)
     }
+  },
+  {
+    version: 3,
+    name: 'recommendation_history: patternKey (t47 grading, cross-hour "same-type" key)',
+    up: (db) => {
+      // t47 评级需要"同类"历史（级别/拒绝跨小时桶累积，spec 决策 9：L1 只能从
+      // L2 升级、近期同类拒绝），而冷却仍按含时段的指纹逐桶生效。模式键 =
+      // 去小时桶的语义散列，写时由调用方（engine）随记录落库；旧行默认空串，
+      // 引擎侧按空串视为无同类历史（等价首次出现）。
+      db.exec(`
+        ALTER TABLE recommendation_history ADD COLUMN patternKey TEXT NOT NULL DEFAULT '';
+      `)
+    }
   }
 ]
 

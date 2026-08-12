@@ -25,6 +25,7 @@ import { emit, recentEvents } from './eventBus'
 import { buildClipboardEvent, decideClipboardAttribution } from './attributor'
 import { createSuggestionEngine, TICK_INTERVAL_MS, type ChatFn, type OcrFn, type SuggestionEngine } from './suggestionEngine'
 import { createIgnoredTable } from './ignored'
+import { logAi } from './aiLog'
 
 const store = new ItemStore()
 const watcher = new ClipboardWatcher(600)
@@ -277,7 +278,7 @@ export function initState(): void {
 function attributeClipboardCapture(item: ClipboardItem | undefined, foreground: ForegroundSnapshot | null): void {
   if (!item || !foreground) return
 
-  const event = buildClipboardEvent(foreground, item.capturedAt)
+  const event = buildClipboardEvent(foreground, item.capturedAt, item.id)
   emit(event)
 
   const taskId = decideClipboardAttribution(event, taskStore.list(), loadSettings().autoAttributionEnabled)
@@ -322,7 +323,9 @@ export function getMemoryStore(): MemoryStore {
   if (!memoryStore) {
     memoryStore = new MemoryStore({
       load: () => loadMemoriesFile(),
-      save: (index) => saveMemoriesFile(index)
+      save: (index) => saveMemoriesFile(index),
+      // Every memory write lands in ai-log.jsonl (suggest/confirm/ban/…).
+      log: (entry) => logAi(entry)
     })
   }
   return memoryStore
@@ -344,6 +347,10 @@ export function getSuggestionEngine(): SuggestionEngine {
       onSuggestions: (suggestions) => pushState.suggestions(suggestions),
       // Context-prior: only live project/workflow memories reach the engine.
       readMemories: () => getMemoryStore().list(),
+      // Clipboard items copied during a segment ride along on the suggestion.
+      readItem: (itemId) => store.get(itemId),
+      // Observability: the pipeline's algorithm outputs land in ai-log.jsonl.
+      log: (entry) => logAi(entry),
       // Feedback distillation: accepted suggestions become suggested candidates.
       onMemorySuggestion: (candidate) => {
         getMemoryStore().suggestMemory({ ...candidate, source: 'task-feedback' })

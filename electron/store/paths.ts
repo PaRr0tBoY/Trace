@@ -22,6 +22,8 @@ export const PATHS = {
   tasksFile: () => join(root(), 'tasks.json'),
   /** Path to the long-term memory index JSON. */
   memoriesFile: () => join(root(), 'memories.json'),
+  /** JSONL observability log: AI calls + algorithm outputs + memory writes. */
+  aiLogFile: () => join(root(), 'ai-log.jsonl'),
   /** Path to the settings JSON. */
   settingsFile: () => join(root(), 'settings.json'),
   /** Scratch dir for temp files handed to native drag-out. */

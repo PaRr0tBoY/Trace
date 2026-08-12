@@ -9,7 +9,7 @@
  *   - `Renderer -> Main` calls (invoke/handle) are listed in `InvokeMap`.
  *   - `Main -> Renderer` events (send/on) are listed in `EventMap`.
  */
-import type { ClipboardItemDto, DragRequest, MergeResult, ProviderConfig, Settings, Suggestion, TaskDto, TaskPatch, UnlinkTarget } from './types'
+import type { AppRef, ClipboardItemDto, DragRequest, MergeResult, ProviderConfig, Settings, Suggestion, TaskDto, TaskPatch, UnlinkTarget } from './types'
 
 /** Result of a connection test against one provider (ai:test-provider). */
 export interface ProviderTestResult {
@@ -19,6 +19,9 @@ export interface ProviderTestResult {
   error?: string
   /** The model that was probed. */
   model?: string
+  /** The probe saw reasoning_content: a thinking model. Short structured
+   *  tasks auto-disable its reasoning (provider chain adapts). */
+  thinkingModel?: boolean
 }
 
 /** Result of probing a local Ollama instance (ai:detect-ollama). */
@@ -49,6 +52,18 @@ export interface SuggestTitleContext {
   appNames: string[]
   /** Short previews of linked resources (text head / file names / image summary). */
   resourcePreviews: string[]
+}
+
+/**
+ * User-edited accept payload from the suggestion convert panel
+ * (suggestion:accept). Omitted fields fall back to what the suggestion
+ * itself carries; clipboardItemIds are snapshotted main-side.
+ */
+export interface SuggestionAcceptOptions {
+  title?: string
+  note?: string
+  apps?: AppRef[]
+  clipboardItemIds?: string[]
 }
 
 /* ------------------------------------------------------------------ */
@@ -194,8 +209,12 @@ export interface InvokeMap {
 
   /* --------------------------- suggestions --------------------------- */
 
-  /** Accept a suggestion: merge into its candidate task or create a new one. Returns the full task list. */
-  'suggestion:accept': { args: [id: string, titleOverride?: string]; result: TaskDto[] }
+  /**
+   * Accept a suggestion: merge into its candidate task or create a new one.
+   * `opts` carries the convert panel's edits (title/note/apps/items).
+   * Returns the full task list.
+   */
+  'suggestion:accept': { args: [id: string, opts?: SuggestionAcceptOptions]; result: TaskDto[] }
 
   /**
    * Accept a suggestion AND attach the dropped resource to the resulting
@@ -288,6 +307,12 @@ export interface SendMap {
    * clicks (cards, buttons, tabs) never activate the panel again.
    */
   'ui:input-blur': { args: [] }
+  /**
+   * Deterministically expand the panel without any mouse involvement
+   * (testing/tray/keyboard path). Main shows the window, makes it
+   * interactive, and forces the renderer open.
+   */
+  'panel:expand': { args: [] }
 }
 
 /* ------------------------------------------------------------------ */

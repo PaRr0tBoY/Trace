@@ -91,27 +91,59 @@ export default function App() {
   }, [hydrate, setItems, setSettings, pushToast])
 
   // The panel window is created focusable:false (upstream legacy), so clicking
-  // an input never hands the renderer keyboard focus. Whenever an editable
-  // element gains focus, ask main to activate the window (user32: strip
-  // WS_EX_NOACTIVATE + SetForegroundWindow) so keystrokes land here instead of
-  // the previously active app; on blur, ask main to restore WS_EX_NOACTIVATE so
-  // plain clicks (cards, buttons, tabs) never activate the panel. Mounted only
-  // in App — the onboarding window is a normal focusable window and needs none
+  // Keyboard-focus bridge (ticket 21): the panel is created with the OS style
+  // pinned to WS_EX_NOACTIVATE so it never pops the taskbar or steals the
+  // foreground on its own. Chromium, however, drops element.focus() and key
+  // events for such a window, so whenever an editable element gains focus we
+  // ask main to truly activate the window (setFocusable(true) + focus(),
+  // focus.ts) — keystrokes then land here. main debounces the release, and
+  // only restores NOACTIVATE once the panel closes, so focus juggling between
+  // inputs (input <-> textarea) never flickers the window. Mounted only in
+  // App — the onboarding window is a normal focusable window and needs none
   // of this.
   useEffect(() => {
     const isEditable = (target: EventTarget | null): target is HTMLElement =>
       target instanceof HTMLElement && target.matches('input, textarea, [contenteditable]')
+    // True when the most recent pointerdown was NOT on an editable element.
+    // Chromium replays a focusin to the previously focused input when the
+    // window regains activation after a click — that replay is NOT a user
+    // intent to type, so it must not re-arm the activation bridge (it would
+    // fight the drop-activation request we just sent for the non-input click).
+    let lastPointerOnNonInput = false
     const onFocusIn = (e: FocusEvent) => {
-      if (isEditable(e.target)) edge.requestInputFocus()
+      if (isEditable(e.target) && !lastPointerOnNonInput) edge.requestInputFocus()
     }
-    const onFocusOut = (e: FocusEvent) => {
-      if (isEditable(e.target)) edge.requestInputBlur()
+    // NOTE: no focusout handler — activation is session-held while an input
+    // is focused (switching between inputs must not flicker the window).
+    // Dropping activation on non-input clicks happens in onPointerDown.`
+    // Deadlock breaker: in an inactive document (window never activated yet)
+    // Chromium silently drops element.focus() — activeElement stays put and
+    // NO focusin is dispatched, so the focusin->activate chain above can
+    // never start. pointerdown is delivered regardless of activation state,
+    // so activate the window from the mouse-down on an editable element; the
+    // browser then performs the real focus and focusin fires normally.
+    const onPointerDown = (e: PointerEvent) => {
+      if (isEditable(e.target)) {
+        lastPointerOnNonInput = false
+        edge.requestInputFocus()
+      } else {
+        // Click on a non-editable surface (card/button/chip): Chromium
+        // activates the window on any click (focusable:true windows do this
+        // internally, WS_EX_NOACTIVATE cannot stop it — verified). We do NOT
+        // drop activation here anymore: blurring on every non-input click
+        // made each click flip the window active<->inactive, which flickers
+        // the transparent panel (layered-window re-synth). Keeping the
+        // activation lets subsequent clicks be no-ops, and the user's
+        // keyboard flow resumes naturally when they click back into their
+        // own app. The flag below still blocks the focusin-replay misread.
+        lastPointerOnNonInput = true
+      }
     }
     document.addEventListener('focusin', onFocusIn, true)
-    document.addEventListener('focusout', onFocusOut, true)
+    document.addEventListener('pointerdown', onPointerDown, true)
     return () => {
       document.removeEventListener('focusin', onFocusIn, true)
-      document.removeEventListener('focusout', onFocusOut, true)
+      document.removeEventListener('pointerdown', onPointerDown, true)
     }
   }, [])
 

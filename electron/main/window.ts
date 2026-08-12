@@ -25,6 +25,7 @@
 import { BrowserWindow, screen, shell, powerMonitor, app } from 'electron'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
+import koffi from 'koffi'
 import { APP_CONFIG } from './config'
 import { runtime } from './config'
 import { PATHS } from '../store/paths'
@@ -36,6 +37,28 @@ import { isFullscreenAppActive, registerFullscreenActiveListener } from './fulls
 export const PANEL_WIDTH = 384
 /** Visual width of the blade when collapsed (only used by the renderer). */
 export const COLLAPSED_WIDTH = 0
+
+// WS_EX_NOACTIVATE is pinned on the panel window: it never activates, never
+// shows in the taskbar, and never pops the auto-hidden taskbar. Chromium's
+// internal focus state stays functional because the window is created
+// focusable:true — keyboard routing is handed over on demand (focus.ts).
+const WS_EX_NOACTIVATE = 0x08000000
+const GWL_EXSTYLE = -20
+
+function enforceNoActivate(win: BrowserWindow): void {
+  try {
+    const user32 = koffi.load('user32.dll')
+    const getEx = user32.func('int64_t __stdcall GetWindowLongPtrW(void *hWnd, int nIndex)') as (hwnd: unknown, index: number) => bigint
+    const setEx = user32.func('int64_t __stdcall SetWindowLongPtrW(void *hWnd, int nIndex, int64_t dwNewLong)') as (hwnd: unknown, index: number, value: bigint) => bigint
+    const hwnd = koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void'))
+    const ex = Number(getEx(hwnd, GWL_EXSTYLE))
+    if ((ex & WS_EX_NOACTIVATE) === 0) {
+      setEx(hwnd, GWL_EXSTYLE, BigInt(ex | WS_EX_NOACTIVATE))
+    }
+  } catch {
+    // fail silent — worst case the panel briefly activates on click
+  }
+}
 
 let mainWindow: BrowserWindow | null = null
 // Kept only by the unused legacy helper at the bottom of this module. The
@@ -432,7 +455,7 @@ export function createWindow(): BrowserWindow {
     hasShadow: false,
     skipTaskbar: true,
     alwaysOnTop: true,
-    focusable: false,
+    focusable: true,
     backgroundColor: '#00000000',
     roundedCorners: false,
     webPreferences: {
@@ -446,6 +469,14 @@ export function createWindow(): BrowserWindow {
 
   // Start click-through with no forwarding — edge detection is done via cursor poll.
   mainWindow.setIgnoreMouseEvents(true, { forward: false })
+
+  // The window is created focusable:true so Chromium's internal activation
+  // state allows keyboard routing, but the OS style is pinned to
+  // WS_EX_NOACTIVATE: the panel never takes the foreground on its own, never
+  // shows a taskbar button, never pops the auto-hidden taskbar. Keyboard
+  // input is granted on demand by truly activating the window (focus.ts);
+  // NOACTIVATE is restored when the panel closes (releasePanelFocusNow).
+  enforceNoActivate(mainWindow)
 
   registerFullscreenActiveListener(() => {
     const settings = loadSettings()

@@ -42,14 +42,26 @@
  * Logging: `[Suggestion]` tag, one line per analysis (with mode), one line
  * per accept/ignore. No per-event noise.
  */
-import { clusterEvents, type ClusterParams } from './clusterer'
+import { clusterEvents, type ClusterParams, type SegmentInfo } from './clusterer'
 import type { ChatRequest, ChatResult } from './provider'
 import type { SuggestTitleContext } from '../../shared/ipc'
 import { algorithmicTitle } from '../../shared/titles'
 import { createId } from '../store/ids'
 import { suggestionSignature, type IgnoredTable } from './ignored'
-import type { TaskStore } from '../store/TaskStore'
-import type { AppRef, AppSwitchEvent, Memory, MemoryType, Suggestion, Task, TaskPatch, UsageEvent } from '../../shared/types'
+import { buildClipboardRef, type TaskStore } from '../store/TaskStore'
+import type {
+  AppRef,
+  AppSwitchEvent,
+  ClipboardEvent,
+  ClipboardItem,
+  Memory,
+  MemoryType,
+  ResourceRef,
+  Suggestion,
+  Task,
+  TaskPatch,
+  UsageEvent
+} from '../../shared/types'
 
 /** Segmenting defaults are fixed for V1 (settings carry only the confidence thresholds). */
 const SEGMENT_PARAMS = { hardGapMs: 600_000, transientMs: 2_500, overlapThreshold: 0.3 } as const
@@ -155,6 +167,13 @@ export interface SuggestionEngineOptions {
    * entries are used). Absent = context-prior disabled.
    */
   readMemories?: () => readonly Memory[]
+  /**
+   * Resolve a clipboard item by id (ItemStore in prod). Clipboard events
+   * carry itemId; without this the suggestions carry no material.
+   */
+  readItem?: (itemId: string) => ClipboardItem | undefined
+  /** Observability sink (ai-log.jsonl in prod): algorithm inputs/outputs. */
+  log?: (entry: Record<string, unknown>) => void
   /** Feedback sink: called with a memory candidate after a successful accept. */
   onMemorySuggestion?: (candidate: MemoryCandidate) => void
 }
@@ -168,6 +187,18 @@ interface SuggestionMeta {
   windowTitles: string[]
   /** Confirmed project/workflow memories this segment matched (LLM material). */
   memoryContext: string[]
+}
+
+/**
+ * User-edited accept payload (suggestion convert panel). Each field is
+ * optional: absent fields fall back to what the suggestion carries.
+ */
+export interface AcceptOptions {
+  title?: string
+  note?: string
+  apps?: AppRef[]
+  /** Final clipboard resource list, snapshotted by the IPC layer. */
+  clipboardRefs?: ResourceRef[]
 }
 
 export interface SuggestionEngine {
@@ -185,11 +216,13 @@ export interface SuggestionEngine {
   /** Pending suggestions (transient). */
   suggestions(): readonly Suggestion[]
   /**
-   * Accept: merge into the candidate task (title override renames it first)
-   * or create a new task. Returns the accepted task id; null when the id
-   * is stale (already replaced by a newer analysis).
+   * Accept: merge into the candidate task or create a new one. `opts`
+   * overrides what the suggestion itself carries — the convert panel sends
+   * the user's edited title/note/apps and the selected clipboard refs.
+   * Returns the accepted task id; null when the id is stale (already
+   * replaced by a newer analysis).
    */
-  accept(id: string, titleOverride?: string): Task['id'] | null
+  accept(id: string, opts?: AcceptOptions): Task['id'] | null
   /** Ignore: drop the card and write its signature into the table. */
   ignore(id: string): boolean
   /** Wire the provider chain after construction (index.ts). */
@@ -206,6 +239,7 @@ export interface SuggestionEngine {
 
 export function createSuggestionEngine(options: SuggestionEngineOptions): SuggestionEngine {
   const { now, readEvents, store, getSettings, ignored, onSuggestions } = options
+  const log = options.log ?? (() => {})
   let chat: ChatFn | undefined = options.chat
   let ocr: OcrFn | undefined = undefined
   let running = false
@@ -239,6 +273,35 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       : `Similar to "${target?.title ?? 'unknown'}" — ${attr.evidence.appCombination}, ${minutes} min`
     const overlaps = attr.evidence.overlappingTasks.slice(0, 2)
     return overlaps.length > 0 ? `${basis}; also near ${overlaps.join(', ')}` : basis
+  }
+
+  /**
+   * Assign clipboard events to the segment whose window contains the copy:
+   * each segment owns [startTs, next segment's startTs); copies after the
+   * final app switch stay with the last segment (no new switch means the
+   * session never visibly ended). Resolves refs through `readItem`; items
+   * evicted between copy and analysis are skipped.
+   */
+  function clipboardRefsBySegment(
+    segments: SegmentInfo[],
+    events: ClipboardEvent[]
+  ): ResourceRef[][] {
+    const out: ResourceRef[][] = segments.map(() => [])
+    if (!options.readItem || events.length === 0 || segments.length === 0) return out
+    for (const e of events) {
+      let idx = segments.length - 1
+      for (let i = 0; i < segments.length; i++) {
+        if (e.ts < segments[i].startTs) {
+          idx = Math.max(0, i - 1)
+          break
+        }
+      }
+      if (!e.itemId) continue
+      const item = options.readItem(e.itemId)
+      if (!item) continue
+      out[idx].push(buildClipboardRef(item))
+    }
+    return out
   }
 
   /** Batched LLM annotation for the built suggestions (bounded by MAX_LLM_CANDIDATES). */
@@ -330,20 +393,24 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
   }
 
   /** One analysis pass: cluster the new batch, dedupe, annotate, push. */
-  async function runAnalysis(newEvents: AppSwitchEvent[]): Promise<Suggestion[]> {
+  async function runAnalysis(newEvents: UsageEvent[]): Promise<Suggestion[]> {
     analyzing = true
     try {
       const settings = getSettings()
       const tasks = [...store.list()]
+      const appSwitches = newEvents.filter((e): e is AppSwitchEvent => e.type === 'app-switch')
+      const clipEvents = newEvents.filter((e): e is ClipboardEvent => e.type === 'clipboard')
       // OCR only when a provider exists to consume it — no AI config means
       // no screen capture at all (performance guard, t30).
       const [result, ocrText] = await Promise.all([
-        clusterEvents(newEvents, tasks, buildParams(settings)),
+        clusterEvents(appSwitches, tasks, buildParams(settings)),
         chat ? runOcrOnce() : Promise.resolve(null)
       ])
+      const refsBySegment = clipboardRefsBySegment(result.attributions.map((a) => a.segment), clipEvents)
 
       const built: Array<{ suggestion: Suggestion; meta: SuggestionMeta }> = []
-      for (const attr of result.attributions) {
+      for (let i = 0; i < result.attributions.length; i++) {
+        const attr = result.attributions[i]
         const appRefs = appRefsFromSegment(attr.segment.appKeys, attr.segment.appNames)
         if (appRefs.length === 0) continue
         const signature = suggestionSignature(attr.segment.appKeys, attr.segment.startTs)
@@ -367,7 +434,10 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
             durationMs: attr.evidence.durationMs,
             overlappingTasks: attr.evidence.overlappingTasks
           },
-          taskId: attr.taskId ?? undefined
+          taskId: attr.taskId ?? undefined,
+          // The material copied during the segment's window (isomorphic with
+          // a task's resources — the card and the convert panel show these).
+          clipboardRefs: refsBySegment[i]
         }
         built.push({ suggestion, meta: { appRefs, segmentStartTs: attr.segment.startTs, signature, windowTitles: attr.segment.windowTitles.slice(0, 3), memoryContext: [] } })
       }
@@ -401,6 +471,29 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       console.log(
         `[Suggestion] analysis: ${newEvents.length} events -> ${result.attributions.length} segments -> ${pending.length} suggestions (mode: ${mode}${ocrNote})`
       )
+      log({
+        kind: 'analysis',
+        events: newEvents.length,
+        mode,
+        ocrChars: ocrText?.length,
+        segments: result.attributions.map((a) => ({
+          apps: a.segment.appNames.slice(0, 5),
+          durationMs: a.segment.durationMs,
+          windowTitles: a.segment.windowTitles.slice(0, 3),
+          confidence: a.confidence,
+          zone: a.zone,
+          taskId: a.taskId
+        })),
+        suggestions: built.map((b) => ({
+          id: b.suggestion.id,
+          title: b.suggestion.title,
+          llmTitle: llmOk,
+          confidence: b.suggestion.confidence,
+          apps: b.suggestion.appNames,
+          clipboardRefs: b.suggestion.clipboardRefs?.length ?? 0,
+          reason: b.suggestion.reason
+        }))
+      })
       onSuggestions(pending)
       return pending
     } finally {
@@ -428,24 +521,26 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       if (events.length < settings.suggestionMinEvents) return undefined
       const lastTs = events[events.length - 1].ts
       if (now() - lastTs < settings.suggestionSilenceSeconds * 1000) return undefined
-      const batch = events.filter((e): e is AppSwitchEvent => e.type === 'app-switch')
-      if (batch.length === 0) {
+      const switches = events.filter((e): e is AppSwitchEvent => e.type === 'app-switch')
+      if (switches.length === 0) {
         // Only clipboard events since the last pass: nothing to cluster; mark them seen.
         lastAnalyzedTs = events[events.length - 1].ts
         return undefined
       }
-      return runAnalysis(batch)
+      // The full batch travels into the analysis — clipboard events carry the
+      // material for the suggestions' clipboardRefs.
+      return runAnalysis(events)
     },
     analyzeNow(): Promise<Suggestion[]> {
       const events = readEvents().filter((e) => e.ts > lastAnalyzedTs)
-      const batch = events.filter((e): e is AppSwitchEvent => e.type === 'app-switch')
-      if (batch.length === 0) return Promise.resolve([])
-      return runAnalysis(batch)
+      const switches = events.filter((e): e is AppSwitchEvent => e.type === 'app-switch')
+      if (switches.length === 0) return Promise.resolve([])
+      return runAnalysis(events)
     },
     suggestions(): readonly Suggestion[] {
       return pending
     },
-    accept(id: string, titleOverride?: string): Task['id'] | null {
+    accept(id: string, opts?: AcceptOptions): Task['id'] | null {
       const suggestion = pending.find((s) => s.id === id)
       if (!suggestion) return null
       const m = meta.get(id)
@@ -453,14 +548,17 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       meta.delete(id)
       onSuggestions(pending)
 
-      const title = titleOverride?.trim() || suggestion.title
+      const title = opts?.title?.trim() || suggestion.title
+      const apps = opts?.apps ?? m?.appRefs ?? []
+      const resources = opts?.clipboardRefs ?? suggestion.clipboardRefs ?? []
       // Evidence captured at accept time (t27): the segment's recent window
       // titles, the confidence shown on the card, and a human-readable reason
       // — LLM rationale when present, else the algorithm evidence summary.
       const evidence: TaskPatch = {
         windowTitles: m?.windowTitles ?? [],
         confidence: suggestion.confidence,
-        reason: suggestion.reason?.trim() || suggestion.algorithmReason
+        reason: suggestion.reason?.trim() || suggestion.algorithmReason,
+        ...(opts?.note !== undefined ? { note: opts.note } : {})
       }
       const emitMemoryCandidate = (): void => {
         // Feedback distillation (spec decision 7): a confirmed work pattern
@@ -469,20 +567,23 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         if (candidate) options.onMemorySuggestion?.(candidate)
       }
       if (suggestion.taskId && store.get(suggestion.taskId)) {
-        if (titleOverride?.trim()) evidence.title = titleOverride.trim()
+        if (opts?.title?.trim()) evidence.title = opts.title.trim()
         store.update(suggestion.taskId, evidence)
-        // Absorb the segment's apps through the type-safe merge path: create a
-        // temp task carrying them, then merge it into the candidate (source is
-        // deleted; apps/timestamps are combined by TaskStore.merge).
-        const temp = store.create(title, { apps: m?.appRefs ?? [] })
+        // Absorb the segment's apps + clipboard material through the type-safe
+        // merge path: create a temp task carrying them, then merge it into the
+        // candidate (source is deleted; apps/resources/timestamps are combined
+        // by TaskStore.merge).
+        const temp = store.create(title, { apps, resources })
         if (temp) store.merge(suggestion.taskId, temp.id)
         console.log(`[Suggestion] accepted ${id} -> merged into ${suggestion.taskId}`)
         emitMemoryCandidate()
+        log({ kind: 'accept', suggestionId: id, title, taskId: suggestion.taskId, merged: true, apps: apps.length, clipboardRefs: resources.length })
         return suggestion.taskId
       }
-      const created = store.create(title, { apps: m?.appRefs ?? [], ...evidence })
+      const created = store.create(title, { apps, resources, ...evidence })
       console.log(`[Suggestion] accepted ${id} -> new task ${created?.id ?? '(none)'}`)
       emitMemoryCandidate()
+      log({ kind: 'accept', suggestionId: id, title, taskId: created?.id ?? null, merged: false, apps: apps.length, clipboardRefs: resources.length })
       return created?.id ?? null
     },
     ignore(id: string): boolean {
@@ -491,6 +592,7 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       meta.delete(id)
       if (m) ignored.add(m.signature)
       onSuggestions(pending)
+      if (m) log({ kind: 'ignore', suggestionId: id, signature: m.signature })
       return m !== undefined
     },
     setChat(fn: ChatFn): void {
@@ -500,7 +602,10 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       ocr = fn
     },
     async suggestTitle(ctx: SuggestTitleContext): Promise<string[] | null> {
-      if (!chat) return null
+      if (!chat) {
+        log({ kind: 'title.request', context: {}, error: 'no provider configured' })
+        return null
+      }
       // Only the fields the draft actually carries travel to the provider.
       const details: Record<string, unknown> = {}
       if (ctx.title && ctx.title.trim().length > 0) details.title = ctx.title.trim()
@@ -520,6 +625,7 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         )
         if (hits[0] && hits[0].length > 0) details.memoryContext = hits[0]
       }
+      log({ kind: 'title.request', context: details })
       const req: ChatRequest = {
         messages: [
           {
@@ -544,12 +650,20 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       try {
         result = await chat(req)
       } catch (err) {
-        console.log(`[Suggestion] title suggestion failed: ${err instanceof Error ? err.message : String(err)}`)
+        const error = err instanceof Error ? err.message : String(err)
+        console.log(`[Suggestion] title suggestion failed: ${error}`)
+        log({ kind: 'title.result', titles: null, error })
         return null
       }
-      if (!result.ok || !result.parsed || typeof result.parsed !== 'object' || Array.isArray(result.parsed)) return null
+      if (!result.ok || !result.parsed || typeof result.parsed !== 'object' || Array.isArray(result.parsed)) {
+        log({ kind: 'title.result', titles: null, error: result.ok ? 'invalid reply' : result.error })
+        return null
+      }
       const parsed = result.parsed as { titles?: unknown }
-      if (!Array.isArray(parsed.titles)) return null
+      if (!Array.isArray(parsed.titles)) {
+        log({ kind: 'title.result', titles: null, error: 'invalid reply' })
+        return null
+      }
 
       const seen = new Set<string>()
       const titles: string[] = []
@@ -560,7 +674,9 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         titles.push(title)
         if (titles.length >= 3) break
       }
-      return titles.length > 0 ? titles : null
+      const out = titles.length > 0 ? titles : null
+      log({ kind: 'title.result', titles: out, error: out ? undefined : 'no valid titles' })
+      return out
     }
   }
 }

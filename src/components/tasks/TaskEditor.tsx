@@ -1,11 +1,17 @@
 /**
- * TaskEditor — guided create/edit form (ADR-0002, ADR-0003).
+ * TaskEditor — guided create/edit/convert form (ADR-0002, ADR-0003).
  *
  * Progressive disclosure top to bottom: title → app grid (multi-select) →
  * clipboard list (3 anchors, expands as apps are picked, +3 per "show
  * more", 15 cap, source-app icons) → note → save/cancel. Create and edit
  * share the form; edit pre-selects the task's apps and linked items (dead
  * snapshots show greyed and cannot be unlinked here).
+ *
+ * Convert mode (`suggestion` prop): the form opens prefilled from a task
+ * suggestion — its apps, the clipboard material copied during the segment,
+ * and the "why" (algorithm evidence + AI rationale) as an extra section.
+ * The primary button becomes "convert to task": same save payload, accepted
+ * through suggestion:accept so evidence and memory feedback still apply.
  *
  * The save button doubles as the AI title trigger (ADR-0003): with an empty
  * title and any context it asks the provider chain for a title first, then
@@ -16,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from '../../i18n'
 import { useStore } from '../../store/appStore'
 import type { SuggestTitleContext } from '../../../shared/ipc'
-import type { AppRef, ResourceSnapshot, TaskDto } from '../../../shared/types'
+import type { AppRef, ResourceSnapshot, Suggestion, TaskDto } from '../../../shared/types'
 import { appKeyFromIdentity } from '../../../shared/appKey'
 import { AppIcon } from './AppIcon'
 import { CheckIcon, FileIcon, ImageIcon, LinkIcon } from '../icons'
@@ -27,6 +33,7 @@ import {
   clipboardPreview,
   fallbackTaskTitle,
   revealStepForApps,
+  suggestionAppRefs,
   CLIPBOARD_MAX_ROWS,
   type ClipboardRow
 } from '../../lib/taskEditor'
@@ -41,36 +48,52 @@ export interface TaskSavePayload {
 
 interface Props {
   /** The task being edited, or null when creating a new one. */
-  task: TaskDto | null
+  task?: TaskDto | null
+  /** The suggestion being converted (mutually exclusive with task). */
+  suggestion?: Suggestion | null
   onSave: (payload: TaskSavePayload) => void
   onCancel: () => void
 }
 
-export function TaskEditor({ task, onSave, onCancel }: Props) {
+function formatDuration(ms: number): string {
+  const minutes = Math.max(1, Math.round(ms / 60_000))
+  return minutes < 60 ? `${minutes}m` : `${Math.round(minutes / 60)}h`
+}
+
+export function TaskEditor({ task, suggestion, onSave, onCancel }: Props) {
   const { t } = useTranslation()
   const items = useStore((s) => s.items)
   const getTaskAppOptions = useStore((s) => s.getTaskAppOptions)
   const getAppIcons = useStore((s) => s.getAppIcons)
   const suggestTaskTitle = useStore((s) => s.suggestTaskTitle)
 
-  const [title, setTitle] = useState(task?.title ?? '')
+  /** Convert-mode prefill: the suggestion's apps and clipboard material. */
+  const suggestionRefs = useMemo(() => suggestion?.clipboardRefs ?? [], [suggestion])
+  const suggestionApps = useMemo(
+    () => (suggestion ? suggestionAppRefs(suggestion.appNames, suggestion.appExePaths) : []),
+    [suggestion]
+  )
+  const prefillApps = task?.apps ?? suggestionApps
+  const prefillResources = task?.resources ?? suggestionRefs
+
+  const [title, setTitle] = useState(task?.title ?? suggestion?.title ?? '')
   const [note, setNote] = useState(task?.note ?? '')
   const [appOptions, setAppOptions] = useState<AppRef[]>([])
   const [selectedApps, setSelectedApps] = useState<Map<string, AppRef>>(
-    () => new Map((task?.apps ?? []).map((a) => [a.id, a]))
+    () => new Map(prefillApps.map((a) => [a.id, a]))
   )
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
-    () => new Set((task?.resources ?? []).flatMap((r) => (r.kind === 'clipboard' ? [r.itemId] : [])))
+    () => new Set(prefillResources.flatMap((r) => (r.kind === 'clipboard' ? [r.itemId] : [])))
   )
   const [icons, setIcons] = useState<Map<string, string | null>>(new Map())
   /**
    * Reveal enough rows that the form is honest about its state: the
    * app-selection step (3 + 3/app) plus every already-linked clipboard row
-   * (edit mode) — a pre-checked item must never hide behind "show more".
+   * (edit/convert mode) — a pre-checked item must never hide behind "show more".
    */
   const [visibleCount, setVisibleCount] = useState(() => {
-    const appCount = task?.apps.length ?? 0
-    const linkedCount = (task?.resources ?? []).filter((r) => r.kind === 'clipboard').length
+    const appCount = prefillApps.length
+    const linkedCount = prefillResources.filter((r) => r.kind === 'clipboard').length
     return Math.min(CLIPBOARD_MAX_ROWS, Math.max(revealStepForApps(appCount), linkedCount))
   })
   const [saving, setSaving] = useState(false)
@@ -94,27 +117,27 @@ export function TaskEditor({ task, onSave, onCancel }: Props) {
     return () => { cancelled = true }
   }, [getTaskAppOptions])
 
-  /** Linked clipboard refs from the task (itemId → snapshot); empty when creating. */
+  /** Linked clipboard refs from the task/suggestion (itemId → snapshot). */
   const linked = useMemo(() => {
     const m = new Map<string, ResourceSnapshot>()
-    for (const r of task?.resources ?? []) {
+    for (const r of prefillResources) {
       if (r.kind === 'clipboard') m.set(r.itemId, r.snapshot)
     }
     return m
-  }, [task])
+  }, [prefillResources])
 
   /**
-   * Grid entries = main-provided options ∪ the task's own apps. The task's
-   * AppRef wins on id collision: it may carry attribution context
-   * (lastContext) the bus copy lacks, and it must stay selectable and
-   * deselected-able even when absent from both bus and clipboard.
+   * Grid entries = main-provided options ∪ the task's/suggestion's own apps.
+   * The prefill AppRef wins on id collision: it may carry attribution
+   * context (lastContext) the bus copy lacks, and it must stay selectable
+   * and deselected-able even when absent from both bus and clipboard.
    */
   const options = useMemo(() => {
     const byId = new Map<string, AppRef>()
-    for (const a of task?.apps ?? []) byId.set(a.id, a)
+    for (const a of prefillApps) byId.set(a.id, a)
     for (const a of appOptions) if (!byId.has(a.id)) byId.set(a.id, a)
     return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
-  }, [appOptions, task])
+  }, [appOptions, prefillApps])
 
   const rows = useMemo(
     () => buildClipboardRows(items, new Set(selectedApps.keys()), linked, selectedItemIds),
@@ -340,6 +363,33 @@ export function TaskEditor({ task, onSave, onCancel }: Props) {
         }}
       />
 
+      {suggestion && (
+        <section className="task-suggestion-meta">
+          <div className="task-suggestion-reason-label">{t('tasks.suggestionReason')}</div>
+          <p className="task-suggestion-reason-text">{suggestion.algorithmReason}</p>
+          <div className="task-suggestion-reason-evidence">
+            {suggestion.evidence.appCombination} · {formatDuration(suggestion.evidence.durationMs)}
+            {suggestion.evidence.overlappingTasks.length > 0 && (
+              <> · {t('tasks.suggestionNearTasks', { titles: suggestion.evidence.overlappingTasks.join(', ') })}</>
+            )}
+          </div>
+          <div className="task-suggestion-conf">
+            <span className="task-suggestion-reason-label">
+              {t('tasks.suggestionConfidence', { value: Math.round(Math.min(1, Math.max(0, suggestion.confidence)) * 100) })}
+            </span>
+            {suggestion.lowConfidence && (
+              <span className="task-suggestion-low">{t('tasks.suggestionLowConfidence')}</span>
+            )}
+          </div>
+          {suggestion.reason && (
+            <div className="task-suggestion-reason-block">
+              <div className="task-suggestion-reason-label">{t('tasks.suggestionAiReason')}</div>
+              <p className="task-suggestion-reason-text">{suggestion.reason}</p>
+            </div>
+          )}
+        </section>
+      )}
+
       <div className="task-editor-actions">
         <button type="button" className="task-btn" onClick={onCancel} disabled={saving}>
           {t('tasks.cancel')}
@@ -350,7 +400,7 @@ export function TaskEditor({ task, onSave, onCancel }: Props) {
           disabled={!canSaveTaskForm(title, selectedApps.size > 0, selectedItemIds.size > 0, note) || saving}
           onClick={() => void handleSave()}
         >
-          {saving ? t('tasks.saving') : t('tasks.save')}
+          {saving ? t('tasks.saving') : suggestion ? t('tasks.suggestionConvert') : t('tasks.save')}
         </button>
       </div>
     </div>

@@ -1,25 +1,37 @@
 /**
- * Panel keyboard-focus bridge (ticket 21).
+ * Panel keyboard-focus bridge (ticket 21, final form).
  *
- * The panel BrowserWindow is created with `focusable: false` (upstream
- * legacy). That sets both the OS WS_EX_NOACTIVATE style AND Chromium's
- * internal "window cannot activate" state — the latter is cached at creation
- * and ignores raw style manipulation: stripping WS_EX_NOACTIVATE via
- * SetWindowLongPtr makes the OS window activatable (foreground/active/keyboard
- * focus all move correctly) but Chromium never routes keyboard input, so
- * keystrokes still get dropped. That path was tried and measured on a real
- * machine; this is the root-cause fix.
+ * Measured platform facts (Windows + Chromium):
+ *   - An inactive window (WS_EX_NOACTIVATE / not foreground) silently drops
+ *     element.focus() AND never receives global keyboard input — user32
+ *     SetFocus from a non-foreground thread only sets the thread-local focus,
+ *     keys still go to the foreground window. Verified end-to-end.
+ *   - Chromium's internal activation (webContents.focus()) alone makes
+ *     document.hasFocus() true but does NOT make the OS route real keystrokes.
+ *   - So keyboard input REQUIRES the OS window to be truly activated.
+ *   - Electron's setFocusable(false) HIDES the window on Windows — never use
+ *     it; the window stays focusable:true at all times (window.ts), and the
+ *     non-activatable behavior is controlled purely via the WS_EX_NOACTIVATE
+ *     style.
  *
- * The working approach uses Electron's own focus machinery, which updates
- * both layers at once:
- *
- *   - requestPanelFocus (renderer fired `ui:input-focus` when an editable
- *     element gained focus): setFocusable(true) + focus() — the window truly
- *     activates and Chromium routes keys to the renderer. Stealing the
- *     foreground is exactly what the user asked for by clicking an input.
- *   - releasePanelFocus (`ui:input-blur`): setFocusable(false) — back to
- *     non-activatable so ordinary clicks (cards, buttons, tabs) never
- *     activate the panel again.
+ * Design (activation on demand, session-held while typing):
+ *   - requestPanelFocus (renderer `ui:input-focus` from pointerdown/focusin
+ *     on an editable element): strip WS_EX_NOACTIVATE, then win.focus() — the
+ *     window truly activates and Chromium routes keys. skipTaskbar is
+ *     re-asserted so no taskbar button appears. Stealing the foreground is
+ *     exactly what the user asked for by clicking an input.
+ *   - While an input is focused the activated state is KEPT (input blur does
+ *     not release it), so switching between inputs (input <-> textarea)
+ *     never flickers the window or re-steals the foreground.
+ *   - Non-input clicks (cards/buttons/chips) also KEEP the activation: early
+ *     versions blurred the window after such clicks to hand the keyboard
+ *     focus back, but every click then flipped the transparent panel
+ *     active<->inactive and flickered it. Chromium activates the window on
+ *     any click anyway, so holding the activation makes subsequent clicks
+ *     no-ops; the user's keyboard flow resumes when they click back into
+ *     their own app.
+ *   - releasePanelFocusNow (main's window:set-interactive(false) path):
+ *     restore WS_EX_NOACTIVATE when the panel closes.
  *
  * Every step fails silent: a hiccup degrades to "input focus request
  * ignored", never a crash.
@@ -42,20 +54,34 @@ if (process.platform === 'win32') {
     getWindowLongPtrW = user32.func('int64_t __stdcall GetWindowLongPtrW(void *hWnd, int nIndex)') as GetWindowLongPtrFn
     setWindowLongPtrW = user32.func('int64_t __stdcall SetWindowLongPtrW(void *hWnd, int nIndex, int64_t dwNewLong)') as SetWindowLongPtrFn
   } catch (err) {
-    console.error('[Focus] koffi user32 load failed — NOACTIVATE restore disabled:', err)
+    console.error('[Focus] koffi user32 load failed — activation bridge disabled:', err)
   }
 }
 
 /**
- * Activate the panel window so Chromium forwards keyboard input to the
- * renderer. Idempotent — repeated calls while an input is focused are cheap
- * (Electron short-circuits an already-active window). Fails silent.
+ * Activate the panel window so the OS routes real keystrokes to it.
+ * Idempotent — repeated calls while an input is focused are cheap (Electron
+ * short-circuits an already-active window; the style strip is a no-op once
+ * NOACTIVATE is gone). Fails silent.
  */
 export function requestPanelFocus(): void {
   const win = getMainWindow()
   if (!win || win.isDestroyed() || win.isMinimized() || !win.isVisible()) return
   try {
-    win.setFocusable(true)
+    win.setSkipTaskbar(true)
+  } catch {
+    // fail silent
+  }
+  try {
+    const hwnd = koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void'))
+    const ex = getWindowLongPtrW ? Number(getWindowLongPtrW(hwnd, GWL_EXSTYLE)) : 0
+    if (ex !== 0 && (ex & WS_EX_NOACTIVATE) !== 0 && setWindowLongPtrW) {
+      setWindowLongPtrW(hwnd, GWL_EXSTYLE, BigInt(ex & ~WS_EX_NOACTIVATE))
+    }
+  } catch {
+    // fail silent
+  }
+  try {
     win.focus()
   } catch {
     // fail silent
@@ -63,22 +89,22 @@ export function requestPanelFocus(): void {
 }
 
 /**
- * Restore the panel to non-activatable after the input lost focus, so
- * non-input clicks never activate it again. Idempotent; fails silent.
- *
- * setFocusable(false) resets Chromium's internal activation state but does
- * NOT re-apply the WS_EX_NOACTIVATE style (measured on Windows) — re-add the
- * style explicitly so plain clicks cannot activate the window at the OS
- * level either.
+ * Input blur (`ui:input-blur`): intentionally a no-op. Early versions blurred
+ * the window on every non-input click to hand the keyboard focus back, but
+ * that flipped the transparent panel active<->inactive on each click and
+ * flickered it (layered-window re-synth), and raced Chromium's own
+ * activation. Activation is held for the panel session; the only release
+ * points are the panel closing (releasePanelFocusNow) and the user clicking
+ * back into their own app (which re-activates that window naturally).
  */
 export function releasePanelFocus(): void {
+  // no-op — see module docs
+}
+
+/** Restore the non-activatable style — called when the panel closes. */
+export function releasePanelFocusNow(): void {
   const win = getMainWindow()
   if (!win || win.isDestroyed()) return
-  try {
-    win.setFocusable(false)
-  } catch {
-    // fail silent
-  }
   try {
     const hwnd = koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void'))
     const ex = getWindowLongPtrW ? Number(getWindowLongPtrW(hwnd, GWL_EXSTYLE)) : 0

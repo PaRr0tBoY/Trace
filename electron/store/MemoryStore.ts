@@ -48,6 +48,8 @@ export interface MemoryStoreDeps {
   now?: () => number
   /** Decay parameters; defaults mirror DEFAULT_SETTINGS, Settings overrides at runtime. */
   decay?: Partial<MemoryDecayParams>
+  /** Observability sink (ai-log.jsonl): every memory write, with content. */
+  log?: (entry: Record<string, unknown>) => void
 }
 
 export const STORAGE_VERSION = 1
@@ -129,9 +131,11 @@ export class MemoryStore {
   private staleDays = DEFAULT_STALE_DAYS
   private cleanupScore = DEFAULT_CLEANUP_SCORE
   private readonly deps: MemoryStoreDeps
+  private readonly log: (entry: Record<string, unknown>) => void
 
   constructor(deps: MemoryStoreDeps) {
     this.deps = deps
+    this.log = deps.log ?? (() => {})
     if (deps.decay) this.setDecay(deps.decay)
   }
 
@@ -192,6 +196,7 @@ export class MemoryStore {
     }
     this.memories.push(memory)
     this.persist()
+    this.log({ kind: 'memory', action: 'suggest', memoryId: memory.id, type: memory.type, content: memory.content, source: memory.source })
     return memory
   }
 
@@ -201,6 +206,7 @@ export class MemoryStore {
     if (!memory || memory.userState !== 'suggested') return false
     memory.userState = 'confirmed'
     this.strengthen(memory)
+    this.log({ kind: 'memory', action: 'confirm', memoryId: memory.id, type: memory.type, content: memory.content })
     return true
   }
 
@@ -210,6 +216,7 @@ export class MemoryStore {
     if (!memory || memory.userState !== 'suggested') return false
     memory.userState = 'ignored'
     this.persist()
+    this.log({ kind: 'memory', action: 'ignore', memoryId: memory.id, type: memory.type, content: memory.content })
     return true
   }
 
@@ -223,6 +230,7 @@ export class MemoryStore {
     if (!memory || memory.userState === 'banned') return false
     memory.userState = 'banned'
     this.persist()
+    this.log({ kind: 'memory', action: 'ban', memoryId: memory.id, type: memory.type, content: memory.content })
     return true
   }
 
@@ -237,6 +245,7 @@ export class MemoryStore {
     if (!memory || memory.userState !== 'banned') return false
     memory.userState = 'ignored'
     this.persist()
+    this.log({ kind: 'memory', action: 'unban', memoryId: memory.id, type: memory.type, content: memory.content })
     return true
   }
 
@@ -245,6 +254,7 @@ export class MemoryStore {
     const memory = this.memories.find((m) => m.id === id)
     if (!memory || memory.userState !== 'confirmed') return false
     this.strengthen(memory)
+    this.log({ kind: 'memory', action: 'hit', memoryId: memory.id, type: memory.type, content: memory.content })
     return true
   }
 
@@ -289,10 +299,14 @@ export class MemoryStore {
 
   /** Hard delete (user-confirmed cleanup). Returns whether a memory was removed. */
   delete(id: string): boolean {
+    const memory = this.memories.find((m) => m.id === id)
     const before = this.memories.length
     this.memories = this.memories.filter((m) => m.id !== id)
     if (this.memories.length === before) return false
     this.persist()
+    if (memory) {
+      this.log({ kind: 'memory', action: 'delete', memoryId: memory.id, type: memory.type, content: memory.content })
+    }
     return true
   }
 

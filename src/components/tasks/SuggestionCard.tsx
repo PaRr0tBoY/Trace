@@ -1,44 +1,48 @@
 /**
- * SuggestionCard — one AI task suggestion (t19), two-line layout (t23).
+ * SuggestionCard — one task suggestion (t19), compact two-row card (t23).
  *
- * Line 1: editable title (+ low-confidence badge). Line 2: app icons
- * (no names) on the left, three icon actions on the right. The "why"
- * toggle folds out the algorithm evidence + optional LLM rationale.
- * Everything delegates to main — the card is a view of the pushed
- * `state:suggestions` payload.
+ * Line 1: title (+ low-confidence badge). Line 2: app icons and the
+ * clipboard material copied during the segment (isomorphic with a task's
+ * resources) on the left, three icon actions on the right. Clicking the
+ * card opens the convert panel (TaskEditor in suggestion mode) where the
+ * "why" lives — the card itself carries no expandable detail. Everything
+ * delegates to main — the card is a view of the pushed `state:suggestions`
+ * payload.
  */
 import { useState } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
-import type { Suggestion } from '../../../shared/types'
-import { CheckIcon, EditIcon, CloseIcon, ChevronDownIcon, ChevronUpIcon, SparklesIcon } from '../icons'
+import { basename } from '../../lib/format'
+import type { ResourceRef, Suggestion } from '../../../shared/types'
+import { CheckIcon, EditIcon, CloseIcon, FileIcon, ImageIcon, SparklesIcon } from '../icons'
 import { acceptSuggestionDrop } from './dropActions'
 
 interface Props {
   suggestion: Suggestion
+  /** Open the convert panel for this suggestion (absent in drop surfaces). */
+  onOpen?: (id: string) => void
 }
 
 const MAX_APPS = 5
+const MAX_CHIPS = 3
 
-function formatDuration(ms: number): string {
-  const minutes = Math.max(1, Math.round(ms / 60_000))
-  return minutes < 60 ? `${minutes}m` : `${Math.round(minutes / 60)}h`
+/** Short chip label for one clipboard ref (the task-detail preview shape). */
+function chipLabel(ref: ResourceRef): string {
+  if (ref.kind === 'files') return ref.paths.length > 1 ? `${basename(ref.paths[0])} +${ref.paths.length - 1}` : basename(ref.paths[0])
+  if (ref.snapshot.type === 'text') return ref.snapshot.preview.slice(0, 24)
+  return ref.snapshot.preview
 }
 
-export function SuggestionCard({ suggestion }: Props) {
+export function SuggestionCard({ suggestion, onOpen }: Props) {
   const { t } = useTranslation()
   const acceptSuggestion = useStore((s) => s.acceptSuggestion)
   const ignoreSuggestion = useStore((s) => s.ignoreSuggestion)
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(suggestion.title)
-  const [expanded, setExpanded] = useState(false)
   const [brokenIcons, setBrokenIcons] = useState<ReadonlySet<string>>(new Set())
   /** Drop-hover highlight (t25): the whole card is a drop target. */
   const [over, setOver] = useState(false)
 
   const confirm = (): void => {
-    const title = editing ? draft.trim() : ''
-    void acceptSuggestion(suggestion.id, title || undefined)
+    void acceptSuggestion(suggestion.id)
   }
 
   /** Drop the in-panel drag onto the card: accept + bind in one main-side step. */
@@ -57,11 +61,15 @@ export function SuggestionCard({ suggestion }: Props) {
   const apps = (suggestion.appIcons ?? [])
     .filter((app) => !brokenIcons.has(app.iconUrl))
     .slice(0, MAX_APPS)
+  const chips = (suggestion.clipboardRefs ?? []).slice(0, MAX_CHIPS)
+  const chipOverflow = (suggestion.clipboardRefs?.length ?? 0) - chips.length
 
   return (
     <div
       className={`task-suggestion-card${over ? ' drop-over' : ''}`}
       data-drop-suggestion-id={suggestion.id}
+      onClick={() => onOpen?.(suggestion.id)}
+      title={onOpen ? t('tasks.openDetail') : undefined}
       onDragOver={(e) => {
         e.preventDefault()
         setOver(true)
@@ -73,22 +81,7 @@ export function SuggestionCard({ suggestion }: Props) {
       onDrop={onDrop}
     >
       <div className="task-suggestion-head">
-        {editing ? (
-          <input
-            className="task-suggestion-input"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') confirm()
-              if (e.key === 'Escape') setEditing(false)
-            }}
-            autoFocus
-            maxLength={80}
-            spellCheck={false}
-          />
-        ) : (
-          <div className="task-suggestion-title">{suggestion.title}</div>
-        )}
+        <div className="task-suggestion-title">{suggestion.title}</div>
         {suggestion.lowConfidence && (
           <span className="task-suggestion-low">{t('tasks.suggestionLowConfidence')}</span>
         )}
@@ -114,31 +107,22 @@ export function SuggestionCard({ suggestion }: Props) {
           )}
         </div>
 
-        <div className="task-suggestion-actions">
+        <div className="task-suggestion-actions" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             className="task-suggestion-action accept"
             title={t('tasks.suggestionAccept')}
             onClick={confirm}
-            disabled={editing && draft.trim().length === 0}
           >
             <CheckIcon width={14} height={14} />
           </button>
           <button
             type="button"
             className="task-suggestion-action"
-            title={editing ? t('tasks.cancel') : t('tasks.suggestionEdit')}
-            onClick={() => {
-              if (editing) {
-                setDraft(suggestion.title)
-                setEditing(false)
-              } else {
-                setDraft(suggestion.title)
-                setEditing(true)
-              }
-            }}
+            title={t('tasks.suggestionEdit')}
+            onClick={() => onOpen?.(suggestion.id)}
           >
-            {editing ? <CloseIcon width={13} height={13} /> : <EditIcon width={13} height={13} />}
+            <EditIcon width={13} height={13} />
           </button>
           <button
             type="button"
@@ -151,33 +135,23 @@ export function SuggestionCard({ suggestion }: Props) {
         </div>
       </div>
 
-      <button
-        type="button"
-        className="task-suggestion-why"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        {t('tasks.suggestionReason')}
-        {expanded ? <ChevronUpIcon width={11} height={11} /> : <ChevronDownIcon width={11} height={11} />}
-      </button>
-
-      {expanded && (
-        <div className="task-suggestion-reason">
-          <div className="task-suggestion-reason-block">
-            <div className="task-suggestion-reason-label">{t('tasks.suggestionAlgorithm')}</div>
-            <div className="task-suggestion-reason-text">{suggestion.algorithmReason}</div>
-            <div className="task-suggestion-reason-evidence">
-              {suggestion.evidence.appCombination} · {formatDuration(suggestion.evidence.durationMs)}
-              {suggestion.evidence.overlappingTasks.length > 0 && (
-                <> · {t('tasks.suggestionNearTasks', { titles: suggestion.evidence.overlappingTasks.join(', ') })}</>
-              )}
-            </div>
-          </div>
-          {suggestion.reason && (
-            <div className="task-suggestion-reason-block">
-              <div className="task-suggestion-reason-label">{t('tasks.suggestionAiReason')}</div>
-              <div className="task-suggestion-reason-text">{suggestion.reason}</div>
-            </div>
-          )}
+      {chips.length > 0 && (
+        <div className="task-suggestion-chips">
+          {chips.map((ref, i) => (
+            <span
+              key={ref.kind === 'files' ? `f${i}` : ref.itemId}
+              className="task-suggestion-chip"
+              title={chipLabel(ref)}
+            >
+              {ref.kind === 'files' ? (
+                <FileIcon width={10} height={10} />
+              ) : ref.snapshot.type !== 'text' ? (
+                <ImageIcon width={10} height={10} />
+              ) : null}
+              {chipLabel(ref)}
+            </span>
+          ))}
+          {chipOverflow > 0 && <span className="task-suggestion-chip-more">+{chipOverflow}</span>}
         </div>
       )}
     </div>

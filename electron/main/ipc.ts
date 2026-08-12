@@ -13,6 +13,7 @@ import { requestPanelFocus, releasePanelFocus, releasePanelFocusNow } from './fo
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
 import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore } from './state'
 import { getMainWindow } from './window'
+import { setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData } from './drag'
 import { clipboardSignature } from '../clipboard/formats'
@@ -22,6 +23,7 @@ import { resolveAppIcon } from './appIcons'
 import { recentEvents } from './eventBus'
 import { acceptWithResource } from './suggestionDrop'
 import { ProviderChain, buildLocalProvider, detectOllama, testProvider } from './provider'
+import { logAi } from './aiLog'
 import type { ItemData, MergeResult, MemoryListPayload, ResourceRef, Task } from '../../shared/types'
 
 /**
@@ -274,8 +276,38 @@ export function registerIpc(): void {
 
   /* --------------------------- suggestions --------------------------- */
 
-  handle('suggestion:accept', (id, titleOverride) => {
-    const accepted = getSuggestionEngine().accept(id, titleOverride)
+  /**
+   * Resolve the convert panel's clipboard selection into final refs: live
+   * items snapshot fresh; evicted-but-linked items keep the suggestion's
+   * own snapshot (dead rows can't be unchecked in the panel).
+   */
+  const suggestionClipboardRefs = (id: string, itemIds: string[] | undefined): ResourceRef[] | undefined => {
+    if (itemIds === undefined) return undefined
+    const suggestion = getSuggestionEngine().suggestions().find((s) => s.id === id)
+    const own = new Map(
+      (suggestion?.clipboardRefs ?? [])
+        .filter((r): r is Extract<ResourceRef, { kind: 'clipboard' }> => r.kind === 'clipboard')
+        .map((r) => [r.itemId, r])
+    )
+    const refs: ResourceRef[] = []
+    for (const itemId of itemIds) {
+      const item = getStore().get(itemId)
+      if (item) refs.push(buildClipboardRef(item))
+      else {
+        const old = own.get(itemId)
+        if (old) refs.push(old)
+      }
+    }
+    return refs
+  }
+
+  handle('suggestion:accept', (id, opts) => {
+    const accepted = getSuggestionEngine().accept(id, {
+      title: opts?.title,
+      note: opts?.note,
+      apps: opts?.apps,
+      clipboardRefs: suggestionClipboardRefs(id, opts?.clipboardItemIds)
+    })
     if (accepted !== null) pushState.tasks()
     return getTaskStore().toDto()
   })
@@ -292,7 +324,7 @@ export function registerIpc(): void {
         : { kind: 'files', paths: resource.paths }
     const accepted = ref
       ? acceptWithResource(getSuggestionEngine(), getTaskStore(), id, titleOverride, ref)
-      : getSuggestionEngine().accept(id, titleOverride)
+      : getSuggestionEngine().accept(id, { title: titleOverride })
     if (accepted !== null) pushState.tasks()
     return getTaskStore().toDto()
   })
@@ -604,6 +636,12 @@ export function registerIpc(): void {
 
   handle('window:set-interactive', (value) => {
     setInteractive(value)
+    // Panel closed (interactive -> non-interactive): drop any active input
+    // focus immediately so the NOACTIVATE style is restored and later plain
+    // clicks don't activate the window (see focus.ts).
+    if (!value) {
+      releasePanelFocusNow()
+    }
   })
 
   handle('window:set-preview-mode', (active) => {
@@ -645,7 +683,10 @@ let providerChain: ProviderChain | null = null
 
 export function getProviderChain(): ProviderChain {
   if (!providerChain) {
-    providerChain = new ProviderChain({ getProviders: () => loadSettings().aiProviders })
+    providerChain = new ProviderChain({
+      getProviders: () => loadSettings().aiProviders,
+      log: (entry) => logAi(entry)
+    })
     console.log(`[AI] provider chain ready (${loadSettings().aiProviders.length} providers)`)
   }
   return providerChain
@@ -688,6 +729,12 @@ export function registerSendListeners(): void {
 
   on('ui:input-blur', () => {
     releasePanelFocus()
+  })
+
+  on('panel:expand', () => {
+    setVisible(true)
+    setInteractive(true)
+    pushState.togglePanel(true)
   })
 
   on('item:start-drag', (sender, req) => {

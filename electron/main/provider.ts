@@ -74,6 +74,11 @@ export type ChatResult =
 export interface ProviderChainOptions {
   getProviders: () => ProviderConfig[]
   fetchImpl?: typeof fetch
+  /**
+   * Observability sink (ai-log.jsonl in prod). Receives one entry per chat
+   * call: the request material and the final outcome. Optional, never throws.
+   */
+  log?: (entry: Record<string, unknown>) => void
 }
 
 export const DEFAULT_OLLAMA_BASE = 'http://127.0.0.1:11434'
@@ -94,7 +99,19 @@ export function normalizeChatUrl(baseUrl: string): string {
  * embedded into a trailing system message (DeepSeek-style endpoints require
  * the prompt to mention JSON; the schema example is the strongest nudge).
  */
-export function buildChatBody(provider: ProviderConfig, req: ChatRequest, mode: ChatMode | 'none'): Record<string, unknown> {
+/**
+ * Extra per-attempt knobs for the adaptive retry loop (callProvider):
+ * `thinking` disables the model's reasoning phase for short structured
+ * tasks (DeepSeek-style thinking models burn the output budget on
+ * reasoning_content otherwise); `scale` multiplies the requested output
+ * budget when a model still needs more room.
+ */
+export interface ChatExtra {
+  thinking?: boolean
+  scale?: number
+}
+
+export function buildChatBody(provider: ProviderConfig, req: ChatRequest, mode: ChatMode | 'none', extra?: ChatExtra): Record<string, unknown> {
   const messages = req.messages.map((m) => ({ ...m }))
   if (mode === 'json_object' && req.schema) {
     messages.push({
@@ -103,7 +120,10 @@ export function buildChatBody(provider: ProviderConfig, req: ChatRequest, mode: 
     })
   }
   const body: Record<string, unknown> = { model: provider.model, messages }
-  if (req.maxTokens !== undefined) body.max_tokens = req.maxTokens
+  if (extra?.thinking) body.thinking = { type: 'disabled' }
+  if (req.maxTokens !== undefined) {
+    body.max_tokens = extra?.scale && extra.scale !== 1 ? req.maxTokens * extra.scale : req.maxTokens
+  }
   if (req.schema) {
     if (mode === 'json_schema') {
       body.response_format = { type: 'json_schema', json_schema: { name: 'trace_response', schema: req.schema, strict: true } }
@@ -207,7 +227,14 @@ export function buildLocalProvider(models?: string[]): ProviderConfig {
   }
 }
 
-/** Connection test: one 1-token chat completion, latency included. */
+/**
+ * Connection test: one small chat completion, latency included. Success is
+ * HTTP-level (like before), but the probe also flags thinking models — a
+ * reasoning model spends the output budget on reasoning_content, which is
+ * why a plain "HTTP 200" test can still produce empty completions in real
+ * calls. The adaptive chain handles those automatically; the flag is for
+ * the settings UI hint.
+ */
 export async function testProvider(
   config: ProviderConfig,
   fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis),
@@ -224,7 +251,7 @@ export async function testProvider(
       body: JSON.stringify({
         model: config.model,
         messages: [{ role: 'user', content: 'ping' }],
-        max_tokens: 1
+        max_tokens: 32
       }),
       signal: AbortSignal.timeout(timeoutMs)
     })
@@ -232,32 +259,62 @@ export async function testProvider(
     if (!res.ok) {
       return { ok: false, latencyMs, status: res.status, error: await extractApiError(res) }
     }
-    return { ok: true, latencyMs, model: config.model }
+    let thinkingModel = false
+    try {
+      const data = (await res.json()) as { choices?: Array<{ message?: { reasoning_content?: unknown } }> }
+      const reasoning = data?.choices?.[0]?.message?.reasoning_content
+      thinkingModel = typeof reasoning === 'string' && reasoning.length > 0
+    } catch {
+      // response body unreadable — still a reachable endpoint
+    }
+    return { ok: true, latencyMs, model: config.model, thinkingModel }
   } catch (err) {
     return { ok: false, latencyMs: Date.now() - started, error: err instanceof Error ? err.message : String(err) }
   }
 }
 
+/** Hard cap on adaptive retry attempts per provider (escalations included). */
+const MAX_ATTEMPTS = 6
+
 /** Provider chain: configured order = priority, auto-failover within the list. */
 export class ProviderChain {
   private readonly getProviders: () => ProviderConfig[]
   private readonly fetchImpl: typeof fetch
+  private readonly log: (entry: Record<string, unknown>) => void
 
   constructor(options: ProviderChainOptions) {
     this.getProviders = options.getProviders
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis)
+    this.log = options.log ?? (() => {})
   }
 
   async callChat(req: ChatRequest): Promise<ChatResult> {
     const providers = this.getProviders()
     if (providers.length === 0) {
+      this.log({ kind: 'provider.request', providers: [], messages: req.messages })
       return { ok: false, error: 'no providers configured', attempts: [] }
     }
+    const started = Date.now()
+    this.log({
+      kind: 'provider.request',
+      providers: providers.map((p) => ({ id: p.id, model: p.model, baseUrl: p.baseUrl })),
+      messages: req.messages,
+      maxTokens: req.maxTokens
+    })
     const attempts: Array<{ providerId: string; error: string }> = []
     for (let i = 0; i < providers.length; i++) {
       const provider = providers[i]
       const outcome = await this.callProvider(provider, req)
       if (outcome.ok) {
+        this.log({
+          kind: 'provider.result',
+          ok: true,
+          providerId: provider.id,
+          latencyMs: Date.now() - started,
+          mode: outcome.mode,
+          content: outcome.content,
+          parsed: outcome.parsed
+        })
         return { ...outcome, provider, providerIndex: i }
       }
       attempts.push({ providerId: provider.id, error: outcome.error })
@@ -266,25 +323,70 @@ export class ProviderChain {
       }
     }
     const failure = { ok: false as const, error: 'all providers failed', attempts }
+    this.log({
+      kind: 'provider.result',
+      ok: false,
+      latencyMs: Date.now() - started,
+      error: failure.error,
+      attempts
+    })
     console.log(`[AI] all providers failed: ${attempts.map((a) => `${a.providerId} (${a.error})`).join('; ')}`)
     return failure
   }
 
+  /**
+   * Adaptive structured-output retry per provider. Escalations, in order:
+   *   1. Endpoint rejects json_schema (HTTP 400) -> json_object + embedded schema.
+   *   2. Empty completion (a thinking model burned the output budget on
+   *      reasoning_content) -> retry with thinking disabled and a 4x budget.
+   *   3. Empty again or the thinking param itself is rejected (HTTP 400) ->
+   *      drop thinking, retry with an 8x budget.
+   * Validation failures keep their own bounded retry budget (RETRY_LIMIT).
+   */
   private async callProvider(
     provider: ProviderConfig,
     req: ChatRequest
   ): Promise<{ ok: true; content: string; parsed?: unknown; mode?: ChatMode } | { ok: false; error: string }> {
     if (!req.schema) {
-      const posted = await this.postChat(provider, req, 'none')
+      const posted = await this.postChat(provider, req, 'none', {})
       return posted.ok ? { ok: true, content: posted.content } : { ok: false, error: posted.error }
     }
 
     // Structured output: schema contract when the endpoint supports it, else
-    // json_object + embedded schema. Either way: parse + validate + bounded retry.
-    const mode: ChatMode = provider.supportsSchemaOutput !== false ? 'json_schema' : 'json_object'
-    for (let attempt = 0; attempt <= RETRY_LIMIT; attempt++) {
-      const posted = await this.postChat(provider, req, mode)
-      if (!posted.ok) return { ok: false, error: posted.error }
+    // json_object + embedded schema.
+    let mode: ChatMode = provider.supportsSchemaOutput !== false ? 'json_schema' : 'json_object'
+    let thinking = false
+    let scale = 1
+    let validationRetries = 0
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const posted = await this.postChat(provider, req, mode, { thinking, scale })
+      if (!posted.ok) {
+        if (posted.error === 'empty completion') {
+          if (!thinking) {
+            thinking = true
+            scale = 4
+            continue
+          }
+          if (scale < 8) {
+            scale = 8
+            continue
+          }
+          return { ok: false, error: 'empty completion' }
+        }
+        if (thinking) {
+          // The current mode was accepted before (an earlier 200 proves it),
+          // so this 400 is the thinking param — drop it, rely on the budget.
+          thinking = false
+          scale = 4
+          continue
+        }
+        if (mode === 'json_schema' && posted.status === 400) {
+          // "This response_format type is unavailable now" — degrade mode.
+          mode = 'json_object'
+          continue
+        }
+        return { ok: false, error: posted.error }
+      }
       try {
         const parsed = JSON.parse(posted.content) as unknown
         if (validateJsonSchema(parsed, req.schema) === null) {
@@ -293,14 +395,19 @@ export class ProviderChain {
       } catch {
         // not JSON at all (e.g. max_tokens truncated mid-object) — retry
       }
+      if (validationRetries >= RETRY_LIMIT) {
+        return { ok: false, error: `invalid JSON after ${RETRY_LIMIT + 1} attempts` }
+      }
+      validationRetries++
     }
-    return { ok: false, error: `invalid JSON after ${RETRY_LIMIT + 1} attempts` }
+    return { ok: false, error: 'provider attempts exhausted' }
   }
 
   private async postChat(
     provider: ProviderConfig,
     req: ChatRequest,
-    mode: ChatMode | 'none'
+    mode: ChatMode | 'none',
+    extra: ChatExtra
   ): Promise<{ ok: true; content: string } | { ok: false; error: string; status?: number }> {
     try {
       const res = await this.fetchImpl(normalizeChatUrl(provider.baseUrl), {
@@ -309,7 +416,7 @@ export class ProviderChain {
           'Content-Type': 'application/json',
           ...(provider.apiKey ? { Authorization: `Bearer ${provider.apiKey}` } : {})
         },
-        body: JSON.stringify(buildChatBody(provider, req, mode)),
+        body: JSON.stringify(buildChatBody(provider, req, mode, extra)),
         signal: AbortSignal.timeout(req.timeoutMs ?? DEFAULT_CHAT_TIMEOUT_MS)
       })
       if (!res.ok) {

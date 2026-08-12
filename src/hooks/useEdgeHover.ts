@@ -473,6 +473,14 @@ export function useEdgeHover(): void {
     // grace period so the animation is not jarring (e.g. user Alt+Tabs to
     // quickly read something and comes back — 400 ms gives them a moment).
     const onWindowBlur = () => {
+      // Drop any lingering input focus: Chromium keeps activeElement across
+      // window deactivation and replays a focusin when the window regains
+      // interactivity, which the App.tsx bridge would misread as a fresh
+      // input click and re-activate the window (stealing the foreground).
+      const active = document.activeElement
+      if (active instanceof HTMLElement && active.matches('input, textarea, [contenteditable]')) {
+        active.blur()
+      }
       const state = useStore.getState()
       if (!state.open) return
       // Don't close during an external OS file drag — the drag surface may

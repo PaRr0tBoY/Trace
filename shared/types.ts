@@ -204,13 +204,18 @@ export interface AppSwitchEvent {
   ts: number
 }
 
-/** Clipboard copy event attributed to the foreground app (t14 emits). */
+/**
+ * Clipboard copy event attributed to the foreground app (t14 emits).
+ * `itemId` links the event to the captured item so a suggestion can carry
+ * the material copied during its segment.
+ */
 export interface ClipboardEvent {
   type: 'clipboard'
   appName: string
   exePath: string
   pid: number
   ts: number
+  itemId?: string
 }
 
 export type UsageEvent = AppSwitchEvent | ClipboardEvent
@@ -250,6 +255,12 @@ export interface Suggestion {
   appExePaths?: string[]
   /** Resolved app icons, one entry per app with an extractable exePath; filled by main at push time (t26). */
   appIcons?: { name: string; iconUrl: string }[]
+  /**
+   * Clipboard material copied during the segment's window (same shape as a
+   * task's resources). Suggestion cards and the convert panel show these;
+   * accepting binds them to the created task. Absent on older payloads.
+   */
+  clipboardRefs?: ResourceRef[]
 }
 
 export type MemoryType = 'identity' | 'tool' | 'project' | 'workflow'

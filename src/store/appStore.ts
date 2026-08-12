@@ -8,7 +8,7 @@
  */
 import { create } from 'zustand'
 import { edge } from '../lib/edge'
-import type { SuggestTitleContext, DropResource } from '../../shared/ipc'
+import type { SuggestTitleContext, SuggestionAcceptOptions, DropResource } from '../../shared/ipc'
 import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, Suggestion, MemoryAction, MemoryListPayload, AppRef } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 
@@ -113,7 +113,7 @@ interface AppState {
   getAppIcons: (exePaths: string[]) => Promise<Record<string, string | null>>
 
   /* suggestion actions (delegate to main; pending list comes back via event) */
-  acceptSuggestion: (id: string, titleOverride?: string) => Promise<void>
+  acceptSuggestion: (id: string, opts?: SuggestionAcceptOptions) => Promise<void>
   /** Accept a suggestion and attach the dragged resource to the resulting task (t25). */
   acceptSuggestionWithResource: (id: string, titleOverride: string | undefined, resource: DropResource) => Promise<void>
   ignoreSuggestion: (id: string) => Promise<void>
@@ -348,8 +348,8 @@ export const useStore = create<AppState>((set, get) => ({
     set({ tasks: await edge.linkFilesToTask(taskId, paths) })
   },
 
-  async acceptSuggestion(id, titleOverride) {
-    set({ tasks: await edge.acceptSuggestion(id, titleOverride) })
+  async acceptSuggestion(id, opts) {
+    set({ tasks: await edge.acceptSuggestion(id, opts) })
   },
 
   async acceptSuggestionWithResource(id, titleOverride, resource) {

@@ -74,13 +74,15 @@ export function createAttributor(options: AttributorOptions): Attributor {
 
 /**
  * Build the clipboard event logged when new content is captured. The source
- * app is the foreground snapshot read at capture time.
+ * app is the foreground snapshot read at capture time; itemId links the
+ * event to the captured item (the suggestion engine resolves refs from it).
  */
 export function buildClipboardEvent(
   snapshot: AppIdentity & { pid: number },
-  ts: number
+  ts: number,
+  itemId?: string
 ): ClipboardEvent {
-  return { type: 'clipboard', appName: snapshot.appName, exePath: snapshot.exePath, pid: snapshot.pid, ts }
+  return { type: 'clipboard', appName: snapshot.appName, exePath: snapshot.exePath, pid: snapshot.pid, ts, itemId }
 }
 
 /**

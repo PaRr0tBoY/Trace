@@ -3,8 +3,10 @@
  *
  * List mode is ONE scroll column (t24): suggestion cards on top when any are
  * pending, a hairline divider, then the grouped task list — no more split
- * panes. Detail and create/edit forms are full-page sub-views. Delete is
- * always a confirmed hard delete.
+ * panes. Detail and create/edit forms are full-page sub-views, and the
+ * suggestion convert panel (TaskEditor in suggestion mode) is one too —
+ * same structure as create/edit, closed loop: edit + convert in place.
+ * Delete is always a confirmed hard delete.
  */
 import { useEffect, useState } from 'react'
 import { useStore } from '../../store/appStore'
@@ -24,17 +26,21 @@ export function TaskView() {
   const createTask = useStore((s) => s.createTask)
   const updateTask = useStore((s) => s.updateTask)
   const deleteTask = useStore((s) => s.deleteTask)
+  const acceptSuggestion = useStore((s) => s.acceptSuggestion)
 
   /** Task whose detail is open (null = list). */
   const [selectedId, setSelectedId] = useState<string | null>(null)
   /** 'new' = create form; a task id = edit form; null = no form. */
   const [editing, setEditing] = useState<string | 'new' | null>(null)
+  /** Suggestion whose convert panel is open (null = closed). */
+  const [convertId, setConvertId] = useState<string | null>(null)
   /** Task awaiting hard-delete confirmation. */
   const [confirmDelete, setConfirmDelete] = useState<TaskDto | null>(null)
   /** Task whose content picker (add content) is open. */
   const [pickerTaskId, setPickerTaskId] = useState<string | null>(null)
 
   const selected = selectedId ? (tasks.find((task) => task.id === selectedId) ?? null) : null
+  const converting = convertId ? (suggestions.find((s) => s.id === convertId) ?? null) : null
 
   // The selected task vanished (deleted here or elsewhere): fall back to the list.
   useEffect(() => {
@@ -43,6 +49,11 @@ export function TaskView() {
       setEditing((e) => (e !== null && e !== 'new' ? null : e))
     }
   }, [selectedId, selected])
+
+  // A new analysis replaced the pending list: close the convert panel too.
+  useEffect(() => {
+    if (convertId && !converting) setConvertId(null)
+  }, [convertId, converting])
 
   const handleDeleteConfirm = async () => {
     if (!confirmDelete) return
@@ -67,6 +78,15 @@ export function TaskView() {
           }}
           onCancel={() => setEditing(null)}
         />
+      ) : converting ? (
+        <TaskEditor
+          suggestion={converting}
+          onSave={async ({ title, note, apps, clipboardItemIds }) => {
+            await acceptSuggestion(converting.id, { title, note, apps, clipboardItemIds })
+            setConvertId(null)
+          }}
+          onCancel={() => setConvertId(null)}
+        />
       ) : selected ? (
         <TaskDetail
           task={selected}
@@ -81,7 +101,7 @@ export function TaskView() {
             <>
               <div className="task-suggest-list">
                 {suggestions.map((s) => (
-                  <SuggestionCard key={s.id} suggestion={s} />
+                  <SuggestionCard key={s.id} suggestion={s} onOpen={setConvertId} />
                 ))}
               </div>
               <div className="task-suggest-divider" />

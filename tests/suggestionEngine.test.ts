@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createSuggestionEngine, type SuggestionEngine } from '../electron/main/suggestionEngine'
 import { createIgnoredTable, suggestionSignature, type IgnoredTable } from '../electron/main/ignored'
 import { TaskStore } from '../electron/store/TaskStore'
-import type { AppSwitchEvent, Memory, Suggestion, UsageEvent } from '../shared/types'
+import type { AppSwitchEvent, ClipboardItem, Memory, Suggestion, UsageEvent } from '../shared/types'
 import type { ChatFn, ChatResult } from '../electron/main/provider'
 
 /** Single-app event batch; gaps are small so the whole batch is one segment. */
@@ -17,8 +17,8 @@ function ev(appName: string, ts: number, title = ''): AppSwitchEvent {
   }
 }
 
-function clipEv(appName: string, ts: number): UsageEvent {
-  return { type: 'clipboard', appName, exePath: `C:\\Apps\\${appName.toLowerCase()}.exe`, pid: 1, ts }
+function clipEv(appName: string, ts: number, itemId?: string): UsageEvent {
+  return { type: 'clipboard', appName, exePath: `C:\\Apps\\${appName.toLowerCase()}.exe`, pid: 1, ts, itemId }
 }
 
 /** 5 events, one segment (1s gaps < transientMs 2.5s), spread over 4s. */
@@ -57,7 +57,7 @@ interface Harness {
   chat: ChatFn | undefined
 }
 
-function makeHarness(initialEvents: UsageEvent[] = []): Harness {
+function makeHarness(initialEvents: UsageEvent[] = [], items: Map<string, ClipboardItem> = new Map()): Harness {
   const h: Harness = {
     events: [...initialEvents],
     now: 1_000_000,
@@ -73,9 +73,15 @@ function makeHarness(initialEvents: UsageEvent[] = []): Harness {
     store: h.store,
     getSettings: () => h.settings,
     ignored: h.ignored,
-    onSuggestions: (sugs) => h.pushed.push(sugs)
+    onSuggestions: (sugs) => h.pushed.push(sugs),
+    readItem: (itemId) => items.get(itemId)
   })
   return h
+}
+
+/** A minimal text clipboard item (buildClipboardRef only needs id/data/capturedAt). */
+function textItem(id: string, text: string, capturedAt: number): ClipboardItem {
+  return { id, capturedAt, data: { kind: 'text', text, isUrl: false } } as ClipboardItem
 }
 
 /** Push events, advance the clock past the silence floor, and await one tick. */
@@ -243,7 +249,7 @@ describe('accept', () => {
     h.engine.start()
     await trigger(h, batch())
     const [s] = h.pushed[0]
-    h.engine.accept(s.id, '  Bug fixing  ')
+    h.engine.accept(s.id, { title: '  Bug fixing  ' })
     expect(h.store.list()[0].title).toBe('Bug fixing')
   })
 
@@ -272,7 +278,7 @@ describe('accept', () => {
     h.engine.start()
     await trigger(h, batch())
     const [s] = h.pushed[0]
-    h.engine.accept(s.id, 'Research + write')
+    h.engine.accept(s.id, { title: 'Research + write' })
     const tasks = h.store.list()
     expect(tasks).toHaveLength(1)
     expect(tasks[0].title).toBe('Research + write')
@@ -647,5 +653,102 @@ describe('OCR context in LLM annotation (t30)', () => {
     const req = (h.chat as ReturnType<typeof vi.fn>).mock.calls[0][0]
     const payload = JSON.parse(req.messages[1].content.slice('Segments: '.length))
     expect(payload.ocrContext).toBeUndefined()
+  })
+})
+
+describe('clipboard material on suggestions (segment window)', () => {
+  it('attaches items copied during the segment window as refs', async () => {
+    const items = new Map<string, ClipboardItem>()
+    items.set('i1', textItem('i1', 'hello world', 12_000))
+    const h = makeHarness([], items)
+    h.engine.start()
+    await trigger(h, [...batch(), clipEv('Code', 12_000, 'i1')])
+    expect(h.pushed[0]).toHaveLength(1)
+    const [s] = h.pushed[0]
+    expect(s.clipboardRefs).toEqual([
+      { kind: 'clipboard', itemId: 'i1', snapshot: { type: 'text', preview: 'hello world', capturedAt: 12_000 } }
+    ])
+  })
+
+  it('keeps copies made after the final app switch with the last segment', async () => {
+    const items = new Map<string, ClipboardItem>()
+    items.set('i2', textItem('i2', 'late copy', 15_000))
+    const h = makeHarness([], items)
+    h.engine.start()
+    await trigger(h, [...batch(), clipEv('Code', 15_000, 'i2')])
+    expect(h.pushed[0]).toHaveLength(1)
+    expect(h.pushed[0][0].clipboardRefs).toHaveLength(1)
+  })
+
+  it('attributes between-segment copies to the preceding segment', async () => {
+    const items = new Map<string, ClipboardItem>()
+    items.set('a', textItem('a', 'mid', 20_000))
+    items.set('b', textItem('b', 'in word', 30_500))
+    const h = makeHarness([], items)
+    h.engine.start()
+    await trigger(h, [
+      ...batch(),
+      clipEv('Code', 20_000, 'a'),
+      ev('Word', 30_000, 'word doc'),
+      clipEv('Word', 30_500, 'b'),
+      ev('Word', 31_000)
+    ])
+    const sugs = h.pushed[0]
+    expect(sugs).toHaveLength(2)
+    const first = sugs.find((s) => s.appNames.includes('Code'))!
+    const second = sugs.find((s) => s.appNames.includes('Word'))!
+    expect(first.clipboardRefs!.map((r) => (r.kind === 'clipboard' ? r.itemId : ''))).toContain('a')
+    expect(first.clipboardRefs!.some((r) => r.kind === 'clipboard' && r.itemId === 'b')).toBe(false)
+    expect(second.clipboardRefs!.some((r) => r.kind === 'clipboard' && r.itemId === 'b')).toBe(true)
+  })
+
+  it('skips clipboard events whose item is already evicted', async () => {
+    const h = makeHarness() // no items registered
+    h.engine.start()
+    await trigger(h, [...batch(), clipEv('Code', 12_000, 'gone')])
+    expect(h.pushed[0]).toHaveLength(1)
+    expect(h.pushed[0][0].clipboardRefs).toEqual([])
+  })
+})
+
+describe('accept with convert-panel payload', () => {
+  it('creates the task from the edited title/note/apps/clipboard refs', async () => {
+    const items = new Map<string, ClipboardItem>()
+    items.set('i1', textItem('i1', 'note body', 12_000))
+    const h = makeHarness([], items)
+    h.engine.start()
+    await trigger(h, [...batch(), clipEv('Code', 12_000, 'i1')])
+    const [s] = h.pushed[0]
+    const taskId = h.engine.accept(s.id, {
+      title: 'My title',
+      note: 'My note',
+      apps: [{ id: 'c:/apps/code.exe', name: 'Code' }],
+      clipboardRefs: [{ kind: 'clipboard', itemId: 'i1', snapshot: { type: 'text', preview: 'note body', capturedAt: 12_000 } }]
+    })
+    expect(taskId).toBeTruthy()
+    const task = h.store.get(taskId!)!
+    expect(task.title).toBe('My title')
+    expect(task.note).toBe('My note')
+    expect(task.apps.map((a) => a.id)).toEqual(['c:/apps/code.exe'])
+    expect(task.resources).toHaveLength(1)
+    expect(task.resources[0]).toMatchObject({ kind: 'clipboard', itemId: 'i1' })
+  })
+
+  it('merges the payload into the candidate task, keeping its evidence', async () => {
+    const items = new Map<string, ClipboardItem>()
+    items.set('i1', textItem('i1', 'note body', 12_000))
+    const h = makeHarness([], items)
+    h.store.create('Writing report', {
+      apps: [{ id: 'c:/apps/code.exe', name: 'Code' }, { id: 'c:/apps/chrome.exe', name: 'Chrome' }]
+    })
+    h.engine.start()
+    await trigger(h, [...batch(), clipEv('Code', 12_000, 'i1')])
+    const [s] = h.pushed[0]
+    const targetId = s.taskId!
+    h.engine.accept(s.id, { note: 'edited note' })
+    const task = h.store.get(targetId)!
+    expect(task.title).toBe('Writing report') // unchanged without a title override
+    expect(task.note).toBe('edited note')
+    expect(task.confidence).toBe(s.confidence)
   })
 })

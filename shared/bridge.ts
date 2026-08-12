@@ -7,7 +7,7 @@
  */
 import type { Settings, Suggestion, TaskDto, TaskPatch, UnlinkTarget } from './types'
 import type { DragRequest, ProviderConfig } from './types'
-import type { OllamaDetectionResult, ProviderTestResult, SuggestTitleContext, DropResource } from './ipc'
+import type { OllamaDetectionResult, ProviderTestResult, SuggestTitleContext, SuggestionAcceptOptions, DropResource } from './ipc'
 
 export interface EdgeApi {
   /* Renderer -> Main */
@@ -48,6 +48,8 @@ export interface EdgeApi {
   requestInputFocus: () => void
   /** Restore the panel to non-activatable after the input lost focus. */
   requestInputBlur: () => void
+  /** Expand the panel deterministically (no mouse edge needed). */
+  expandPanel: () => void
 
   /* Task domain */
   loadTasks: () => Promise<TaskDto[]>
@@ -72,7 +74,8 @@ export interface EdgeApi {
   detectOllama: (baseUrl?: string) => Promise<OllamaDetectionResult>
 
   /* Suggestions */
-  acceptSuggestion: (id: string, titleOverride?: string) => Promise<TaskDto[]>
+  /** Accept a suggestion, optionally with the convert panel's edits (title/note/apps/items). */
+  acceptSuggestion: (id: string, opts?: SuggestionAcceptOptions) => Promise<TaskDto[]>
   /** Accept a suggestion and attach the dragged resource (t25 drop-to-bind). */
   acceptSuggestionWithResource: (id: string, titleOverride: string | undefined, resource: DropResource) => Promise<TaskDto[]>
   ignoreSuggestion: (id: string) => Promise<void>

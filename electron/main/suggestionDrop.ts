@@ -37,7 +37,7 @@ export function acceptWithResource(
   titleOverride: string | undefined,
   resource: ResourceRef
 ): Task['id'] | null {
-  const taskId = engine.accept(id, titleOverride)
+  const taskId = engine.accept(id, { title: titleOverride })
   if (!taskId) return null
 
   const ref: ResourceRef =

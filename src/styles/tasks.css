@@ -57,6 +57,10 @@
   border-radius: var(--radius-card);
   background: linear-gradient(180deg, rgba(251, 191, 36, 0.05), rgba(255, 255, 255, 0.02));
   transition: border-color 0.15s ease, background-color 0.15s ease;
+  cursor: pointer;
+}
+.task-suggestion-card:hover {
+  border-color: rgba(251, 191, 36, 0.4);
 }
 
 /* Whole card is a drop target (t25). */
@@ -82,22 +86,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.task-suggestion-input {
-  flex: 1;
-  min-width: 0;
-  padding: 3px 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(251, 191, 36, 0.4);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.95);
-  font-size: calc(12.5px * var(--font-scale, 1));
-  font-weight: 600;
-  outline: none;
-}
-.task-suggestion-input:focus {
-  border-color: var(--accent);
 }
 
 .task-suggestion-low {
@@ -185,28 +173,41 @@
   pointer-events: none;
 }
 
-.task-suggestion-why {
+/* Clipboard material copied during the segment (compact chips, t23 layout). */
+.task-suggestion-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+.task-suggestion-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  align-self: flex-start;
-  padding: 0;
-  border: none;
-  background: none;
-  font-size: calc(10.5px * var(--font-scale, 1));
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.45);
-  cursor: pointer;
+  max-width: 120px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: calc(10px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.task-suggestion-why:hover {
-  color: rgba(255, 255, 255, 0.8);
+.task-suggestion-chip-more {
+  font-size: calc(10px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
 }
 
-.task-suggestion-reason {
+/* "Why" block inside the convert panel (TaskEditor suggestion mode). */
+.task-suggestion-meta {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 10px 12px;
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.07);
@@ -229,17 +230,19 @@
   font-size: calc(10.5px * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.4);
 }
-
-.task-suggestion-actions {
+.task-suggestion-reason-block {
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
-.task-suggestion-actions .task-btn {
-  padding: 5px 10px;
-  font-size: calc(11.5px * var(--font-scale, 1));
-}
-.task-suggestion-actions .task-btn:first-child {
-  margin-right: auto;
+.task-suggestion-conf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 /* ---------- list ---------- */

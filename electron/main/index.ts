@@ -11,6 +11,7 @@
 import { app, BrowserWindow, protocol, session } from 'electron'
 import { APP_CONFIG, runtime } from './config'
 import { ensureDirs, cleanTemp, PATHS } from '../store/paths'
+import { configureAiLog } from './aiLog'
 import { createWindow, getMainWindow, setInteractive, setVisible, startCursorPoll, stopCursorPoll, stopHeartbeat, setHotZoneWidth } from './window'
 import { createTray, registerIncognitoApplier } from './tray'
 import { registerIpc, registerSendListeners, getProviderChain } from './ipc'
@@ -87,6 +88,7 @@ app.whenReady().then(() => {
 
   ensureDirs()
   cleanTemp()
+  configureAiLog(PATHS.aiLogFile())
 
   // Lock the renderer session down: block all permission requests by default.
   const ses = session.defaultSession

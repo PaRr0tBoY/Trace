@@ -157,7 +157,7 @@ describe('feedback distillation through the engine (accept -> MemoryStore)', () 
     const h = makeHarness({ onMemorySuggestion: (c) => mh.store.suggestMemory({ ...c, source: 'task-feedback' }) })
     h.engine.start()
     await trigger(h, batch())
-    h.engine.accept(h.pushed[0][0].id, '开发 CAD Agent')
+    h.engine.accept(h.pushed[0][0].id, { title: '开发 CAD Agent' })
     expect(mh.store.candidates()[0].content).toBe('开发 CAD Agent')
   })
 

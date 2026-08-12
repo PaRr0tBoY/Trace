@@ -1148,7 +1148,7 @@ function AIProviderSection() {
   const patch = useStore((s) => s.patchSettings)
   const providers = settings.aiProviders ?? []
 
-  const [testStates, setTestStates] = useState<Record<string, { status: 'testing' | 'ok' | 'fail'; detail?: string }>>({})
+  const [testStates, setTestStates] = useState<Record<string, { status: 'testing' | 'ok' | 'fail'; detail?: string; thinkingModel?: boolean }>>({})
   const [detectState, setDetectState] = useState<{ status: 'idle' | 'detecting' | 'ok' | 'fail'; detail?: string }>({ status: 'idle' })
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<ProviderConfig | null>(null)
@@ -1188,7 +1188,7 @@ function AIProviderSection() {
     setTestStates((s) => ({
       ...s,
       [p.id]: res.ok
-        ? { status: 'ok', detail: String(res.latencyMs ?? 0) }
+        ? { status: 'ok', detail: String(res.latencyMs ?? 0), thinkingModel: res.thinkingModel }
         : { status: 'fail', detail: res.error ?? '' }
     }))
   }
@@ -1302,6 +1302,11 @@ function AIProviderSection() {
               {test?.status === 'testing' && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>{t('ai.testing')}</span>}
               {test?.status === 'ok' && <span style={{ fontSize: 11, color: '#4caf50', whiteSpace: 'nowrap' }}>✓ {t('ai.testOk', { ms: test.detail ?? '' })}</span>}
               {test?.status === 'fail' && <span style={{ fontSize: 11, color: '#ff6b6b', overflowWrap: 'anywhere' }}>✗ {t('ai.testFailed', { error: test.detail ?? '' })}</span>}
+              {test?.status === 'ok' && test.thinkingModel && (
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', overflowWrap: 'anywhere' }}>
+                  {t('ai.thinkingModelHint')}
+                </span>
+              )}
             </div>
 
             {isExpanded && (

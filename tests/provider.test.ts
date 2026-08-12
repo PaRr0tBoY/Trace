@@ -97,6 +97,77 @@ describe('structured output: two-level degradation', () => {
   })
 })
 
+describe('adaptive escalation (endpoint reality)', () => {
+  it('degrades json_schema to json_object on HTTP 400 and succeeds', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ error: { message: 'This response_format type is unavailable now' } }, 400))
+      .mockResolvedValueOnce(chatResponse(JSON.stringify({ title: 't', confidence: 0.8 })))
+    const res = await makeChain([LOCAL], fetchImpl).callChat({ messages: [{ role: 'user', content: 'hi' }], schema: SCHEMA })
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      expect(res.mode).toBe('json_object')
+      expect(lastBody(fetchImpl).response_format).toEqual({ type: 'json_object' })
+    }
+  })
+
+  it('retries with thinking disabled when a reasoning model burns the output budget', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(chatResponse('')) // reasoning_content ate max_tokens
+      .mockResolvedValueOnce(chatResponse(JSON.stringify({ title: 't', confidence: 0.7 })))
+    const res = await makeChain([LOCAL], fetchImpl).callChat({
+      messages: [{ role: 'user', content: 'hi' }],
+      schema: SCHEMA,
+      maxTokens: 200
+    })
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      const first = JSON.parse(String((fetchImpl.mock.calls[0][1] as RequestInit).body)) as Record<string, unknown>
+      const second = JSON.parse(String((fetchImpl.mock.calls[1][1] as RequestInit).body)) as Record<string, unknown>
+      expect(first.thinking).toBeUndefined()
+      expect(second.thinking).toEqual({ type: 'disabled' })
+      expect(second.max_tokens).toBe(800) // 200 * scale 4
+    }
+  })
+
+  it('drops the thinking param and scales the budget when the endpoint rejects it', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(chatResponse(''))
+      .mockResolvedValueOnce(jsonResponse({ error: { message: 'unknown parameter' } }, 400))
+      .mockResolvedValueOnce(chatResponse(JSON.stringify({ title: 't', confidence: 0.6 })))
+    const res = await makeChain([LOCAL], fetchImpl).callChat({
+      messages: [{ role: 'user', content: 'hi' }],
+      schema: SCHEMA,
+      maxTokens: 100
+    })
+    expect(fetchImpl).toHaveBeenCalledTimes(3)
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      const third = JSON.parse(String((fetchImpl.mock.calls[2][1] as RequestInit).body)) as Record<string, unknown>
+      expect(third.thinking).toBeUndefined()
+      expect(third.max_tokens).toBe(400) // 100 * scale 4
+    }
+  })
+
+  it('keeps the bounded validation-retry budget for invalid JSON (no escalation)', async () => {
+    const fetchImpl = vi.fn(async () => chatResponse('{"not": "json"}'))
+    const res = await makeChain([LOCAL], fetchImpl).callChat({ messages: [{ role: 'user', content: 'hi' }], schema: SCHEMA })
+    expect(res.ok).toBe(false)
+    expect(fetchImpl).toHaveBeenCalledTimes(3) // 1 + RETRY_LIMIT
+  })
+
+  it('logs request and result entries through the log hook', async () => {
+    const entries: Record<string, unknown>[] = []
+    const fetchImpl = vi.fn(async () => chatResponse(JSON.stringify({ title: 't', confidence: 0.8 })))
+    const chain = new ProviderChain({ getProviders: () => [LOCAL], fetchImpl, log: (e) => entries.push(e) })
+    const res = await chain.callChat({ messages: [{ role: 'user', content: 'hi' }], schema: SCHEMA })
+    expect(res.ok).toBe(true)
+    expect(entries.map((e) => e.kind)).toEqual(['provider.request', 'provider.result'])
+    expect(entries[1]).toMatchObject({ ok: true, providerId: 'local' })
+  })
+})
+
 describe('client-side validation retry', () => {
   it('retries the same provider when the reply is truncated mid-JSON', async () => {
     const fetchImpl = vi.fn()

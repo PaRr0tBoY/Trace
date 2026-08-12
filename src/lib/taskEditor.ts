@@ -6,7 +6,7 @@
  * apps expands the candidate set with those apps' items, single list, newest
  * first, deduped (anchor wins). "Show more" reveals +3 at a time, 15 cap.
  */
-import type { ClipboardItemDto, ResourceSnapshot } from '../../shared/types'
+import type { AppRef, ClipboardItemDto, ResourceSnapshot } from '../../shared/types'
 import { appKeyFromIdentity } from '../../shared/appKey'
 import { algorithmicTitle, MAX_TITLE_CHARS } from '../../shared/titles'
 import { previewText, formatImageDisplayName } from './format'
@@ -106,4 +106,18 @@ export function clipboardPreview(item: ClipboardItemDto): string {
     case 'files':
       return item.data.paths.map((p) => formatImageDisplayName(p, item.capturedAt)).join(', ')
   }
+}
+
+/**
+ * AppRefs for a suggestion (convert panel prefill): appExePaths parallel
+ * appNames, both engine-produced. id follows the AppRef.id convention —
+ * appKeyFromIdentity over the pair — so the editor's grid dedupes them
+ * against the main-provided options.
+ */
+export function suggestionAppRefs(appNames: string[], appExePaths?: string[]): AppRef[] {
+  return appNames.map((name, i) => ({
+    id: appKeyFromIdentity({ name, exePath: appExePaths?.[i] }),
+    name,
+    exePath: appExePaths?.[i]
+  }))
 }

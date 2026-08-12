@@ -134,6 +134,7 @@ const api = {
   broadcastTutorialStep: (step: number) => send('tutorial:set-step', step),
   requestInputFocus: () => send('ui:input-focus'),
   requestInputBlur: () => send('ui:input-blur'),
+  expandPanel: () => send('panel:expand'),
 
   /* Task domain */
   loadTasks: () => invoke('task:load'),
@@ -154,7 +155,7 @@ const api = {
   detectOllama: (baseUrl?: string) => invoke('ai:detect-ollama', baseUrl),
 
   /* Suggestions */
-  acceptSuggestion: (id: string, titleOverride?: string) => invoke('suggestion:accept', id, titleOverride),
+  acceptSuggestion: (id: string, opts?: import('../../shared/ipc').SuggestionAcceptOptions) => invoke('suggestion:accept', id, opts),
   acceptSuggestionWithResource: (id: string, titleOverride: string | undefined, resource: import('../../shared/ipc').DropResource) =>
     invoke('suggestion:accept-with-resource', id, titleOverride, resource),
   ignoreSuggestion: (id: string) => invoke('suggestion:ignore', id),

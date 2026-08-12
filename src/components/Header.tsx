@@ -436,12 +436,14 @@ export function Header() {
             animate={{ opacity: 1, height: 26 }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ type: 'spring', stiffness: 400, damping: 34 }}
-            style={{ overflow: 'hidden', flexShrink: 0 }}
+            style={{ overflow: 'hidden', flexShrink: 0, display: 'flex', justifyContent: 'center' }}
           >
             <div
               className="filter-segmented-track"
               style={{
                 position: 'relative',
+                // content-sized (the flex parent centers it), like the
+                // primary row's track which hugs its chips.
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

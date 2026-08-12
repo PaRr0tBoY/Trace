@@ -13,6 +13,7 @@ import { requestPanelFocus, releasePanelFocus, releasePanelFocusNow } from './fo
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
 import { rehomeTraceAfterMerge } from '../store/traceStore'
 import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore, getMemoryGraph, getTraceStore, getLocalModelManager, getLocalModelRuntime, resetLocalModelRuntime, ensureLocalModelLoaded } from './state'
+import type { FactRecord } from '../store/memoryGraph'
 import { isTraceRecordDto, renderTraceReportHtml } from './traceReport'
 import { getMainWindow } from './window'
 import { setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
@@ -27,7 +28,7 @@ import { recentEvents } from './eventBus'
 import { acceptWithResource } from './suggestionDrop'
 import { ProviderChain, testProvider } from './provider'
 import { logAi } from './aiLog'
-import type { ItemData, MergeResult, MemoryListPayload, ResourceRef, Task } from '../../shared/types'
+import type { ItemData, MergeResult, MemoryFactDto, MemoryFactPanelPayload, MemoryListPayload, ResourceRef, Task } from '../../shared/types'
 
 /**
  * Returns true if the current system clipboard content matches the given item data.
@@ -425,6 +426,54 @@ export function registerIpc(): void {
     // Action names mirror MemoryStore methods; each returns whether it applied.
     getMemoryStore()[action](id)
     return memoryListPayload()
+  })
+
+  /* --------------------------- memory graph panel (t51) --------------------------- */
+
+  /**
+   * 记忆图面板载荷：未失效 facts（UI 按 type 过滤分组）+ 待裁决冲突对（含
+   * 被失效方）+ 每条内联来源链 episode 摘要。DB 故障（graph null）→ 空载荷，
+   * 面板降级只读空态（不阻塞设置页其余部分）。
+   */
+  const memoryGraphPayload = (): MemoryFactPanelPayload => {
+    const graph = getMemoryGraph()
+    if (!graph) return { facts: [], conflicts: [], degraded: true }
+    const episodes = new Map(graph.listEpisodes().map((e) => [e.id, e]))
+    const toDto = (f: FactRecord): MemoryFactDto => {
+      const ep = f.episodeId !== null ? episodes.get(f.episodeId) : undefined
+      return {
+        id: f.id,
+        type: f.type,
+        content: f.content,
+        source: f.source,
+        userState: f.userState,
+        intent: f.intent,
+        weight: f.weight,
+        validAt: f.validAt,
+        invalidAt: f.invalidAt,
+        expiredAt: f.expiredAt,
+        createdAt: f.createdAt,
+        updatedAt: f.updatedAt,
+        hitCount: f.hitCount,
+        episodeId: f.episodeId,
+        episode: ep ? { id: ep.id, startedAt: ep.startedAt, endedAt: ep.endedAt, summary: ep.summary } : null
+      }
+    }
+    return {
+      facts: graph.listFacts().map(toDto),
+      conflicts: graph.listConflicts().map((c) => ({ active: toDto(c.active), invalidated: toDto(c.invalidated) })),
+      degraded: false
+    }
+  }
+
+  handle('memory-graph:list', () => memoryGraphPayload())
+  handle('memory-graph:set-state', (id, userState) => {
+    const graph = getMemoryGraph()
+    return graph && graph.updateFactState(id, userState) ? memoryGraphPayload() : null
+  })
+  handle('memory-graph:adjudicate', (activeId, invalidatedId, resolution) => {
+    getMemoryGraph()?.adjudicateConflict(activeId, invalidatedId, resolution)
+    return memoryGraphPayload()
   })
 
   /* --------------------------- ai rationale (trace, t42) --------------------------- */

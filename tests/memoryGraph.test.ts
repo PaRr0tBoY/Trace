@@ -475,3 +475,130 @@ describe('memoryGraph — 纯函数', () => {
     expect(toFtsQuery('""')).toBe('')
   })
 })
+
+describe('memoryGraph — 面板冲突（t51）：listConflicts / adjudicateConflict', () => {
+  it('listConflicts 返回同 (type, 主语键) 的 (有效方, 被失效方) 对', () => {
+    const h = makeHarness()
+    const a = h.graph.addFact({ type: 'profile', content: '用户所在城市是北京', source: 'inferred', validAt: 1_000 })!
+    const b = h.graph.addFact({ type: 'profile', content: '用户所在城市是上海', source: 'inferred', validAt: 2_000 })!
+    const pairs = h.graph.listConflicts()
+    expect(pairs).toHaveLength(1)
+    expect(pairs[0]!.active.id).toBe(b.id)
+    expect(pairs[0]!.invalidated.id).toBe(a.id)
+    expect(pairs[0]!.invalidated.invalidAt).toBe(2_000)
+  })
+
+  it('无待裁决对 → 空列表（无失效 / 不同主语 / 无时间窗口不配对）', () => {
+    const h = makeHarness()
+    h.graph.addFact({ type: 'profile', content: '用户所在城市是北京', source: 'user' })
+    h.graph.addFact({ type: 'preference', content: '默认深色模式', source: 'user' })
+    // 同 type 不同主语（无标点/系词截断成不同键）不配对
+    h.graph.addFact({ type: 'profile', content: '用户在杭州工作', source: 'inferred', validAt: 1_000 })
+    h.graph.addFact({ type: 'profile', content: '用户在用 Rust', source: 'inferred', validAt: 2_000 })
+    expect(h.graph.listConflicts()).toHaveLength(0)
+  })
+
+  it('keep-active：保留当前有效方（弃方维持失效），裁决后退出面板', () => {
+    const h = makeHarness()
+    const a = h.graph.addFact({ type: 'profile', content: '用户所在城市是北京', source: 'inferred', validAt: 1_000 })!
+    const b = h.graph.addFact({ type: 'profile', content: '用户所在城市是上海', source: 'inferred', validAt: 2_000 })!
+    expect(h.graph.adjudicateConflict(b.id, a.id, 'keep-active')).toBe(true)
+    expect(h.graph.getFact(b.id)!.invalidAt).toBeNull()
+    expect(h.graph.getFact(a.id)!.invalidAt).toBe(2_000)
+    // 双方落 resolved_at：该冲突不再展示
+    expect(h.graph.listConflicts()).toHaveLength(0)
+    expect(h.graph.getFact(a.id)!.resolvedAt).not.toBeNull()
+    expect(h.graph.getFact(b.id)!.resolvedAt).not.toBeNull()
+  })
+
+  it('keep-invalidated：复活被失效方（清 invalid_at、重算权重）并失效当前方', () => {
+    const h = makeHarness()
+    const a = h.graph.addFact({ type: 'profile', content: '用户所在城市是北京', source: 'inferred', validAt: 1_000 })!
+    const b = h.graph.addFact({ type: 'profile', content: '用户所在城市是上海', source: 'inferred', validAt: 2_000 })!
+    expect(h.graph.adjudicateConflict(b.id, a.id, 'keep-invalidated')).toBe(true)
+    const revived = h.graph.getFact(a.id)!
+    expect(revived.invalidAt).toBeNull()
+    expect(revived.weight).toBeGreaterThan(0) // 权重重算（不再是 0）
+    const dropped = h.graph.getFact(b.id)!
+    expect(dropped.invalidAt).toBe(h.now)
+    expect(dropped.weight).toBe(0)
+    expect(h.graph.listConflicts()).toHaveLength(0)
+    // 复活方回到默认事实视图
+    expect(h.graph.listFacts({ types: ['profile'] }).map((f) => f.id)).toEqual([a.id])
+  })
+
+  it('keep-none：双方失效', () => {
+    const h = makeHarness()
+    const a = h.graph.addFact({ type: 'profile', content: '用户所在城市是北京', source: 'inferred', validAt: 1_000 })!
+    const b = h.graph.addFact({ type: 'profile', content: '用户所在城市是上海', source: 'inferred', validAt: 2_000 })!
+    expect(h.graph.adjudicateConflict(b.id, a.id, 'keep-none')).toBe(true)
+    expect(h.graph.getFact(a.id)!.invalidAt).toBe(2_000)
+    expect(h.graph.getFact(b.id)!.invalidAt).toBe(h.now)
+    expect(h.graph.listConflicts()).toHaveLength(0)
+    expect(h.graph.listFacts({ types: ['profile'] })).toHaveLength(0)
+  })
+
+  it('裁决守卫：不存在的对 / 形状不符（双方同状态 / 主语不同）→ false', () => {
+    const h = makeHarness()
+    const a = h.graph.addFact({ type: 'profile', content: '用户所在城市是北京', source: 'inferred', validAt: 1_000 })!
+    const b = h.graph.addFact({ type: 'profile', content: '用户所在城市是上海', source: 'inferred', validAt: 2_000 })!
+    expect(h.graph.adjudicateConflict('f_missing', a.id, 'keep-active')).toBe(false)
+    // active 侧必须有效、invalidated 侧必须已失效
+    expect(h.graph.adjudicateConflict(a.id, b.id, 'keep-active')).toBe(false)
+    // 不同主语不构成对
+    const c = h.graph.addFact({ type: 'profile', content: '用户在杭州工作', source: 'inferred', validAt: 1_000 })!
+    expect(h.graph.adjudicateConflict(c.id, a.id, 'keep-active')).toBe(false)
+  })
+
+  it('裁决守卫：非法 resolution（IPC 边界任意字符串）→ false 且不落任何行', () => {
+    const h = makeHarness()
+    const a = h.graph.addFact({ type: 'profile', content: '用户所在城市是北京', source: 'inferred', validAt: 1_000 })!
+    const b = h.graph.addFact({ type: 'profile', content: '用户所在城市是上海', source: 'inferred', validAt: 2_000 })!
+    // @ts-expect-error 运行时 IPC 可传任意字符串，白名单守卫必须拦截
+    expect(h.graph.adjudicateConflict(b.id, a.id, 'keep-active-everything')).toBe(false)
+    // 冲突对仍在待审列表（双方 resolved_at 未被写入）
+    expect(h.graph.listConflicts()).toHaveLength(1)
+    const rows = h.db.prepare(`SELECT id, invalid_at, resolvedAt FROM facts ORDER BY id`).all() as Array<{ id: string; invalid_at: number | null; resolvedAt: number | null }>
+    for (const r of rows) expect(r.resolvedAt).toBeNull()
+    expect(h.graph.getFact(a.id)!.invalidAt).toBe(2_000)
+    expect(h.graph.getFact(b.id)!.invalidAt).toBeNull()
+  })
+
+  it('持久化：裁决结果重启后保持（resolved_at / invalid_at 落库，SQLite 断言）', () => {
+    const h = makeHarness()
+    const a = h.graph.addFact({ type: 'profile', content: '用户所在城市是北京', source: 'inferred', validAt: 1_000 })!
+    const b = h.graph.addFact({ type: 'profile', content: '用户所在城市是上海', source: 'inferred', validAt: 2_000 })!
+    expect(h.graph.adjudicateConflict(b.id, a.id, 'keep-invalidated')).toBe(true)
+    // SQLite 断言：行内字段即持久化状态
+    const rows = h.db.prepare(`SELECT id, invalid_at, resolvedAt FROM facts ORDER BY id`).all() as Array<{ id: string; invalid_at: number | null; resolvedAt: number | null }>
+    const byId = new Map(rows.map((r) => [r.id, r]))
+    expect(byId.get(a.id)!.invalid_at).toBeNull()
+    expect(byId.get(a.id)!.resolvedAt).toBe(h.now)
+    expect(byId.get(b.id)!.invalid_at).toBe(h.now)
+    expect(byId.get(b.id)!.resolvedAt).toBe(h.now)
+
+    // 重开同一 DB 文件：图重建后状态一致，冲突不再出现
+    closeDatabase(h.db)
+    const db2 = openForTest(h.filePath)
+    openDbs.push(db2)
+    const graph2 = createSqliteMemoryGraph(db2, { now: () => h.now, lambda: 0.25 })
+    expect(graph2.getFact(a.id)!.invalidAt).toBeNull()
+    expect(graph2.getFact(a.id)!.resolvedAt).toBe(h.now)
+    expect(graph2.getFact(b.id)!.invalidAt).toBe(h.now)
+    expect(graph2.listConflicts()).toHaveLength(0)
+    expect(graph2.listFacts({ types: ['profile'] }).map((f) => f.id)).toEqual([a.id])
+  })
+
+  it('已裁决冲突的新矛盾：新入站事实再次失效复活方 → 重新成为待审冲突', () => {
+    const h = makeHarness()
+    const a = h.graph.addFact({ type: 'profile', content: '用户所在城市是北京', source: 'inferred', validAt: 1_000 })!
+    const b = h.graph.addFact({ type: 'profile', content: '用户所在城市是上海', source: 'inferred', validAt: 2_000 })!
+    h.graph.adjudicateConflict(b.id, a.id, 'keep-invalidated') // a 复活（resolved_at 清空）
+    const c = h.graph.addFact({ type: 'profile', content: '用户所在城市是广州', source: 'inferred', validAt: 3_000 })!
+    // a（复活方，resolved_at 已被复活语句清空）与 c 构成新冲突
+    const pairs = h.graph.listConflicts()
+    expect(pairs).toHaveLength(1)
+    expect(pairs[0]!.active.id).toBe(c.id)
+    expect(pairs[0]!.invalidated.id).toBe(a.id)
+  })
+})

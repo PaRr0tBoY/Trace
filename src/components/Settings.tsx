@@ -7,6 +7,7 @@ import { LiquidOctopusLoader } from './LiquidOctopusLoader'
 import { TickIndicatorIcon, CopyIndicatorIcon, SparkleIndicatorIcon } from './CopyIndicatorCurve'
 import { ChevronRightIcon, CloseIcon, LogOutIcon, StarIcon, GithubOctocatLogo, ChevronDownIcon, PlusIcon } from './icons'
 import { ChangelogView } from './ChangelogView'
+import { MemoryGraphPanel } from './MemoryGraphPanel'
 import kofiSupportImg from '../assets/kofi-support.webp'
 import { playDialTickSound, playToggleSound, playButtonClickSound } from '../lib/soundEffects'
 import { useTranslation } from '../i18n'
@@ -1155,6 +1156,10 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                   <div className="setting-divider" />
 
                   <MemorySection />
+
+                  <div className="setting-divider" />
+
+                  <MemoryGraphPanel />
 
                   <div className="setting-divider" />
 

@@ -9,7 +9,7 @@
  *   - `Renderer -> Main` calls (invoke/handle) are listed in `InvokeMap`.
  *   - `Main -> Renderer` events (send/on) are listed in `EventMap`.
  */
-import type { AppRef, ClipboardItemDto, DragRequest, IgnoreReason, LocalModelSource, LocalModelStatus, MergeResult, ProviderConfig, Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
+import type { AppRef, ClipboardItemDto, DragRequest, IgnoreReason, LocalModelSource, LocalModelStatus, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, MergeResult, ProviderConfig, Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
 
 /** Result of a connection test against one provider (ai:test-provider). */
 export interface ProviderTestResult {
@@ -254,6 +254,23 @@ export interface InvokeMap {
    * Returns the refreshed buckets so the panel stays in sync in one round-trip.
    */
   'memory:act': { args: [id: string, action: import('./types').MemoryAction]; result: import('./types').MemoryListPayload }
+
+  /* --------------------------- memory graph panel (t51) --------------------------- */
+
+  /** 记忆图面板全量：未失效 facts（UI 按 type 过滤分组）+ 待裁决冲突对（含内联来源链）。 */
+  'memory-graph:list': { args: []; result: MemoryFactPanelPayload }
+
+  /** 单条事实用户状态（confirm/ignore/ban，转换规则与 MemoryStore 一致）。非法转换返回 null（不刷新载荷）。 */
+  'memory-graph:set-state': { args: [id: string, userState: MemoryUserState]; result: MemoryFactPanelPayload | null }
+
+  /**
+   * 冲突裁决（spec 决策 10，不自动覆盖）：保留 active / 复活 invalidated /
+   * 都不保留；裁决双方落 resolved_at，待审冲突退出面板。返回刷新载荷。
+   */
+  'memory-graph:adjudicate': {
+    args: [activeId: string, invalidatedId: string, resolution: MemoryConflictResolution]
+    result: MemoryFactPanelPayload
+  }
 
   /* --------------------------- ai rationale (trace, t42) --------------------------- */
 

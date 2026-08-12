@@ -92,6 +92,8 @@ export interface FactRecord {
   validAt: number | null
   invalidAt: number | null
   expiredAt: number | null
+  /** 冲突裁决时刻（t51）：用户裁决后落库；NULL = 未被裁决（含待审冲突）。 */
+  resolvedAt: number | null
   createdAt: number
   updatedAt: number
   hitCount: number
@@ -129,6 +131,8 @@ export interface FactInput {
   validAt?: number | null
   invalidAt?: number | null
   expiredAt?: number | null
+  /** putFact 专用：显式 resolvedAt（迁移/适配器保留原值）。addFact 忽略（新行恒未裁决）。 */
+  resolvedAt?: number | null
   hitCount?: number
   lastSeenAt?: number
   /** putFact 专用：显式 id（迁移/适配器必须保留原 id）。addFact 忽略（自分配）。 */
@@ -147,6 +151,19 @@ export interface FactQuery {
   validNow?: boolean
   episodeId?: string
   limit?: number
+}
+
+/* ------------------------------------------------------------------ */
+/* 面板裁决（t51，spec 决策 10：Conflict 不自动覆盖，用户显式裁决）      */
+/* ------------------------------------------------------------------ */
+
+/** 冲突裁决三选：保留当前有效方 / 复活被失效方并弃当前方 / 都不保留。 */
+export type ConflictResolution = 'keep-active' | 'keep-invalidated' | 'keep-none'
+
+/** 冲突对：同 (type, 主语键) 的当前有效方 + 被自动失效方（invalid_at 非空、未裁决）。 */
+export interface ConflictPair {
+  active: FactRecord
+  invalidated: FactRecord
 }
 
 /* ------------------------------------------------------------------ */
@@ -395,6 +412,20 @@ export interface MemoryGraphStore {
   putFact(input: FactInput): FactRecord | null
   /** 用户状态转换（转换规则与 MemoryStore 一致），confirm 顺带强化。 */
   updateFactState(id: string, userState: FactUserState): boolean
+  /**
+   * t51 面板冲突对（spec 决策 10）：同 (type, 主语键) 且被自动失效方
+   * （invalid_at 非空、resolved_at 空 = 待裁决）与当前有效方的对子。
+   */
+  listConflicts(): ConflictPair[]
+  /**
+   * t51 用户裁决（spec 决策 10：不自动覆盖，只落用户决定）：
+   * - keep-active → 保留当前有效方（弃方维持失效）；
+   * - keep-invalidated → 复活被失效方（清 invalid_at、重算权重）并失效当前方；
+   * - keep-none → 双方失效。
+   * 命中该 (active, invalidated) 对即裁决成立，双方写 resolved_at（待审冲突
+   * 退出面板）；不存在的对 / 形状不符返回 false。
+   */
+  adjudicateConflict(activeId: string, invalidatedId: string, resolution: ConflictResolution): boolean
   /** 命中强化：仅 confirmed 事实，hitCount+1、lastSeenAt 刷新、权重重算。 */
   reinforceFact(id: string): boolean
   deleteFact(id: string): boolean
@@ -556,6 +587,7 @@ interface FactRow {
   valid_at: number | null
   invalid_at: number | null
   expired_at: number | null
+  resolvedAt: number | null
   createdAt: number
   updatedAt: number
   hitCount: number
@@ -584,6 +616,7 @@ function toFact(row: FactRow): FactRecord {
     validAt: row.valid_at,
     invalidAt: row.invalid_at,
     expiredAt: row.expired_at,
+    resolvedAt: row.resolvedAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     hitCount: row.hitCount,
@@ -608,7 +641,7 @@ interface EntityRow {
   createdAt: number
 }
 
-const FACT_COLUMNS = `id, type, content, source, userState, intent, weight, episodeId, entityIds, valid_at, invalid_at, expired_at, createdAt, updatedAt, hitCount, lastSeenAt`
+const FACT_COLUMNS = `id, type, content, source, userState, intent, weight, episodeId, entityIds, valid_at, invalid_at, expired_at, resolvedAt, createdAt, updatedAt, hitCount, lastSeenAt`
 
 /** better-sqlite3 implementation over db.ts's three memory-graph tables. */
 export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphOptions = {}): MemoryGraphStore {
@@ -644,17 +677,18 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
   )
   const insertFact = db.prepare(
     `INSERT INTO facts (${FACT_COLUMNS})
-     VALUES (@id, @type, @content, @source, @userState, @intent, @weight, @episodeId, @entityIds, @valid_at, @invalid_at, @expired_at, @createdAt, @updatedAt, @hitCount, @lastSeenAt)`
+     VALUES (@id, @type, @content, @source, @userState, @intent, @weight, @episodeId, @entityIds, @valid_at, @invalid_at, @expired_at, @resolvedAt, @createdAt, @updatedAt, @hitCount, @lastSeenAt)`
   )
   const upsertFact = db.prepare(
     `INSERT INTO facts (${FACT_COLUMNS})
-     VALUES (@id, @type, @content, @source, @userState, @intent, @weight, @episodeId, @entityIds, @valid_at, @invalid_at, @expired_at, @createdAt, @updatedAt, @hitCount, @lastSeenAt)
+     VALUES (@id, @type, @content, @source, @userState, @intent, @weight, @episodeId, @entityIds, @valid_at, @invalid_at, @expired_at, @resolvedAt, @createdAt, @updatedAt, @hitCount, @lastSeenAt)
      ON CONFLICT(id) DO UPDATE SET
-       type = excluded.type, content = excluded.content, source = excluded.source,
-       userState = excluded.userState, intent = excluded.intent, weight = excluded.weight,
-       episodeId = excluded.episodeId, entityIds = excluded.entityIds,
-       valid_at = excluded.valid_at, invalid_at = excluded.invalid_at, expired_at = excluded.expired_at,
-       updatedAt = excluded.updatedAt, hitCount = excluded.hitCount, lastSeenAt = excluded.lastSeenAt`
+      type = excluded.type, content = excluded.content, source = excluded.source,
+      userState = excluded.userState, intent = excluded.intent, weight = excluded.weight,
+      episodeId = excluded.episodeId, entityIds = excluded.entityIds,
+      valid_at = excluded.valid_at, invalid_at = excluded.invalid_at, expired_at = excluded.expired_at,
+      resolvedAt = excluded.resolvedAt,
+      updatedAt = excluded.updatedAt, hitCount = excluded.hitCount, lastSeenAt = excluded.lastSeenAt`
   )
   const updateFactMerge = db.prepare(
     `UPDATE facts SET content = @content, source = @source, userState = @userState,
@@ -671,8 +705,17 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
   const updateFactReinforce = db.prepare(
     `UPDATE facts SET hitCount = @hitCount, lastSeenAt = @lastSeenAt, weight = @weight, updatedAt = @updatedAt WHERE id = @id`
   )
+  /** 失效（自动矛盾消解 / 裁决弃方共用）：resolvedAt 一并清空——裁决路径紧跟着写回 */
   const updateFactInvalidate = db.prepare(
-    `UPDATE facts SET invalid_at = @invalid_at, weight = @weight, updatedAt = @updatedAt WHERE id = @id`
+    `UPDATE facts SET invalid_at = @invalid_at, weight = @weight, resolvedAt = NULL, updatedAt = @updatedAt WHERE id = @id`
+  )
+  /** t51 裁决复活：清 invalid_at、重算权重；resolved_at 一并清（复活方重新待审）。 */
+  const updateFactRestore = db.prepare(
+    `UPDATE facts SET invalid_at = NULL, weight = @weight, resolvedAt = NULL, updatedAt = @updatedAt WHERE id = @id`
+  )
+  /** t51 裁决标记：双方写裁决时刻，待审冲突退出面板。 */
+  const updateFactResolve = db.prepare(
+    `UPDATE facts SET resolvedAt = @resolvedAt, updatedAt = @updatedAt WHERE id = @id`
   )
   const deleteFactStmt = db.prepare(`DELETE FROM facts WHERE id = ?`)
 
@@ -718,6 +761,7 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
     const validAt = input.validAt ?? null
     const invalidAt = input.invalidAt ?? null
     const expiredAt = input.expiredAt ?? null
+    const resolvedAt = input.resolvedAt ?? null
     const row: FactRow = {
       id: input.id ?? `f_${nextId()}`,
       type,
@@ -731,6 +775,7 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
       valid_at: validAt,
       invalid_at: invalidAt,
       expired_at: expiredAt,
+      resolvedAt,
       createdAt: input.createdAt ?? t,
       updatedAt: t,
       hitCount,
@@ -844,6 +889,7 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
       valid_at: validAt,
       invalid_at: invalidAt,
       expired_at: expiredAt,
+      resolvedAt: null,
       createdAt: t,
       updatedAt: t,
       hitCount,
@@ -883,6 +929,74 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
     })
     log({ kind: 'memory-graph', action: 'state', factId: id, userState })
     return true
+  }
+
+  /**
+   * t51 面板冲突对：同 (type, 主语键) 的 (有效方, 被自动失效方) 对。只挑
+   * 未裁决的被失效方（resolved_at 空 = 待面板裁决）；每侧按时间排序，
+   * 每个被失效方对最早的有效方（自动消解时新行即替换者，v1 一主语一有效）。
+   */
+  function listConflicts(): ConflictPair[] {
+    const all = listFacts({ includeInvalidated: true })
+    const activeBySubject = new Map<string, FactRecord[]>()
+    const invalidatedBySubject = new Map<string, FactRecord[]>()
+    for (const f of all) {
+      const key = `${f.type}\u0000${subjectKey(f.content)}`
+      const bucket = f.invalidAt === null ? activeBySubject : invalidatedBySubject
+      const list = bucket.get(key) ?? []
+      list.push(f)
+      bucket.set(key, list)
+    }
+    const pairs: ConflictPair[] = []
+    for (const [key, invalidated] of invalidatedBySubject) {
+      const active = (activeBySubject.get(key) ?? []).slice().sort((a, b) => a.createdAt - b.createdAt)
+      if (active.length === 0) continue
+      const pending = invalidated
+        .filter((f) => f.resolvedAt === null)
+        .sort((a, b) => (a.invalidAt ?? 0) - (b.invalidAt ?? 0))
+      for (const f of pending) pairs.push({ active: active[0]!, invalidated: f })
+    }
+    return pairs.sort((a, b) => (a.invalidated.invalidAt ?? 0) - (b.invalidated.invalidAt ?? 0))
+  }
+
+  /**
+   * t51 用户裁决（spec 决策 10：不自动覆盖）。事务内整体生效：
+   * keep-active → 只标记裁决（弃方 invalid_at 已由自动消解落库）；
+   * keep-invalidated → 复活弃方（清 invalid_at、重算权重）并失效当前方；
+   * keep-none → 双方失效。双方写 resolved_at，待审冲突退出面板。
+   */
+  function adjudicateConflict(activeId: string, invalidatedId: string, resolution: ConflictResolution): boolean {
+    // 白名单守卫：IPC 边界可传任意字符串，非法值不落任何行（含 resolved_at）
+    if (resolution !== 'keep-active' && resolution !== 'keep-invalidated' && resolution !== 'keep-none') return false
+    const active = selectFactById.get(activeId) as FactRow | undefined
+    const invalidated = selectFactById.get(invalidatedId) as FactRow | undefined
+    if (!active || !invalidated) return false
+    if (active.invalid_at !== null || invalidated.invalid_at === null) return false
+    if (active.type !== invalidated.type || subjectKey(active.content) !== subjectKey(invalidated.content)) return false
+    const t = now()
+    return db.transaction(() => {
+      if (resolution === 'keep-invalidated') {
+        updateFactRestore.run({
+          id: invalidatedId,
+          weight: weightFor({
+            intent: invalidated.intent,
+            hitCount: invalidated.hitCount,
+            lastSeenAt: invalidated.lastSeenAt ?? invalidated.createdAt,
+            validAt: invalidated.valid_at,
+            invalidAt: null,
+            expiredAt: invalidated.expired_at
+          }),
+          updatedAt: t
+        })
+        updateFactInvalidate.run({ invalid_at: t, weight: 0, updatedAt: t, id: activeId })
+      } else if (resolution === 'keep-none') {
+        updateFactInvalidate.run({ invalid_at: t, weight: 0, updatedAt: t, id: activeId })
+      }
+      updateFactResolve.run({ resolvedAt: t, updatedAt: t, id: activeId })
+      updateFactResolve.run({ resolvedAt: t, updatedAt: t, id: invalidatedId })
+      log({ kind: 'memory-graph', action: 'adjudicate', activeId, invalidatedId, resolution })
+      return true
+    })()
   }
 
   function reinforceFact(id: string): boolean {
@@ -958,7 +1072,7 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
       clauses.push('f.episodeId = ?')
       params.push(opts.episodeId)
     }
-    let sql = `SELECT f.id, f.type, f.content, f.source, f.userState, f.intent, f.weight, f.episodeId, f.entityIds, f.valid_at, f.invalid_at, f.expired_at, f.createdAt, f.updatedAt, f.hitCount, f.lastSeenAt
+    let sql = `SELECT f.id, f.type, f.content, f.source, f.userState, f.intent, f.weight, f.episodeId, f.entityIds, f.valid_at, f.invalid_at, f.expired_at, f.resolvedAt, f.createdAt, f.updatedAt, f.hitCount, f.lastSeenAt
                FROM facts_fts JOIN facts f ON f.id = facts_fts.id WHERE ${clauses.join(' AND ')} ORDER BY facts_fts.rank`
     if (opts.limit !== undefined && opts.limit > 0) {
       sql += ' LIMIT ?'
@@ -1101,6 +1215,8 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
     addFact,
     putFact,
     updateFactState,
+    listConflicts,
+    adjudicateConflict,
     reinforceFact,
     deleteFact: (id) => deleteFactStmt.run(id).changes > 0,
     getFact: (id) => {

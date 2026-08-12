@@ -10,7 +10,7 @@ import { create } from 'zustand'
 import { edge } from '../lib/edge'
 import { shouldRestoreToLanding } from '../lib/restore'
 import type { SuggestTitleContext, SuggestionAcceptOptions, DropResource } from '../../shared/ipc'
-import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View, TraceRecordDto, IgnoreReason } from '../../shared/types'
+import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View, TraceRecordDto, IgnoreReason } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
@@ -163,6 +163,12 @@ interface AppState {
   memories: MemoryListPayload | null
   loadMemories: () => Promise<void>
   actMemory: (id: string, action: MemoryAction) => Promise<void>
+
+  /* memory graph panel (t51; facts over the memory graph, refreshed after each decision) */
+  memoryFacts: MemoryFactPanelPayload | null
+  loadMemoryFacts: () => Promise<void>
+  setMemoryFactState: (id: string, userState: MemoryUserState) => Promise<void>
+  adjudicateMemoryConflict: (activeId: string, invalidatedId: string, resolution: MemoryConflictResolution) => Promise<void>
 
   /* ai rationale (trace, t42; read-only views over traceStore) */
   getTraceByDecision: (decisionId: string) => Promise<TraceRecordDto[]>
@@ -463,6 +469,20 @@ export const useStore = create<AppState>((set, get) => ({
   },
   async actMemory(id, action) {
     set({ memories: await edge.actMemory(id, action) })
+  },
+
+  /* memory graph panel (t51) — 每次操作主进程返回整体刷新载荷 */
+  memoryFacts: null,
+  async loadMemoryFacts() {
+    set({ memoryFacts: await edge.loadMemoryFacts() })
+  },
+  async setMemoryFactState(id, userState) {
+    // 非法转换主进程返回 null：不刷新载荷（行保持原状，UI 竞态时如实呈现）
+    const payload = await edge.setMemoryFactState(id, userState)
+    if (payload !== null) set({ memoryFacts: payload })
+  },
+  async adjudicateMemoryConflict(activeId, invalidatedId, resolution) {
+    set({ memoryFacts: await edge.adjudicateMemoryConflict(activeId, invalidatedId, resolution) })
   },
 
   /* ai rationale (trace, t42) — thin views; the panel holds the loaded rows */

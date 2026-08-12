@@ -172,6 +172,12 @@ const api = {
   loadMemories: () => invoke('memory:list'),
   actMemory: (id: string, action: import('../../shared/types').MemoryAction) => invoke('memory:act', id, action),
 
+  /* Memory graph panel (t51) */
+  loadMemoryFacts: () => invoke('memory-graph:list'),
+  setMemoryFactState: (id: string, userState: import('../../shared/types').MemoryUserState) => invoke('memory-graph:set-state', id, userState),
+  adjudicateMemoryConflict: (activeId: string, invalidatedId: string, resolution: import('../../shared/types').MemoryConflictResolution) =>
+    invoke('memory-graph:adjudicate', activeId, invalidatedId, resolution),
+
   /* AI rationale (trace, t42) */
   getTraceByDecision: (decisionId: string) => invoke('trace:list-by-decision', decisionId),
   getTraceByTask: (taskId: string) => invoke('trace:list-by-task', taskId),

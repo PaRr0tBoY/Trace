@@ -99,6 +99,18 @@ export interface EdgeApi {
   loadMemories: () => Promise<import('./types').MemoryListPayload>
   actMemory: (id: string, action: import('./types').MemoryAction) => Promise<import('./types').MemoryListPayload>
 
+  /* Memory graph panel (t51) */
+  /** 记忆图面板全量：未失效 facts（按 type 过滤分组）+ 待裁决冲突对 + 来源链。 */
+  loadMemoryFacts: () => Promise<import('./types').MemoryFactPanelPayload>
+  /** 单条事实 confirm/ignore/ban；非法转换返回 null（不刷新载荷）。 */
+  setMemoryFactState: (id: string, userState: import('./types').MemoryUserState) => Promise<import('./types').MemoryFactPanelPayload | null>
+  /** 冲突裁决：保留 active / 保留 invalidated / 都不保留；返回刷新载荷。 */
+  adjudicateMemoryConflict: (
+    activeId: string,
+    invalidatedId: string,
+    resolution: import('./types').MemoryConflictResolution
+  ) => Promise<import('./types').MemoryFactPanelPayload>
+
   /* AI rationale (trace, t42) */
   /** One decision chain (proposal "AI 依据"): observed → … → result rows, ascending. */
   getTraceByDecision: (decisionId: string) => Promise<import('./types').TraceRecordDto[]>

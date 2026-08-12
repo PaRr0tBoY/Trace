@@ -214,6 +214,18 @@ const MIGRATIONS: readonly Migration[] = [
         ALTER TABLE recommendation_history ADD COLUMN patternKey TEXT NOT NULL DEFAULT '';
       `)
     }
+  },
+  {
+    version: 4,
+    name: 'facts: resolvedAt (t51 panel adjudication marker)',
+    up: (db) => {
+      // t51 冲突裁决（spec 决策 10：不自动覆盖）需要区分"被自动失效、待面板裁决"
+      // 与"用户已裁决"——裁决写 resolved_at 时刻，listConflicts 只挑未裁决对。
+      // 自动矛盾消解路径不写（仍是待审冲突）；新行默认 NULL。
+      db.exec(`
+        ALTER TABLE facts ADD COLUMN resolvedAt INTEGER;
+      `)
+    }
   }
 ]
 

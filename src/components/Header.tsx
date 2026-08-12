@@ -61,8 +61,8 @@ function SecondaryRow({ children }: { children: React.ReactNode }) {
           transition={{ type: 'spring', stiffness: 500, damping: 35 }}
           style={{
             position: 'absolute',
-            top: 2,
-            bottom: 2,
+            top: 0,
+            bottom: 0,
             borderRadius: 999,
             background: 'rgba(255, 255, 255, 0.16)',
             border: '1px solid rgba(255, 255, 255, 0.22)',
@@ -170,12 +170,15 @@ export function Header() {
     letterSpacing: '0.01em',
     fontWeight: active ? 600 : 500,
     color: active ? '#ffffff' : 'rgba(255, 255, 255, 0.6)',
-    background: active ? 'rgba(255, 255, 255, 0.16)' : 'transparent',
-    border: active ? '1px solid rgba(255, 255, 255, 0.22)' : '1px solid transparent',
+    // Selection is drawn by the sliding selector pill behind the row; the
+    // chip itself stays transparent so no second background/border overlaps
+    // the pill (a fixed transparent border keeps layout width stable).
+    background: 'transparent',
+    border: '1px solid transparent',
     borderRadius: 999,
     cursor: 'pointer',
     userSelect: 'none',
-    transition: 'color 0.18s ease, background 0.18s ease, border-color 0.18s ease',
+    transition: 'color 0.18s ease',
     zIndex: 1,
     whiteSpace: 'nowrap',
     // visible lets the corner badges sit slightly outside the pill; chip
@@ -272,7 +275,10 @@ export function Header() {
               gap: PRIMARY_GAP,
               boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05)',
               maxWidth: '100%',
-              overflow: 'hidden'
+              // visible lets the tasks badge (absolutely positioned outside
+              // its chip) break out; the selector pill never exceeds the
+              // track width, so nothing leaks during the spring.
+              overflow: 'visible'
             }}
           >
             <motion.div
@@ -448,7 +454,9 @@ export function Header() {
                 marginRight: 2,
                 boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
                 maxWidth: '100%',
-                overflow: 'hidden',
+                // visible lets the task-count badge (absolute, outside its
+                // chip) break out; the selector pill fits inside the track.
+                overflow: 'visible',
                 height: 26,
                 boxSizing: 'border-box'
               }}

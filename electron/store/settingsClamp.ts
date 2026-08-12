@@ -7,6 +7,7 @@
  */
 import { DEFAULT_SETTINGS, type Settings } from '../../shared/types'
 import { isThemeColor } from '../../shared/themes'
+import { normalizeExePath } from './privacyGate'
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = Number(value)
@@ -62,6 +63,31 @@ export function clampSettings(input: Settings): Settings {
   out.traceRetentionDays = clampInt(out.traceRetentionDays, 1, 365, 30)
   // Provider chain: must stay an array (priority order = array order).
   out.aiProviders = Array.isArray(out.aiProviders) ? out.aiProviders : []
+  // Privacy domain (t45, spec 决策 7/12; consumed by privacyGate in main).
+  // Defaults mirror DEFAULT_POLICY: 全开显式可见.
+  out.aiEnabled = out.aiEnabled !== false
+  // Denied apps are exePath keys, normalized by the same rule privacyGate
+  // matches on; dedupe + drop empty entries. Garbage → empty list (deny nothing).
+  out.deniedApps = Array.isArray(out.deniedApps)
+    ? [...new Set(out.deniedApps.filter((p): p is string => typeof p === 'string').map(normalizeExePath).filter((p) => p.length > 0))]
+    : []
+  // Content types: only the three known literals survive. Non-array garbage
+  // falls back to all three; a valid array keeps its members ([] = the user
+  // explicitly blocked every type, which privacyGate enforces as deny-all).
+  out.allowedContentTypes = Array.isArray(out.allowedContentTypes)
+    ? out.allowedContentTypes.filter((c) => c === 'text' || c === 'image' || c === 'files')
+    : ['text', 'image', 'files']
+  // Daily AI window end hour: 0–24 per privacyGate semantics; undefined = all
+  // day. 24 is semantically all-day (hourOfDay < 24 always holds), so both
+  // garbage and an explicit 24 normalize to undefined — every persisted value
+  // then maps to a UI pill state (all-day/12/18/21/23) instead of a dangling 24.
+  if (out.aiTimeRangeHours !== undefined) {
+    const h = clampInt(out.aiTimeRangeHours, 0, 24, 24)
+    out.aiTimeRangeHours = h === 24 ? undefined : h
+  }
+  out.clipboardAccess = out.clipboardAccess !== false
+  out.memoryAccess = out.memoryAccess !== false
+  out.memoryEnabled = out.memoryEnabled !== false
   // Landing page (ADR-0004): view must be a valid top-level view, filters
   // must match the view's second level; anything else falls back to defaults.
   const landing = out.landing

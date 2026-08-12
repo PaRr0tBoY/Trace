@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef, type CSSProperties } from 'react'
+import { useEffect, useState, useRef, useMemo, type CSSProperties } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore, type SettingsTab } from '../store/appStore'
-import type { DisplayInfo, Memory, MemoryAction, ProviderConfig, ClipboardFilter, RestoreTime } from '../../shared/types'
+import type { DisplayInfo, Memory, MemoryAction, ProviderConfig, ClipboardFilter, RestoreTime, AppRef, ContentType } from '../../shared/types'
 import { THEME_ACCENTS, THEME_COLORS } from '../../shared/themes'
 import { LiquidOctopusLoader } from './LiquidOctopusLoader'
 import { TickIndicatorIcon, CopyIndicatorIcon, SparkleIndicatorIcon } from './CopyIndicatorCurve'
@@ -10,6 +10,8 @@ import { ChangelogView } from './ChangelogView'
 import kofiSupportImg from '../assets/kofi-support.webp'
 import { playDialTickSound, playToggleSound, playButtonClickSound } from '../lib/soundEffects'
 import { useTranslation } from '../i18n'
+import { AppIcon } from './tasks/AppIcon'
+import { normalizeAppKey } from '../../shared/appKey'
 import '../styles/settings.css'
 
 export type { SettingsTab }
@@ -23,6 +25,7 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
     { id: 'position',   label: t('tabs.position') },
     { id: 'appearance', label: t('tabs.appearance') },
     { id: 'tasks',      label: t('tabs.tasks') },
+    { id: 'privacy',    label: t('tabs.privacy') },
   ]
   const patch = useStore((s) => s.patchSettings)
   const currentVersion = useStore((s) => s.currentVersion)
@@ -82,7 +85,8 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
     behaviour: 0,
     position: 0,
     appearance: 0,
-    tasks: 0
+    tasks: 0,
+    privacy: 0
   })
 
   const handleTabSwitch = (newTab: SettingsTab) => {
@@ -448,19 +452,6 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                     <Toggle
                       checked={settings.launchAtLogin}
                       onChange={(v) => patch({ launchAtLogin: v })}
-                    />
-                  </div>
-
-                  <div className="setting-divider" />
-
-                  <div className="setting-row">
-                    <div className="setting-info">
-                      <div className="setting-title">{t('behaviour.incognitoTitle')}</div>
-                      <div className="setting-desc">{t('behaviour.incognitoDesc')}</div>
-                    </div>
-                    <Toggle
-                      checked={settings.incognito}
-                      onChange={(v) => patch({ incognito: v })}
                     />
                   </div>
 
@@ -1168,6 +1159,21 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                   {PersistentFooter}
                 </motion.div>
               )}
+
+              {/* ── Tab 5: Privacy (spec 决策 12 — 采集 / AI / 记忆三权) ── */}
+              {activeTab === 'privacy' && (
+                <motion.div
+                  key="tab-privacy"
+                  initial={{ opacity: 0, scale: 0.98, y: 4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: -4 }}
+                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <PrivacySection />
+
+                  {PersistentFooter}
+                </motion.div>
+              )}
             </AnimatePresence>
 
           </div>
@@ -1812,6 +1818,276 @@ function MemorySection() {
       ) : (
         memories.banned.map((m) => memoryRow(m, [{ action: 'unban', label: t('memory.unban') }]))
       )}
+    </>
+  )
+}
+
+/**
+ * Privacy section (spec 决策 12): 采集 / AI / 记忆 三权开关 + AI 政策五维
+ * (主开关 / 拒绝应用 / 内容类型 / 时间范围 / 剪贴板访问 / 记忆访问). Every
+ * control patches settings — the same merge+clamp three-registration path every
+ * other setting uses, so the privacyGate consumer in main reads the same
+ * persisted policy. The blocked-app list reuses the task-editor app source
+ * (L0-tracked ∪ clipboard sourceApps) with icons via getAppIcons.
+ */
+function PrivacySection() {
+  const { t } = useTranslation()
+  const settings = useStore((s) => s.settings)
+  const patch = useStore((s) => s.patchSettings)
+  const getTaskAppOptions = useStore((s) => s.getTaskAppOptions)
+  const getAppIcons = useStore((s) => s.getAppIcons)
+
+  const [appOptions, setAppOptions] = useState<AppRef[]>([])
+  const [icons, setIcons] = useState<Map<string, string | null>>(new Map())
+
+  // App options are computed main-side (event bus ∪ clipboard sourceApps);
+  // load once on mount; failures degrade to the empty grid state.
+  useEffect(() => {
+    let cancelled = false
+    void getTaskAppOptions()
+      .then((opts) => {
+        if (!cancelled) setAppOptions(opts)
+      })
+      .catch(() => {
+        if (!cancelled) setAppOptions([])
+      })
+    return () => { cancelled = true }
+  }, [getTaskAppOptions])
+
+  // privacyGate matches the deny list on appExePath only — apps without a
+  // path can never be denied, so they are not offered.
+  const blockable = useMemo(
+    () => appOptions.filter((a) => a.exePath).sort((a, b) => a.name.localeCompare(b.name)),
+    [appOptions]
+  )
+
+  // Icons on demand (app:icons, cache-first); failures fall back to glyphs.
+  useEffect(() => {
+    const missing = blockable.map((a) => a.exePath as string).filter((p) => !icons.has(p))
+    if (missing.length === 0) return
+    let cancelled = false
+    void getAppIcons(missing)
+      .then((res) => {
+        if (cancelled) return
+        setIcons((prev) => {
+          const next = new Map(prev)
+          for (const p of missing) next.set(p, res[p] ?? null)
+          return next
+        })
+      })
+      .catch(() => { /* icons are cosmetic — tiles fall back to letter glyphs */ })
+    return () => { cancelled = true }
+  }, [blockable, icons, getAppIcons])
+
+  const denied = useMemo(() => new Set(settings.deniedApps ?? []), [settings.deniedApps])
+
+  const toggleBlocked = (exePath: string): void => {
+    const key = normalizeAppKey(exePath)
+    const next = new Set(denied)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    playButtonClickSound()
+    patch({ deniedApps: [...next].sort() })
+  }
+
+  const toggleContentType = (ct: ContentType): void => {
+    const cur = settings.allowedContentTypes ?? ['text', 'image', 'files']
+    const next = cur.includes(ct) ? cur.filter((c) => c !== ct) : [...cur, ct]
+    playButtonClickSound()
+    patch({ allowedContentTypes: next })
+  }
+
+  const aiEnabled = settings.aiEnabled !== false
+  // AI policy sub-controls are dimmed while the master switch is off — the
+  // same pattern as hoverActivation → fullscreenProtection.
+  const aiDim = aiEnabled ? undefined : { opacity: 0.45, transition: 'opacity 0.2s ease' }
+
+  return (
+    <>
+      <div className="setting-group-label">{t('tabs.privacy')}</div>
+
+      {/* ── GROUP: Capture ────────────────────────────────────────────── */}
+      <div className="setting-group-label">{t('privacy.captureGroup')}</div>
+
+      <div className="setting-row">
+        <div className="setting-info">
+          <div className="setting-title">{t('privacy.taskCaptureTitle')}</div>
+          <div className="setting-desc">{t('privacy.taskCaptureDesc')}</div>
+        </div>
+        <Toggle
+          checked={settings.taskCaptureEnabled !== false}
+          onChange={(v) => patch({ taskCaptureEnabled: v })}
+        />
+      </div>
+
+      <div className="setting-divider" />
+
+      <div className="setting-row">
+        <div className="setting-info">
+          <div className="setting-title">{t('privacy.l0CaptureTitle')}</div>
+          <div className="setting-desc">{t('privacy.l0CaptureDesc')}</div>
+        </div>
+        <Toggle
+          checked={settings.l0CaptureEnabled !== false}
+          onChange={(v) => patch({ l0CaptureEnabled: v })}
+        />
+      </div>
+
+      <div className="setting-divider" />
+
+      <div className="setting-row">
+        <div className="setting-info">
+          <div className="setting-title">{t('privacy.incognitoTitle')}</div>
+          <div className="setting-desc">{t('privacy.incognitoDesc')}</div>
+        </div>
+        <Toggle
+          checked={settings.incognito}
+          onChange={(v) => patch({ incognito: v })}
+        />
+      </div>
+
+      <div className="setting-divider" />
+
+      {/* ── GROUP: AI ─────────────────────────────────────────────────── */}
+      <div className="setting-group-label">{t('privacy.aiGroup')}</div>
+
+      <div className="setting-row">
+        <div className="setting-info">
+          <div className="setting-title">{t('privacy.aiEnabledTitle')}</div>
+          <div className="setting-desc">{t('privacy.aiEnabledDesc')}</div>
+        </div>
+        <Toggle
+          checked={aiEnabled}
+          onChange={(v) => patch({ aiEnabled: v })}
+        />
+      </div>
+
+      <div className="setting-divider" />
+
+      <div style={aiDim}>
+        <div className="setting-row vertical" style={{ gap: 8 }}>
+          <div className="setting-info">
+            <div className="setting-title">{t('privacy.blockedAppsTitle')}</div>
+            <div className="setting-desc">{t('privacy.blockedAppsDesc')}</div>
+          </div>
+          {blockable.length === 0 ? (
+            <div className="setting-desc" style={{ fontSize: 10.5, opacity: 0.6 }}>{t('privacy.blockedAppsEmpty')}</div>
+          ) : (
+            <div className="task-editor-apps">
+              {blockable.map((app) => {
+                const key = normalizeAppKey(app.exePath as string)
+                const selected = denied.has(key)
+                return (
+                  <button
+                    type="button"
+                    key={app.id}
+                    className={`task-editor-app${selected ? ' selected' : ''}`}
+                    title={app.exePath}
+                    disabled={!aiEnabled}
+                    onClick={() => toggleBlocked(app.exePath as string)}
+                  >
+                    <AppIcon
+                      app={{ name: app.name, iconUrl: icons.get(app.exePath as string) ?? undefined }}
+                      size={22}
+                    />
+                    <span className="task-editor-app-name">{app.name}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="setting-divider" />
+
+        <div className="setting-row vertical" style={{ gap: 8 }}>
+          <div className="setting-info">
+            <div className="setting-title">{t('privacy.contentTypesTitle')}</div>
+            <div className="setting-desc">{t('privacy.contentTypesDesc')}</div>
+          </div>
+          <div className="setting-pills">
+            {([
+              { id: 'text' as const, label: t('privacy.contentTypesText') },
+              { id: 'image' as const, label: t('privacy.contentTypesImage') },
+              { id: 'files' as const, label: t('privacy.contentTypesFiles') }
+            ]).map((opt) => (
+              <button
+                key={opt.id}
+                className={`pill ${(settings.allowedContentTypes ?? ['text', 'image', 'files']).includes(opt.id) ? 'active' : ''}`}
+                disabled={!aiEnabled}
+                onClick={() => toggleContentType(opt.id)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="setting-divider" />
+
+        <div className="setting-row vertical" style={{ gap: 8 }}>
+          <div className="setting-info">
+            <div className="setting-title">{t('privacy.timeRangeTitle')}</div>
+            <div className="setting-desc">{t('privacy.timeRangeDesc')}</div>
+          </div>
+          <div className="setting-pills">
+            {([undefined, 12, 18, 21, 23] as Array<number | undefined>).map((h) => (
+              <button
+                key={h ?? 'all'}
+                className={`pill ${(settings.aiTimeRangeHours ?? undefined) === h ? 'active' : ''}`}
+                disabled={!aiEnabled}
+                onClick={() => { playButtonClickSound(); patch({ aiTimeRangeHours: h }) }}
+              >
+                {h === undefined ? t('privacy.timeAllDay') : t('privacy.timeHours', { hours: h })}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="setting-divider" />
+
+        <div className="setting-row">
+          <div className="setting-info">
+            <div className="setting-title">{t('privacy.clipboardAccessTitle')}</div>
+            <div className="setting-desc">{t('privacy.clipboardAccessDesc')}</div>
+          </div>
+          <Toggle
+            checked={settings.clipboardAccess !== false}
+            onChange={(v) => patch({ clipboardAccess: v })}
+            disabled={!aiEnabled}
+          />
+        </div>
+
+        <div className="setting-divider" />
+
+        <div className="setting-row">
+          <div className="setting-info">
+            <div className="setting-title">{t('privacy.memoryAccessTitle')}</div>
+            <div className="setting-desc">{t('privacy.memoryAccessDesc')}</div>
+          </div>
+          <Toggle
+            checked={settings.memoryAccess !== false}
+            onChange={(v) => patch({ memoryAccess: v })}
+            disabled={!aiEnabled}
+          />
+        </div>
+      </div>
+
+      <div className="setting-divider" />
+
+      {/* ── GROUP: Memory ─────────────────────────────────────────────── */}
+      <div className="setting-group-label">{t('privacy.memoryGroup')}</div>
+
+      <div className="setting-row">
+        <div className="setting-info">
+          <div className="setting-title">{t('privacy.memoryEnabledTitle')}</div>
+          <div className="setting-desc">{t('privacy.memoryEnabledDesc')}</div>
+        </div>
+        <Toggle
+          checked={settings.memoryEnabled !== false}
+          onChange={(v) => patch({ memoryEnabled: v })}
+        />
+      </div>
     </>
   )
 }

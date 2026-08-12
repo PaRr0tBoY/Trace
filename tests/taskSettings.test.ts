@@ -102,6 +102,56 @@ describe('clampSettings — task domain fields', () => {
   })
 })
 
+describe('clampSettings — privacy domain (t45, spec 决策 12)', () => {
+  it('keeps privacy master switches on unless explicitly false', () => {
+    const all = clampSettings(DEFAULT_SETTINGS)
+    expect(all.aiEnabled).toBe(true)
+    expect(all.clipboardAccess).toBe(true)
+    expect(all.memoryAccess).toBe(true)
+    expect(all.memoryEnabled).toBe(true)
+    const off = clampSettings({
+      ...DEFAULT_SETTINGS,
+      aiEnabled: false,
+      clipboardAccess: false,
+      memoryAccess: false,
+      memoryEnabled: false
+    })
+    expect(off.aiEnabled).toBe(false)
+    expect(off.clipboardAccess).toBe(false)
+    expect(off.memoryAccess).toBe(false)
+    expect(off.memoryEnabled).toBe(false)
+  })
+
+  it('normalizes and dedupes the denied-app list with the privacyGate key rule', () => {
+    const out = clampSettings({
+      ...DEFAULT_SETTINGS,
+      deniedApps: ['  C:\\Windows\\Notepad.EXE  ', 'c:/windows/notepad.exe', 'chrome.exe', '', 42 as never]
+    })
+    expect(out.deniedApps).toEqual(['c:/windows/notepad.exe', 'chrome.exe'])
+    expect(clampSettings({ ...DEFAULT_SETTINGS, deniedApps: 'garbage' as never }).deniedApps).toEqual([])
+  })
+
+  it('keeps only the three known content types; garbage falls back to all three', () => {
+    expect(clampSettings(DEFAULT_SETTINGS).allowedContentTypes).toEqual(['text', 'image', 'files'])
+    const out = clampSettings({ ...DEFAULT_SETTINGS, allowedContentTypes: ['text', 'video' as never, 'files'] })
+    expect(out.allowedContentTypes).toEqual(['text', 'files'])
+    // An explicit empty list survives — the user blocked every type on purpose.
+    expect(clampSettings({ ...DEFAULT_SETTINGS, allowedContentTypes: [] }).allowedContentTypes).toEqual([])
+    expect(clampSettings({ ...DEFAULT_SETTINGS, allowedContentTypes: 'garbage' as never }).allowedContentTypes).toEqual(['text', 'image', 'files'])
+  })
+
+  it('clamps the daily AI window hour to 0-24; undefined stays all-day', () => {
+    expect(clampSettings(DEFAULT_SETTINGS).aiTimeRangeHours).toBeUndefined()
+    expect(clampSettings({ ...DEFAULT_SETTINGS, aiTimeRangeHours: 18 }).aiTimeRangeHours).toBe(18)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, aiTimeRangeHours: -1 }).aiTimeRangeHours).toBe(0)
+    // 24 is semantically all-day (hourOfDay < 24 always holds); normalize to
+    // undefined so every persisted value maps to a UI pill (all-day/12/18/21/23).
+    expect(clampSettings({ ...DEFAULT_SETTINGS, aiTimeRangeHours: 24 }).aiTimeRangeHours).toBeUndefined()
+    expect(clampSettings({ ...DEFAULT_SETTINGS, aiTimeRangeHours: 99 }).aiTimeRangeHours).toBeUndefined()
+    expect(clampSettings({ ...DEFAULT_SETTINGS, aiTimeRangeHours: NaN }).aiTimeRangeHours).toBeUndefined()
+  })
+})
+
 describe('clampSettings — existing fields keep their behaviour', () => {
   it('preserves the legacy slider/enum clamps', () => {
     const out = clampSettings(corrupt())

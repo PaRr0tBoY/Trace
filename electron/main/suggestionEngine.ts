@@ -66,13 +66,13 @@ import {
   TIME_OVERLAP_WINDOW_MS
 } from '../store/proposalGrading'
 import type { ChatRequest, ChatResult } from './provider'
-import type { SuggestTitleContext } from '../../shared/ipc'
 import { algorithmicTitle } from '../../shared/titles'
 import { createId } from '../store/ids'
 import { normalizeAppKey } from '../../shared/appKey'
 import { normalizeExePath, type PrivacyPolicy } from '../store/privacyGate'
 import { buildClipboardRef, type TaskStore } from '../store/TaskStore'
 import { MAX_LOCAL_CANDIDATES, type CandidateOptimizer } from '../store/localModelOptimizer'
+import { matchMemories } from '../store/decisionProvider'
 import type {
   AppRef,
   CandidateActivity,
@@ -120,41 +120,6 @@ export function buildMemoryCandidate(title: string): MemoryCandidate | null {
   const content = title.trim()
   if (!content) return null
   return { type: 'project', content }
-}
-
-/** Text a segment is matched against: window titles + app names. */
-export interface SegmentText {
-  appNames: string[]
-  windowTitles: string[]
-}
-
-/**
- * Context-prior matching (spec decision 7): which confirmed project/workflow
- * memories each segment hits. A memory matches when its content and the
- * segment text overlap in either direction (case-insensitive substring) — a
- * memory "CAD Agent" hits a "CAD Agent" segment, and a memory describing the
- * segment's own terms hits as well. Identity/tool memories and anything not
- * user-confirmed are never injected.
- */
-export function matchMemories(segments: SegmentText[], memories: readonly Memory[]): string[][] {
-  const usable = memories.filter(
-    (m) => m.userState === 'confirmed' && (m.type === 'project' || m.type === 'workflow') && m.content.trim().length > 0
-  )
-  return segments.map((seg) => {
-    const parts = [...seg.windowTitles, ...seg.appNames].map((p) => p.trim().toLowerCase()).filter((p) => p.length > 0)
-    if (parts.length === 0) return []
-    const joined = parts.join(' ')
-    const hits: string[] = []
-    for (const m of usable) {
-      const content = m.content.trim().toLowerCase()
-      if (!content) continue
-      // Either the memory is a phrase inside the segment text, or the segment
-      // carries one of the memory's phrases — checked per part, because the
-      // joined text is only meaningful in the memory->text direction.
-      if (joined.includes(content) || parts.some((p) => content.includes(p))) hits.push(m.content.trim())
-    }
-    return hits
-  })
 }
 
 /** The subset of settings the engine reads live on every tick. */
@@ -364,12 +329,6 @@ export interface SuggestionEngine {
   setChat(chat: ChatFn): void
   /** Wire the OCR capture after construction (index.ts); optional, silent when absent. */
   setOcr(ocr: OcrFn): void
-  /**
-   * Ask the provider chain for 1-3 title candidates for a task draft
-   * (task:suggest-title). Null when no provider is configured, the chain
-   * fails, or the reply doesn't validate.
-   */
-  suggestTitle(ctx: SuggestTitleContext): Promise<string[] | null>
 }
 
 /**
@@ -1059,83 +1018,6 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
     },
     setOcr(fn: OcrFn): void {
       ocr = fn
-    },
-    async suggestTitle(ctx: SuggestTitleContext): Promise<string[] | null> {
-      if (!chat) {
-        log({ kind: 'title.request', context: {}, error: 'no provider configured' })
-        return null
-      }
-      // Only the fields the draft actually carries travel to the provider.
-      const details: Record<string, unknown> = {}
-      if (ctx.title && ctx.title.trim().length > 0) details.title = ctx.title.trim()
-      if (ctx.note && ctx.note.trim().length > 0) details.note = ctx.note.trim()
-      if (ctx.appNames.length > 0) details.appNames = ctx.appNames
-      if (ctx.resourcePreviews.length > 0) details.resourcePreviews = ctx.resourcePreviews
-      // Memory context (ADR-0003): same context-prior rule as the analysis
-      // pass — confirmed project/workflow memories overlapping the draft
-      // text (apps + previews + title + note) travel as memoryContext.
-      if (options.readMemories) {
-        const draftParts = [ctx.title, ctx.note, ...ctx.resourcePreviews].filter(
-          (s): s is string => typeof s === 'string' && s.trim().length > 0
-        )
-        const hits = matchMemories(
-          [{ appNames: ctx.appNames, windowTitles: draftParts }],
-          options.readMemories()
-        )
-        if (hits[0] && hits[0].length > 0) details.memoryContext = hits[0]
-      }
-      log({ kind: 'title.request', context: details })
-      const req: ChatRequest = {
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You suggest titles for a task tracker. Given a task draft, reply with JSON only: ' +
-              '{"titles": ["...", "..."]} with 1 to 3 concise titles, at most 8 words each, no quotes, ' +
-              'written in the same language as the draft. The first title is the best; every candidate must be distinct.'
-          },
-          { role: 'user', content: `Task: ${JSON.stringify(details)}` }
-        ],
-        schema: {
-          type: 'object',
-          properties: { titles: { type: 'array', items: { type: 'string' } } },
-          required: ['titles']
-        },
-        maxTokens: 200,
-        timeoutMs: LLM_TIMEOUT_MS
-      }
-
-      let result: ChatResult
-      try {
-        result = await chat(req)
-      } catch (err) {
-        const error = err instanceof Error ? err.message : String(err)
-        console.log(`[Suggestion] title suggestion failed: ${error}`)
-        log({ kind: 'title.result', titles: null, error })
-        return null
-      }
-      if (!result.ok || !result.parsed || typeof result.parsed !== 'object' || Array.isArray(result.parsed)) {
-        log({ kind: 'title.result', titles: null, error: result.ok ? 'invalid reply' : result.error })
-        return null
-      }
-      const parsed = result.parsed as { titles?: unknown }
-      if (!Array.isArray(parsed.titles)) {
-        log({ kind: 'title.result', titles: null, error: 'invalid reply' })
-        return null
-      }
-
-      const seen = new Set<string>()
-      const titles: string[] = []
-      for (const raw of parsed.titles) {
-        const title = sanitizeString(raw, MAX_TITLE_CHARS)
-        if (title.length === 0 || seen.has(title.toLowerCase())) continue
-        seen.add(title.toLowerCase())
-        titles.push(title)
-        if (titles.length >= 3) break
-      }
-      const out = titles.length > 0 ? titles : null
-      log({ kind: 'title.result', titles: out, error: out ? undefined : 'no valid titles' })
-      return out
     }
   }
 }

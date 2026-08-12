@@ -13,6 +13,7 @@ import { createMemorySessionStore } from '../electron/store/sessionStore'
 import { createMemoryTraceStore, type TraceStore } from '../electron/store/traceStore'
 import {
   createCurrentTaskController,
+  MAX_PENDING_PROPOSALS,
   type CurrentTaskController,
   type DecisionContext,
   type SwitchParams,
@@ -20,7 +21,10 @@ import {
   type TaskDecisionProvider
 } from '../electron/store/currentTaskController'
 import { createAlgorithmDecisionProvider } from '../electron/store/decisionProvider'
+import { recommendationFingerprint } from '../electron/store/activityLedger'
+import { createMemoryRecommendationHistory, type RecommendationHistory } from '../electron/store/recommendationHistory'
 import type { Activity, ActivityDetail } from '../electron/store/activityLedger'
+import type { TaskProposal } from '../shared/types'
 
 const BASE_PARAMS: SwitchParams = {
   switchDwellSeconds: 45,
@@ -70,6 +74,7 @@ interface Harness {
   store: TaskStore
   controller: CurrentTaskController
   calls: DecisionContext[]
+  decisionIds: string[]
   trace: TraceStore
   tick: (ms: number) => void
   now: () => number
@@ -81,6 +86,7 @@ function makeHarness(opts?: {
   params?: Partial<SwitchParams>
   provider?: TaskDecisionProvider
   readMemories?: (activity: Activity) => { content: string; reasons: string[]; hops: number }[]
+  history?: RecommendationHistory
 }): Harness {
   let saved: TaskIndex | null = null
   let now = 1_000_000
@@ -92,11 +98,13 @@ function makeHarness(opts?: {
   })
   store.load()
   const calls: DecisionContext[] = []
+  const decisionIds: string[] = []
   let scripted: TaskDecision | null = null
   const record = (inner: TaskDecisionProvider): TaskDecisionProvider => ({
     id: inner.id,
-    async evaluateTaskContext(ctx) {
+    async evaluateTaskContext(ctx, decisionId) {
       calls.push(ctx)
+      if (decisionId) decisionIds.push(decisionId)
       return inner.evaluateTaskContext(ctx)
     }
   })
@@ -116,12 +124,14 @@ function makeHarness(opts?: {
     trace,
     getParams: () => ({ ...BASE_PARAMS, ...opts?.params }),
     now: () => now,
-    readMemories: opts?.readMemories
+    readMemories: opts?.readMemories,
+    history: opts?.history
   })
   return {
     store,
     controller,
     calls,
+    decisionIds,
     trace,
     tick: (ms: number) => { now += ms },
     now: () => now,
@@ -536,5 +546,221 @@ describe('CurrentTaskController — 决策上下文与 trace', () => {
     const chain = trace.listByDecisionId(outcome.decisionId!)
     expect(chain.map((r) => r.kind).sort()).toEqual(['decision', 'observed'])
     expect(chain.find((r) => r.kind === 'decision')!.payload.action).toBe('continue')
+  })
+})
+
+describe('CurrentTaskController — 决策产出接线（t56：提案 ≤3 + 推荐历史）', () => {
+  /** 触发一次决策：稳态复位 → score-drop + new-cluster，dwell 后观察。 */
+  async function fireDecision(h: Harness, scripted: TaskDecision): Promise<ReturnType<Harness['controller']['observe']>> {
+    // 稳态观察复位“已决策”记忆（同候选抑制只在变化沿持续，多轮脚本需复位）。
+    const running = h.store.list().find((t) => t.status === 'running')
+    if (running) await h.controller.observe(...Object.values(attributed('high', 0.85, running.id)))
+    const drop = activityOf({ zone: 'new', confidence: 0.3 })
+    await h.controller.observe(drop.activity, drop.detail)
+    h.tick(46_000)
+    h.decide(scripted)
+    return h.controller.observe(drop.activity, drop.detail)
+  }
+
+  it('new → 提案（title / appNames / level 1 / 携带 decisionId）', async () => {
+    const h = makeHarness()
+    const outcome = await fireDecision(h, {
+      action: 'new',
+      title: 'Build CAD Agent',
+      confidence: 0.6,
+      reason: 'new semantic cluster',
+      apps: ['code.exe'],
+      evidence: []
+    })
+    expect(outcome.action).toBe('new')
+    expect(outcome.proposals).toHaveLength(1)
+    const p = outcome.proposals[0]
+    expect(p).toMatchObject({
+      title: 'Build CAD Agent',
+      appNames: ['code.exe'],
+      confidence: 0.6,
+      level: 1,
+      decisionId: outcome.decisionId
+    })
+    expect(h.controller.pendingProposals()).toEqual(outcome.proposals)
+  })
+
+  it('new 空标题 → 无提案', async () => {
+    const h = makeHarness()
+    const outcome = await fireDecision(h, { action: 'new', title: '  ', confidence: 0.5, reason: 'r', apps: [], evidence: [] })
+    expect(outcome.proposals).toHaveLength(0)
+  })
+
+  it('提案 ≤3 FIFO：满员后最旧被挤掉；同目标替换旧卡', async () => {
+    const h = makeHarness()
+    h.store.create('A') // running 任务（稳态复位用）
+    for (const t of ['P1', 'P2', 'P3', 'P4']) {
+      const outcome = await fireDecision(h, { action: 'new', title: t, confidence: 0.6, reason: 'r', apps: [], evidence: [] })
+      if (t === 'P4') {
+        // P1 被挤掉，剩 P2/P3/P4。
+        expect(outcome.proposals.map((p) => p.title)).toEqual(['P2', 'P3', 'P4'])
+      }
+    }
+    // 同标题（同 key）再发 → 替换旧卡不增员。
+    const replaced = await fireDecision(h, { action: 'new', title: 'P2', confidence: 0.7, reason: 'r', apps: [], evidence: [] })
+    expect(replaced.proposals).toHaveLength(MAX_PENDING_PROPOSALS)
+    expect(replaced.proposals.filter((p) => p.title === 'P2')).toHaveLength(1)
+    expect(replaced.proposals.find((p) => p.title === 'P2')!.confidence).toBe(0.7)
+  })
+
+  it('merge → 提案带 taskId（标题取目标任务）', async () => {
+    const h = makeHarness()
+    const target = h.store.create('Target Task')!
+    const outcome = await fireDecision(h, {
+      action: 'merge',
+      fromTaskId: 't_x',
+      toTaskId: target.id,
+      confidence: 0.65,
+      reason: 'same workstream'
+    })
+    expect(outcome.proposals).toHaveLength(1)
+    expect(outcome.proposals[0]).toMatchObject({
+      taskId: target.id,
+      title: 'Target Task',
+      confidence: 0.65,
+      level: 1,
+      decisionId: outcome.decisionId
+    })
+  })
+
+  it('merge 目标不存在 → 无提案（域层约束）', async () => {
+    const h = makeHarness()
+    const outcome = await fireDecision(h, {
+      action: 'merge',
+      fromTaskId: 't_x',
+      toTaskId: 'missing',
+      confidence: 0.65,
+      reason: 'r'
+    })
+    expect(outcome.proposals).toHaveLength(0)
+  })
+
+  it('ignore → 推荐历史 L3 ignored 行（指纹 + not_now）', async () => {
+    const history = createMemoryRecommendationHistory({ now: () => 1_000_000, createId: () => 'h1' })
+    const h = makeHarness({ history })
+    const drop = activityOf({ zone: 'new', confidence: 0.3 })
+    await h.controller.observe(drop.activity, drop.detail)
+    h.tick(46_000)
+    h.decide({ action: 'ignore', reason: 'noise' })
+    await h.controller.observe(drop.activity, drop.detail)
+    const rows = history.list()
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      fingerprint: recommendationFingerprint(drop.activity.apps.map((a) => a.id), drop.activity.startAt),
+      level: 3,
+      outcome: 'ignored',
+      actionReason: 'not_now'
+    })
+  })
+
+  it('决策调用携带 decisionId（决策链前创建，provider 第二参接收）', async () => {
+    const h = makeHarness()
+    const outcome = await fireDecision(h, {
+      action: 'new',
+      title: 'Chain',
+      confidence: 0.6,
+      reason: 'r',
+      apps: [],
+      evidence: []
+    })
+    expect(h.decisionIds).toContain(outcome.decisionId)
+    // 提案 / trace 与决策链同 id。
+    expect(outcome.proposals[0].decisionId).toBe(outcome.decisionId)
+    const chain = h.trace.listByDecisionId(outcome.decisionId!)
+    expect(chain.some((r) => r.kind === 'decision')).toBe(true)
+  })
+})
+
+describe('CurrentTaskController — 候选池（t56：≤3 确定性候选，[0] 恒胜者）', () => {
+  function poolHarness() {
+    const h = makeHarness()
+    // A 最后创建 = running（TaskStore 语义：新建任务接管运行位）。
+    const b = h.store.create('B')!
+    const c = h.store.create('C')!
+    const d = h.store.create('D')!
+    const a = h.store.create('A')!
+    return { h, a, b, c, d }
+  }
+
+  it('归属胜者 + 池内竞争任务（≤3）；胜者恒 [0]，池置信 = 胜者 ×0.95', async () => {
+    const { h, a, b, c, d } = poolHarness()
+    const obs = activityOf({
+      zone: 'high',
+      confidence: 0.8,
+      margin: 0.3,
+      attribution: { taskId: b.id, confidence: 0.8 },
+      overlappingTasks: [b.id, c.id, d.id]
+    })
+    await h.controller.observe(obs.activity, obs.detail)
+    h.tick(46_000)
+    await h.controller.observe(obs.activity, obs.detail)
+    const ctx = h.calls[0]
+    expect(ctx.candidates.map((x) => x.taskId)).toEqual([b.id, c.id, d.id])
+    expect(ctx.candidates[0]).toMatchObject({ taskId: b.id, confidence: 0.8 })
+    for (const pool of ctx.candidates.slice(1)) {
+      expect(pool.confidence).toBeCloseTo(0.8 * 0.95, 5)
+      expect(pool.zone).toBe('low')
+    }
+    expect(ctx.currentTask?.id).toBe(a.id)
+  })
+
+  it('池内 completed / archived 任务排除；超过 3 个只取前 3', async () => {
+    const { h, b, c, d } = poolHarness()
+    h.store.update(c.id, { status: 'completed' })
+    const e = h.store.create('E')!
+    const obs = activityOf({
+      zone: 'high',
+      confidence: 0.8,
+      margin: 0.3,
+      attribution: { taskId: b.id, confidence: 0.8 },
+      overlappingTasks: [b.id, c.id, d.id, e.id]
+    })
+    await h.controller.observe(obs.activity, obs.detail)
+    h.tick(46_000)
+    await h.controller.observe(obs.activity, obs.detail)
+    const ctx = h.calls[0]
+    // c(completed) 排除；d、e 入池（上限 3）。
+    expect(ctx.candidates.map((x) => x.taskId)).toEqual([b.id, d.id, e.id])
+  })
+
+  it('zone new（无归属）→ 候选池为空', async () => {
+    const { h } = poolHarness()
+    const drop = activityOf({ zone: 'new', confidence: 0.3 })
+    await h.controller.observe(drop.activity, drop.detail)
+    h.tick(46_000)
+    await h.controller.observe(drop.activity, drop.detail)
+    expect(h.calls[0].candidates).toEqual([])
+  })
+
+  it('归属字段缺失（竞争触发）→ 候选池为空', async () => {
+    const { h, b, c } = poolHarness()
+    const comp = activityOf({ zone: 'low', confidence: 0.5, overlappingTasks: [b.id, c.id] })
+    await h.controller.observe(comp.activity, comp.detail)
+    h.tick(46_000)
+    await h.controller.observe(comp.activity, comp.detail)
+    expect(h.calls[0].candidates).toEqual([])
+  })
+
+  it('终态任务不进 ctx.overlappingTasks（upgrade 判定与池同源，t56 评审）', async () => {
+    const { h, b, c, d } = poolHarness()
+    h.store.update(c.id, { status: 'completed' })
+    const obs = activityOf({
+      zone: 'high',
+      confidence: 0.8,
+      margin: 0.3,
+      attribution: { taskId: b.id, confidence: 0.8 },
+      overlappingTasks: [b.id, c.id, d.id]
+    })
+    await h.controller.observe(obs.activity, obs.detail)
+    h.tick(46_000)
+    await h.controller.observe(obs.activity, obs.detail)
+    const ctx = h.calls[0]
+    // completed 的 c 被剔除：决策上下文里的竞争信号只数可行动任务。
+    expect(ctx.detail.evidence.overlappingTasks).toEqual([b.id, d.id])
   })
 })

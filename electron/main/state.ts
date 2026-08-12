@@ -51,7 +51,7 @@ import { createSuggestionEngine, TICK_INTERVAL_MS, type ChatFn, type OcrFn, type
 import { createIgnoredTable } from './ignored'
 import { createActivityLedger, DEFAULT_SEGMENT_PARAMS, type ActivityLedger } from '../store/activityLedger'
 import { createChatEpisodeExtractor, createEpisodeConsolidator, type EpisodeConsolidator } from '../store/episodeConsolidator'
-import { aiAllowed, memoryAllowed, policyFromSettings } from '../store/privacyGate'
+import { aiAllowed, memoryAllowed, normalizeExePath, policyFromSettings } from '../store/privacyGate'
 import { logAi } from './aiLog'
 import { LocalModelManager, shouldLoadLocalModel } from '../store/localModelManager'
 import { LocalModelRuntime } from '../store/localModelRuntime'
@@ -66,7 +66,12 @@ import {
 import {
   createAgentDecisionProvider,
   createAlgorithmDecisionProvider,
-  createLocalModelDecisionProvider
+  createLocalModelDecisionProvider,
+  createTitleSuggester,
+  filterClipboardHitsByType,
+  shouldUpgradeToTools,
+  type AgentToolSet,
+  type TitleSuggester
 } from '../store/decisionProvider'
 
 const store = new ItemStore()
@@ -106,6 +111,8 @@ let episodeConsolidator: EpisodeConsolidator | null = null
 let consolidationTimer: ReturnType<typeof setInterval> | null = null
 /** Provider 链聊天入口（setSuggestionChat 注入；null = AI 未接线）。 */
 let suggestionChat: ChatFn | null = null
+/** 保存时自动标题（t56 迁入决策模块；ADR-0003 通道 task:suggest-title 不变）。 */
+let titleSuggester: TitleSuggester | null = null
 /** 时段整理检查节流（t49）：5 分钟粒度，会话结束/时段边界/6h 兜底都经它。 */
 const CONSOLIDATION_CHECK_MS = 5 * 60_000
 /** Retention sweep cadence (t39): hourly, single indexed DELETE — never blocks capture. */
@@ -681,7 +688,34 @@ function getCurrentTaskController(): CurrentTaskController {
       // 惰性取值：index.ts 的 setSuggestionChat 在 registerIpc 后注入，
       // 首次构造可能早于它（启动即触发的 analyze）。
       getChat: () => suggestionChat,
-      fallback: algorithm
+      fallback: algorithm,
+      // t56 预填隐私门（spec 决策 6/7，不变量 D）：AI 侧预填整体过门——
+      // denied 应用剥离、memoryAccess 关 → 无记忆、aiEnabled 关 → 整趟算法。
+      getPolicy: () => policyFromSettings(loadSettings()),
+      // 隐私拦截落 trace（kind='privacy'，决策链共享 decisionId；DB 降级丢弃）。
+      recordPrivacy: (block) => {
+        const trace = getTraceStore()
+        if (!trace) return
+        trace.append({
+          decisionId: block.decisionId,
+          kind: 'privacy',
+          payload: { reason: block.reason, access: block.access, appExePath: block.appExePath }
+        })
+      },
+      // 工具召回落 trace（kind='recall'，spec 决策 8：工具/查询/条数/预览）。
+      recordRecall: (recall) => {
+        const trace = getTraceStore()
+        if (!trace) return
+        trace.append({
+          decisionId: recall.decisionId,
+          kind: 'recall',
+          payload: { tool: recall.tool, query: recall.query, count: recall.count, preview: recall.preview }
+        })
+      },
+      // t56 升级路径：四固定工具面（本地查询，预览 ≤200 字符）。
+      tools: buildAgentTools(),
+      // 高不确定升级判定：以设置的低置信阈值为准（缺省 0.45）。
+      shouldUpgrade: (ctx) => shouldUpgradeToTools(ctx, loadSettings().confidenceLow)
     })
     currentTaskController = createCurrentTaskController({
       taskStore,
@@ -723,10 +757,115 @@ function getCurrentTaskController(): CurrentTaskController {
           reasons: [...h.reasons],
           hops: h.hops
         }))
+      },
+      // t56 决策产出接线（spec 决策 6）：ignore → 推荐历史（指纹冷却防同类
+      // 反复打扰）；new/merge → 提案缓冲（≤3）——提案的 UI 消费面是后续票，
+      // 此处先落 ai-log 与 trace（决策链已含 observed/decision 行）。
+      history: getRecommendationHistory() ?? undefined,
+      onProposals: (proposals) => {
+        logAi({
+          kind: 'decision.proposals',
+          proposals: proposals.map((p) => ({ title: p.title, taskId: p.taskId, confidence: p.confidence, decisionId: p.decisionId }))
+        })
       }
     })
   }
   return currentTaskController
+}
+
+/**
+ * 保存时自动标题（t56 迁入决策模块）：IPC 通道（task:suggest-title）与触发
+ * 条件（渲染侧：标题空 + 其他内容非空才调用；失败静默降级算法标题）不变。
+ */
+export function getTitleSuggester(): TitleSuggester {
+  if (!titleSuggester) {
+    titleSuggester = createTitleSuggester({
+      // 与决策链共用同一个 provider 聊天入口（index.ts 注入）。
+      getChat: () => suggestionChat,
+      readMemories: () => getMemoryStore().list(),
+      log: (entry) => logAi(entry)
+    })
+  }
+  return titleSuggester
+}
+
+/**
+ * 四固定工具面（spec 决策 6 升级路径）：search_tasks / search_memories /
+ * search_activities / search_clipboard——全部本地确定性查询，输出 ≤200 字符
+ * 预览（trace 与提示词共用）。无 getEverything 类工具；剪贴板仅预览。
+ * 结果格再过 deniedApps / allowedContentTypes 过滤：被拒应用的行不进预览
+ * （不变量 D 覆盖升级路径，不止预填）。
+ */
+function buildAgentTools(): AgentToolSet {
+  const denied = (exePath: string | undefined): boolean => {
+    if (!exePath) return false
+    const key = normalizeExePath(exePath)
+    return policyFromSettings(loadSettings()).deniedApps.some((d) => normalizeExePath(d) === key)
+  }
+  return {
+    async searchTasks(query) {
+      const keyword = query.trim().toLowerCase()
+      const hits = taskStore
+        .list()
+        .filter(
+          (t) =>
+            t.status !== 'archived' &&
+            !t.apps.some((a) => denied(a.exePath ?? a.id)) &&
+            (t.title.toLowerCase().includes(keyword) ||
+              (t.note ?? '').toLowerCase().includes(keyword) ||
+              t.apps.some((a) => a.name.toLowerCase().includes(keyword)))
+        )
+        .slice(0, 5)
+      return { count: hits.length, preview: hits.map((t) => `${t.title} (${t.status})`).join('; ').slice(0, 200) }
+    },
+    async searchMemories(query) {
+      const graph = getMemoryGraph()
+      if (!graph) return { count: 0, preview: '' }
+      const keys = query.split(/\s+/).map(normalizeContent).filter((k) => k.length >= 2)
+      if (keys.length === 0) return { count: 0, preview: '' }
+      const result = graph.retrieveMemories({ activityKeys: keys })
+      return { count: result.hits.length, preview: result.hits.map((h) => h.fact.content).join('; ').slice(0, 200) }
+    },
+    async searchActivities(query) {
+      if (!evidenceStore) return { count: 0, preview: '' }
+      const keyword = query.trim()
+      const events = evidenceStore
+        .query({ keyword: keyword || undefined, limit: 20 })
+        .filter((e) => {
+          const exe = (e.payload as { exePath?: string } | undefined)?.exePath
+          return !denied(exe ?? e.source)
+        })
+      return {
+        count: events.length,
+        preview: events.map((e) => `${e.source}${e.windowTitle ? `: ${e.windowTitle}` : ''}`).join('; ').slice(0, 200)
+      }
+    },
+    async searchClipboard(query) {
+      // 仅预览：query 按 itemId 精确命中，否则文本内容关键词扫描（图片/文件
+      // 条目给尺寸/路径预览）。总开关在决策模块的工具门（clipboardAccess）；
+      // 内容类型在此按 policy.allowedContentTypes 整格过滤（用户收窄为仅
+      // text 后，文件/图片预览不进提示词）。
+      const policy = policyFromSettings(loadSettings())
+      const items = filterClipboardHitsByType(getStore().list(), policy.allowedContentTypes)
+      const keyword = query.trim().toLowerCase()
+      const hits = items
+        .filter(
+          (it) =>
+            it.id === query || (it.data.kind === 'text' && it.data.text.toLowerCase().includes(keyword))
+        )
+        .slice(0, 5)
+      const preview = hits
+        .map((it) => {
+          if (it.data.kind === 'text') return it.data.text.slice(0, 60)
+          if (it.data.kind === 'files') return it.data.paths.join(', ')
+          if (it.data.kind === 'image') return `${it.data.width}x${it.data.height}`
+          return `${it.data.images[0]?.width ?? 0}x${it.data.images[0]?.height ?? 0}`
+        })
+        .join('; ')
+        .slice(0, 200)
+      return { count: hits.length, preview }
+    }
+  }
 }
 
 /**

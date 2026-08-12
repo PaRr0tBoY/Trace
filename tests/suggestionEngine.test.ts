@@ -15,8 +15,8 @@ import { TaskStore } from '../electron/store/TaskStore'
 import { gradeProposal } from '../electron/store/proposalGrading'
 import { createMemoryRecommendationHistory, type RecommendationHistory } from '../electron/store/recommendationHistory'
 import type { CandidateOptimizer } from '../electron/store/localModelOptimizer'
-import type { AppSwitchEvent, ClipboardItem, Memory, TaskProposal, UsageEvent } from '../shared/types'
-import type { ChatFn, ChatResult } from '../electron/main/provider'
+import type { AppSwitchEvent, ClipboardItem, TaskProposal, UsageEvent } from '../shared/types'
+import type { ChatFn } from '../electron/main/provider'
 
 /** Privacy interceptions recorded via the engine's recordPrivacy sink (t44). */
 interface PrivacyRecord {
@@ -491,142 +491,6 @@ describe('LLM annotation and degradation', () => {
     const [s] = h.pushed[0]
     expect(s.title).toBe(ALGO_TITLE)
     expect(s.reason).toBeUndefined()
-  })
-})
-
-describe('suggestTitle (task:suggest-title)', () => {
-  const ctx = {
-    title: 'draft',
-    note: 'polish the CAD drawings',
-    appNames: ['Code', 'Chrome'],
-    resourcePreviews: ['report.md']
-  }
-
-  it('returns 1-3 sanitized candidates when the chain succeeds', async () => {
-    const h = makeHarness()
-    h.chat = vi.fn(async () => ({
-      ok: true,
-      content: 'x',
-      parsed: { titles: ['Finish CAD drawings', '   ', 'CAD polish', 'CAD polish', 'A very long title that exceeds the sixty character cap for a suggestion title and should be cut', 'Extra'] }
-    })) as unknown as ChatFn
-    h.engine.setChat(h.chat)
-    const titles = await h.engine.suggestTitle(ctx)
-    expect(titles).toEqual(['Finish CAD drawings', 'CAD polish', 'A very long title that exceeds the sixty character cap for a']) // 去空、去重、截断、上限 3
-    const req = (h.chat as ReturnType<typeof vi.fn>).mock.calls[0][0]
-    expect(JSON.parse(req.messages[1].content.slice('Task: '.length))).toEqual({
-      title: 'draft',
-      note: 'polish the CAD drawings',
-      appNames: ['Code', 'Chrome'],
-      resourcePreviews: ['report.md']
-    })
-  })
-
-  it('returns null without a provider', async () => {
-    const h = makeHarness()
-    expect(await h.engine.suggestTitle(ctx)).toBeNull()
-  })
-
-  it('returns null when the chain reports failure', async () => {
-    const h = makeHarness()
-    h.chat = vi.fn(async () => ({ ok: false, error: 'all providers failed', attempts: [] })) as unknown as ChatFn
-    h.engine.setChat(h.chat)
-    expect(await h.engine.suggestTitle(ctx)).toBeNull()
-  })
-
-  it('returns null when the chain throws', async () => {
-    const h = makeHarness()
-    h.chat = vi.fn(async () => {
-      throw new Error('network down')
-    }) as unknown as ChatFn
-    h.engine.setChat(h.chat)
-    expect(await h.engine.suggestTitle(ctx)).toBeNull()
-  })
-
-  it('returns null when the reply fails validation', async () => {
-    const h = makeHarness()
-    for (const parsed of [null, { nope: [] }, { titles: 'x' }, { titles: [] }, { titles: ['   '] }]) {
-      h.chat = vi.fn(async () => ({ ok: true, content: 'x', parsed })) as unknown as ChatFn
-      h.engine.setChat(h.chat)
-      expect(await h.engine.suggestTitle(ctx)).toBeNull()
-    }
-  })
-
-  it('omits empty draft fields from the request', async () => {
-    const h = makeHarness()
-    h.chat = vi.fn(async () => ({
-      ok: true,
-      content: 'x',
-      parsed: { titles: ['Only app names'] }
-    })) as unknown as ChatFn
-    h.engine.setChat(h.chat)
-    const titles = await h.engine.suggestTitle({ title: '', note: '  ', appNames: ['Code'], resourcePreviews: [] })
-    expect(titles).toEqual(['Only app names'])
-    const req = (h.chat as ReturnType<typeof vi.fn>).mock.calls[0][0]
-    expect(JSON.parse(req.messages[1].content.slice('Task: '.length))).toEqual({ appNames: ['Code'] })
-  })
-
-  it('injects confirmed project/workflow memories overlapping the draft as memoryContext (ADR-0003)', async () => {
-    const memories: Memory[] = [
-      { id: 'm1', type: 'project', content: 'CAD drawings', userState: 'confirmed', confidence: 1, hitCount: 2, lastSeenAt: 1, createdAt: 1, source: 'user' },
-      { id: 'm2', type: 'tool', content: 'Chrome', userState: 'confirmed', confidence: 1, hitCount: 1, lastSeenAt: 1, createdAt: 1, source: 'user' },
-      { id: 'm3', type: 'project', content: 'polish the CAD drawings', userState: 'suggested', confidence: 1, hitCount: 1, lastSeenAt: 1, createdAt: 1, source: 'ai-suggest' }
-    ]
-    const store = new TaskStore({ load: () => null, save: () => {} })
-    const engine = createSuggestionEngine({
-      now: () => 1_000_000,
-      readEvents: () => [],
-      store,
-      getSettings: () => ({ suggestionMinEvents: 5, suggestionSilenceSeconds: 60 }),
-      ledger: createActivityLedger({
-        evidence: createMemoryEvidenceStore(),
-        getTasks: () => store.list(),
-        getParams: () => ({ ...DEFAULT_SEGMENT_PARAMS, confidenceHigh: 0.7, confidenceLow: 0.45 }),
-        ignored: createIgnoredTable({ load: () => null, save: () => {} })
-      }),
-      onSuggestions: () => {},
-      readMemories: () => memories
-    })
-    const chat = vi.fn(async () => ({
-      ok: true,
-      content: 'x',
-      parsed: { titles: ['Finish CAD work'] }
-    })) as unknown as ChatFn
-    engine.setChat(chat)
-    await engine.suggestTitle({ title: '', note: 'polish the CAD drawings', appNames: ['Code'], resourcePreviews: [] })
-    const payload = JSON.parse(chat.mock.calls[0][0].messages[1].content.slice('Task: '.length))
-    // 'CAD drawings' sits inside the draft note (memory → text direction); m2
-    // is a tool (never injected), m3 is not user-confirmed (never injected).
-    expect(payload.memoryContext).toEqual(['CAD drawings'])
-  })
-
-  it('omits memoryContext when no memory overlaps the draft', async () => {
-    const memories: Memory[] = [
-      { id: 'm1', type: 'project', content: 'CAD Agent', userState: 'confirmed', confidence: 1, hitCount: 1, lastSeenAt: 1, createdAt: 1, source: 'user' }
-    ]
-    const store = new TaskStore({ load: () => null, save: () => {} })
-    const engine = createSuggestionEngine({
-      now: () => 1_000_000,
-      readEvents: () => [],
-      store,
-      getSettings: () => ({ suggestionMinEvents: 5, suggestionSilenceSeconds: 60 }),
-      ledger: createActivityLedger({
-        evidence: createMemoryEvidenceStore(),
-        getTasks: () => store.list(),
-        getParams: () => ({ ...DEFAULT_SEGMENT_PARAMS, confidenceHigh: 0.7, confidenceLow: 0.45 }),
-        ignored: createIgnoredTable({ load: () => null, save: () => {} })
-      }),
-      onSuggestions: () => {},
-      readMemories: () => memories
-    })
-    const chat = vi.fn(async () => ({
-      ok: true,
-      content: 'x',
-      parsed: { titles: ['Unrelated title'] }
-    })) as unknown as ChatFn
-    engine.setChat(chat)
-    await engine.suggestTitle({ title: 'Tax filing', note: '', appNames: ['Excel'], resourcePreviews: [] })
-    const payload = JSON.parse(chat.mock.calls[0][0].messages[1].content.slice('Task: '.length))
-    expect(payload.memoryContext).toBeUndefined()
   })
 })
 

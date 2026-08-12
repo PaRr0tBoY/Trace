@@ -3,10 +3,10 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createSuggestionEngine,
   buildMemoryCandidate,
-  matchMemories,
   MEMORY_CONFIDENCE_BOOST,
   type SuggestionEngine
 } from '../electron/main/suggestionEngine'
+import { matchMemories } from '../electron/store/decisionProvider'
 import { createIgnoredTable } from '../electron/main/ignored'
 import { createActivityLedger, DEFAULT_SEGMENT_PARAMS } from '../electron/store/activityLedger'
 import { createMemoryEvidenceStore, evidenceFromUsageEvent, type EvidenceStore } from '../electron/store/evidenceStore'

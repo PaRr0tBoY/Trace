@@ -41,7 +41,7 @@ Agent 依据活动与记忆推出的待采纳任务建议（标题、理由、�
 _Avoid_: 备选任务、建议任务、建议
 
 **任务决策（TaskDecision）**:
-决策协议（evaluateTaskContext）的一次输出：action 为 continue（继续当前任务）/ switch（切换）/ new（新建）/ merge（并入已有任务）/ ignore（忽略），附目标任务、标题、理由与置信度。Agent、本地模型、纯算法都实现同一接口，外层不感知决策者；状态转换由确定性的状态控制器验证后执行。
+决策协议（evaluateTaskContext）的一次输出：action 为 continue（继续当前任务）/ switch（切换）/ new（新建）/ merge（并入已有任务）/ ignore（忽略），附目标任务、标题、理由与置信度。Agent、本地模型、纯算法都实现同一接口，外层不感知决策者；状态转换由确定性的状态控制器验证后执行。决策链以决策前创建的 decisionId 贯穿（预填隐私拦截、工具召回、决策与提案同链审计）；new/merge 产出待采纳提案（≤3 未决），ignore 记推荐历史（L3、同类冷却）。`decidedBy` 标识实际做出判断的决策者层（AI 失败/关闭时降级为算法）。
 _Avoid_: 判断、结论
 
 **采纳（Adopt）**:
@@ -100,11 +100,11 @@ _Avoid_: 身份、个人资料
 _Avoid_: 本地 Ollama、本地大模型
 
 **Agent 循环（Agent Loop）**:
-Agent 层与云模型的工具调用循环：预填上下文后按需查询记忆、任务、剪贴板与证据时间线。主路径是一次性任务决策（见任务决策）；循环只作为**高不确定场景的升级路径**（候选竞争、疑似新主题、长时间中断后恢复等），有预算上限。
+Agent 层在**高不确定场景**（候选竞争、疑似新主题、置信跌破低阈值等）的确定性升级路径：按固定顺序发起 ≤3 次工具查询（search_tasks / search_memories / search_activities / search_clipboard，四固定面，无 getEverything 类工具；剪贴板最敏感、只随引用出现、仅预览且受剪贴板访问开关控制，关 → 空结果并记拦截），结果与拦截/失败行一并进入**一次性**任务决策请求（ChatFn 单次契约，非模型驱动的多轮 ReAct），预算耗尽即停。稳态直接走最小预填决策，不升级。
 _Avoid_: 工具调用、多轮对话
 
 **工作上下文（Work Context）**:
-AI 观测用户工作的"横切面"：某时刻的多维切片——当前活动、当前任务与会话、召回的记忆/任务/剪贴板、证据分级（L0 元数据 → L1 结构化 → L2 语义 → L3 视觉 → L4 历史）与关系。Agent 的预填与工具都作用于它；隐私门是它的披露闸门。
+AI 观测用户工作的"横切面"：某时刻的多维切片——当前活动、当前任务与会话、召回的记忆/任务/剪贴板、证据分级（L0 元数据 → L1 结构化 → L2 语义 → L3 视觉 → L4 历史）与关系。Agent 的预填与工具都作用于它；预填整体过隐私门（不变量 D：denied 应用剥离活动/窗口/组合、memoryAccess 关 → 无记忆、aiEnabled 关/时间窗外 → 整趟算法兜底；被拒数据落 trace kind='privacy'）。
 _Avoid_: 上下文（泛指）、横切面（口语）
 
 **证据分级（Evidence Level）**:
@@ -136,7 +136,9 @@ _Avoid_: 记忆库、模式表
 - 本地模型 ≠ Ollama：Ollama 集成已删除，本地模型嵌入产品内部、默认关闭（2026-08-12 确认）。
 - 任务状态机：active→RUNNING（唯一）、waiting→WAITING（自动休息态）、paused→PAUSED（手动、免疫自动恢复）、新增 ARCHIVED；旧数据迁移：多 active 只保留最近活跃者为 RUNNING（2026-08-12 确认）。
 - Agent 主路径 = 一次性任务决策（evaluateTaskContext）；工具循环只作高不确定场景升级路径（2026-08-12 确认）。
-- Agent 预填最小上下文 = 当前活动 + 当前会话 + ≤3 确定性候选 + 已匹配记忆 + 画像；Top-10 任务列表移入升级路径（2026-08-12 确认）。
+- Agent 预填最小上下文 = 当前活动 + 当前会话 + ≤3 确定性候选 + 已匹配记忆 + 画像，整体过隐私门（不变量 D）；升级路径 = 四固定工具面（search_tasks / search_memories / search_activities / search_clipboard）≤3 次预算，剪贴板仅预览且受开关控制（2026-08-13 确认）。
+- new/merge 决策产出 TaskProposal 提案（≤3 未决 FIFO，同目标替换）；ignore 决策记推荐历史（L3 not_now 冷却）；decisionId 决策链贯穿隐私拦截 / 工具召回 / 提案 / trace（2026-08-13 确认）。
+- suggestTitle 从 suggestionEngine 迁入决策模块（createTitleSuggester），IPC 通道 task:suggest-title 与触发条件不变（2026-08-13 确认）。
 - matchedMemories = 确定性预筛（活动 / 时间 / 实体 / 相关性命中），不是"记忆 Top-K"（2026-08-12 确认）。
 - 记忆存储只有 episode / entity / fact 三类表；Profile / Pattern / Task 记忆 / Preference 是 fact 的类型，不是独立实体表（2026-08-12 确认）。
 - 证据分级（EvidenceLevel）与隐私敏感度是两个正交维度，不合并成一个整数（2026-08-12 确认）。

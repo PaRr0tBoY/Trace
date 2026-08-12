@@ -38,7 +38,15 @@
 import { createId } from './ids'
 import type { Activity, ActivityDetail, ConfidenceZone } from './activityLedger'
 import type { TraceStore, TraceInput } from './traceStore'
-import type { StatusSource, Task, TaskSession, TaskStatus } from '../../shared/types'
+import type { RecommendationHistory } from './recommendationHistory'
+import { recommendationFingerprint } from './recommendationHistory'
+import type { StatusSource, Task, TaskProposal, TaskSession, TaskStatus } from '../../shared/types'
+
+/** 决策产出提案上限（spec 决策 6：new/merge 产生提案 ≤3 未决）。 */
+export const MAX_PENDING_PROPOSALS = 3
+
+/** 预填确定性候选上限（spec 决策 6：当前归属胜者 + 池内竞争任务 ≤3）。 */
+export const MAX_PREFILL_CANDIDATES = 3
 
 /** Spec 决策 6 — decision protocol（判别联合，决策者公共输出契约）。
  * `decidedBy` 是客户端元数据（不在模型回复 schema 内）：实际执行决策的
@@ -101,11 +109,13 @@ export interface DecisionContext {
   now: number
 }
 
-/** 决策者公共接口 —— 控制器不感知谁在做（agent / 算法 / 本地模型）。 */
+/** 决策者公共接口 —— 控制器不感知谁在做（agent / 算法 / 本地模型）。
+ * `decisionId` 由控制器在调用前创建（决策链分组 id）：预填门拦截 / 工具
+ * 召回的 trace 行共享它（spec 决策 8）。 */
 export interface TaskDecisionProvider {
   /** 决策者标识（trace agentVersion 与诊断用）：'algorithm' | 'agent' | 'local-model' | … */
   readonly id: string
-  evaluateTaskContext(ctx: DecisionContext): Promise<TaskDecision>
+  evaluateTaskContext(ctx: DecisionContext, decisionId?: string): Promise<TaskDecision>
 }
 
 /** 控制器读 TaskStore 的端口（窄接口；TaskStore 本身满足）。 */
@@ -138,6 +148,16 @@ export interface CurrentTaskControllerOptions {
   createDecisionId?: () => string
   /** 已匹配记忆预筛（t50 retrieveMemories 的消费方组装）；缺省 = 空。 */
   readMemories?: (activity: Activity) => MatchedMemory[]
+  /**
+   * 决策产出提案落点（spec 决策 6：new/merge 产生提案，≤3 未决）；每次
+   * 缓冲变化后调用（含替换与驱逐）。缺省 = 不推送（缓冲仍在控制器内）。
+   */
+  onProposals?: (proposals: TaskProposal[]) => void
+  /**
+   * 推荐历史（t46，spec 决策 9）：ignore 决策记录 ignored 行（指纹冷却，
+   * 同类不反复打扰）。缺省 = 不记录。
+   */
+  history?: RecommendationHistory
 }
 
 /** 一次 observe 的对外输出（主 seam 断言面）。 */
@@ -161,6 +181,8 @@ export interface ControllerOutcome {
    * 域层拒绝）。门拒绝（threshold/margin/dwell）→ false：证据改善可重开窗。
    */
   settled?: boolean
+  /** 决策调用后的未决提案缓冲快照（≤3；new/merge 决策后更新）。 */
+  proposals?: TaskProposal[]
 }
 
 /** 切换判定：threshold + margin + dwell 三者满足才执行。 */
@@ -207,6 +229,8 @@ export interface CurrentTaskController {
   candidateSince(): number | null
   /** 最近一次观察时刻（spec 内部状态 lastEvidenceAt）。 */
   lastEvidenceAt(): number
+  /** 当前未决决策提案（≤3；spec 决策 6，new/merge 产出）。 */
+  pendingProposals(): TaskProposal[]
 }
 
 export function createCurrentTaskController(options: CurrentTaskControllerOptions): CurrentTaskController {
@@ -226,6 +250,8 @@ export function createCurrentTaskController(options: CurrentTaskControllerOption
   let lastDecidedKey: string | null = null
   /** 上一观察最佳分（score-drop 变化沿检测；spec 内部状态 lastScore）。 */
   let prevBestScore: number | null = null
+  /** 决策产出未决提案（spec 决策 6：new/merge 产出，≤3 FIFO）。 */
+  let pendingProposals: TaskProposal[] = []
 
   function runningTask(): Task | null {
     return port.list().find((t) => t.status === 'running') ?? null
@@ -280,9 +306,16 @@ export function createCurrentTaskController(options: CurrentTaskControllerOption
     return options.getParams()
   }
 
-  /** 构建决策上下文（最小预填雏形）。 */
+  /** 构建决策上下文（最小预填：当前活动 + 会话 + ≤3 确定性候选 + 记忆 + 画像）。 */
   function buildContext(activity: Activity, detail: ActivityDetail, running: Task | null): DecisionContext {
     const candidates: TaskCandidate[] = []
+    // 竞争任务只数"可行动"的（非终态）：completed/archived 不进池，也不进
+    // ctx 的 overlappingTasks——upgrade 判定（competition 触发）与池填充看
+    // 同一份清单，语义一致（t56 评审修复）。
+    const viableOverlaps = detail.evidence.overlappingTasks.filter((id) => {
+      const t = port.list().find((x) => x.id === id)
+      return t !== undefined && t.status !== 'completed' && t.status !== 'archived'
+    })
     const attribution = activity.attribution
     if (attribution && detail.zone !== 'new') {
       const task = port.list().find((t) => t.id === attribution.taskId)
@@ -294,11 +327,29 @@ export function createCurrentTaskController(options: CurrentTaskControllerOption
         margin: detail.evidence.margin,
         evidence: [...detail.windowTitles.slice(0, 3), detail.evidence.appCombination]
       })
+      // 池内候选（竞争任务的共享应用集）：确定性附加，置信恒低于归属胜者 ×0.95
+      // ——candidates[0] 永远是归属胜者（算法决策者只读 [0]，行为稳定）；Agent
+      // 预填得到 ≤3 个确定性候选（spec 决策 6）。new 语义簇（无归属）不填池。
+      const winnerId = attribution.taskId
+      for (const poolId of viableOverlaps) {
+        if (poolId === winnerId || candidates.length >= MAX_PREFILL_CANDIDATES) continue
+        const pool = port.list().find((t) => t.id === poolId)
+        if (!pool) continue
+        candidates.push({
+          taskId: pool.id,
+          title: pool.title,
+          confidence: attribution.confidence * 0.95,
+          zone: 'low',
+          margin: 0,
+          evidence: [detail.evidence.appCombination]
+        })
+      }
     }
     const session = running ? port.openSessionFor(running.id) ?? null : null
     return {
       activity,
-      detail,
+      // ctx 的 evidence 只带可行动竞争任务（upgrade 判定 / 预填同源）。
+      detail: { ...detail, evidence: { ...detail.evidence, overlappingTasks: viableOverlaps } },
       currentTask: running ? { id: running.id, title: running.title, status: running.status } : null,
       currentSession: session,
       candidates,
@@ -368,7 +419,81 @@ export function createCurrentTaskController(options: CurrentTaskControllerOption
   }
 
   /**
-   * 应用决策。switch → TaskStore.transition（原子 settle+open+迁移，PAUSED
+   * 决策 → 提案卡（spec 决策 6 产出）：new = 新任务提案；merge = 并入
+   * toTaskId 目标的提案（卡标题取目标任务标题）。决策链 decisionId 随卡
+   * 携带（t42 AI 依据按它分组）。
+   */
+  function buildProposal(activity: Activity, detail: ActivityDetail, decision: TaskDecision, decisionId: string): TaskProposal | null {
+    if (decision.action === 'new') {
+      if (!decision.title.trim()) return null
+      return {
+        id: `prop_${decisionId}`,
+        title: decision.title,
+        appNames: activity.apps.map((a) => a.name),
+        confidence: decision.confidence,
+        lowConfidence: decision.confidence < params().confidenceLow,
+        algorithmReason: decision.reason,
+        evidence: {
+          appCombination: detail.evidence.appCombination,
+          durationMs: detail.evidence.durationMs,
+          overlappingTasks: detail.evidence.overlappingTasks
+        },
+        reason: decision.reason,
+        decisionId,
+        level: 1
+      }
+    }
+    if (decision.action === 'merge') {
+      const target = port.list().find((t) => t.id === decision.toTaskId)
+      if (!target) return null
+      return {
+        id: `prop_${decisionId}`,
+        title: target.title,
+        appNames: activity.apps.map((a) => a.name),
+        confidence: decision.confidence,
+        lowConfidence: decision.confidence < params().confidenceLow,
+        algorithmReason: decision.reason,
+        evidence: {
+          appCombination: detail.evidence.appCombination,
+          durationMs: detail.evidence.durationMs,
+          overlappingTasks: detail.evidence.overlappingTasks
+        },
+        reason: decision.reason,
+        taskId: decision.toTaskId,
+        decisionId,
+        level: 1
+      }
+    }
+    return null
+  }
+
+  /**
+   * 决策产出接线（spec 决策 6）：new/merge → 提案（≤3 未决 FIFO；同目标
+   * 提案替换旧卡）；ignore → 推荐历史（t46，指纹冷却防同类反复打扰）。
+   */
+  function handleDecisionOutputs(activity: Activity, detail: ActivityDetail, decision: TaskDecision, decisionId: string): void {
+    if (decision.action === 'new' || decision.action === 'merge') {
+      const proposal = buildProposal(activity, detail, decision, decisionId)
+      if (proposal) {
+        const key = proposal.taskId ?? `new:${proposal.title.toLowerCase()}`
+        pendingProposals = [...pendingProposals.filter((p) => (p.taskId ?? `new:${p.title.toLowerCase()}`) !== key), proposal].slice(
+          -MAX_PENDING_PROPOSALS
+        )
+        options.onProposals?.(pendingProposals)
+      }
+    } else if (decision.action === 'ignore' && options.history) {
+      // 决策路径的忽略 = "该簇不值得行动"：L3 语义（不展示、同类 7 天冷却），
+      // actionReason 取 not_now（该模式并非错，只是此刻不值得）。
+      options.history.record({
+        fingerprint: recommendationFingerprint(activity.apps.map((a) => a.id), activity.startAt),
+        level: 3,
+        outcome: 'ignored',
+        actionReason: 'not_now'
+      })
+    }
+  }
+
+  /**
    * 免疫由域层拒绝）；其余动作只记录（new/merge 提案路径与 ignore 推荐历史
    * 属 t56 接线）。
    *
@@ -389,8 +514,10 @@ export function createCurrentTaskController(options: CurrentTaskControllerOption
     applySwitch = true
   ): Promise<ControllerOutcome> {
     const ctx = buildContext(activity, detail, running)
-    const decision = await options.decide.evaluateTaskContext(ctx)
+    // decisionId 在决策调用前创建：预填门拦截 / 工具召回的 trace 行共享同链
+    // （spec 决策 8；provider 经第二参接收）。
     const decisionId = createDecisionId()
+    const decision = await options.decide.evaluateTaskContext(ctx, decisionId)
     let action: ControllerOutcome['action'] = 'noop'
     let switchedTo: string | undefined
     let rejected: string | undefined
@@ -441,8 +568,11 @@ export function createCurrentTaskController(options: CurrentTaskControllerOption
       settled = true
     }
 
+    // 决策产出接线（new/merge 提案 ≤3、ignore 推荐历史）——在 trace 之前，
+    // 提案携带的 decisionId 与决策链一致。
+    handleDecisionOutputs(activity, detail, decision, decisionId)
     recordDecision(activity, decision, decisionId, traceTaskId)
-    return { triggers, decisionCalls: 1, action, decision, decisionId, switchedTo, rejected, settled }
+    return { triggers, decisionCalls: 1, action, decision, decisionId, switchedTo, rejected, settled, proposals: [...pendingProposals] }
   }
 
   async function observe(activity: Activity, detail: ActivityDetail): Promise<ControllerOutcome> {
@@ -512,6 +642,7 @@ export function createCurrentTaskController(options: CurrentTaskControllerOption
     currentTaskId: () => currentTaskId,
     currentSessionId: () => currentSessionId,
     candidateSince: () => pending?.since ?? null,
-    lastEvidenceAt: () => lastEvidenceAt
+    lastEvidenceAt: () => lastEvidenceAt,
+    pendingProposals: () => pendingProposals
   }
 }

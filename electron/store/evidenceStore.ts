@@ -118,7 +118,11 @@ export function buildClipboardPreview(item: Pick<ClipboardItem, 'data'>): Clipbo
 /**
  * Map a gated bus event (app-switch / clipboard) to a store row. `source` is
  * the shared appKey rule (attributor uses the same identity); clipboard rows
- * carry `itemId` plus the caller-supplied material preview.
+ * carry `itemId` plus the caller-supplied material preview. The raw appName
+ * and exePath ride in the payload so the ActivityLedger (t40) can
+ * reconstruct the clusterer's exact app identity from the timeline — the
+ * normalized `source` alone is not enough (display names drive segment
+ * appNames and name-first key fallbacks).
  */
 export function evidenceFromUsageEvent(
   event: UsageEvent,
@@ -129,12 +133,12 @@ export function evidenceFromUsageEvent(
     kind: event.type,
     capturedAt: event.ts,
     source: appKeyFromIdentity({ name: event.appName, exePath: event.exePath }),
-    payload: { pid: event.pid }
+    payload: { pid: event.pid, appName: event.appName, exePath: event.exePath }
   }
   if (event.type === 'app-switch') {
     return { ...common, windowTitle: event.windowTitle }
   }
-  return { ...common, payload: { pid: event.pid, itemId: event.itemId, preview: enrich.preview } }
+  return { ...common, payload: { pid: event.pid, itemId: event.itemId, preview: enrich.preview, appName: event.appName, exePath: event.exePath } }
 }
 
 /* ------------------------- in-memory implementation ------------------------- */

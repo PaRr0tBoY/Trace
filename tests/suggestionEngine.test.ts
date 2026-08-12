@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createSuggestionEngine, type SuggestionEngine } from '../electron/main/suggestionEngine'
-import { createIgnoredTable, suggestionSignature, type IgnoredTable } from '../electron/main/ignored'
+import { createIgnoredTable, type IgnoredTable } from '../electron/main/ignored'
+import { createActivityLedger, DEFAULT_SEGMENT_PARAMS, suggestionSignature } from '../electron/store/activityLedger'
+import { createMemoryEvidenceStore, evidenceFromUsageEvent, type EvidenceStore } from '../electron/store/evidenceStore'
 import { TaskStore } from '../electron/store/TaskStore'
 import type { AppSwitchEvent, ClipboardItem, Memory, TaskProposal, UsageEvent } from '../shared/types'
 import type { ChatFn, ChatResult } from '../electron/main/provider'
@@ -50,6 +52,7 @@ interface Harness {
   engine: SuggestionEngine
   store: TaskStore
   events: UsageEvent[]
+  evidence: EvidenceStore
   now: number
   settings: { suggestionMinEvents: number; suggestionSilenceSeconds: number; confidenceHigh: number; confidenceLow: number }
   ignored: IgnoredTable
@@ -65,14 +68,25 @@ function makeHarness(initialEvents: UsageEvent[] = [], items: Map<string, Clipbo
     ignored: createIgnoredTable({ load: () => null, save: () => {} }),
     pushed: [],
     chat: undefined,
-    store: new TaskStore({ load: () => null, save: () => {} })
+    store: new TaskStore({ load: () => null, save: () => {} }),
+    evidence: createMemoryEvidenceStore()
   }
+  for (const e of initialEvents) h.evidence.record(evidenceFromUsageEvent(e))
   h.engine = createSuggestionEngine({
     now: () => h.now,
     readEvents: () => h.events,
     store: h.store,
     getSettings: () => h.settings,
-    ignored: h.ignored,
+    ledger: createActivityLedger({
+      evidence: h.evidence,
+      getTasks: () => h.store.list(),
+      getParams: () => ({
+        ...DEFAULT_SEGMENT_PARAMS,
+        confidenceHigh: h.settings.confidenceHigh,
+        confidenceLow: h.settings.confidenceLow
+      }),
+      ignored: h.ignored
+    }),
     onSuggestions: (sugs) => h.pushed.push(sugs),
     readItem: (itemId) => items.get(itemId)
   })
@@ -84,9 +98,10 @@ function textItem(id: string, text: string, capturedAt: number): ClipboardItem {
   return { id, capturedAt, data: { kind: 'text', text, isUrl: false } } as ClipboardItem
 }
 
-/** Push events, advance the clock past the silence floor, and await one tick. */
+/** Push events (ring buffer + evidence timeline), advance the clock, await one tick. */
 async function trigger(h: Harness, events: UsageEvent[], silenceMs = 60_000): Promise<void> {
   h.events.push(...events)
+  for (const e of events) h.evidence.record(evidenceFromUsageEvent(e))
   h.now = events[events.length - 1].ts + silenceMs
   await h.engine.tick()
 }
@@ -112,7 +127,9 @@ describe('trigger conditions (injected clock)', () => {
   it('does not fire before the silence floor elapses', async () => {
     const h = makeHarness()
     h.engine.start()
-    h.events.push(...batch())
+    const batchEvents = batch()
+    h.events.push(...batchEvents)
+    for (const e of batchEvents) h.evidence.record(evidenceFromUsageEvent(e))
     const last = h.events[h.events.length - 1].ts
     h.now = last + 59_999 // silence 59.999s < 60s
     await h.engine.tick()
@@ -350,11 +367,13 @@ describe('ignore', () => {
     expect(h.engine.suggestions()).toHaveLength(0)
     expect(h.ignored.has(SIG_CODE)).toBe(true)
 
-    // Same activity in the same hour bucket must not resurface.
+    // Same app combination in the same hour bucket (2_000_000 → hour 0, like
+    // 10_000) produces the same signature; the ledger's gate drops it — the
+    // second pass runs but pushes nothing (push #2 came from ignore() itself).
     h.events = []
-    await trigger(h, batch(10_000))
-    expect(h.pushed).toHaveLength(2) // second pass ran but pushed nothing
-    expect(h.pushed[1]).toHaveLength(0)
+    await trigger(h, batch(2_000_000))
+    expect(h.pushed).toHaveLength(3) // [suggestions, ignore(), second pass]
+    expect(h.pushed[2]).toHaveLength(0)
   })
 
   it('returns false for an unknown id', () => {
@@ -531,8 +550,13 @@ describe('suggestTitle (task:suggest-title)', () => {
       now: () => 1_000_000,
       readEvents: () => [],
       store,
-      getSettings: () => ({ suggestionMinEvents: 5, suggestionSilenceSeconds: 60, confidenceHigh: 0.7, confidenceLow: 0.45 }),
-      ignored: createIgnoredTable({ load: () => null, save: () => {} }),
+      getSettings: () => ({ suggestionMinEvents: 5, suggestionSilenceSeconds: 60 }),
+      ledger: createActivityLedger({
+        evidence: createMemoryEvidenceStore(),
+        getTasks: () => store.list(),
+        getParams: () => ({ ...DEFAULT_SEGMENT_PARAMS, confidenceHigh: 0.7, confidenceLow: 0.45 }),
+        ignored: createIgnoredTable({ load: () => null, save: () => {} })
+      }),
       onSuggestions: () => {},
       readMemories: () => memories
     })
@@ -558,8 +582,13 @@ describe('suggestTitle (task:suggest-title)', () => {
       now: () => 1_000_000,
       readEvents: () => [],
       store,
-      getSettings: () => ({ suggestionMinEvents: 5, suggestionSilenceSeconds: 60, confidenceHigh: 0.7, confidenceLow: 0.45 }),
-      ignored: createIgnoredTable({ load: () => null, save: () => {} }),
+      getSettings: () => ({ suggestionMinEvents: 5, suggestionSilenceSeconds: 60 }),
+      ledger: createActivityLedger({
+        evidence: createMemoryEvidenceStore(),
+        getTasks: () => store.list(),
+        getParams: () => ({ ...DEFAULT_SEGMENT_PARAMS, confidenceHigh: 0.7, confidenceLow: 0.45 }),
+        ignored: createIgnoredTable({ load: () => null, save: () => {} })
+      }),
       onSuggestions: () => {},
       readMemories: () => memories
     })
@@ -663,7 +692,11 @@ describe('clipboard material on suggestions (segment window)', () => {
     items.set('i1', textItem('i1', 'hello world', 12_000))
     const h = makeHarness([], items)
     h.engine.start()
-    await trigger(h, [...batch(), clipEv('Code', 12_000, 'i1')])
+    // The copy (ts 12_000) must arrive before the later switches: the ledger
+    // anchors the silence floor at the newest event, so append in ts order.
+    const midClip = [...batch(), clipEv('Code', 12_000, 'i1')]
+    midClip.sort((a, b) => a.ts - b.ts)
+    await trigger(h, midClip)
     expect(h.pushed[0]).toHaveLength(1)
     const [s] = h.pushed[0]
     expect(s.clipboardRefs).toEqual([
@@ -706,7 +739,9 @@ describe('clipboard material on suggestions (segment window)', () => {
   it('skips clipboard events whose item is already evicted', async () => {
     const h = makeHarness() // no items registered
     h.engine.start()
-    await trigger(h, [...batch(), clipEv('Code', 12_000, 'gone')])
+    const midClip = [...batch(), clipEv('Code', 12_000, 'gone')]
+    midClip.sort((a, b) => a.ts - b.ts)
+    await trigger(h, midClip)
     expect(h.pushed[0]).toHaveLength(1)
     expect(h.pushed[0][0].clipboardRefs).toEqual([])
   })
@@ -718,7 +753,9 @@ describe('accept with convert-panel payload', () => {
     items.set('i1', textItem('i1', 'note body', 12_000))
     const h = makeHarness([], items)
     h.engine.start()
-    await trigger(h, [...batch(), clipEv('Code', 12_000, 'i1')])
+    const midClip = [...batch(), clipEv('Code', 12_000, 'i1')]
+    midClip.sort((a, b) => a.ts - b.ts)
+    await trigger(h, midClip)
     const [s] = h.pushed[0]
     const taskId = h.engine.accept(s.id, {
       title: 'My title',
@@ -743,7 +780,9 @@ describe('accept with convert-panel payload', () => {
       apps: [{ id: 'c:/apps/code.exe', name: 'Code' }, { id: 'c:/apps/chrome.exe', name: 'Chrome' }]
     })
     h.engine.start()
-    await trigger(h, [...batch(), clipEv('Code', 12_000, 'i1')])
+    const midClip = [...batch(), clipEv('Code', 12_000, 'i1')]
+    midClip.sort((a, b) => a.ts - b.ts)
+    await trigger(h, midClip)
     const [s] = h.pushed[0]
     const targetId = s.taskId!
     h.engine.accept(s.id, { note: 'edited note' })

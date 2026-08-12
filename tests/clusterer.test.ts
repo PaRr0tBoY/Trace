@@ -8,7 +8,7 @@ import {
   validateParams,
   type ClusterParams,
   type EmbeddingChannel
-} from '../electron/main/clusterer'
+} from '../electron/store/activityLedger'
 import type { AppSwitchEvent, Task } from '../shared/types'
 
 /** Baseline params: defaults as t19 will inject from settings. */

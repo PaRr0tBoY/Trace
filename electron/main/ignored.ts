@@ -1,10 +1,11 @@
 /**
  * IgnoredTable — local signature table for dismissed suggestions (t19).
  *
- * "Ignore" means "don't show me this kind of suggestion again": the engine
- * hashes the suggestion's app combination + time slot, and the table skips
- * any suggestion whose signature is present. The LLM is stateless by design
- * (spec 实现决策 5) — this file IS the memory.
+ * "Ignore" means "don't show me this kind of suggestion again": the
+ * ActivityLedger (t40) hashes the activity's app combination + time slot
+ * (suggestionSignature in store/activityLedger.ts) and skips any activity
+ * whose signature the table holds. The LLM is stateless by design
+ * (spec 实现决策 5) — this table IS the memory.
  *
  * Pure module: no Electron imports. Persistence (ignored.json under userData)
  * is injected, so vitest drives it with an in-memory adapter. The table is
@@ -31,28 +32,6 @@ export interface IgnoredTableOptions {
 }
 
 export const DEFAULT_IGNORED_LIMIT = 200
-
-/**
- * FNV-1a over `sorted-app-keys#hour-bucket`, hex-encoded. Deterministic and
- * stable across runs: the key material is the app identity keys (lowercase
- * exePath, fallback appName) sorted ascending plus the hour the segment
- * started in — the same app combination in a later hour is a new session and
- * may be suggested again.
- */
-export function suggestionSignature(appKeys: string[], segmentStartTs: number, bucketMs = 3_600_000): string {
-  const keys = [...appKeys]
-    .map((k) => k.trim().toLowerCase())
-    .filter((k) => k.length > 0)
-    .sort()
-  const bucket = Math.floor(segmentStartTs / bucketMs)
-  const material = `${keys.join('|')}#${bucket}`
-  let hash = 0x811c9dc5 // FNV offset basis
-  for (let i = 0; i < material.length; i++) {
-    hash ^= material.charCodeAt(i)
-    hash = Math.imul(hash, 0x01000193) >>> 0 // FNV prime, keep as uint32
-  }
-  return hash.toString(16)
-}
 
 export function createIgnoredTable(options: IgnoredTableOptions): IgnoredTable {
   const limit = options.limit ?? DEFAULT_IGNORED_LIMIT

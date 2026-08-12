@@ -1,10 +1,18 @@
 /**
- * Clusterer — pure event-batch → segment → task-attribution pipeline (t16).
+ * ActivityLedger — the clustering module (t40, spec 实现决策 3).
  *
- * No Electron imports, no logging on the happy path: a deterministic,
- * reproducible assignment of app-switch events to tasks. The caller (t19)
- * owns settings injection, triggering and suggestion lifecycle; this module
- * only decides "which task does this segment belong to, and how sure are we".
+ * The suggestion clustering pipeline (t16) moved here wholesale: trigger
+ * cursor, segmentation params, attribution, signature generation and the
+ * ignored-table gate. It turns the evidence timeline (t39) into observed
+ * Activity objects — app set, window titles, dwell, clipboard material and
+ * attribution target, stamped with classifier version. Activities are
+ * observations and are never persisted; every activity can be traced back to
+ * the events that constitute it (eventsOf / the [startAt, endAt] window).
+ *
+ * No Electron imports: the timeline, the task list, the clustering params and
+ * the ignored table are all injected, so vitest drives it with the memory
+ * evidence store. Behavior of the algorithm path is unchanged from t16 — the
+ * migrated clusterer tests are the proof.
  *
  * Pipeline (spec 实现决策 5 / research 10):
  *   1. Segmenting. Hard split on gaps ≥ hardGapMs. Gaps < transientMs are
@@ -44,9 +52,14 @@
  * id; name collisions between distinct executables are accepted for V1.
  *
  * Out of scope by contract: cross-batch summaries, time decay (memory
- * layer), title generation / rationale text (LLM layer), persistence (t19).
+ * layer), title generation / rationale text (LLM layer), persistence (t19),
+ * sessions (t37 — the ledger observes, it does not interpret).
  */
 import type { AppRef, AppSwitchEvent, Task } from '../../shared/types'
+import type { EvidenceEvent, EvidenceStore } from './evidenceStore'
+import { MAX_EVIDENCE_QUERY_LIMIT } from './evidenceStore'
+import { createId } from './ids'
+import type { IgnoredTable } from '../main/ignored'
 
 /** All thresholds come from the caller (settings values in prod, t19). */
 export interface ClusterParams {
@@ -95,6 +108,10 @@ export interface SegmentInfo {
    * own matching keeps its name-first internal keys.
    */
   appKeys: string[]
+  /** Dwell per app identity (ms), index-aligned with appKeys — Activity apps material. */
+  appDurationsMs: number[]
+  /** Unique window titles per app identity, most-dwelled first, index-aligned with appKeys. */
+  appWindows: string[][]
   /** Unique window titles, most-dwelled first (LLM/evidence material). */
   windowTitles: string[]
   /** Noise-filtered title tokens (deterministic order). */
@@ -248,9 +265,9 @@ function dwellAt(sorted: AppSwitchEvent[], i: number): number {
 }
 
 function toInternalSegment(sorted: AppSwitchEvent[], range: number[]): InternalSegment {
-  const appDwell = new Map<string, number>()
-  const appDisplay = new Map<string, string>()
   const identDwell = new Map<string, number>()
+  const identDisplay = new Map<string, string>()
+  const identTitleDwell = new Map<string, Map<string, number>>()
   const titleDwell = new Map<string, number>()
   const tokenCount = new Map<string, number>()
   const appKeys = new Set<string>()
@@ -258,17 +275,20 @@ function toInternalSegment(sorted: AppSwitchEvent[], range: number[]): InternalS
   for (let p = 0; p < range.length; p++) {
     const e = sorted[range[p]]
     const dwell = dwellAt(sorted, range[p])
+    const title = e.windowTitle.trim()
     const key = eventAppKey(e)
-    if (key) {
-      appKeys.add(key)
-      appDwell.set(key, (appDwell.get(key) ?? 0) + dwell)
-      if (e.appName.trim().length > 0 && !appDisplay.has(key)) appDisplay.set(key, e.appName.trim())
-    }
+    if (key) appKeys.add(key)
     const ident = normalizeAppKey(e.exePath) || normalizeAppKey(e.appName)
     if (ident.length > 0) {
       identDwell.set(ident, (identDwell.get(ident) ?? 0) + dwell)
+      const name = e.appName.trim()
+      if (name.length > 0 && !identDisplay.has(ident)) identDisplay.set(ident, name)
+      if (title.length > 0) {
+        const perApp = identTitleDwell.get(ident) ?? new Map<string, number>()
+        perApp.set(title, (perApp.get(title) ?? 0) + dwell)
+        identTitleDwell.set(ident, perApp)
+      }
     }
-    const title = e.windowTitle.trim()
     if (title.length > 0) {
       titleDwell.set(title, (titleDwell.get(title) ?? 0) + dwell)
       for (const t of tokenizeTitle(title)) {
@@ -279,8 +299,12 @@ function toInternalSegment(sorted: AppSwitchEvent[], range: number[]): InternalS
   }
   const byDwellDesc = (a: [string, number], b: [string, number]) =>
     b[1] - a[1] || (a[0] < b[0] ? -1 : 1)
-  const appNames = [...appDwell.entries()].sort(byDwellDesc).map(([k]) => appDisplay.get(k) ?? k)
+  // appKeys (ident space, exePath-first) is THE ordered key list; display
+  // names are looked up per ident key in the same order — an independent
+  // sort in the name key space could tie-break differently and misalign
+  // the Activity.apps pairing (t40 review #3).
   const appIdentKeys = [...identDwell.entries()].sort(byDwellDesc).map(([k]) => k)
+  const appNames = appIdentKeys.map((k) => identDisplay.get(k) ?? k)
   const windowTitles = [...titleDwell.entries()].sort(byDwellDesc).map(([t]) => t)
   const tokens = [...tokenCount.entries()].sort(byDwellDesc).map(([t]) => t)
   const first = sorted[range[0]].ts
@@ -293,6 +317,11 @@ function toInternalSegment(sorted: AppSwitchEvent[], range: number[]): InternalS
       eventCount: range.length,
       appNames,
       appKeys: appIdentKeys,
+      appDurationsMs: appIdentKeys.map((k) => identDwell.get(k) ?? 0),
+      appWindows: appIdentKeys.map((k) => {
+        const perApp = identTitleDwell.get(k)
+        return perApp ? [...perApp.entries()].sort(byDwellDesc).map(([t]) => t) : []
+      }),
       windowTitles,
       titleTokens: tokens
     },
@@ -485,4 +514,343 @@ export async function clusterEvents(
   return { attributions }
 }
 
+/* ------------------------------------------------------------------ */
+/*  Activity contract (spec 实现决策 3) + ledger entry point (t40)      */
+/* ------------------------------------------------------------------ */
 
+/**
+ * FNV-1a over `sorted-app-keys#hour-bucket`, hex-encoded. Deterministic and
+ * stable across runs: the key material is the app identity keys (lowercase
+ * exePath, fallback appName) sorted ascending plus the hour the segment
+ * started in — the same app combination in a later hour is a new session and
+ * may be suggested again. Migrated verbatim from the suggestion engine's
+ * ignore logic (t19); the ledger stamps it on every activity.
+ */
+export function suggestionSignature(appKeys: string[], segmentStartTs: number, bucketMs = 3_600_000): string {
+  const keys = [...appKeys]
+    .map((k) => k.trim().toLowerCase())
+    .filter((k) => k.length > 0)
+    .sort()
+  const bucket = Math.floor(segmentStartTs / bucketMs)
+  const material = `${keys.join('|')}#${bucket}`
+  let hash = 0x811c9dc5 // FNV offset basis
+  for (let i = 0; i < material.length; i++) {
+    hash ^= material.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193) >>> 0 // FNV prime, keep as uint32
+  }
+  return hash.toString(16)
+}
+
+/** Version of the attribution classifier stamped on every activity (t40). */
+export const CLASSIFIER_VERSION = 'clusterer@1'
+
+/**
+ * One app of an activity (spec 实现决策 3): identity key + display name +
+ * dwell + the window titles seen on it, dwell-weighted.
+ */
+export interface ActivityApp {
+  /** Normalized app identity key (lowercase exePath, fallback appName). */
+  id: string
+  /** Display name as observed on the switch events. */
+  name: string
+  /** Dwell inside the activity (ms). */
+  durationMs: number
+  /** Unique window titles on this app, most-dwelled first. */
+  windows: string[]
+}
+
+/**
+ * Activity — the observed object of the pipeline (spec 实现决策 3). Never
+ * persisted; 1:N into TaskSessions later. Traceable: the events that
+ * constitute it are `ledger.eventsOf(id)` while it is the most recent
+ * analysis. For older activities, reconstruct the event set from the
+ * evidence timeline: app-switch rows with capturedAt in [startAt, endAt]
+ * (segments partition the batch, so the window is exact) plus clipboard
+ * rows in the activity's window [startAt, next activity's startAt), or
+ * [startAt, ∞) for the last activity — the same rule assignClipboardEvents
+ * applies.
+ */
+export interface Activity {
+  id: string
+  startAt: number
+  endAt: number
+  apps: ActivityApp[]
+  /** itemId refs of the copies made during the activity's window (source app via the evidence row). */
+  clipboardRefs: string[]
+  /** Present when the activity was attributed to a task (zones high/low). */
+  attribution?: { taskId: string; confidence: number }
+  /** App combination × time-slot signature (ignore/cooldown table material). */
+  signature: string
+  classifierVersion: string
+  promptVersion?: string
+  sessionId?: string
+}
+
+/**
+ * Engine-side material for one activity the contract shape does not carry
+ * (zone, evidence strings, window titles). Index-aligned with the
+ * activities of an ActivityAnalysis; the suggestion engine (t19) renders
+ * the proposal card from it.
+ */
+export interface ActivityDetail {
+  /** Attribution zone ('high' | 'low' | 'new') — the low-confidence flag. */
+  zone: ConfidenceZone
+  /** Top similarity against the best candidate (0-1); attribution.confidence when attributed. */
+  confidence: number
+  /** Unique window titles, most-dwelled first (LLM/evidence material). */
+  windowTitles: string[]
+  /** Algorithmic evidence for the suggestion card. */
+  evidence: {
+    appCombination: string
+    durationMs: number
+    overlappingTasks: string[]
+  }
+}
+
+/** One analysis pass: the observable activities plus engine-side detail. */
+export interface ActivityAnalysis {
+  /** Non-ignored activities in time order. */
+  activities: Activity[]
+  /** Index-aligned with activities. */
+  details: ActivityDetail[]
+}
+
+export interface ActivityLedgerOptions {
+  /** Evidence timeline (SQLite in prod, memory impl in tests). */
+  evidence: EvidenceStore
+  /** Live task list — the attribution pool is re-derived on every run. */
+  getTasks: () => readonly Task[]
+  /** Clustering params (settings in prod): segmentation + confidence thresholds. */
+  getParams: () => ClusterParams
+  /** Dismissal table; activities whose signature is present are skipped. */
+  ignored: IgnoredTable
+  /** Optional embedding channel (title similarity); absent = token path. */
+  embed?: EmbeddingChannel
+  /** Classifier version stamped on activities; defaults to CLASSIFIER_VERSION. */
+  classifierVersion?: string
+  /** Prompt version stamped on activities (absent for the pure-algorithm path). */
+  promptVersion?: string
+}
+
+/**
+ * The ActivityLedger — owns the trigger cursor over the evidence timeline,
+ * the clustering pipeline and the ignored-table gate (t40). Pure module:
+ * the store, tasks, params and table are injected.
+ */
+export interface ActivityLedger {
+  /** Baseline the trigger cursor at the newest timeline event (idempotent). */
+  baseline(): void
+  /** Unanalyzed events since the cursor (live timeline query, no stale cache). */
+  pendingCount(): number
+  /** True when any unanalyzed event is an app-switch (a clusterable batch). */
+  hasPendingSwitches(): boolean
+  /** Newest unanalyzed event timestamp, or null when nothing is pending. */
+  pendingLastTs(): number | null
+  /** Mark all pending events seen without clustering (clipboard-only pass). */
+  markSeen(): void
+  /**
+   * Cluster the pending batch into activities and advance the cursor.
+   * Activities whose signature is on the ignored table are dropped. On
+   * failure (invalid params, unexpected store error) the cursor is left
+   * untouched — the batch stays pending and the next pass retries it.
+   */
+  analyze(): Promise<ActivityAnalysis>
+  /**
+   * Traceability: the events that constitute one activity (copy of the
+   * rows). Scope: the most recent analysis pass only — the trace map is
+   * replaced on every pass and cleared on clipboard-only passes. Older
+   * activities are reconstructable from the timeline via the [startAt,
+   * endAt] switch window + clipboard window rule (see Activity docs).
+   */
+  eventsOf(activityId: string): EvidenceEvent[]
+  /** Record a user dismissal into the ignored table. */
+  dismiss(signature: string): void
+}
+
+/** Map an app-switch evidence row back to the clusterer's event shape. */
+function toAppSwitchEvent(row: EvidenceEvent): AppSwitchEvent {
+  const payload = row.payload ?? {}
+  const rawName = payload.appName
+  const appName = typeof rawName === 'string' && rawName.trim().length > 0 ? rawName : row.source
+  const rawExe = payload.exePath
+  const exePath = typeof rawExe === 'string' ? rawExe : ''
+  const pid = typeof payload.pid === 'number' ? payload.pid : 0
+  return {
+    type: 'app-switch',
+    appName,
+    exePath,
+    pid,
+    windowTitle: row.windowTitle ?? '',
+    ts: row.capturedAt
+  }
+}
+
+/**
+ * Assign clipboard rows to the segment whose window contains the copy:
+ * each segment owns [startTs, next segment's startTs); copies after the
+ * final app switch stay with the last segment (no new switch means the
+ * session never visibly ended). Migrated verbatim from the suggestion
+ * engine (t19); returns the itemId refs and the rows for traceability.
+ */
+function assignClipboardEvents(
+  segments: SegmentInfo[],
+  clips: EvidenceEvent[]
+): Array<{ itemIds: string[]; rows: EvidenceEvent[] }> {
+  const out: Array<{ itemIds: string[]; rows: EvidenceEvent[] }> = segments.map(() => ({ itemIds: [], rows: [] }))
+  if (clips.length === 0 || segments.length === 0) return out
+  for (const e of clips) {
+    let idx = segments.length - 1
+    for (let i = 0; i < segments.length; i++) {
+      if (e.capturedAt < segments[i].startTs) {
+        idx = Math.max(0, i - 1)
+        break
+      }
+    }
+    out[idx].rows.push(e)
+    const itemId = e.payload?.itemId
+    if (typeof itemId === 'string' && itemId.length > 0) out[idx].itemIds.push(itemId)
+  }
+  return out
+}
+
+function buildActivity(
+  attr: Attribution,
+  clipboardItemIds: string[],
+  classifierVersion: string,
+  promptVersion?: string
+): { activity: Activity; detail: ActivityDetail } {
+  const seg = attr.segment
+  const apps: ActivityApp[] = seg.appKeys.map((id, i) => ({
+    id,
+    name: seg.appNames[i] ?? id,
+    durationMs: seg.appDurationsMs[i] ?? 0,
+    windows: seg.appWindows[i] ?? []
+  }))
+  const activity: Activity = {
+    id: createId(),
+    startAt: seg.startTs,
+    endAt: seg.endTs,
+    apps,
+    clipboardRefs: clipboardItemIds,
+    ...(attr.taskId !== null ? { attribution: { taskId: attr.taskId, confidence: attr.confidence } } : {}),
+    signature: suggestionSignature(seg.appKeys, seg.startTs),
+    classifierVersion,
+    ...(promptVersion !== undefined ? { promptVersion } : {})
+  }
+  const detail: ActivityDetail = {
+    zone: attr.zone,
+    confidence: attr.confidence,
+    windowTitles: seg.windowTitles,
+    evidence: {
+      appCombination: attr.evidence.appCombination,
+      durationMs: attr.evidence.durationMs,
+      overlappingTasks: attr.evidence.overlappingTasks
+    }
+  }
+  return { activity, detail }
+}
+
+export function createActivityLedger(options: ActivityLedgerOptions): ActivityLedger {
+  const { evidence, getTasks, getParams, ignored } = options
+  const classifierVersion = options.classifierVersion ?? CLASSIFIER_VERSION
+  const promptVersion = options.promptVersion
+  /** Max event ts covered by the last pass; only newer events re-trigger. */
+  let cursor = 0
+  /** activity id → constituent events of the last analysis. */
+  let trace = new Map<string, EvidenceEvent[]>()
+
+  /**
+   * Fetch every unanalyzed row (newest-first pages, deduped by id, ascending).
+   * No cross-tick cache: the timeline grows between ticks, and a stale
+   * snapshot would permanently starve the trigger after a below-threshold
+   * pass. Query cost is bounded (one page per tick in practice).
+   */
+  function loadPending(): EvidenceEvent[] {
+    const seen = new Map<string, EvidenceEvent>()
+    let offset = 0
+    for (;;) {
+      const page = evidence.query({ from: cursor + 1, limit: MAX_EVIDENCE_QUERY_LIMIT, offset })
+      for (const row of page) if (!seen.has(row.id)) seen.set(row.id, row)
+      if (page.length < MAX_EVIDENCE_QUERY_LIMIT) break
+      offset += page.length
+    }
+    return [...seen.values()].sort((a, b) => a.capturedAt - b.capturedAt)
+  }
+
+  function advanceTo(rows: EvidenceEvent[]): void {
+    if (rows.length > 0) {
+      let max = rows[0].capturedAt
+      for (let i = 1; i < rows.length; i++) if (rows[i].capturedAt > max) max = rows[i].capturedAt
+      cursor = max
+    }
+  }
+
+  return {
+    baseline(): void {
+      const newest = evidence.query({ limit: 1, offset: 0 })
+      cursor = newest.length > 0 ? newest[0].capturedAt : 0
+    },
+    pendingCount(): number {
+      return loadPending().length
+    },
+    hasPendingSwitches(): boolean {
+      return loadPending().some((r) => r.kind === 'app-switch')
+    },
+    pendingLastTs(): number | null {
+      const rows = loadPending()
+      if (rows.length === 0) return null
+      let max = rows[0].capturedAt
+      for (let i = 1; i < rows.length; i++) if (rows[i].capturedAt > max) max = rows[i].capturedAt
+      return max
+    },
+    markSeen(): void {
+      advanceTo(loadPending())
+    },
+    async analyze(): Promise<ActivityAnalysis> {
+      const rows = loadPending()
+      const appSwitches = rows.filter((r) => r.kind === 'app-switch').map(toAppSwitchEvent)
+      if (appSwitches.length === 0) {
+        // Clipboard-only batch: nothing to cluster — consume it (markSeen
+        // semantics, matches the engine's clipboard-only tick path).
+        advanceTo(rows)
+        trace = new Map()
+        return { activities: [], details: [] }
+      }
+      const clips = rows.filter((r) => r.kind === 'clipboard')
+      // Cluster BEFORE advancing the cursor: a failure (invalid params,
+      // unexpected store error) must leave the batch pending for retry.
+      const result = await clusterEvents(appSwitches, [...getTasks()], getParams(), options.embed)
+      advanceTo(rows)
+      const clipAssignments = assignClipboardEvents(
+        result.attributions.map((a) => a.segment),
+        clips
+      )
+      const traceNext = new Map<string, EvidenceEvent[]>()
+      const activities: Activity[] = []
+      const details: ActivityDetail[] = []
+      for (let i = 0; i < result.attributions.length; i++) {
+        const attr = result.attributions[i]
+        if (ignored.has(suggestionSignature(attr.segment.appKeys, attr.segment.startTs))) continue
+        const { activity, detail } = buildActivity(attr, clipAssignments[i].itemIds, classifierVersion, promptVersion)
+        // The app-switch rows inside [startAt, endAt] — segments partition the
+        // batch, so the window is exact — plus the clipboard rows assigned
+        // here, time-ordered (stable for equal timestamps).
+        traceNext.set(activity.id, [
+          ...rows.filter((r) => r.kind === 'app-switch' && r.capturedAt >= activity.startAt && r.capturedAt <= activity.endAt),
+          ...clipAssignments[i].rows
+        ].sort((a, b) => a.capturedAt - b.capturedAt))
+        activities.push(activity)
+        details.push(detail)
+      }
+      trace = traceNext
+      return { activities, details }
+    },
+    eventsOf(activityId: string): EvidenceEvent[] {
+      const rows = trace.get(activityId)
+      return rows ? rows.map((r) => ({ ...r, payload: r.payload ? { ...r.payload } : undefined })) : []
+    },
+    dismiss(signature: string): void {
+      ignored.add(signature)
+    }
+  }
+}

@@ -8,6 +8,8 @@ import {
   type SuggestionEngine
 } from '../electron/main/suggestionEngine'
 import { createIgnoredTable } from '../electron/main/ignored'
+import { createActivityLedger, DEFAULT_SEGMENT_PARAMS } from '../electron/store/activityLedger'
+import { createMemoryEvidenceStore, evidenceFromUsageEvent, type EvidenceStore } from '../electron/store/evidenceStore'
 import { MemoryStore, type MemoryIndex } from '../electron/store/MemoryStore'
 import { TaskStore } from '../electron/store/TaskStore'
 import type { AppSwitchEvent, Memory, MemoryType, TaskProposal, UsageEvent } from '../shared/types'
@@ -28,6 +30,7 @@ interface Harness {
   engine: SuggestionEngine
   store: TaskStore
   events: UsageEvent[]
+  evidence: EvidenceStore
   now: number
   settings: { suggestionMinEvents: number; suggestionSilenceSeconds: number; confidenceHigh: number; confidenceLow: number }
   ignored: ReturnType<typeof createIgnoredTable>
@@ -43,14 +46,24 @@ function makeHarness(opts?: { memories?: () => readonly Memory[]; onMemorySugges
     ignored: createIgnoredTable({ load: () => null, save: () => {} }),
     pushed: [],
     chat: undefined,
-    store: new TaskStore({ load: () => null, save: () => {} })
+    store: new TaskStore({ load: () => null, save: () => {} }),
+    evidence: createMemoryEvidenceStore()
   }
   h.engine = createSuggestionEngine({
     now: () => h.now,
     readEvents: () => h.events,
     store: h.store,
     getSettings: () => h.settings,
-    ignored: h.ignored,
+    ledger: createActivityLedger({
+      evidence: h.evidence,
+      getTasks: () => h.store.list(),
+      getParams: () => ({
+        ...DEFAULT_SEGMENT_PARAMS,
+        confidenceHigh: h.settings.confidenceHigh,
+        confidenceLow: h.settings.confidenceLow
+      }),
+      ignored: h.ignored
+    }),
     onSuggestions: (s) => h.pushed.push(s),
     ...(opts?.memories ? { readMemories: opts.memories } : {}),
     ...(opts?.onMemorySuggestion ? { onMemorySuggestion: opts.onMemorySuggestion } : {})
@@ -60,6 +73,7 @@ function makeHarness(opts?: { memories?: () => readonly Memory[]; onMemorySugges
 
 async function trigger(h: Harness, events: UsageEvent[]): Promise<void> {
   h.events.push(...events)
+  for (const e of events) h.evidence.record(evidenceFromUsageEvent(e))
   h.now = events[events.length - 1].ts + 60_000
   await h.engine.tick()
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createIgnoredTable, suggestionSignature, type IgnoredTable } from '../electron/main/ignored'
+import { createIgnoredTable, type IgnoredTable } from '../electron/main/ignored'
+import { suggestionSignature } from '../electron/store/activityLedger'
 
 /** In-memory persistence adapter. */
 function memoryTable(initial: string[] | null = null): { table: IgnoredTable; saved: string[][] } {

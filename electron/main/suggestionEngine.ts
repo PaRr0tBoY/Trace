@@ -1,16 +1,19 @@
 /**
  * SuggestionEngine — quiet-period trigger + suggestion lifecycle (t19).
  *
- * The glue between the event bus (t12), the clustering pipeline (t16) and
- * the provider chain (t15). Pure module: no Electron imports, everything the
- * engine needs is injected so vitest drives it with a fake clock, a fake bus
- * and a real TaskStore.
+ * The glue between the event bus (t12), the ActivityLedger clustering
+ * module (t40) and the provider chain (t15). Pure module: no Electron
+ * imports, everything the engine needs is injected so vitest drives it with
+ * a fake clock, a fake bus and a real TaskStore.
  *
  * Pipeline per analysis (spec 实现决策 5):
  *   1. Trigger — at least `suggestionMinEvents` events arrived since the
- *      last analysis AND no new event for `suggestionSilenceSeconds`.
- *   2. clusterEvents (t16) attributes segments to tasks; each attribution
- *      becomes a TaskProposal unless its signature is on the ignored table.
+ *      last analysis AND no new event for `suggestionSilenceSeconds`. The
+ *      cursor itself lives in the ledger (t40); the engine only evaluates
+ *      the settings thresholds against the ledger's pending stats.
+ *   2. ledger.analyze() (t40) turns the evidence batch into Activity
+ *      objects; each activity becomes a TaskProposal unless its signature is
+ *      on the ignored table (the ledger owns that gate too).
  *   3. Context-prior (spec 实现决策 7): confirmed project/workflow memories
  *      matching a segment nudge its confidence up and travel as
  *      memoryContext into the LLM annotation.
@@ -21,15 +24,11 @@
  *      provider is available. When no provider is configured or the chain
  *      fails, the pass degrades silently to pure algorithm: temporary titles
  *      like "Code + Chrome task", no rationale.
- *      suggestions, and only for title + rationale (never the attribution
- *      decision). One batched call for the whole analysis; when no provider
- *      is configured or the chain fails, the pass degrades silently to pure
- *      algorithm: temporary titles like "Code + Chrome task", no rationale.
  *
  * TaskProposal lifecycle: pending proposals are transient and in-memory
  * only — never persisted (restart clears them). Accept merges into the
  * candidate task (type-safe, TaskStore.merge) or creates a new one; ignore
- * writes the signature into the ignored table and drops the card. A new
+ * routes the signature through the ledger's table and drops the card. A new
  * analysis replaces the whole pending list. A successful accept also emits a
  * memory candidate (onMemorySuggestion) so the task system's feedback
  * distills into long-term memory — the candidate stays 'suggested' until the
@@ -42,17 +41,15 @@
  * Logging: `[Suggestion]` tag, one line per analysis (with mode), one line
  * per accept/ignore. No per-event noise.
  */
-import { clusterEvents, normalizeAppKey, type ClusterParams, type SegmentInfo } from './clusterer'
+import type { ActivityLedger } from '../store/activityLedger'
 import type { ChatRequest, ChatResult } from './provider'
 import type { SuggestTitleContext } from '../../shared/ipc'
 import { algorithmicTitle } from '../../shared/titles'
 import { createId } from '../store/ids'
-import { suggestionSignature, type IgnoredTable } from './ignored'
+import { normalizeAppKey } from '../../shared/appKey'
 import { buildClipboardRef, type TaskStore } from '../store/TaskStore'
 import type {
   AppRef,
-  AppSwitchEvent,
-  ClipboardEvent,
   ClipboardItem,
   Memory,
   MemoryType,
@@ -61,9 +58,6 @@ import type {
   Task,
   UsageEvent
 } from '../../shared/types'
-
-/** Segmenting defaults are fixed for V1 (settings carry only the confidence thresholds). */
-const SEGMENT_PARAMS = { hardGapMs: 600_000, transientMs: 2_500, overlapThreshold: 0.3 } as const
 
 const MAX_TITLE_CHARS = 60
 const MAX_REASON_CHARS = 300
@@ -137,8 +131,6 @@ export function matchMemories(segments: SegmentText[], memories: readonly Memory
 export interface SuggestionSettings {
   suggestionMinEvents: number
   suggestionSilenceSeconds: number
-  confidenceHigh: number
-  confidenceLow: number
 }
 
 /** Chat surface of the provider chain (injected; absent = algorithmic only). */
@@ -156,7 +148,8 @@ export interface SuggestionEngineOptions {
   readEvents: () => UsageEvent[]
   store: TaskStore
   getSettings: () => SuggestionSettings
-  ignored: IgnoredTable
+  /** ActivityLedger (t40): owns the trigger cursor, clustering and ignore gate. */
+  ledger: ActivityLedger
   /** Provider chain; undefined until the main process wires it (index.ts). */
   chat?: ChatFn
   /** Full-list push to the renderer (state.ts pushState.suggestions). */
@@ -237,24 +230,14 @@ export interface SuggestionEngine {
 }
 
 export function createSuggestionEngine(options: SuggestionEngineOptions): SuggestionEngine {
-  const { now, readEvents, store, getSettings, ignored, onSuggestions } = options
+  const { now, readEvents, store, getSettings, ledger, onSuggestions } = options
   const log = options.log ?? (() => {})
   let chat: ChatFn | undefined = options.chat
   let ocr: OcrFn | undefined = undefined
   let running = false
   let analyzing = false
-  /** Max event ts covered by the last analysis; only newer events re-trigger. */
-  let lastAnalyzedTs = 0
   let pending: TaskProposal[] = []
   const meta = new Map<string, TaskProposalMeta>()
-
-  function buildParams(settings: SuggestionSettings): ClusterParams {
-    return {
-      ...SEGMENT_PARAMS,
-      confidenceHigh: settings.confidenceHigh,
-      confidenceLow: settings.confidenceLow
-    }
-  }
 
   /**
    * Most recent app-switch event whose normalized exePath or appName matches
@@ -300,32 +283,18 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
   }
 
   /**
-   * Assign clipboard events to the segment whose window contains the copy:
-   * each segment owns [startTs, next segment's startTs); copies after the
-   * final app switch stay with the last segment (no new switch means the
-   * session never visibly ended). Resolves refs through `readItem`; items
+   * Resolve the activity's clipboard itemId refs (assigned to the activity
+   * window by the ledger) into ResourceRefs through `readItem`; items
    * evicted between copy and analysis are skipped.
    */
-  function clipboardRefsBySegment(
-    segments: SegmentInfo[],
-    events: ClipboardEvent[]
-  ): ResourceRef[][] {
-    const out: ResourceRef[][] = segments.map(() => [])
-    if (!options.readItem || events.length === 0 || segments.length === 0) return out
-    for (const e of events) {
-      let idx = segments.length - 1
-      for (let i = 0; i < segments.length; i++) {
-        if (e.ts < segments[i].startTs) {
-          idx = Math.max(0, i - 1)
-          break
-        }
-      }
-      if (!e.itemId) continue
-      const item = options.readItem(e.itemId)
-      if (!item) continue
-      out[idx].push(buildClipboardRef(item))
+  function resolveClipboardRefs(itemIds: string[]): ResourceRef[] {
+    if (!options.readItem) return []
+    const refs: ResourceRef[] = []
+    for (const itemId of itemIds) {
+      const item = options.readItem(itemId)
+      if (item) refs.push(buildClipboardRef(item))
     }
-    return out
+    return refs
   }
 
   /** Batched LLM annotation for the built suggestions (bounded by MAX_LLM_CANDIDATES). */
@@ -417,52 +386,52 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
   }
 
   /** One analysis pass: cluster the new batch, dedupe, annotate, push. */
-  async function runAnalysis(newEvents: UsageEvent[]): Promise<TaskProposal[]> {
+  /** One analysis pass: ledger clusters the pending batch, we build proposals. */
+  async function runAnalysis(): Promise<TaskProposal[]> {
     analyzing = true
     try {
-      const settings = getSettings()
       const tasks = [...store.list()]
-      const appSwitches = newEvents.filter((e): e is AppSwitchEvent => e.type === 'app-switch')
-      const clipEvents = newEvents.filter((e): e is ClipboardEvent => e.type === 'clipboard')
       // OCR only when a provider exists to consume it — no AI config means
       // no screen capture at all (performance guard, t30).
-      const [result, ocrText] = await Promise.all([
-        clusterEvents(appSwitches, tasks, buildParams(settings)),
+      const [analysis, ocrText] = await Promise.all([
+        ledger.analyze(),
         chat ? runOcrOnce() : Promise.resolve(null)
       ])
-      const refsBySegment = clipboardRefsBySegment(result.attributions.map((a) => a.segment), clipEvents)
 
       const built: Array<{ suggestion: TaskProposal; meta: TaskProposalMeta }> = []
-      for (let i = 0; i < result.attributions.length; i++) {
-        const attr = result.attributions[i]
-        const appRefs = appRefsFromSegment(attr.segment.appKeys, attr.segment.appNames)
+      for (let i = 0; i < analysis.activities.length; i++) {
+        const activity = analysis.activities[i]
+        const detail = analysis.details[i]
+        const appRefs = appRefsFromSegment(activity.apps.map((a) => a.id), activity.apps.map((a) => a.name))
         if (appRefs.length === 0) continue
-        const signature = suggestionSignature(attr.segment.appKeys, attr.segment.startTs)
-        if (ignored.has(signature)) continue
+        // The ledger already dropped ignored signatures; the activity's own
+        // signature travels as the proposal's dismissal key.
+        const signature = activity.signature
 
-        const target = attr.taskId ? tasks.find((t) => t.id === attr.taskId) : undefined
+        const attribution = activity.attribution
+        const target = attribution ? tasks.find((t) => t.id === attribution.taskId) : undefined
         // Icon extraction prefers original-case exePaths; the normalized
         // identity key is the fallback when no raw path is known.
-        const appExePaths = attr.segment.appKeys.slice(0, 5).map((key) => latestSwitchFor(key)?.exePath ?? key)
+        const appExePaths = activity.apps.slice(0, 5).map((app) => latestSwitchFor(app.id)?.exePath ?? app.id)
         const suggestion: TaskProposal = {
           id: `s_${createId()}`,
-          title: target ? target.title : algorithmicTitle(attr.segment.appNames),
-          appNames: attr.segment.appNames.slice(0, 5),
+          title: target ? target.title : algorithmicTitle(activity.apps.map((a) => a.name)),
+          appNames: activity.apps.slice(0, 5).map((a) => a.name),
           appExePaths,
-          confidence: attr.confidence,
-          lowConfidence: attr.zone === 'low',
-          algorithmReason: algorithmReason(attr, target),
+          confidence: detail.confidence,
+          lowConfidence: detail.zone === 'low',
+          algorithmReason: algorithmReason(detail, target),
           evidence: {
-            appCombination: attr.evidence.appCombination,
-            durationMs: attr.evidence.durationMs,
-            overlappingTasks: attr.evidence.overlappingTasks
+            appCombination: detail.evidence.appCombination,
+            durationMs: detail.evidence.durationMs,
+            overlappingTasks: detail.evidence.overlappingTasks
           },
-          taskId: attr.taskId ?? undefined,
-          // The material copied during the segment's window (isomorphic with
+          taskId: activity.attribution?.taskId,
+          // The material copied during the activity's window (isomorphic with
           // a task's resources — the card and the convert panel show these).
-          clipboardRefs: refsBySegment[i]
+          clipboardRefs: resolveClipboardRefs(activity.clipboardRefs)
         }
-        built.push({ suggestion, meta: { appRefs, segmentStartTs: attr.segment.startTs, signature, windowTitles: attr.segment.windowTitles.slice(0, 3), memoryContext: [] } })
+        built.push({ suggestion, meta: { appRefs, segmentStartTs: activity.startAt, signature, windowTitles: detail.windowTitles.slice(0, 3), memoryContext: [] } })
       }
 
       // Context-prior: confirmed project/workflow memories matching a segment
@@ -487,25 +456,24 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       pending = built.map((b) => b.suggestion)
       meta.clear()
       for (const b of built) meta.set(b.suggestion.id, b.meta)
-      lastAnalyzedTs = newEvents.length > 0 ? newEvents[newEvents.length - 1].ts : lastAnalyzedTs
 
       const mode = llmOk ? 'llm' : 'algorithm'
       const ocrNote = ocrText ? `, ocr: ${ocrText.length} chars` : ''
       console.log(
-        `[Suggestion] analysis: ${newEvents.length} events -> ${result.attributions.length} segments -> ${pending.length} suggestions (mode: ${mode}${ocrNote})`
+        `[Suggestion] analysis: ${analysis.activities.length} activities -> ${pending.length} suggestions (mode: ${mode}${ocrNote})`
       )
       log({
         kind: 'analysis',
-        events: newEvents.length,
+        activities: analysis.activities.length,
         mode,
         ocrChars: ocrText?.length,
-        segments: result.attributions.map((a) => ({
-          apps: a.segment.appNames.slice(0, 5),
-          durationMs: a.segment.durationMs,
-          windowTitles: a.segment.windowTitles.slice(0, 3),
-          confidence: a.confidence,
-          zone: a.zone,
-          taskId: a.taskId
+        segments: analysis.activities.map((a, idx) => ({
+          apps: a.apps.slice(0, 5).map((app) => app.name),
+          durationMs: a.endAt - a.startAt,
+          windowTitles: analysis.details[idx].windowTitles.slice(0, 3),
+          confidence: analysis.details[idx].confidence,
+          zone: analysis.details[idx].zone,
+          taskId: a.attribution?.taskId ?? null
         })),
         suggestions: built.map((b) => ({
           id: b.suggestion.id,
@@ -528,8 +496,9 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
     start(): void {
       if (running) return
       running = true
-      const events = readEvents()
-      if (events.length > 0) lastAnalyzedTs = events[events.length - 1].ts
+      // Baseline the ledger's trigger cursor at the newest timeline event;
+      // anything before start() is history, never analyzed.
+      ledger.baseline()
       console.log('[Suggestion] engine started')
     },
     stop(): void {
@@ -540,25 +509,19 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
     tick(): Promise<TaskProposal[]> | undefined {
       if (!running || analyzing) return undefined
       const settings = getSettings()
-      const events = readEvents().filter((e) => e.ts > lastAnalyzedTs)
-      if (events.length < settings.suggestionMinEvents) return undefined
-      const lastTs = events[events.length - 1].ts
-      if (now() - lastTs < settings.suggestionSilenceSeconds * 1000) return undefined
-      const switches = events.filter((e): e is AppSwitchEvent => e.type === 'app-switch')
-      if (switches.length === 0) {
+      if (ledger.pendingCount() < settings.suggestionMinEvents) return undefined
+      const lastTs = ledger.pendingLastTs()
+      if (lastTs === null || now() - lastTs < settings.suggestionSilenceSeconds * 1000) return undefined
+      if (!ledger.hasPendingSwitches()) {
         // Only clipboard events since the last pass: nothing to cluster; mark them seen.
-        lastAnalyzedTs = events[events.length - 1].ts
+        ledger.markSeen()
         return undefined
       }
-      // The full batch travels into the analysis — clipboard events carry the
-      // material for the suggestions' clipboardRefs.
-      return runAnalysis(events)
+      return runAnalysis()
     },
     analyzeNow(): Promise<TaskProposal[]> {
-      const events = readEvents().filter((e) => e.ts > lastAnalyzedTs)
-      const switches = events.filter((e): e is AppSwitchEvent => e.type === 'app-switch')
-      if (switches.length === 0) return Promise.resolve([])
-      return runAnalysis(events)
+      if (!ledger.hasPendingSwitches()) return Promise.resolve([])
+      return runAnalysis()
     },
     suggestions(): readonly TaskProposal[] {
       return pending
@@ -605,7 +568,7 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       const m = meta.get(id)
       pending = pending.filter((s) => s.id !== id)
       meta.delete(id)
-      if (m) ignored.add(m.signature)
+      if (m) ledger.dismiss(m.signature)
       onSuggestions(pending)
       if (m) log({ kind: 'ignore', suggestionId: id, signature: m.signature })
       return m !== undefined

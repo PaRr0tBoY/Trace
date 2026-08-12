@@ -294,7 +294,9 @@ describe('evidenceFromUsageEvent — bus event → store row mapper', () => {
     expect(row.capturedAt).toBe(1_000)
     expect(row.source).toBe('c:/code/editor.exe') // shared appKey rule (attributor identity)
     expect(row.windowTitle).toBe('main.ts')
-    expect(row.payload).toEqual({ pid: 12 })
+    // Raw identity rides in the payload so the ActivityLedger (t40) can
+    // reconstruct the clusterer's exact keys/display names from the timeline.
+    expect(row.payload).toEqual({ pid: 12, appName: 'Code', exePath: 'C:\\Code\\Editor.exe' })
   })
 
   it('maps clipboard: itemId + preview in payload, no window title', () => {
@@ -309,7 +311,7 @@ describe('evidenceFromUsageEvent — bus event → store row mapper', () => {
     const row = evidenceFromUsageEvent(event, { preview: { text: 'hi' } })
     expect(row.kind).toBe('clipboard')
     expect(row.capturedAt).toBe(2_000)
-    expect(row.payload).toEqual({ pid: 12, itemId: 'i9', preview: { text: 'hi' } })
+    expect(row.payload).toEqual({ pid: 12, itemId: 'i9', preview: { text: 'hi' }, appName: 'Code', exePath: 'C:\\Code\\Editor.exe' })
     expect(row.windowTitle).toBeUndefined()
   })
 

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { acceptWithResource } from '../electron/main/suggestionDrop'
 import { createSuggestionEngine, type SuggestionEngine } from '../electron/main/suggestionEngine'
 import { createIgnoredTable } from '../electron/main/ignored'
+import { createActivityLedger, DEFAULT_SEGMENT_PARAMS } from '../electron/store/activityLedger'
+import { createMemoryEvidenceStore, evidenceFromUsageEvent, type EvidenceStore } from '../electron/store/evidenceStore'
 import { TaskStore } from '../electron/store/TaskStore'
 import type { AppSwitchEvent, ResourceRef, UsageEvent } from '../shared/types'
 
@@ -43,6 +45,7 @@ interface Harness {
   engine: SuggestionEngine
   store: TaskStore
   events: UsageEvent[]
+  evidence: EvidenceStore
   now: number
   settings: { suggestionMinEvents: number; suggestionSilenceSeconds: number; confidenceHigh: number; confidenceLow: number }
   pushed: unknown[][]
@@ -54,22 +57,33 @@ function makeHarness(): Harness {
     now: 1_000_000,
     settings: { suggestionMinEvents: 5, suggestionSilenceSeconds: 60, confidenceHigh: 0.7, confidenceLow: 0.45 },
     pushed: [],
-    store: new TaskStore({ load: () => null, save: () => {} })
+    store: new TaskStore({ load: () => null, save: () => {} }),
+    evidence: createMemoryEvidenceStore()
   }
   h.engine = createSuggestionEngine({
     now: () => h.now,
     readEvents: () => h.events,
     store: h.store,
     getSettings: () => h.settings,
-    ignored: createIgnoredTable({ load: () => null, save: () => {} }),
+    ledger: createActivityLedger({
+      evidence: h.evidence,
+      getTasks: () => h.store.list(),
+      getParams: () => ({
+        ...DEFAULT_SEGMENT_PARAMS,
+        confidenceHigh: h.settings.confidenceHigh,
+        confidenceLow: h.settings.confidenceLow
+      }),
+      ignored: createIgnoredTable({ load: () => null, save: () => {} })
+    }),
     onSuggestions: (sugs) => h.pushed.push(sugs)
   })
   return h
 }
 
-/** Push events, advance the clock past the silence floor, and await one tick. */
+/** Push events (ring buffer + evidence timeline), advance the clock, await one tick. */
 async function trigger(h: Harness, events: UsageEvent[] = batch()): Promise<void> {
   h.events.push(...events)
+  for (const e of events) h.evidence.record(evidenceFromUsageEvent(e))
   h.now = h.events[h.events.length - 1].ts + 60_000
   await h.engine.tick()
 }

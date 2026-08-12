@@ -13,16 +13,25 @@ import { openDatabase, closeDatabase, type TraceDatabase } from '../store/db'
 import { createSqliteSessionStore } from '../store/sessionStore'
 import {
   buildClipboardPreview,
+  createMemoryEvidenceStore,
   createSqliteEvidenceStore,
   evidenceFromUsageEvent,
   type EvidenceStore
 } from '../store/evidenceStore'
+import { createSqliteTraceStore, type TraceStore } from '../store/traceStore'
+import {
+  createMemoryIndexAdapter,
+  createSqliteMemoryGraph,
+  LEGACY_MEMORY_TYPES,
+  type MemoryGraphStore,
+  type MemoryIndexAdapter
+} from '../store/memoryGraph'
 import { MemoryStore, type MemoryIndex } from '../store/MemoryStore'
 import type { ClipboardItem, ClipboardItemDto, Settings, TaskProposal, TaskDto, UsageEvent } from '../../shared/types'
 import { MAX_STACK } from '../../shared/types'
 import { createId } from '../store/ids'
 import { nativeImage, BrowserWindow, powerMonitor, safeStorage, app } from 'electron'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PATHS } from '../store/paths'
 import { prefetchFileIcons } from './drag'
@@ -33,6 +42,7 @@ import { emit, recentEvents, subscribe as subscribeEvents } from './eventBus'
 import { buildClipboardEvent } from './attributor'
 import { createSuggestionEngine, TICK_INTERVAL_MS, type ChatFn, type OcrFn, type SuggestionEngine } from './suggestionEngine'
 import { createIgnoredTable } from './ignored'
+import { createActivityLedger, DEFAULT_SEGMENT_PARAMS, type ActivityLedger } from '../store/activityLedger'
 import { logAi } from './aiLog'
 
 const store = new ItemStore()
@@ -42,11 +52,18 @@ let wakeTimer: ReturnType<typeof setTimeout> | null = null
 let taskSweepTimer: ReturnType<typeof setInterval> | null = null
 let suggestionTimer: ReturnType<typeof setInterval> | null = null
 let suggestionEngine: SuggestionEngine | null = null
+let activityLedger: ActivityLedger | null = null
 let memoryStore: MemoryStore | null = null
+/** Memory graph (t48): 三表事实图 over trace.db；null = DB 故障降级。 */
+let memoryGraph: MemoryGraphStore | null = null
+/** 记忆面板的 SQLite 适配器（MemoryIndex ↔ facts 行）；随图创建。 */
+let memoryIndexAdapter: MemoryIndexAdapter | null = null
 /** SQLite canonical store handle (opened after app ready; closed on quit). */
 let traceDb: TraceDatabase | null = null
 /** Evidence timeline store over traceDb (t39); null when the DB failed to open. */
 let evidenceStore: EvidenceStore | null = null
+/** AI-rationale store over the same traceDb (t42); null when the DB failed to open. */
+let traceStore: TraceStore | null = null
 let evidenceUnsubscribe: (() => void) | null = null
 let evidencePurgeTimer: ReturnType<typeof setInterval> | null = null
 /** Retention sweep cadence (t39): hourly, single indexed DELETE — never blocks capture. */
@@ -144,6 +161,38 @@ function saveMemoriesFile(index: MemoryIndex): void {
 }
 
 /**
+ * memories.json → facts 一次性迁移（t48）：数据不丢、source/userState 不变。
+ * 先确认写入成功（条数对账）再删旧文件；ingest 整体单事务，故崩溃续跑时
+ * facts 已有 legacy 事实 ⇔ 迁移完整 → 只删文件不重复迁；DB 或文件异常 →
+ * 保留文件（面板降级 JSON 路径）。
+ */
+function migrateMemoriesToGraph(graph: MemoryGraphStore): void {
+  const file = PATHS.memoriesFile()
+  if (!existsSync(file)) return
+  const index = loadMemoriesFile()
+  if (!index || !Array.isArray(index.memories)) {
+    console.error('[Memory] migration skipped: memories.json unreadable, file kept')
+    return
+  }
+  if (graph.countFacts({ types: LEGACY_MEMORY_TYPES }) > 0) {
+    rmSync(file, { force: true })
+    console.info('[Memory] migration resumed: facts already present, memories.json removed')
+    return
+  }
+  try {
+    const inserted = graph.ingestLegacyMemories(index.memories)
+    if (inserted === index.memories.length) {
+      rmSync(file, { force: true })
+      console.info(`[Memory] migration complete: ${inserted} memories → facts; memories.json removed`)
+    } else {
+      console.error(`[Memory] migration incomplete (${inserted}/${index.memories.length}); memories.json kept`)
+    }
+  } catch (err) {
+    console.error('[Memory] migration failed; memories.json kept:', err)
+  }
+}
+
+/**
  * Ignored-suggestion signatures (userData/ignored.json, LRU 200). Plain JSON:
  * signatures are one-way hashes of app+time-slot material, no titles or paths.
  */
@@ -200,11 +249,28 @@ export function initState(): void {
     traceDb = openDatabase(PATHS.dbFile())
     taskStore.attachSessionStore(createSqliteSessionStore(traceDb))
     evidenceStore = createSqliteEvidenceStore(traceDb)
-    evidenceUnsubscribe = subscribeEvents(handleEvidenceEvent)
+    traceStore = createSqliteTraceStore(traceDb)
   } catch (err) {
     traceDb = null
-    evidenceStore = null
-    console.error('[Store] trace.db open failed; sessions/evidence will not persist:', err)
+    // In-memory timeline fallback (t40): capture keeps flowing and the
+    // suggestion pipeline stays fully functional; only persistence is lost.
+    evidenceStore = createMemoryEvidenceStore()
+    traceStore = null
+    console.error('[Store] trace.db open failed; sessions/evidence/trace will not persist:', err)
+  }
+  // Subscribed regardless of the store backend so a degraded DB never breaks
+  // the suggestion pipeline (the ActivityLedger reads this timeline).
+  evidenceUnsubscribe = subscribeEvents(handleEvidenceEvent)
+  // Memory graph (t48): three-table fact store over trace.db. When the DB is
+  // healthy, the memory panel's MemoryStore persists through the graph adapter
+  // and memories.json is migrated once (verify-then-delete, see
+  // migrateMemoriesToGraph). On DB failure the panel degrades to the old JSON
+  // file — the migration never ran, so nothing is lost.
+  if (traceDb) {
+    const graphSettings = loadSettings()
+    memoryGraph = createSqliteMemoryGraph(traceDb, { lambda: graphSettings.memoryLambda })
+    memoryIndexAdapter = createMemoryIndexAdapter(memoryGraph)
+    migrateMemoriesToGraph(memoryGraph)
   }
   taskStore.load()
   taskStore.setPauseThreshold(loadSettings().taskPauseThresholdMinutes)
@@ -385,6 +451,24 @@ export function getTaskStore(): TaskStore {
 }
 
 /**
+ * AI-rationale trace store (t42) over the same SQLite handle as evidence
+ * (trace table, spec 决策 8). Null when the DB failed to open — the trace UI
+ * then degrades to the empty state. Reads are cheap; writes go through the
+ * future trace recorder.
+ */
+export function getTraceStore(): TraceStore | null {
+  return traceStore
+}
+
+/**
+ * Memory graph handle (t48): null when trace.db failed to open (degrade path).
+ * Exposed so settings:update can sync memoryLambda into the graph at runtime.
+ */
+export function getMemoryGraph(): MemoryGraphStore | null {
+  return memoryGraph
+}
+
+/**
  * Memory store singleton (t20). Lazily constructed so the IPC layer and the
  * suggestion engine can reach it without ordering constraints. Loaded once in
  * initState(); decay parameters track Settings at runtime (settings:update).
@@ -392,13 +476,43 @@ export function getTaskStore(): TaskStore {
 export function getMemoryStore(): MemoryStore {
   if (!memoryStore) {
     memoryStore = new MemoryStore({
-      load: () => loadMemoriesFile(),
-      save: (index) => saveMemoriesFile(index),
+      // SQLite 图（t48）可用时经适配器落 facts 表；DB 故障降级回 memories.json
+      // （迁移只在 DB 健康时发生，此时文件仍在）。
+      load: () => (memoryGraph ? memoryIndexAdapter!.load() : loadMemoriesFile()),
+      save: (index) => (memoryGraph ? memoryIndexAdapter!.save(index) : saveMemoriesFile(index)),
       // Every memory write lands in ai-log.jsonl (suggest/confirm/ban/…).
       log: (entry) => logAi(entry)
     })
   }
   return memoryStore
+}
+
+/**
+ * ActivityLedger singleton (t40). Lazily constructed so the IPC layer can
+ * reach it without ordering constraints; reads the evidence timeline (SQLite
+ * in prod, in-memory fallback when the DB failed to open), the live task
+ * list, the clustering settings and the ignored-signature table.
+ */
+export function getActivityLedger(): ActivityLedger {
+  if (!activityLedger) {
+    activityLedger = createActivityLedger({
+      // initState() always assigns evidenceStore (SQLite or the in-memory
+      // fallback) before the suggestion timer starts, so the ledger never
+      // sees null here.
+      evidence: evidenceStore!,
+      getTasks: () => taskStore.list(),
+      getParams: () => {
+        const s = loadSettings()
+        return {
+          ...DEFAULT_SEGMENT_PARAMS,
+          confidenceHigh: s.confidenceHigh,
+          confidenceLow: s.confidenceLow
+        }
+      },
+      ignored: createIgnoredTable({ load: loadIgnoredSignatures, save: saveIgnoredSignatures })
+    })
+  }
+  return activityLedger
 }
 
 /**
@@ -413,7 +527,7 @@ export function getSuggestionEngine(): SuggestionEngine {
       readEvents: () => recentEvents(),
       store: taskStore,
       getSettings: () => loadSettings(),
-      ignored: createIgnoredTable({ load: loadIgnoredSignatures, save: saveIgnoredSignatures }),
+      ledger: getActivityLedger(),
       onSuggestions: (suggestions) => pushState.suggestions(suggestions),
       // Context-prior: only live project/workflow memories reach the engine.
       readMemories: () => getMemoryStore().list(),

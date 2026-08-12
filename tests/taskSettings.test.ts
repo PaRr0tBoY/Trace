@@ -17,6 +17,7 @@ function corrupt(): Settings {
     taskPauseThresholdMinutes: 0,
     suggestionMinEvents: 0,
     suggestionSilenceSeconds: 10,
+    evidenceRetentionDays: 999,
     confidenceHigh: 0.1,
     confidenceLow: 0.9,
     memoryLambda: 99,
@@ -55,6 +56,14 @@ describe('clampSettings — task domain fields', () => {
     expect(out.memoryLambda).toBe(1)
     expect(out.memoryStaleDays).toBe(7)
     expect(out.memoryCleanupScore).toBe(0)
+  })
+
+  it('clamps evidence retention to 1-365 days with a 30-day default', () => {
+    expect(clampSettings(corrupt()).evidenceRetentionDays).toBe(365)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, evidenceRetentionDays: 0 }).evidenceRetentionDays).toBe(1)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, evidenceRetentionDays: -3 }).evidenceRetentionDays).toBe(1)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, evidenceRetentionDays: 'garbage' as never }).evidenceRetentionDays).toBe(30)
+    expect(clampSettings(DEFAULT_SETTINGS).evidenceRetentionDays).toBe(30)
   })
 
   it('forces the provider chain to be an array', () => {

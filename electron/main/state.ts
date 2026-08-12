@@ -11,8 +11,14 @@ import { loadSettings, saveSettings } from '../store/settings'
 import { TaskStore, type TaskIndex } from '../store/TaskStore'
 import { openDatabase, closeDatabase, type TraceDatabase } from '../store/db'
 import { createSqliteSessionStore } from '../store/sessionStore'
+import {
+  buildClipboardPreview,
+  createSqliteEvidenceStore,
+  evidenceFromUsageEvent,
+  type EvidenceStore
+} from '../store/evidenceStore'
 import { MemoryStore, type MemoryIndex } from '../store/MemoryStore'
-import type { ClipboardItem, ClipboardItemDto, Settings, TaskProposal, TaskDto } from '../../shared/types'
+import type { ClipboardItem, ClipboardItemDto, Settings, TaskProposal, TaskDto, UsageEvent } from '../../shared/types'
 import { MAX_STACK } from '../../shared/types'
 import { createId } from '../store/ids'
 import { nativeImage, BrowserWindow, powerMonitor, safeStorage, app } from 'electron'
@@ -23,7 +29,7 @@ import { prefetchFileIcons } from './drag'
 import { attachAppIcons, attachSuggestionIcons } from './appIcons'
 import { runtime } from './config'
 import { queryForegroundSnapshot, type ForegroundSnapshot } from './foreground'
-import { emit, recentEvents } from './eventBus'
+import { emit, recentEvents, subscribe as subscribeEvents } from './eventBus'
 import { buildClipboardEvent } from './attributor'
 import { createSuggestionEngine, TICK_INTERVAL_MS, type ChatFn, type OcrFn, type SuggestionEngine } from './suggestionEngine'
 import { createIgnoredTable } from './ignored'
@@ -39,6 +45,12 @@ let suggestionEngine: SuggestionEngine | null = null
 let memoryStore: MemoryStore | null = null
 /** SQLite canonical store handle (opened after app ready; closed on quit). */
 let traceDb: TraceDatabase | null = null
+/** Evidence timeline store over traceDb (t39); null when the DB failed to open. */
+let evidenceStore: EvidenceStore | null = null
+let evidenceUnsubscribe: (() => void) | null = null
+let evidencePurgeTimer: ReturnType<typeof setInterval> | null = null
+/** Retention sweep cadence (t39): hourly, single indexed DELETE — never blocks capture. */
+const EVIDENCE_RETENTION_CHECK_MS = 3_600_000
 
 /**
  * Task persistence adapter: tasks.json with DPAPI encryption when available
@@ -187,9 +199,12 @@ export function initState(): void {
   try {
     traceDb = openDatabase(PATHS.dbFile())
     taskStore.attachSessionStore(createSqliteSessionStore(traceDb))
+    evidenceStore = createSqliteEvidenceStore(traceDb)
+    evidenceUnsubscribe = subscribeEvents(handleEvidenceEvent)
   } catch (err) {
     traceDb = null
-    console.error('[Sessions] trace.db open failed; sessions will not persist:', err)
+    evidenceStore = null
+    console.error('[Store] trace.db open failed; sessions/evidence will not persist:', err)
   }
   taskStore.load()
   taskStore.setPauseThreshold(loadSettings().taskPauseThresholdMinutes)
@@ -269,6 +284,20 @@ export function initState(): void {
     if (taskStore.sweep() > 0) pushState.tasks()
   }, 60_000)
 
+  // Evidence retention (t39, spec decision 2): purge events older than the
+  // setting once at startup and hourly. One indexed DELETE on capturedAt —
+  // cheap enough to never block capture (WAL isolates the writer anyway).
+  const runEvidencePurge = (): void => {
+    if (runtime.quitting || evidenceStore === null) return
+    const settings = loadSettings()
+    const cutoff = Date.now() - settings.evidenceRetentionDays * 86_400_000
+    const removed = evidenceStore.purgeBefore(cutoff)
+    if (removed > 0) console.log(`[Evidence] purged ${removed} events (retention ${settings.evidenceRetentionDays}d)`)
+  }
+  runEvidencePurge()
+  if (evidencePurgeTimer !== null) clearInterval(evidencePurgeTimer)
+  evidencePurgeTimer = setInterval(runEvidencePurge, EVIDENCE_RETENTION_CHECK_MS)
+
   if (suggestionTimer !== null) clearInterval(suggestionTimer)
   suggestionTimer = setInterval(() => {
     if (runtime.quitting) return
@@ -298,6 +327,25 @@ function logClipboardCapture(item: ClipboardItem | undefined, foreground: Foregr
   emit(event)
 }
 
+/**
+ * Evidence timeline (t39): persist every gated usage event into the events
+ * table. Collectors already enforce the capture gates (incognito / task-capture
+ * / L0), so anything that reaches the bus is recordable. Clipboard events carry
+ * a bounded material preview (text ≤200 chars, image dims+bytes, file paths —
+ * spec story 35) so the by-id detail answers "what was copied".
+ */
+function handleEvidenceEvent(event: UsageEvent): void {
+  if (evidenceStore === null) return
+  if (event.type === 'clipboard' && event.itemId) {
+    const item = getStore().get(event.itemId)
+    evidenceStore.record(
+      evidenceFromUsageEvent(event, { preview: item ? buildClipboardPreview(item) : undefined })
+    )
+  } else {
+    evidenceStore.record(evidenceFromUsageEvent(event))
+  }
+}
+
 export function stopStateTimers(): void {
   if (pruneTimer !== null) {
     clearInterval(pruneTimer)
@@ -312,6 +360,12 @@ export function stopStateTimers(): void {
     suggestionTimer = null
   }
   suggestionEngine?.stop()
+  if (evidencePurgeTimer !== null) {
+    clearInterval(evidencePurgeTimer)
+    evidencePurgeTimer = null
+  }
+  evidenceUnsubscribe?.()
+  evidenceUnsubscribe = null
   if (traceDb !== null) {
     closeDatabase(traceDb)
     traceDb = null

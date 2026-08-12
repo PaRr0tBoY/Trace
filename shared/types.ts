@@ -480,6 +480,8 @@ export interface Settings {
   taskCaptureEnabled: boolean
   /** L0 foreground/window event capture. Off = nothing leaves the machine. */
   l0CaptureEnabled: boolean
+  /** Evidence timeline retention in days (spec decision 2; 1-365, default 30). */
+  evidenceRetentionDays: number
   /** Minutes without an attribution event before an Active task auto-pauses (1-120). */
   taskPauseThresholdMinutes: number
   /** Minimum new events before a suggestion pass triggers (1-50). */
@@ -496,6 +498,8 @@ export interface Settings {
   memoryStaleDays: number
   /** Score floor below which a memory becomes a cleanup candidate (0-1). */
   memoryCleanupScore: number
+  /** Days unadopted AI-trace rows are kept before cleanup (spec 决策 8; default 30). */
+  traceRetentionDays: number
   /** Provider chain in priority order (first = primary, auto-failover within the list). */
   aiProviders: ProviderConfig[]
   /**
@@ -541,6 +545,7 @@ export const DEFAULT_SETTINGS: Settings = {
   language: 'system',
   taskCaptureEnabled: true,
   l0CaptureEnabled: true,
+  evidenceRetentionDays: 30,
   taskPauseThresholdMinutes: 15,
   suggestionMinEvents: 5,
   suggestionSilenceSeconds: 60,
@@ -549,6 +554,7 @@ export const DEFAULT_SETTINGS: Settings = {
   memoryLambda: 0.25,
   memoryStaleDays: 60,
   memoryCleanupScore: 0.1,
+  traceRetentionDays: 30,
   aiProviders: [],
   landing: { view: 'tasks', filter: 'existing' },
   restoreTime: 'relaxed'

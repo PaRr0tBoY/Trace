@@ -11,6 +11,12 @@
  * File: <userData>/ai-log.jsonl (configured in index.ts via paths.ts).
  * Contents are the user's own task/clipboard material — same trust domain
  * as tasks.json, kept on the local disk only.
+ *
+ * Positioning (spec 决策 8 / t41): NOT a query source of truth anymore —
+ * the trace table (electron/store/traceStore.ts) is canonical for AI
+ * rationale. This file is demoted to crash-safe append / diagnostics /
+ * export input (scripts/export-golden-seed.cjs still consumes it).
+ * Do not add read/query APIs here; new AI-rationale reads go to traceStore.
  */
 import { appendFileSync, existsSync, readFileSync, statSync, writeFileSync } from 'fs'
 

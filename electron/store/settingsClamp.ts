@@ -41,6 +41,11 @@ export function clampSettings(input: Settings): Settings {
   // Task domain (t11): master switches default on; anything but an explicit false is true.
   out.taskCaptureEnabled = out.taskCaptureEnabled !== false
   out.l0CaptureEnabled = out.l0CaptureEnabled !== false
+  // Evidence timeline retention (t39, spec decision 2): 1-365 days, default 30.
+  // Floor 1 keeps the events table bounded — unlike clipboard items
+  // (autoDeleteHours 0 = never), the timeline must eventually reclaim space;
+  // cap 365 mirrors the memoryStaleDays (7-365) range convention.
+  out.evidenceRetentionDays = clampInt(out.evidenceRetentionDays, 1, 365, 30)
   // State machine: idle-to-paused threshold in minutes (1-120, default 15).
   out.taskPauseThresholdMinutes = clampInt(out.taskPauseThresholdMinutes, 1, 120, 15)
   // Proposal triggers.
@@ -53,6 +58,8 @@ export function clampSettings(input: Settings): Settings {
   out.memoryLambda = clampNum(out.memoryLambda, 0.01, 1, 0.25)
   out.memoryStaleDays = clampInt(out.memoryStaleDays, 7, 365, 60)
   out.memoryCleanupScore = clampNum(out.memoryCleanupScore, 0, 1, 0.1)
+  // AI trace retention (t41, spec 决策 8): unadopted rows purge after N days (1-365, default 30).
+  out.traceRetentionDays = clampInt(out.traceRetentionDays, 1, 365, 30)
   // Provider chain: must stay an array (priority order = array order).
   out.aiProviders = Array.isArray(out.aiProviders) ? out.aiProviders : []
   // Landing page (ADR-0004): view must be a valid top-level view, filters

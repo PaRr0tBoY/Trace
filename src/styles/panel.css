@@ -182,15 +182,17 @@
   border-radius: var(--radius-pill);
   outline: none;
   color: var(--text-primary);
-  transition: border-color var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out);
+  transition: border-color var(--dur-fast) var(--ease-out);
 }
 .search input::placeholder {
   color: var(--text-tertiary);
 }
+/* Neutral focus ring: the accent glow looked rough on the transparent panel
+ * (and got clipped by the search container), so the field keeps a plain
+ * white hairline — no theme color here. */
 .search input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow: none;
 }
 .search .search-icon {
   position: absolute;

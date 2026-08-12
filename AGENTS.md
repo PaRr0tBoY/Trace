@@ -6,8 +6,8 @@
 
 - **平台**：仅 Windows（Win32 OLE 拖拽、PowerShell HDROP 解析、透明窗口光标轮询、koffi FFI）
 - **技术栈**：Electron 34 · React 18 · TypeScript 5 · Framer Motion 11 · Zustand 4 · electron-vite · vitest；koffi 用于全屏检测与剪贴板格式读取（upstream 引入）
-- **单一 worktree**：`C:\Users\Acid\Documents\repo\Trace`（main）。feature/Animation、feature/tasks 分支已删除（任务系统设计作废，待推翻重建）
-- **分支状态**：main = upstream 0.2.6 合并结果（merge 3741b70），领先 origin/main 78 个提交未推送；upstream 同步按需手动做
+- **单一 worktree**：`C:\Users\Acid\Documents\repo\Trace`（main）。feature/Animation、feature/tasks 分支已删除；animate/deslop 已 merge 入 main（2026-08-12），其 worktree（`C:\Users\Acid\.herdr\worktrees\Trace\animate-deslop`）待清理
+- **分支状态**：main = upstream 0.2.6 合并结果（merge 3741b70）+ 本地 100+ 提交（ADR-0001…0005、任务层、AI 层）未推送；upstream 同步按需手动做
 
 ## 常用命令
 
@@ -20,7 +20,7 @@
 | `npm run build` | 生产构建到 `out/` |
 | `npm run package` | 构建 + Windows NSIS 安装包到 `dist/` |
 | `npm run preview` | 预览构建产物 |
-| `npm test` | vitest 单元测试（geometry/imageProtocol/power） |
+| `npm test` | vitest 单元测试（22 文件 / 424 用例：任务层、restore、fileTabs、AI、几何等） |
 
 - **有 vitest 测试，没有 lint 脚本。** 验收靠 `npm run typecheck` + `npm test` + `npm run dev` 手动验证。
 - npm ≥ 11 默认拦截 postinstall 脚本：装完依赖要 `npm approve-scripts electron esbuild koffi`，否则 esbuild/electron 二进制缺失，`npm run dev` 直接失败。
@@ -49,7 +49,9 @@
 
 - `InvokeMap` — renderer invoke → main 返回 Promise（`state:load`、`item:merge`、`app:get-releases`…）
 - `EventMap` — main → renderer 推送（`state:items`、`window:cursor-edge`、`ui:toast`…）
-- `SendMap` — 即发即弃（`item:start-drag`、`tutorial:set-step`）
+- `SendMap` — 即发即弃（`item:start-drag`、`tutorial:set-step`、`panel:expand`…）
+
+任务层通道：`task:load/merge/update/delete/link-*`、`suggestion:accept`（带 opts：title/note/apps/clipboardItemIds）、`suggestion:accept-with-resource`、`task:app-options`（ADR-0002 编辑器应用网格）、`app:icons`（on-demand 图标）、`app:open-linked-window`（ADR-0005 窗口切换）。
 
 领域模型在 `shared/types.ts`：`ItemData`（text/image/image-collection/files 判别联合）、`ClipboardItem`/`ClipboardItemDto`、`Settings`、`MAX_STACK = 10`、`DragRequest`。
 
@@ -64,10 +66,10 @@
 
 ### 边缘触发器（`electron/main/window.ts` + `src/hooks/useEdgeHover.ts`）
 - 窗口 384px 宽、透明、无边框、常驻最前；视觉 blade 270px（`--panel-width`）。折叠时 `setIgnoreMouseEvents(true)` 点击穿透。
-- Main 每 16ms `screen.getCursorScreenPoint()` 轮询（透明窗口收不到 pointermove），`clientX <= 450` 或面板开着时持续推送 `window:cursor-edge`。
+- Main 每 16ms `screen.getCursorScreenPoint()` 轮询（透明窗口收不到 pointermove），**IPC 减频**（ADR-0004 后）：边缘状态翻转即发；面板关闭时仅 450px 内且移动 ≥3px 才发；面板开着时移动才发（静止不再 60Hz 刷屏）。
 - 滞回：3px 触发 × 120ms 停留打开；≤255px 保持；>290px 开始 250ms 关闭宽限。
 - 关闭检测主靠 renderer 的 `panel:leave` 自定义事件（React mouseleave 不冒泡，正好只响应真实离开），Y 轴越界 pointermove 兜底；外部 OS 文件拖拽期间永不关闭。
-- **detector window**（`createDetectorWindow`）：1px 宽 × 30% 高的透明 click-through 窗口，常驻面板下方（'normal' 置顶级 vs 面板 'screen-saver' 级），是 OS 拖入的兜底 surface。**必须保持 click-through**——非 click-through 的置顶透明窗口在 Windows 上会吞掉整条边缘的桌面点击（最小命中区域）。拖入感知实际由主进程光标轮询完成，detector 只做保险。
+- **detector window**（`createDetectorWindow`）：1px 宽 × 30% 高的透明 click-through 窗口，曾是 OS 拖入的兜底 surface。**已不再创建**（`window.ts` 仅保留 legacy 函数）——拖入感知完全由主进程光标轮询完成；该函数若重新启用，**必须保持 click-through**（非 click-through 的置顶透明窗口在 Windows 上会吞掉整条边缘的桌面点击）。
 - `useEdgeHover` 把所有响应值放 refs，effect 只挂一次（重启会取消计时器）。新增依赖时照此办理。
 - **置顶心跳**：`setAlwaysOnTop` 每 500ms 重申一次（'screen-saver' 级，压过全屏应用）；原生拖拽期间必须暂停（`setHeartbeatPaused`），否则置顶窗口会压到拖拽幽灵上面。动 z-order 相关代码先看这里。
 - `window.ts` 禁止 import `state.ts`（循环依赖，文件头有注释）。
@@ -86,7 +88,8 @@
 
 ### 原生拖拽（`electron/main/drag.ts`）
 - renderer 拦截 `dragstart` → `item:start-drag` 即发即弃 → main 把内容暂存临时文件 → `webContents.startDrag({file, icon})`。必须从 dragstart 同步调用，所以走 send 不走 invoke。
-- 拖拽图标：`@resvg/resvg-js` 渲染 SVG（文件栈卡片、文本玻璃卡片、图片缩略图），64 项内存缓存 + 启动预暖。
+- 文本也走文件拖出（temp .txt + UTF-8 BOM，Notepad/Word 识别编码）；早期手搓 OLE IDataObject 方案因 `RPC_E_CALL_REJECTED` 放弃（koffi 对象无法跨进程 marshaling，见 git 历史 oleDrag.ts）。
+- 拖拽图标：`@resvg/resvg-js` 渲染 SVG（文件栈卡片），badge 用主题色 accent（`THEME_ACCENTS[themeColor]`，主题切换重建缓存），64 项内存缓存 + 启动预暖。
 
 ### 其他 main 模块
 - `powershell.ts` — PowerShell 调用封装（模拟 Ctrl+V 粘贴、HDROP 文件列表、`runOutput` 捕获 stdout 供 OCR）。**多行脚本在常驻会话 stdin 会卡死**——给常驻通道的脚本必须写成单行（`;` 连接，OCR 脚本即如此）。
@@ -94,26 +97,34 @@
 - `onboardingWindow.ts` — 首次启动引导窗口，独立 frameless 窗口，加载 `#/onboarding` 路由。
 - `config.ts` — `APP_CONFIG`（应用名、`tracelocal://` 图片协议）与 `runtime` 可变标志。
 - `focus.ts` — 输入框焦点桥（见注意事项"输入框焦点（t21）"）。
-- `appIcons.ts` — APP 图标通道：`app.getFileIcon` → dataURL，LRU 缓存；`attachAppIcons`/`attachSuggestionIcons` 在 `pushState.tasks/suggestions` 推送前批量填充（`AppRef.iconUrl` / `Suggestion.appIcons`）。`appIconCore.ts` 是纯逻辑（缓存/占位），可注入测试。
+- `windowSwitch.ts` — ADR-0005：`app:open-linked-window` 的实现（pid 命中 → 激活窗口；应用存活 → 最新窗口；否则启动 exe）。`suggestionEngine.ts` 的 `latestSwitchFor` 提供链接窗口快照（linkedWindow）。
+- `aiLog.ts` — JSONL 可观测日志（`ai-log.jsonl`）：聊天调用、引擎算法输出、记忆写入各留一条；`provider.ts` 的 `log` 钩子 + `MemoryStore`/`suggestionEngine` 的 `log` 均汇入。
+- `appIcons.ts` — APP 图标：`attachAppIcons`/`attachSuggestionIcons` 在 `pushState.tasks/suggestions` 推送前批量填充（`AppRef.iconUrl` / `Suggestion.appIcons`），`app:icons` 通道按需补取（LRU 128 缓存）；`appIconCore.ts` 是纯逻辑（缓存/占位），可注入测试。
+- `imageProtocol.ts` — `tracelocal://thumb` 缩略图协议（ADR-0004 性能项，图片预览 base64 移出 IPC DTO）。
 - `ocr.ts` — Windows.Media.Ocr（WinRT，经 PowerShell 单行脚本）识别前台窗口文字，作为 LLM 建议的 `ocrContext` 输入。**只作 AI 资料不进 UI、不持久化**；隐私三开关（incognito/L0/总开关）任一关闭即跳过；分析触发时才跑，超时放弃。
 - `suggestionDrop.ts` — 拖到备选卡"自动建任务并绑定"的纯逻辑组合（`acceptWithResource`），IPC 层薄封装。
 
 ### 设置（`electron/store/settings.ts`）
-- 扁平 JSON，读取时深合并到 `DEFAULT_SETTINGS` 并**钳制数值**（hotZoneHeight 0.2–0.6、historyLimit 50–2000、autoDeleteHours ≥ 0、uiStyle 枚举）。新加设置字段要同时登记 `shared/types.ts` 的 `Settings`/`DEFAULT_SETTINGS` 和这里的 `merge()`。
+- 扁平 JSON，读取时深合并到 `DEFAULT_SETTINGS` 并**钳制数值**（hotZoneHeight 0.2–0.6、historyLimit 50–2000、autoDeleteHours ≥ 0、uiStyle 枚举、themeColor/restoreTime/tasksFilter 枚举钳制在 `settingsClamp.ts`）。新加设置字段要同时登记 `shared/types.ts` 的 `Settings`/`DEFAULT_SETTINGS` 和这里的 `merge()`。
+- Settings UI 是 4-tab（behaviour/position/appearance/tasks，ADR-0004）；`settingsTab` 在 store 里，restore 机制记住它。
 
 ### 渲染层
 - `src/main.tsx` 按 hash 路由：`#/onboarding` → Onboarding，否则 App。
-- 组件树：App → Panel（Header / ItemList / Settings / ToastStack），Settings 内嵌 ChangelogView 子视图；i18n 30 语言（`src/i18n/`）。
-- `src/components/PreviewFlyout.tsx` 是 upstream 遗留死文件（无人引用），别动。
-- 任务层 UI：`tasks/` 下 TaskView（备选卡 + 分割线 + 任务列表同一滚动栏）、SuggestionCard（两行卡）、TaskDetail（全页详情：应用/窗口名/置信度/创建原因）、TaskDropPanel（拖入绑定面板：保存区 + 任务列表 + 备选卡落点）、dropActions.ts（`linkDraggedItem`/`linkFiles`/`acceptWithResource` 的 renderer 侧薄封装）；`data-drop-task-id`/`data-drop-suggestion-id`/`.drop-save-zone` 是 Panel `onInternalDrop` 的解析锚点。
-- 样式分层：tokens.css（主题变量）→ global → panel/item/settings。
+- 组件树：App → Panel（Header / ItemList / Settings / ToastStack），App 还挂 CopyIndicatorCurve、PreviewFlyout、IndicatorStyleFlyout；Settings 内嵌 ChangelogView 子视图；i18n 30 语言（`src/i18n/`）。
+- 导航（ADR-0004）：三视图 `View`（clipboard/files/tasks），tasks 视图二级 tab（existing/candidates），导航状态全在 store（restore 机制记忆/重置，`src/lib/restore.ts` + `shouldRestoreToLanding`）。
+- 文件视图：FileListView + FileMemberRow + `src/lib/fileTabs.ts`（动态扩展名 tab）；任务详情 TaskDetail（关联应用/窗口/关联内容/置信度/创建原因）。
+- 主题（ADR-0004）：`shared/themes.ts`（`THEME_ACCENTS`/`THEME_COLORS`，5 主题）+ `src/lib/theme.ts`（`applyTheme` 运行时换 accent）；`--accent-rgb` 供 rgba 用。
+- 任务层 UI：`tasks/` 下 TaskView（二级 tab + 全页子视图：TaskEditor 创建/编辑/convert panel、TaskDetail、ContentPicker）、SuggestionCard（两行卡 + 剪贴板 chips + 点击开 convert panel，卡内无编辑/展开）、TaskEditor（引导式：标题/app 网格/剪贴板列表/AI 标题，suggestion 模式展示 "why"）、TaskDropPanel（拖入绑定面板：保存区 + 任务列表 + 备选卡落点）、dropActions.ts（`linkDraggedItem`/`acceptSuggestionDrop`）；`data-drop-task-id`/`data-drop-suggestion-id`/`.drop-save-zone` 是 Panel `onInternalDrop` 的解析锚点。
+- 样式分层：tokens.css（主题变量：`--accent` 主题色、`--bg-2`/`--divider` 中性色）→ global → panel/item/settings/tasks。
 
 ## 注意事项
 
 - **upstream 同步（2026-08-09）**：已合并 Deepender25/Edge-Drop 到 v0.2.6（63 提交 / 3 万行：i18n 30 语言、设置 3-tab 重构、Web Audio 音效、多显示器持久化、性能优化、vitest）。**自动更新（electron-updater）已整体剔除**——silent auto-update 会下载 upstream 的包覆盖 Trace，合并后删除了 updater.ts、相关 IPC 通道、设置 UI 与 i18n 键；保留 `app:get-releases`（What's New 视图，指向 PaRr0tBoY/Trace releases，离线回退静态 changelog）。品牌已全部替换为 Trace；ChangelogView.tsx 与 ipc.ts 的静态 changelog 保留 Edge-Drop 历史原文；AppX 证书身份（Deepender.EdgeDrop）保留（证书绑定）。
-- **feature/tasks 已删除（2026-08-09）**：任务系统设计作废（上游大更新后决策推翻重建）。旧设计要点（Task 聚合根、四层面板、Alt-Tab 窗口切换、koffi 键盘轮询、C# 窗口枚举 helper）仅存于 git 历史（`3dc9b07`、`f146a96`），重建时可参考但不要恢复代码。
+- **feature/tasks 已删除（2026-08-09）**：任务系统设计作废（上游大更新后决策推翻重建）。旧设计要点（Task 聚合根、四层面板、Alt-Tab 窗口切换、koffi 键盘轮询、C# 窗口枚举 helper）仅存于 git 历史（`3dc9b07`、`f146a96`），重建时可参考但不要恢复代码。**任务系统现已重建（2026-08-12，ADR-0001/0002/0003/0005 + animate/deslop 合并）：引导式 TaskEditor、窗口切换、restore、主题、双行导航。**
+- **t14 剪贴板自动归属已移除（2026-08-12）**：任务关联内容只由显式操作变更（拖入绑定、task:link-item/unlink）。剪贴板事件仍带来源 app（sourceApp，ADR-0001）和 itemId 流向建议引擎（分段 + readItem），但不再自动 link 到任务；`decideClipboardAttribution`/`autoAttributionEnabled` 已删，剪贴板事件只在 attributor.ts 的 `buildClipboardEvent` 记录。
 - userData 目录：`%APPDATA%\Trace`（rebrand 后），旧 `edge-drop` 数据不迁移。
 - **输入框焦点（t21，2026-08-11 最终版）**：键盘输入必须真正激活窗口——实测三条死路：①`focusable:false` 窗口 `element.focus()` 静默失败（无 focusin）；②user32 `SetFocus` 只设线程焦点，全局按键仍去前台窗口（keybd_event 实测 0 到达）；③`setFocusable(false)` 在 Windows 上**隐藏窗口**（禁用）。最终方案：窗口常驻 `focusable:true`（window.ts），OS 侧用 koffi 的 `WS_EX_NOACTIVATE`（`GetWindowLongPtrW`/`SetWindowLongPtrW`，`electron/main/focus.ts`）控制可激活性。输入框聚焦链：renderer 全局 `focusin`/`pointerdown`（App.tsx，捕获阶段，匹配 `input, textarea, [contenteditable]`）→ `ui:input-focus` → main：剥 NOACTIVATE + `win.focus()`（+ `setSkipTaskbar(true)` 防任务栏按钮）。**激活按会话保持**：输入框 blur 不释放（切换输入框不闪烁），面板关闭（`window:set-interactive(false)`）才贴回 NOACTIVATE；窗口失活（`onWindowBlur`）时主动 blur 输入框防 Chromium 焦点重放误激活；pointerdown 非输入元素 → `ui:input-blur` → `win.blur()` 立即失活（Chromium 对 focusable:true 窗口**任何点击都会激活**，NOACTIVATE 拦不住——实测，所以非输入点击后必须主动失活还焦点）。输入框聚焦时 Escape 只 blur 不关面板（useEdgeHover onKeyDown）。
 - **0.2.6 合并丢失了三个 IPC handler（2026-08-11 恢复）**：`file:reveal`、`displays:list`、`window:set-preview-mode` 在 `shared/ipc.ts`/preload 有声明但 main 从未注册（真机报 `No handler registered`）。已恢复并注释。**教训：四文件契约靠 typecheck 校验签名，但"声明了没注册"typecheck 查不出**——新增通道后跑一次真机或 grep 确认 `handle('channel'` 存在。
+- **搜索框 focus 样式（2026-08-12）**：不用主题色——accent 光晕在透明面板上边缘粗糙且被 `overflow:hidden` 容器截断；focus 时白色细线框（`rgba(255,255,255,0.85)`），无 box-shadow（panel.css `.search input:focus`）。
 - `drag_debug.txt` 是 OLE 拖拽排障日志，已被 gitignore（upstream 加的），运行时生成不提交。
 - `features_and_architecture.md` 是旧架构文档（fork 前写的），可能滞后于代码；`scratch/` 用途不明，别动。

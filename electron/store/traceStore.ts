@@ -122,10 +122,36 @@ export interface TraceStore {
   /**
    * 保留清理：删除未采纳（taskId IS NULL）且 createdAt < ts 的记录，返回删除
    * 条数。已采纳（taskId 非空）随任务活，本接口不碰（任务删除时的连带清理属
-   * 任务生命周期，另票处理）。t46 联动调用方式：
+   * 任务生命周期，t42 在此实现）。t46 联动调用方式：
    *   cleanupBefore(now - settings.traceRetentionDays * 86400000)
    */
   cleanupBefore(ts: number): number
+  /**
+   * 任务生命周期连带清理（t42）：任务硬删除时删掉它的已采纳 trace，返回删除
+   * 条数。spec 决策 8：已采纳 trace 随任务活，任务没了它也没了。
+   */
+  deleteByTaskId(taskId: string): number
+  /**
+   * 任务合并连带迁移（t42）：source 任务并入 target 后，把挂在 source 下的已
+   * 采纳 trace 改挂 target（决策链对幸存任务仍然有效），返回迁移条数。避免
+   * taskId 指向已删除任务的孤儿行（既不显示也永远清不掉）。
+   */
+  reassignTaskId(fromTaskId: string, toTaskId: string): number
+}
+
+/**
+ * 任务合并连带迁移的调用方组合缝（t42）：IPC 层把 TaskStore.merge 的结果
+ * 传进来，只有合并成功才迁移 trace 行——merge 失败（如 target === source）
+ * 时绝不挪数据。独立成纯函数以便 vitest 直测该分支（IPC 层无法单测）。
+ */
+export function rehomeTraceAfterMerge(
+  trace: TraceStore | null,
+  merged: boolean,
+  fromTaskId: string,
+  toTaskId: string
+): number {
+  if (!merged || !trace) return 0
+  return trace.reassignTaskId(fromTaskId, toTaskId)
 }
 
 export interface TraceStoreOptions {
@@ -179,6 +205,23 @@ export function createMemoryTraceStore(options: TraceStoreOptions = {}): TraceSt
         if (rows[i].taskId === undefined && rows[i].createdAt < ts) rows.splice(i, 1)
       }
       return before - rows.length
+    },
+    deleteByTaskId: (taskId) => {
+      const before = rows.length
+      for (let i = rows.length - 1; i >= 0; i--) {
+        if (rows[i].taskId === taskId) rows.splice(i, 1)
+      }
+      return before - rows.length
+    },
+    reassignTaskId: (fromTaskId, toTaskId) => {
+      let moved = 0
+      for (const row of rows) {
+        if (row.taskId === fromTaskId) {
+          row.taskId = toTaskId
+          moved++
+        }
+      }
+      return moved
     }
   }
 }
@@ -246,6 +289,8 @@ export function createSqliteTraceStore(db: TraceDatabase, options: TraceStoreOpt
     `SELECT ${SELECT_COLUMNS} FROM trace WHERE createdAt >= ? AND createdAt < ? ORDER BY createdAt, id`
   )
   const deleteUnadoptedBefore = db.prepare(`DELETE FROM trace WHERE taskId IS NULL AND createdAt < ?`)
+  const deleteByTask = db.prepare(`DELETE FROM trace WHERE taskId = ?`)
+  const reassign = db.prepare(`UPDATE trace SET taskId = ? WHERE taskId = ?`)
 
   return {
     append: (record) => {
@@ -273,6 +318,8 @@ export function createSqliteTraceStore(db: TraceDatabase, options: TraceStoreOpt
       (selectByDecisionId.all(decisionId) as TraceRow[]).map(toRecord),
     listByTaskId: (taskId) => (selectByTaskId.all(taskId) as TraceRow[]).map(toRecord),
     listInWindow: (from, to) => (selectInWindow.all(from, to) as TraceRow[]).map(toRecord),
-    cleanupBefore: (ts) => deleteUnadoptedBefore.run(ts).changes
+    cleanupBefore: (ts) => deleteUnadoptedBefore.run(ts).changes,
+    deleteByTaskId: (taskId) => deleteByTask.run(taskId).changes,
+    reassignTaskId: (fromTaskId, toTaskId) => reassign.run(toTaskId, fromTaskId).changes
   }
 }

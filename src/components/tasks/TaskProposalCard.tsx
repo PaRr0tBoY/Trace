@@ -14,13 +14,15 @@ import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import { basename } from '../../lib/format'
 import type { ResourceRef, TaskProposal } from '../../../shared/types'
-import { CheckIcon, EditIcon, CloseIcon, FileIcon, ImageIcon, SparklesIcon } from '../icons'
+import { CheckIcon, EditIcon, CloseIcon, FileIcon, ImageIcon, SparklesIcon, InfoIcon } from '../icons'
 import { acceptSuggestionDrop } from './dropActions'
 
 interface Props {
   suggestion: TaskProposal
   /** Open the convert panel for this suggestion (absent in drop surfaces). */
   onOpen?: (id: string) => void
+  /** Open the shared AI-rationale panel for this proposal's decision chain (t42). */
+  onTrace?: (id: string) => void
 }
 
 const MAX_APPS = 5
@@ -33,7 +35,7 @@ function chipLabel(ref: ResourceRef): string {
   return ref.snapshot.preview
 }
 
-export function TaskProposalCard({ suggestion, onOpen }: Props) {
+export function TaskProposalCard({ suggestion, onOpen, onTrace }: Props) {
   const { t } = useTranslation()
   const acceptSuggestion = useStore((s) => s.acceptSuggestion)
   const ignoreSuggestion = useStore((s) => s.ignoreSuggestion)
@@ -130,6 +132,14 @@ export function TaskProposalCard({ suggestion, onOpen }: Props) {
             onClick={() => onOpen?.(suggestion.id)}
           >
             <EditIcon width={13} height={13} />
+          </button>
+          <button
+            type="button"
+            className="task-suggestion-action"
+            title={t('trace.entryLabel')}
+            onClick={() => onTrace?.(suggestion.decisionId ?? suggestion.id)}
+          >
+            <InfoIcon width={13} height={13} />
           </button>
           <button
             type="button"

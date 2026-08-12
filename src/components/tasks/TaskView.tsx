@@ -20,6 +20,10 @@ import { TaskEditor } from './TaskEditor'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ContentPicker } from './ContentPicker'
 import { TaskProposalCard } from './TaskProposalCard'
+import { TracePanel } from './TracePanel'
+
+/** Which "AI 依据" chain the shared TracePanel is showing (t42). */
+type TraceTarget = { kind: 'proposal'; id: string } | { kind: 'task'; id: string } | null
 
 export function TaskView() {
   const { t } = useTranslation()
@@ -41,6 +45,8 @@ export function TaskView() {
   const setPickerTaskId = useStore((s) => s.setPickerTaskId)
   /** TaskProposal whose convert panel is open (null = closed). */
   const [convertId, setConvertId] = useState<string | null>(null)
+  /** "AI 依据" panel target (shared TracePanel, t42). */
+  const [traceTarget, setTraceTarget] = useState<TraceTarget>(null)
 
   const selected = selectedId ? (tasks.find((task) => task.id === selectedId) ?? null) : null
   const converting = convertId ? (suggestions.find((s) => s.id === convertId) ?? null) : null
@@ -99,6 +105,7 @@ export function TaskView() {
           onEdit={() => setEditingTask(selected.id)}
           onDeleteRequest={(task) => setConfirmDeleteTaskId(task.id)}
           onAddContent={() => setPickerTaskId(selected.id)}
+          onTrace={() => setTraceTarget({ kind: 'task', id: selected.id })}
         />
       ) : (
         <div className="task-scroll">
@@ -106,7 +113,12 @@ export function TaskView() {
             suggestions.length > 0 ? (
               <div className="task-suggest-list">
                 {suggestions.map((s) => (
-                  <TaskProposalCard key={s.id} suggestion={s} onOpen={setConvertId} />
+                  <TaskProposalCard
+                    key={s.id}
+                    suggestion={s}
+                    onOpen={setConvertId}
+                    onTrace={(id) => setTraceTarget({ kind: 'proposal', id })}
+                  />
                 ))}
               </div>
             ) : (
@@ -143,6 +155,14 @@ export function TaskView() {
           confirmLabel={t('tasks.deleteConfirm')}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setConfirmDeleteTaskId(null)}
+        />
+      )}
+
+      {traceTarget && (
+        <TracePanel
+          decisionId={traceTarget.kind === 'proposal' ? traceTarget.id : undefined}
+          taskId={traceTarget.kind === 'task' ? traceTarget.id : undefined}
+          onClose={() => setTraceTarget(null)}
         />
       )}
     </div>

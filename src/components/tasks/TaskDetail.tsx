@@ -24,7 +24,8 @@ import {
   CompleteIcon,
   RestoreIcon,
   ArchiveIcon,
-  PlusIcon
+  PlusIcon,
+  InfoIcon
 } from '../icons'
 
 interface Props {
@@ -33,6 +34,8 @@ interface Props {
   onEdit: () => void
   onDeleteRequest: (task: TaskDto) => void
   onAddContent: () => void
+  /** Open the shared AI-rationale panel for this task's adopted trace (t42). */
+  onTrace?: () => void
 }
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
@@ -228,7 +231,7 @@ function AppRow({ app, onOpen }: { app: AppRef; onOpen: (app: AppRef) => void })
   )
 }
 
-export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent }: Props) {
+export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent, onTrace }: Props) {
   const { t } = useTranslation()
   const updateTask = useStore((s) => s.updateTask)
   const tasks = useStore((s) => s.tasks)
@@ -285,6 +288,16 @@ export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent
         <button type="button" className="task-btn ghost task-detail-title-edit" onClick={onEdit} title={t('tasks.edit')}>
           <EditIcon width={14} height={14} />
         </button>
+        {onTrace && (
+          <button
+            type="button"
+            className="task-btn ghost task-detail-title-edit"
+            onClick={onTrace}
+            title={t('trace.entryLabel')}
+          >
+            <InfoIcon width={14} height={14} />
+          </button>
+        )}
       </div>
       {task.note && <div className="task-detail-note">{task.note}</div>}
 

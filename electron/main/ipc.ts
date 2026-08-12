@@ -5,13 +5,15 @@
  * renderer calls them through the typed preload bridge, so a signature mismatch
  * is a compile-time error rather than a runtime one.
  */
-import { app, ipcMain, clipboard, nativeImage, shell } from 'electron'
-import { existsSync } from 'node:fs'
+import { app, ipcMain, clipboard, nativeImage, shell, dialog } from 'electron'
+import { existsSync, writeFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { psHost } from './powershell'
 import { requestPanelFocus, releasePanelFocus, releasePanelFocusNow } from './focus'
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
-import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore } from './state'
+import { rehomeTraceAfterMerge } from '../store/traceStore'
+import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore, getMemoryGraph, getTraceStore } from './state'
+import { isTraceRecordDto, renderTraceReportHtml } from './traceReport'
 import { getMainWindow } from './window'
 import { setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
@@ -222,12 +224,18 @@ export function registerIpc(): void {
 
   handle('task:delete', (id) => {
     getTaskStore().delete(id)
+    // Adopted AI-rationale trace lives with its task (spec 决策 8): a hard
+    // delete cascades, so no orphan rows point at a dead task id.
+    getTraceStore()?.deleteByTaskId(id)
     pushState.tasks()
     return getTaskStore().toDto()
   })
 
   handle('task:merge', (targetId, sourceId) => {
-    getTaskStore().merge(targetId, sourceId)
+    const merged = getTaskStore().merge(targetId, sourceId)
+    // The absorbed task's decision chains stay relevant to the survivor:
+    // rehome its trace rows only when the merge actually succeeded.
+    rehomeTraceAfterMerge(getTraceStore(), merged, sourceId, targetId)
     pushState.tasks()
     return getTaskStore().toDto()
   })
@@ -356,6 +364,56 @@ export function registerIpc(): void {
     // Action names mirror MemoryStore methods; each returns whether it applied.
     getMemoryStore()[action](id)
     return memoryListPayload()
+  })
+
+  /* --------------------------- ai rationale (trace, t42) --------------------------- */
+
+  handle('trace:list-by-decision', (decisionId) => {
+    const store = getTraceStore()
+    return store ? store.listByDecisionId(decisionId) : []
+  })
+
+  handle('trace:list-by-task', (taskId) => {
+    const store = getTraceStore()
+    return store ? store.listByTaskId(taskId) : []
+  })
+
+  handle('trace:get-by-id', (id) => {
+    const store = getTraceStore()
+    return store ? (store.getById(id) ?? null) : null
+  })
+
+  /**
+   * Clear AI-rationale data: unadopted rows only (taskId IS NULL) — the same
+   * boundary traceStore.cleanupBefore enforces for retention. Adopted trace
+   * lives with its task and is untouched (it dies with the task instead).
+   * The +1 ms guard avoids leaving rows created in the same millisecond.
+   */
+  handle('trace:clear', () => {
+    const store = getTraceStore()
+    return store ? store.cleanupBefore(Date.now() + 1) : 0
+  })
+
+  /** Export the chain the panel is showing as a standalone HTML report (save dialog). */
+  handle('trace:export-report', async (records) => {
+    if (!Array.isArray(records) || !records.every((r) => isTraceRecordDto(r))) {
+      console.error('[IPC] trace:export-report rejected malformed records payload')
+      return null
+    }
+    const html = renderTraceReportHtml(records)
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'Export AI Rationale Report',
+      defaultPath: `trace-ai-rationale-${Date.now()}.html`,
+      filters: [{ name: 'HTML', extensions: ['html'] }]
+    })
+    if (canceled || !filePath) return null
+    try {
+      writeFileSync(filePath, html, 'utf8')
+      return filePath
+    } catch (err) {
+      console.error('[IPC] trace:export-report write failed:', err)
+      return null
+    }
   })
 
   handle('app:get-releases', async () => {
@@ -639,6 +697,8 @@ export function registerIpc(): void {
       staleDays: next.memoryStaleDays,
       cleanupScore: next.memoryCleanupScore
     })
+    // Keep the memory graph's decay in lockstep too (it snapshots λ at startup).
+    getMemoryGraph()?.setLambda(next.memoryLambda)
     pushState.settings(next)
     return next
   })

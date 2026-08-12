@@ -164,6 +164,13 @@ const api = {
   loadMemories: () => invoke('memory:list'),
   actMemory: (id: string, action: import('../../shared/types').MemoryAction) => invoke('memory:act', id, action),
 
+  /* AI rationale (trace, t42) */
+  getTraceByDecision: (decisionId: string) => invoke('trace:list-by-decision', decisionId),
+  getTraceByTask: (taskId: string) => invoke('trace:list-by-task', taskId),
+  getTraceById: (id: string) => invoke('trace:get-by-id', id),
+  clearTrace: () => invoke('trace:clear'),
+  exportTraceReport: (records: import('../../shared/types').TraceRecordDto[]) => invoke('trace:export-report', records),
+
   /* Main -> Renderer */
   onItems: (cb: (items: EventArgs<'state:items'>[0]) => void) => on('state:items', cb),
   onTasks: (cb: (tasks: EventArgs<'state:tasks'>[0]) => void) => on('state:tasks', cb),

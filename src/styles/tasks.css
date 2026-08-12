@@ -1482,3 +1482,195 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- AI rationale panel (t42, spec 决策 8) ---------- */
+
+.trace-panel {
+  width: 100%;
+  max-width: 420px;
+  max-height: min(480px, 82%);
+  background: var(--bg-2);
+  border: 1px solid var(--edge-strong);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.trace-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+.trace-panel-title {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 650;
+  color: rgba(255, 255, 255, 0.92);
+}
+.trace-panel-head .task-btn {
+  padding: 4px 7px;
+}
+.trace-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.trace-panel-body::-webkit-scrollbar {
+  display: none;
+}
+.trace-panel-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+.trace-panel-foot .task-btn {
+  padding: 5px 10px;
+  font-size: calc(11.5px * var(--font-scale, 1));
+}
+
+.trace-row {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.trace-row.blocked {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.06);
+}
+.trace-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.trace-row-kind {
+  font-size: calc(10.5px * var(--font-scale, 1));
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.55);
+}
+.trace-row.blocked .trace-row-kind {
+  color: #fbbf24;
+}
+.trace-row-time {
+  margin-left: auto;
+  font-size: calc(10px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.35);
+}
+.trace-privacy-badge {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: calc(9.5px * var(--font-scale, 1));
+  font-weight: 650;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+.trace-privacy-note {
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-size: calc(10.5px * var(--font-scale, 1));
+  line-height: 1.45;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.22);
+}
+
+.trace-payload {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.trace-payload-row {
+  display: flex;
+  gap: 8px;
+  font-size: calc(11px * var(--font-scale, 1));
+  line-height: 1.45;
+}
+.trace-payload-key {
+  flex-shrink: 0;
+  min-width: 84px;
+  color: rgba(255, 255, 255, 0.4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trace-payload-value {
+  color: rgba(255, 255, 255, 0.78);
+  word-break: break-word;
+}
+.trace-payload-value.num {
+  color: #7dd3fc;
+  font-variant-numeric: tabular-nums;
+}
+.trace-hit-path {
+  color: #c4b5fd;
+  font-size: calc(10.5px * var(--font-scale, 1));
+}
+.trace-versions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: calc(9.5px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.trace-empty {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 4px;
+  padding: 36px 16px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: calc(12px * var(--font-scale, 1));
+}
+.trace-empty-title {
+  font-weight: 650;
+  color: rgba(255, 255, 255, 0.7);
+}
+.trace-empty-hint {
+  font-size: calc(10.5px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.trace-clear-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.trace-clear-confirm-text {
+  flex: 1;
+  min-width: 140px;
+  font-size: calc(10.5px * var(--font-scale, 1));
+  line-height: 1.4;
+  color: #f87171;
+}
+.trace-clear-confirm .task-btn {
+  padding: 4px 9px;
+  font-size: calc(10.5px * var(--font-scale, 1));
+}

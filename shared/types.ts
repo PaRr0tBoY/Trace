@@ -361,6 +361,12 @@ export interface TaskProposal {
   reason?: string
   /** Candidate task id for merges; absent = new-candidate suggestion (t19). */
   taskId?: string
+  /**
+   * AI-rationale decision-chain id (t42): the trace recorder groups this
+   * proposal's observed → … → result rows under it. Absent on older
+   * payloads — the UI falls back to the proposal's own id.
+   */
+  decisionId?: string
   /** exePaths parallel to appNames; filled by the suggestion engine so main can fetch icons (t26). */
   appExePaths?: string[]
   /** Resolved app icons, one entry per app with an extractable exePath; filled by main at push time (t26). */
@@ -403,6 +409,38 @@ export interface Memory {
   source: 'ai-suggest' | 'task-feedback' | 'user'
   userState: MemoryUserState
 }
+
+/* ------------------------------------------------------------------ */
+/* AI rationale trace (t42) — renderer view of traceStore rows          */
+/* ------------------------------------------------------------------ */
+
+/** Kind of one AI-rationale row (mirrors traceStore TRACE_KINDS, t41). */
+export type TraceKind = 'observed' | 'recall' | 'decision' | 'result' | 'privacy'
+
+/**
+ * One AI-rationale row as pushed to the renderer (t42). Same shape as the
+ * traceStore record: payload is the kind-specific JSON body (already parsed),
+ * versions are per-row (spec 决策 8). Read-only for the renderer — writes go
+ * through the future trace recorder in main.
+ */
+export interface TraceRecordDto {
+  id: string
+  /** Decision-chain group id: one observed → … → result chain shares it. */
+  decisionId: string
+  kind: TraceKind
+  payload: Record<string, unknown>
+  /** Adopted proposal's task: non-empty = lives with the task (retention skips it). */
+  taskId?: string
+  agentVersion?: string
+  policyVersion?: string
+  classifierVersion?: string
+  promptVersion?: string
+  /** Unix epoch ms (store-assigned clock). */
+  createdAt: number
+}
+
+/** 隐私：可进入 AI 的内容类型（与 privacyGate.ContentType 同构，spec 决策 7）。 */
+export type ContentType = 'text' | 'image' | 'files'
 
 export interface Settings {
   /** Fraction of the screen height the hot zone occupies (0.2 - 0.6). */
@@ -502,6 +540,22 @@ export interface Settings {
   traceRetentionDays: number
   /** Provider chain in priority order (first = primary, auto-failover within the list). */
   aiProviders: ProviderConfig[]
+  // Privacy domain (spec 决策 7/12; consumed by privacyGate in main). Defaults
+  // mirror DEFAULT_POLICY — 全开显式可见。
+  /** AI 总开关（决策预填 + 全部工具 + OCR 都过它）。 */
+  aiEnabled: boolean
+  /** 拒绝应用清单，exePath 归一化键（小写 + 正斜杠；与 privacyGate.normalizeExePath 同规则）。 */
+  deniedApps: string[]
+  /** 允许进 AI 的内容类型（剪贴板条目 / 关联材料）。 */
+  allowedContentTypes: ContentType[]
+  /** 每日 AI 可用截止小时（00:00 起算，0–24）；undefined = 全天不限。 */
+  aiTimeRangeHours?: number
+  /** search_clipboard 总开关（剪贴板预览访问）。 */
+  clipboardAccess: boolean
+  /** search_memories / 预填记忆 总开关。 */
+  memoryAccess: boolean
+  /** 记忆写入主开关（时段整理落库）。 */
+  memoryEnabled: boolean
   /**
    * Landing page applied on first launch and after the restore time expires
    * (ADR-0004). The files view has no second level.
@@ -556,8 +610,48 @@ export const DEFAULT_SETTINGS: Settings = {
   memoryCleanupScore: 0.1,
   traceRetentionDays: 30,
   aiProviders: [],
+  aiEnabled: true,
+  deniedApps: [],
+  allowedContentTypes: ['text', 'image', 'files'],
+  clipboardAccess: true,
+  memoryAccess: true,
+  memoryEnabled: true,
   landing: { view: 'tasks', filter: 'existing' },
   restoreTime: 'relaxed'
 }
 
+/* ------------------------------------------------------------------ */
+/* Local model (t53/54)                                                */
+/* ------------------------------------------------------------------ */
 
+/** How the local model file is provided: auto-downloaded or a user-picked .gguf. */
+export type LocalModelSource = 'auto' | 'manual'
+
+/**
+ * Lifecycle state of the local model manager (t53). 'ready' means the model
+ * file is present; integrity is enforced by the checksum gate (verify / load
+ * refuses mismatching files).
+ */
+export type LocalModelState = 'none' | 'downloading' | 'ready' | 'error'
+
+/** Download progress for the auto model file. */
+export interface DownloadProgress {
+  receivedBytes: number
+  totalBytes: number
+  /** 0..1 fraction of the file received (1 = fully received, checksum still pending). */
+  percent: number
+}
+
+/**
+ * Snapshot of the local model manager — the DTO the settings UI (t54) polls
+ * over IPC. `modelFilePath` is the loadable model file (verified auto download
+ * or the user-picked manual path).
+ */
+export interface LocalModelStatus {
+  state: LocalModelState
+  source: LocalModelSource | null
+  progress: DownloadProgress | null
+  /** Last failure message when state is 'error'. */
+  error: string | null
+  modelFilePath: string | null
+}

@@ -227,6 +227,31 @@ export interface InvokeMap {
    * Returns the refreshed buckets so the panel stays in sync in one round-trip.
    */
   'memory:act': { args: [id: string, action: import('./types').MemoryAction]; result: import('./types').MemoryListPayload }
+
+  /* --------------------------- ai rationale (trace, t42) --------------------------- */
+
+  /** One decision chain's full trace (by decisionId), (createdAt, id) ascending. */
+  'trace:list-by-decision': { args: [decisionId: string]; result: import('./types').TraceRecordDto[] }
+
+  /** All trace rows of an adopted task (by taskId) — these live with the task. */
+  'trace:list-by-task': { args: [taskId: string]; result: import('./types').TraceRecordDto[] }
+
+  /** One trace row by id (drill-down). */
+  'trace:get-by-id': { args: [id: string]; result: import('./types').TraceRecordDto | null }
+
+  /**
+   * Clear AI-rationale data: unadopted rows only (taskId IS NULL), same
+   * boundary semantics as traceStore.cleanupBefore. Adopted trace lives with
+   * its task and is untouched. Returns the number of deleted rows.
+   */
+  'trace:clear': { args: []; result: number }
+
+  /**
+   * Export the given trace chain as a standalone HTML report (spec 决策 8,
+   * developer view: full chain + versions + retrieval hit paths). Shows a
+   * native save dialog; returns the saved path, or null when canceled/failed.
+   */
+  'trace:export-report': { args: [records: import('./types').TraceRecordDto[]]; result: string | null }
 }
 
 /* ------------------------------------------------------------------ */

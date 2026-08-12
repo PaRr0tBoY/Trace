@@ -17,6 +17,7 @@ import { join } from 'node:path'
 import {
   createMemoryTraceStore,
   createSqliteTraceStore,
+  rehomeTraceAfterMerge,
   type TraceDecisionPayload,
   type TraceInput,
   type TraceObservedPayload,
@@ -268,6 +269,74 @@ describe('createSqliteTraceStore — trace table persistence', () => {
     expect(store.listByDecisionId('adopted-old')).toHaveLength(1)
     expect(store.listByDecisionId('unadopted-fresh')).toHaveLength(1)
     expect(store.listByDecisionId('unadopted-old')).toHaveLength(0)
+  })
+})
+
+/* ------------------------------------------------------------------ */
+/* Task-lifecycle cascade (t42): deleteByTaskId / reassignTaskId        */
+/* ------------------------------------------------------------------ */
+
+describe('traceStore — task lifecycle cascade (t42)', () => {
+  it('deleteByTaskId 只删该任务的已采纳 trace，其他任务与未采纳行不受影响', () => {
+    const store = createMemoryTraceStore({ now: () => T0, createId: () => 'id' })
+    store.append({ decisionId: 'd1', kind: 'result', payload: { outcome: 'accepted' }, taskId: 'task-1' })
+    store.append({ decisionId: 'd2', kind: 'result', payload: { outcome: 'accepted' }, taskId: 'task-2' })
+    store.append({ decisionId: 'd3', kind: 'decision', payload: { action: 'ignore', reason: 'r', confidence: 0.1 } })
+
+    expect(store.deleteByTaskId('task-1')).toBe(1)
+    expect(store.listByTaskId('task-1')).toHaveLength(0)
+    expect(store.listByTaskId('task-2')).toHaveLength(1)
+    expect(store.listByDecisionId('d3')).toHaveLength(1)
+    expect(store.deleteByTaskId('missing')).toBe(0)
+  })
+
+  it('reassignTaskId 把合并任务的已采纳 trace 改挂幸存任务，返回迁移条数', () => {
+    const store = createMemoryTraceStore({ now: () => T0, createId: () => 'id' })
+    store.append({ decisionId: 'd1', kind: 'result', payload: { outcome: 'accepted' }, taskId: 'source' })
+    store.append({ decisionId: 'd2', kind: 'result', payload: { outcome: 'accepted' }, taskId: 'source' })
+    store.append({ decisionId: 'd3', kind: 'decision', payload: { action: 'ignore', reason: 'r', confidence: 0.1 } })
+
+    expect(store.reassignTaskId('source', 'target')).toBe(2)
+    expect(store.listByTaskId('target')).toHaveLength(2)
+    expect(store.listByTaskId('source')).toHaveLength(0)
+    // 未采纳行没有 taskId，不迁移。
+    expect(store.listByDecisionId('d3')[0].taskId).toBeUndefined()
+  })
+
+  it('sqlite 实现同语义：deleteByTaskId 与 reassignTaskId 落库', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'trace-store-'))
+    tempDirs.push(dir)
+    const filePath = join(dir, 'trace.db')
+    const db = openTestDb(filePath)
+    openDbs.push(db)
+    const store = createSqliteTraceStore(db, { now: () => T0, createId: counterId() })
+    store.append({ decisionId: 'd1', kind: 'result', payload: { outcome: 'accepted' }, taskId: 'source' })
+    store.append({ decisionId: 'd2', kind: 'result', payload: { outcome: 'accepted' }, taskId: 'other' })
+    store.append({ decisionId: 'd3', kind: 'decision', payload: { action: 'ignore', reason: 'r', confidence: 0.1 } })
+
+    expect(store.reassignTaskId('source', 'target')).toBe(1)
+    expect(store.listByTaskId('target').map((r) => r.decisionId)).toEqual(['d1'])
+    expect(store.deleteByTaskId('other')).toBe(1)
+    const remaining = db.prepare('SELECT COUNT(*) AS n FROM trace').get() as { n: number }
+    expect(remaining.n).toBe(2) // d1 (target) + d3 (unadopted)
+  })
+
+  it('rehomeTraceAfterMerge：merge 失败（false）时 trace 一行不迁', () => {
+    const store = createMemoryTraceStore({ now: () => T0, createId: () => 'id' })
+    store.append({ decisionId: 'd1', kind: 'result', payload: { outcome: 'accepted' }, taskId: 'source' })
+
+    expect(rehomeTraceAfterMerge(store, false, 'source', 'target')).toBe(0)
+    expect(store.listByTaskId('source')).toHaveLength(1)
+    expect(store.listByTaskId('target')).toHaveLength(0)
+  })
+
+  it('rehomeTraceAfterMerge：merge 成功（true）才迁移；store 为 null（DB 失败）时安全返回 0', () => {
+    const store = createMemoryTraceStore({ now: () => T0, createId: () => 'id' })
+    store.append({ decisionId: 'd1', kind: 'result', payload: { outcome: 'accepted' }, taskId: 'source' })
+
+    expect(rehomeTraceAfterMerge(store, true, 'source', 'target')).toBe(1)
+    expect(store.listByTaskId('target')).toHaveLength(1)
+    expect(rehomeTraceAfterMerge(null, true, 'source', 'target')).toBe(0)
   })
 })
 

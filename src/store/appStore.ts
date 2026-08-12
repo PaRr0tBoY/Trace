@@ -10,7 +10,7 @@ import { create } from 'zustand'
 import { edge } from '../lib/edge'
 import { shouldRestoreToLanding } from '../lib/restore'
 import type { SuggestTitleContext, SuggestionAcceptOptions, DropResource } from '../../shared/ipc'
-import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View } from '../../shared/types'
+import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View, TraceRecordDto } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
@@ -23,7 +23,7 @@ export interface ToastMsg {
 }
 
 /** Settings sheet tabs. Lifted into the store so restore can remember/reset them (ADR-0004). */
-export type SettingsTab = 'behaviour' | 'position' | 'appearance' | 'tasks'
+export type SettingsTab = 'behaviour' | 'position' | 'appearance' | 'tasks' | 'privacy'
 
 interface AppState {
   items: ClipboardItemDto[]
@@ -163,6 +163,13 @@ interface AppState {
   memories: MemoryListPayload | null
   loadMemories: () => Promise<void>
   actMemory: (id: string, action: MemoryAction) => Promise<void>
+
+  /* ai rationale (trace, t42; read-only views over traceStore) */
+  getTraceByDecision: (decisionId: string) => Promise<TraceRecordDto[]>
+  getTraceByTask: (taskId: string) => Promise<TraceRecordDto[]>
+  getTraceById: (id: string) => Promise<TraceRecordDto | null>
+  clearTrace: () => Promise<number>
+  exportTraceReport: (records: TraceRecordDto[]) => Promise<string | null>
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -456,5 +463,22 @@ export const useStore = create<AppState>((set, get) => ({
   },
   async actMemory(id, action) {
     set({ memories: await edge.actMemory(id, action) })
+  },
+
+  /* ai rationale (trace, t42) — thin views; the panel holds the loaded rows */
+  async getTraceByDecision(decisionId) {
+    return edge.getTraceByDecision(decisionId)
+  },
+  async getTraceByTask(taskId) {
+    return edge.getTraceByTask(taskId)
+  },
+  async getTraceById(id) {
+    return edge.getTraceById(id)
+  },
+  async clearTrace() {
+    return edge.clearTrace()
+  },
+  async exportTraceReport(records) {
+    return edge.exportTraceReport(records)
   }
 }))

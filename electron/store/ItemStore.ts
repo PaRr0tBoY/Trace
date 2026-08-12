@@ -11,7 +11,7 @@
  */
 import { existsSync, readFileSync, writeFileSync, rmSync, statSync, readdirSync } from 'node:fs'
 import { join, extname, basename as pathBasename } from 'node:path'
-import { nativeImage, safeStorage } from 'electron'
+import { safeStorage } from 'electron'
 import {
   type ClipboardItem,
   type ClipboardItemDto,
@@ -24,6 +24,7 @@ import {
 } from '../../shared/types'
 import { PATHS } from './paths'
 import { createId } from './ids'
+import { thumbUrl, thumbUrlForPath } from '../main/imageProtocol'
 
 /** Stable, content-based key used for deduplication. */
 function signature(data: ItemData): string {
@@ -47,9 +48,6 @@ interface Index {
 export class ItemStore {
   private items: ClipboardItem[] = []
   private sigToId = new Map<string, string>()
-  /** Small, bounded thumbnails for renderer DTOs. Original image bytes stay on disk. */
-  private previewCache = new Map<string, string>()
-
   /** Load persisted state from disk. Called once at startup. */
   load(): void {
     try {
@@ -479,39 +477,9 @@ export class ItemStore {
   /* ----------------------------- image files ----------------------------- */
 
   /**
-   * Build a display-sized image preview. Sending originals as base64 data URLs
-   * duplicates every image in the main process, IPC payload and renderer heap.
-   */
-  imageToDataUrl(imageId: string, ext?: string): string | null {
-    const cacheKey = `${imageId}.${ext || ''}`
-    const cached = this.previewCache.get(cacheKey)
-    if (cached) {
-      this.previewCache.delete(cacheKey)
-      this.previewCache.set(cacheKey, cached)
-      return cached
-    }
-    try {
-      const img = nativeImage.createFromPath(this.imagePath(imageId, ext))
-      if (img.isEmpty()) return null
-      const size = img.getSize()
-      const thumb = size.width > THUMB_SIZE || size.height > THUMB_SIZE
-        ? img.resize({ width: THUMB_SIZE, quality: 'good' })
-        : img
-      const url = thumb.toDataURL({ scaleFactor: 1 })
-      if (this.previewCache.size >= PREVIEW_CACHE_MAX) {
-        this.previewCache.delete(this.previewCache.keys().next().value!)
-      }
-      this.previewCache.set(cacheKey, url)
-      return url
-    } catch {
-      return null
-    }
-  }
-
-  /**
    * Stage an image's bytes from a clipboard capture. The image was already
    * written to userData/images by the clipboard watcher (which has the raw
-   * nativeImage); here we just no-op because the file already exists.
+   * bytes); here we just no-op because the file already exists.
    * Kept for symmetry / future use.
    */
   private writeImageFile(_imageId: string): void {
@@ -542,9 +510,6 @@ export class ItemStore {
   }
 
   private removeImageFile(imageId: string): void {
-    for (const key of this.previewCache.keys()) {
-      if (key.startsWith(imageId)) this.previewCache.delete(key)
-    }
     const dir = PATHS.imagesDir()
     if (!existsSync(dir)) return
     try {
@@ -568,13 +533,13 @@ export class ItemStore {
         const { kind, imageId, width, height, bytes, ext } = it.data
         return {
           ...it,
-          data: { kind, imageId, width, height, bytes, ext, preview: this.imageToDataUrl(imageId, ext) ?? '' }
+          data: { kind, imageId, width, height, bytes, ext, preview: thumbUrl(imageId) }
         }
       }
       if (it.data.kind === 'image-collection') {
         const imagesWithPreviews = it.data.images.map((img) => ({
           ...img,
-          preview: this.imageToDataUrl(img.imageId, img.ext) ?? ''
+          preview: thumbUrl(img.imageId)
         }))
         return {
           ...it,
@@ -582,18 +547,11 @@ export class ItemStore {
         }
       }
       if (it.data.kind === 'files') {
-        // Build per-file metadata entries. Generate image preview thumbnails for image files.
-        let imagePreviewCount = 0
+        // Build per-file metadata entries. Image files get a thumbnail URL —
+        // the protocol serves it lazily, so there is no per-entry payload cost.
         const entries = it.data.paths.map((p) => {
           const entry = buildFileEntry(p)
-          if (entry.isImage && imagePreviewCount < 20) {
-            imagePreviewCount++
-            return {
-              ...entry,
-              preview: fileToDataUrl(p)
-            }
-          }
-          return entry
+          return entry.isImage ? { ...entry, preview: thumbUrlForPath(p) } : entry
         })
         return {
           ...it,
@@ -625,7 +583,6 @@ function isImageExt(p: string): boolean {
  * hides the size label when it's 0.
  */
 const fileEntryCache = new Map<string, FileEntry>()
-const fileDataUrlCache = new Map<string, string>()
 
 function buildFileEntry(p: string): FileEntry {
   if (fileEntryCache.has(p)) return fileEntryCache.get(p)!
@@ -641,59 +598,4 @@ function buildFileEntry(p: string): FileEntry {
   if (fileEntryCache.size > 500) fileEntryCache.clear()
   fileEntryCache.set(p, entry)
   return entry
-}
-
-/** 
- * Read an image file from disk and return a small thumbnail as a JPEG data URL.
- * We use Electron's nativeImage.createFromPath().resize() to generate a small
- * thumbnail on-the-fly without loading the full image bytes into memory.
- * This keeps the IPC payload tiny (thumbnail vs 8-9MB original) and prevents
- * the main thread from blocking when the user copies large images.
- */
-const THUMB_SIZE = 240 // px — enough for the card UI, tiny IPC payload
-
-const PREVIEW_CACHE_MAX = 100
-
-function fileToDataUrl(p: string): string {
-  if (fileDataUrlCache.has(p)) return fileDataUrlCache.get(p)!
-  try {
-    // Use Electron nativeImage to create a thumbnail without loading the full file.
-    const img = nativeImage.createFromPath(p)
-    if (!img.isEmpty()) {
-      const size = img.getSize()
-      // Only resize if the image is larger than our thumbnail size.
-      const needsResize = size.width > THUMB_SIZE || size.height > THUMB_SIZE
-      const thumb = needsResize
-        ? img.resize({ width: THUMB_SIZE, quality: 'good' })
-        : img
-      const url = thumb.toDataURL({ scaleFactor: 1.0 })
-      if (fileDataUrlCache.size > 200) fileDataUrlCache.clear()
-      fileDataUrlCache.set(p, url)
-      return url
-    }
-    // Fallback for SVG and other formats nativeImage can't decode — read raw.
-    const buf = readFileSync(p)
-    const mime = detectImageMime(buf)
-    const url = `data:${mime};base64,${buf.toString('base64')}`
-    if (fileDataUrlCache.size > 200) fileDataUrlCache.clear()
-    fileDataUrlCache.set(p, url)
-    return url
-  } catch {
-    return ''
-  }
-}
-
-/** Detect exact MIME type from image magic bytes. */
-function detectImageMime(buf: Buffer): string {
-  if (buf.length >= 3 && buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return 'image/jpeg'
-  if (buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return 'image/png'
-  if (buf.length >= 3 && buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return 'image/gif'
-  if (buf.length >= 12 && buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return 'image/webp'
-  if (buf.length >= 2 && buf[0] === 0x42 && buf[1] === 0x4D) return 'image/bmp'
-  if (buf.length >= 4 && buf[0] === 0x00 && buf[1] === 0x00 && buf[2] === 0x01 && buf[3] === 0x00) return 'image/x-icon'
-  if (buf.length >= 4 && ((buf[0] === 0x49 && buf[1] === 0x49 && buf[2] === 0x2A && buf[3] === 0x00) || (buf[0] === 0x4D && buf[1] === 0x4D && buf[2] === 0x00 && buf[3] === 0x2A))) return 'image/tiff'
-  if (buf.length >= 12 && buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) return 'image/avif'
-  const head = buf.subarray(0, 1024).toString('utf8').trim()
-  if (head.startsWith('<svg') || head.startsWith('<?xml') || head.includes('<svg')) return 'image/svg+xml'
-  return 'image/png'
 }

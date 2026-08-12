@@ -66,16 +66,30 @@ describe('clampSettings — task domain fields', () => {
   it('keeps master switches on unless explicitly false', () => {
     expect(clampSettings({ ...DEFAULT_SETTINGS }).taskCaptureEnabled).toBe(true)
     expect(clampSettings({ ...DEFAULT_SETTINGS }).l0CaptureEnabled).toBe(true)
-    expect(clampSettings({ ...DEFAULT_SETTINGS }).autoAttributionEnabled).toBe(true)
     const off = clampSettings({
       ...DEFAULT_SETTINGS,
       taskCaptureEnabled: false,
-      l0CaptureEnabled: false,
-      autoAttributionEnabled: false
+      l0CaptureEnabled: false
     })
     expect(off.taskCaptureEnabled).toBe(false)
     expect(off.l0CaptureEnabled).toBe(false)
-    expect(off.autoAttributionEnabled).toBe(false)
+  })
+
+  it('clamps the landing page to a valid view + matching second level', () => {
+    const ok = clampSettings({ ...DEFAULT_SETTINGS, landing: { view: 'tasks', filter: 'candidates' } })
+    expect(ok.landing).toEqual({ view: 'tasks', filter: 'candidates' })
+    expect(clampSettings({ ...DEFAULT_SETTINGS, landing: { view: 'tasks', filter: 'bogus' as never } }).landing).toEqual({ view: 'tasks', filter: 'existing' })
+    expect(clampSettings({ ...DEFAULT_SETTINGS, landing: { view: 'clipboard', filter: 'images' } }).landing).toEqual({ view: 'clipboard', filter: 'images' })
+    expect(clampSettings({ ...DEFAULT_SETTINGS, landing: { view: 'clipboard', filter: 'bogus' as never } }).landing).toEqual({ view: 'clipboard', filter: 'all' })
+    expect(clampSettings({ ...DEFAULT_SETTINGS, landing: { view: 'files', filter: 'anything' as never } }).landing).toEqual({ view: 'files' })
+    expect(clampSettings({ ...DEFAULT_SETTINGS, landing: 'garbage' as never }).landing).toEqual(DEFAULT_SETTINGS.landing)
+  })
+
+  it('clamps restore time to the four presets', () => {
+    expect(clampSettings({ ...DEFAULT_SETTINGS, restoreTime: 'instant' }).restoreTime).toBe('instant')
+    expect(clampSettings({ ...DEFAULT_SETTINGS, restoreTime: 'delayed' }).restoreTime).toBe('delayed')
+    expect(clampSettings({ ...DEFAULT_SETTINGS, restoreTime: 'forever' }).restoreTime).toBe('forever')
+    expect(clampSettings({ ...DEFAULT_SETTINGS, restoreTime: 'bogus' as never }).restoreTime).toBe('relaxed')
   })
 })
 

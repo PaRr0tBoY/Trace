@@ -7,6 +7,7 @@
  */
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '../store/appStore'
+import { THEME_ACCENTS } from '../../shared/themes'
 import { LiquidOctopusLoader } from './LiquidOctopusLoader'
 
 export function TickIndicatorIcon({
@@ -232,6 +233,8 @@ export function CopyIndicatorCurve() {
   const settings = useStore((s) => s.settings)
   const isRight = settings.stickPosition === 'right'
   const indicatorStyle = settings.copyIndicatorStyle || 'logo'
+  // Indicator icons follow the selected theme accent (Ticket 3).
+  const accent = THEME_ACCENTS[settings.themeColor ?? 'graphite']
 
   // Spans the full height of the hover bar trigger zone
   const triggerHeightPx = window.innerHeight * (settings.hotZoneHeight || 0.25)
@@ -340,13 +343,13 @@ export function CopyIndicatorCurve() {
             }}
           >
             {indicatorStyle === 'check' ? (
-              <TickIndicatorIcon fillColor="#ffffff" glowColor="rgba(255, 255, 255, 0.85)" />
+              <TickIndicatorIcon fillColor={accent.color} glowColor={accent.glow} />
             ) : indicatorStyle === 'copy' ? (
-              <CopyIndicatorIcon fillColor="#ffffff" glowColor="rgba(255, 255, 255, 0.85)" />
+              <CopyIndicatorIcon fillColor={accent.color} glowColor={accent.glow} />
             ) : indicatorStyle === 'sparkle' ? (
-              <SparkleIndicatorIcon fillColor="#ffffff" glowColor="rgba(255, 255, 255, 0.85)" />
+              <SparkleIndicatorIcon fillColor={accent.color} glowColor={accent.glow} />
             ) : (
-              <LiquidOctopusLoader fillColor="#ffffff" glowColor="rgba(255, 255, 255, 0.85)" speed={1.2} />
+              <LiquidOctopusLoader fillColor={accent.color} glowColor={accent.glow} speed={1.2} />
             )}
           </motion.div>
         </motion.div>

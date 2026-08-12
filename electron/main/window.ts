@@ -271,17 +271,16 @@ function _pollTick(): void {
 
   const newState = inEdge
 
-  // ── Fix 5: IPC gating — suppress redundant messages ──────────────────────
-  // Previously every poll tick within 450px of the edge sent a full IPC message
-  // to the renderer, even when the cursor hadn't moved. This flooded the IPC
-  // channel at 60Hz during all active browsing.
-  //
-  // Now we only send when:
+  // ── IPC gating — suppress redundant messages ─────────────────────────────
+  // We only send when:
   //   a) Edge crossing state changes (inEdge flip) — always send immediately.
-  //   b) Panel is open (interactive) — send on every fast tick so the renderer
-  //      can track cursor position for the close-panel logic.
-  //   c) Cursor moved >= IPC_MIN_DELTA_PX since last send — avoids spamming
-  //      the renderer when the cursor is stationary near the edge.
+  //   b) Cursor moved >= IPC_MIN_DELTA_PX since last send.
+  //      Panel closed: only within 450px of the edge (renderer only acts near
+  //      the edge). Panel open (interactive): anywhere on the stick display —
+  //      the close logic keys off the cursor leaving the blade, so it needs
+  //      every crossing; a stationary cursor (even outside the panel) needs no
+  //      further messages: the close timer it already scheduled fires anyway.
+  //      This drops the open-panel stream from 60Hz to movement-only.
   const IPC_MIN_DELTA_PX = 3
   const nearEdge = settings.stickPosition === 'right'
     ? (wa.width - clientX) <= 450
@@ -291,7 +290,7 @@ function _pollTick(): void {
     Math.abs(clientX - _lastSentX) >= IPC_MIN_DELTA_PX ||
     Math.abs(clientY - _lastSentY) >= IPC_MIN_DELTA_PX
 
-  const shouldSend = newState !== lastEdgeState || interactive || (nearEdge && positionChangedEnough)
+  const shouldSend = newState !== lastEdgeState || (interactive ? positionChangedEnough : nearEdge && positionChangedEnough)
 
   if (shouldSend) {
     lastEdgeState = newState

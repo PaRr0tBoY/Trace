@@ -13,9 +13,10 @@ import { requestPanelFocus, releasePanelFocus, releasePanelFocusNow } from './fo
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
 import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore } from './state'
 import { getMainWindow } from './window'
-import { setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions } from './window'
+import { setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData } from './drag'
+import { activateAppWindow } from './windowSwitch'
 import { clipboardSignature } from '../clipboard/formats'
 import { buildClipboardRef } from '../store/TaskStore'
 import { mergeAppOptions } from './appOptions'
@@ -272,6 +273,10 @@ export function registerIpc(): void {
         icons[p] = await resolveAppIcon(p)
       })
     ).then(() => icons)
+  })
+
+  handle('app:open-linked-window', (appRef) => {
+    return activateAppWindow(appRef)
   })
 
   /* --------------------------- suggestions --------------------------- */
@@ -618,6 +623,12 @@ export function registerIpc(): void {
     if (patch.hotZoneWidth !== undefined) {
       setHotZoneWidth(patch.hotZoneWidth)
     }
+    if (patch.stickPosition !== undefined) {
+      // The window anchors to the opposite edge — move it now, not on the
+      // next pop-up (the setting was persisted but the window stayed put
+      // until a display event or restart).
+      repositionWindow()
+    }
     if (patch.taskPauseThresholdMinutes !== undefined) {
       // A changed threshold may immediately flip Active tasks; re-evaluate now.
       getTaskStore().setPauseThreshold(next.taskPauseThresholdMinutes)
@@ -752,12 +763,19 @@ export function registerSendListeners(): void {
     // dragged item appear to vanish ~0.5 s into any drag gesture.
     setHeartbeatPaused(true)
 
-    startDragOut(sender, data)
-    console.log('[IPC] start-drag returned, sending drag-end')
-    sender.send('item:drag-end')
+    try {
+      // Every kind — text included — rides the DWM file drag-out. Text is
+      // staged as a temp .txt (see drag.ts); the main-process OLE drag
+      // (oleDrag.ts, git history) could not marshal its koffi IDataObject to
+      // out-of-process drop targets and always failed with RPC_E_CALL_REJECTED.
+      startDragOut(sender, data)
+    } finally {
+      console.log('[IPC] start-drag returned, sending drag-end')
+      sender.send('item:drag-end')
 
-    // Re-enable the heartbeat now that the drag is over.
-    setHeartbeatPaused(false)
+      // Re-enable the heartbeat now that the drag is over.
+      setHeartbeatPaused(false)
+    }
 
     // Workaround for Electron/Windows not firing drop events on the source window:
     // Check if the user dropped the item back onto our window!

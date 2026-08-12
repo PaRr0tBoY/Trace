@@ -8,8 +8,9 @@
  */
 import { create } from 'zustand'
 import { edge } from '../lib/edge'
+import { shouldRestoreToLanding } from '../lib/restore'
 import type { SuggestTitleContext, SuggestionAcceptOptions, DropResource } from '../../shared/ipc'
-import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, Suggestion, MemoryAction, MemoryListPayload, AppRef } from '../../shared/types'
+import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, Suggestion, MemoryAction, MemoryListPayload, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
@@ -21,6 +22,9 @@ export interface ToastMsg {
   tone: 'info' | 'error'
 }
 
+/** Settings sheet tabs. Lifted into the store so restore can remember/reset them (ADR-0004). */
+export type SettingsTab = 'behaviour' | 'position' | 'appearance' | 'tasks'
+
 interface AppState {
   items: ClipboardItemDto[]
   tasks: TaskDto[]
@@ -30,18 +34,53 @@ interface AppState {
   hydrated: boolean
   /** Free-text search filter (UI-only state). */
   query: string
-  typeFilter: import('../../shared/types').TypeFilter
-  setTypeFilter: (filter: import('../../shared/types').TypeFilter) => void
+  /** Clipboard view second level (ADR-0004). */
+  clipboardFilter: ClipboardFilter
+  setClipboardFilter: (filter: ClipboardFilter) => void
+  /** Files view second level: 'all' | 'other' | a live extension tab (ADR-0004). */
+  filesFilter: FilesFilter
+  setFilesFilter: (filter: FilesFilter) => void
+  /** Tasks view second level (ADR-0004). */
+  tasksFilter: TasksFilter
+  setTasksFilter: (filter: TasksFilter) => void
   /** Whether the panel blade is expanded. */
   open: boolean
+  /** Dev/debug: keep the panel open against hover auto-close (CDP-driven UI work). */
+  debugHoldOpen: boolean
+  setDebugHoldOpen: (hold: boolean) => void
   /** Settings sheet visibility. */
   settingsOpen: boolean
-  /** Active panel layer: clipboard shelf or task layer. */
-  view: 'clipboard' | 'tasks'
-  setView: (view: 'clipboard' | 'tasks') => void
+  /** Active panel layer (ADR-0004). */
+  view: View
+  setView: (view: View) => void
+  /** Active settings sheet tab (lifted from Settings.tsx so restore can remember it). */
+  settingsTab: SettingsTab
+  setSettingsTab: (tab: SettingsTab) => void
   /** Active view mode within settings ('main' | 'changelog'). */
   settingsSubView: 'main' | 'changelog'
   setSettingsSubView: (subView: 'main' | 'changelog') => void
+  /**
+   * Timestamp of the last panel close (ADR-0004 restore anchor); 0 until the
+   * panel has ever been closed.
+   */
+  lastClosedAt: number
+  /**
+   * Bumped every time the restore mechanism applies the landing page;
+   * components may react to it for defensive resets.
+   */
+  restoreEpoch: number
+  /** Task detail open in the task layer (null = list). Store-visible so restore can reset it. */
+  selectedTaskId: string | null
+  setSelectedTaskId: (id: string | null) => void
+  /** 'new' = create form; a task id = edit form; null = no form (ADR-0004 edit protection). */
+  editingTask: string | 'new' | null
+  setEditingTask: (editing: string | 'new' | null) => void
+  /** Task id awaiting hard-delete confirmation. */
+  confirmDeleteTaskId: string | null
+  setConfirmDeleteTaskId: (id: string | null) => void
+  /** Task whose content picker (add content) is open. */
+  pickerTaskId: string | null
+  setPickerTaskId: (id: string | null) => void
   /** True while an OS file drag is hovering the panel (prevents premature close). */
   dragActive: boolean
   /** True if the active drag originated from within the app itself. Stores the drag request (which item/sub-item). */
@@ -133,14 +172,32 @@ export const useStore = create<AppState>((set, get) => ({
   settings: { ...DEFAULT_SETTINGS },
   hydrated: false,
   query: '',
-  typeFilter: 'all',
-  setTypeFilter: (typeFilter) => set({ typeFilter }),
+  clipboardFilter: 'all',
+  setClipboardFilter: (clipboardFilter) => set({ clipboardFilter }),
+  filesFilter: 'all',
+  setFilesFilter: (filesFilter) => set({ filesFilter }),
+  tasksFilter: 'existing',
+  setTasksFilter: (tasksFilter) => set({ tasksFilter }),
   open: false,
+  debugHoldOpen: false,
+  setDebugHoldOpen: (debugHoldOpen) => set({ debugHoldOpen }),
   settingsOpen: false,
   view: 'clipboard',
   setView: (view) => set({ view }),
+  settingsTab: 'behaviour',
+  setSettingsTab: (settingsTab) => set({ settingsTab }),
   settingsSubView: 'main',
   setSettingsSubView: (subView) => set({ settingsSubView: subView }),
+  lastClosedAt: 0,
+  restoreEpoch: 0,
+  selectedTaskId: null,
+  setSelectedTaskId: (selectedTaskId) => set({ selectedTaskId }),
+  editingTask: null,
+  setEditingTask: (editingTask) => set({ editingTask }),
+  confirmDeleteTaskId: null,
+  setConfirmDeleteTaskId: (confirmDeleteTaskId) => set({ confirmDeleteTaskId }),
+  pickerTaskId: null,
+  setPickerTaskId: (pickerTaskId) => set({ pickerTaskId }),
   dragActive: false,
   internalDragReq: null,
   toasts: [],
@@ -207,21 +264,45 @@ export const useStore = create<AppState>((set, get) => ({
 
   setQuery: (query) => set({ query }),
   setOpen: (open) => {
-    set({ open })
+    const s = get()
     if (!open) {
-      // NOTE: Do NOT reset styleFlyoutOpen here — closePanel() handles the
-      // sequencing so the flyout exit animation completes before the panel closes.
-      // Only reset previewItemId so the normal preview flyout clears correctly.
-      set({ previewItemId: null, previewItemRect: null })
+      // Restore anchor (ADR-0004): the moment the panel collapses.
+      set({ open, lastClosedAt: Date.now(), previewItemId: null, previewItemRect: null })
       edge.setPreviewMode(false)
+      return
     }
+    const patch: Partial<AppState> = { open: true }
+    // Already open (e.g. tray "Open Settings"): this is not a close→open
+    // transition, so the restore anchor semantics (ADR-0004) don't apply.
+    if (s.open) {
+      set(patch)
+      return
+    }
+    if (shouldRestoreToLanding(s)) {
+      const landing = s.settings.landing ?? DEFAULT_SETTINGS.landing
+      patch.view = landing.view
+      if (landing.view === 'clipboard') patch.clipboardFilter = landing.filter
+      if (landing.view === 'tasks') patch.tasksFilter = landing.filter
+      patch.filesFilter = 'all'
+      patch.settingsOpen = false
+      patch.settingsSubView = 'main'
+      patch.query = ''
+      patch.selectedTaskId = null
+      patch.editingTask = null
+      patch.confirmDeleteTaskId = null
+      patch.pickerTaskId = null
+      patch.restoreEpoch = s.restoreEpoch + 1
+    }
+    set(patch)
   },
   setSettingsOpen: (settingsOpen) => {
     set({
       settingsOpen,
-      settingsSubView: 'main',
       ...(settingsOpen
         ? {
+            // Opening always starts at the main settings page; closing keeps
+            // the sub view so the restore mechanism can remember it (ADR-0004).
+            settingsSubView: 'main',
             previewItemId: null,
             previewItemRect: null,
             previewFlyoutRect: null,
@@ -316,7 +397,12 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   setTutorialStep: (step) => {
-    set({ tutorialStep: step })
+    set({
+      tutorialStep: step,
+      // ADR-0004: the files card lives in the files view — step 4 of the
+      // onboarding tutorial points at it, so flip the view when it starts.
+      ...(step === 4 ? { view: 'files' } : {})
+    })
     edge.broadcastTutorialStep(step)
   },
 

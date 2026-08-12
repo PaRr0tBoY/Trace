@@ -230,8 +230,12 @@ export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent
             <AppRow
               key={a.id}
               app={a}
-              onOpen={(app) => {
-                if (app.exePath) void window.edge.revealFile(app.exePath)
+              onOpen={async (app) => {
+                const res = await window.edge.openLinkedWindow(app)
+                if (res.ok) {
+                  useStore.getState().setOpen(false)
+                  window.edge.setInteractive(false)
+                }
               }}
             />
           ))}

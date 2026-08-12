@@ -26,7 +26,7 @@ import { subscribe as subscribeEvents } from './eventBus'
 import { extname, normalize } from 'node:path'
 import { existsSync, createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { resolveStoredImage } from './imageProtocol'
+import { resolveStoredImage, resolveThumbnail } from './imageProtocol'
 
 // Trace renders a small, mostly static transparent panel. Chromium's GPU
 // process costs substantially more memory (~150–250 MB) than the iGPU compositing
@@ -211,6 +211,42 @@ function registerImageProtocol(): void {
           })
         }
         return new Response('Not found', { status: 404 })
+      }
+
+      // Display-sized thumbnails: tracelocal://thumb/<imageId | encodedPath>
+      if (request.url.startsWith(`${APP_CONFIG.imageProtocol}://thumb/`)) {
+        const rawKey = request.url.slice(`${APP_CONFIG.imageProtocol}://thumb/`.length)
+
+        if (/^[a-z0-9-]+$/i.test(rawKey)) {
+          const storedImage = resolveStoredImage(PATHS.imagesDir(), rawKey)
+          if (!storedImage) return new Response('Not found', { status: 404 })
+          const thumb = resolveThumbnail(storedImage.filePath)
+          if (!thumb) return new Response('Not found', { status: 404 })
+          return new Response(thumb.bytes, {
+            status: 200,
+            headers: new Headers({
+              'Content-Type': thumb.contentType,
+              'Cache-Control': 'max-age=3600'
+            })
+          })
+        }
+
+        let filePath: string
+        try {
+          filePath = normalize(decodeURIComponent(rawKey))
+        } catch {
+          return new Response('Bad request', { status: 400 })
+        }
+        if (!existsSync(filePath)) return new Response('Not found', { status: 404 })
+        const thumb = resolveThumbnail(filePath)
+        if (!thumb) return new Response('Not found', { status: 404 })
+        return new Response(thumb.bytes, {
+          status: 200,
+          headers: new Headers({
+            'Content-Type': thumb.contentType,
+            'Cache-Control': 'max-age=3600'
+          })
+        })
       }
 
       const imageId = new URL(request.url).hostname

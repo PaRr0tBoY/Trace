@@ -42,7 +42,7 @@
  * Logging: `[Suggestion]` tag, one line per analysis (with mode), one line
  * per accept/ignore. No per-event noise.
  */
-import { clusterEvents, type ClusterParams, type SegmentInfo } from './clusterer'
+import { clusterEvents, normalizeAppKey, type ClusterParams, type SegmentInfo } from './clusterer'
 import type { ChatRequest, ChatResult } from './provider'
 import type { SuggestTitleContext } from '../../shared/ipc'
 import { algorithmicTitle } from '../../shared/titles'
@@ -257,11 +257,36 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
     }
   }
 
+  /**
+   * Most recent app-switch event whose normalized exePath or appName matches
+   * the segment appKey; the "open app" action's linked-window snapshot
+   * (ADR-0005). Newest-first scan; events are chronological in the ring buffer.
+   */
+  function latestSwitchFor(appKey: string): { pid: number; title: string; ts: number; exePath?: string } | undefined {
+    const events = readEvents()
+    for (let i = events.length - 1; i >= 0; i--) {
+      const e = events[i]
+      if (e.type !== 'app-switch') continue
+      if (normalizeAppKey(e.exePath) === appKey || normalizeAppKey(e.appName) === appKey) {
+        return { pid: e.pid, title: e.windowTitle, ts: e.ts, exePath: e.exePath || undefined }
+      }
+    }
+    return undefined
+  }
+
   /** AppRefs from a segment: id = normalized exePath (attributor key space), name = display name. */
   function appRefsFromSegment(appKeys: string[], appNames: string[]): AppRef[] {
     const refs: AppRef[] = []
     for (let i = 0; i < appKeys.length; i++) {
-      refs.push({ id: appKeys[i], name: appNames[i] ?? appKeys[i] })
+      const ref: AppRef = { id: appKeys[i], name: appNames[i] ?? appKeys[i] }
+      const linked = latestSwitchFor(appKeys[i])
+      if (linked) {
+        ref.linkedWindow = { pid: linked.pid, title: linked.title, ts: linked.ts }
+        // Original-case exePath powers icon extraction at push time
+        // (appIconCore skips apps without one).
+        ref.exePath = linked.exePath
+      }
+      refs.push(ref)
     }
     return refs
   }
@@ -417,10 +442,9 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         if (ignored.has(signature)) continue
 
         const target = attr.taskId ? tasks.find((t) => t.id === attr.taskId) : undefined
-        // exePaths are the segment's identity keys (lowercase exePath,
-        // fallback appName), index-aligned with appNames — t26 fetches icons
-        // from them at push time.
-        const appExePaths = attr.segment.appKeys.slice(0, 5)
+        // Icon extraction prefers original-case exePaths; the normalized
+        // identity key is the fallback when no raw path is known.
+        const appExePaths = attr.segment.appKeys.slice(0, 5).map((key) => latestSwitchFor(key)?.exePath ?? key)
         const suggestion: Suggestion = {
           id: `s_${createId()}`,
           title: target ? target.title : algorithmicTitle(attr.segment.appNames),

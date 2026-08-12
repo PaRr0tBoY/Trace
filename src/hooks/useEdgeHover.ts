@@ -142,7 +142,9 @@ export function useEdgeHover(): void {
     const closePanelNow = () => {
       const s = useStore.getState()
       if (s.styleFlyoutOpen) s.setStyleFlyoutOpen(false)
-      if (s.settingsOpen) s.setSettingsOpen(false)
+      // NOTE: the settings sheet stays open — the restore mechanism
+      // (ADR-0004) remembers it within the restore time and resets it when
+      // the time expires.
       s.setOpen(false)
       if (interactiveTimer !== undefined) window.clearTimeout(interactiveTimer)
       interactiveTimer = window.setTimeout(() => {
@@ -154,6 +156,7 @@ export function useEdgeHover(): void {
     const closePanel = () => {
       const state = useStore.getState()
       if (!state.open) return
+      if (state.debugHoldOpen) return
       if (state.sliderActive) return
       if (state.dragActive && !state.internalDragReq) return
 
@@ -189,6 +192,7 @@ export function useEdgeHover(): void {
 
     const scheduleClose = (delay = GRACE_MS) => {
       const state = useStore.getState()
+      if (state.debugHoldOpen) return
       if (state.sliderActive) return
       if (state.dragActive && !state.internalDragReq) return
       if (graceTimer !== undefined) return // already closing
@@ -463,9 +467,9 @@ export function useEdgeHover(): void {
     // ── window blur (Alt+Tab / OS focus stolen) ────────────────────────────
     // When the user presses Alt+Tab or any other mechanism gives focus to
     // another OS window, the Electron renderer fires a native `blur` event on
-    // the global `window` object. Because the Trace window is `focusable:
-    // false`, the cursor-poll path never learns that the app lost OS focus —
-    // the cursor position it last saw was still "inside the blade", so
+    // the global `window` object. Because the Trace window stays non-activatable
+    // (WS_EX_NOACTIVATE), the cursor-poll path never learns that the app lost
+    // OS focus — the cursor position it last saw was still "inside the blade", so
     // isInsideBlade() keeps returning true and the panel is stuck open.
     //
     // Listening for `window.blur` here catches the exact moment the OS
@@ -526,8 +530,11 @@ export function useEdgeHover(): void {
     document.addEventListener('dragenter', onDocDragEnter)
     document.addEventListener('dragover', onDocDragOver)
     document.addEventListener('dragleave', onDocDragLeave)
-    document.addEventListener('drop', onDocDrop)
-    document.addEventListener('dragend', onDocDragEnd)
+    // Capture phase: drop handlers inside the panel (save zone, task rows)
+    // stopPropagation on their own drops — the drag-active flag must still
+    // reset so the drop-binding panel hides after the drop (t25).
+    document.addEventListener('drop', onDocDrop, true)
+    document.addEventListener('dragend', onDocDragEnd, true)
 
     return () => {
       unsubCursorEdge()
@@ -538,8 +545,8 @@ export function useEdgeHover(): void {
       document.removeEventListener('dragenter', onDocDragEnter)
       document.removeEventListener('dragover', onDocDragOver)
       document.removeEventListener('dragleave', onDocDragLeave)
-      document.removeEventListener('drop', onDocDrop)
-      document.removeEventListener('dragend', onDocDragEnd)
+      document.removeEventListener('drop', onDocDrop, true)
+      document.removeEventListener('dragend', onDocDragEnd, true)
       window.clearTimeout(dwellTimer)
       window.clearTimeout(graceTimer)
       window.clearTimeout(interactiveTimer)

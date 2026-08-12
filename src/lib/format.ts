@@ -33,6 +33,12 @@ export function relativeTime(ts: number): string {
   return new Date(ts).toLocaleDateString()
 }
 
+/** Compact duration like "45m" / "2h" (coarse; used by task evidence + running time). */
+export function formatDuration(ms: number): string {
+  const minutes = Math.max(1, Math.round(ms / 60_000))
+  return minutes < 60 ? `${minutes}m` : `${Math.round(minutes / 60)}h`
+}
+
 /** Pull a filename out of a path, cross-platform. */
 export function basename(p: string): string {
   const norm = p.replace(/\\/g, '/')

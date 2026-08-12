@@ -10,9 +10,12 @@
  */
 import { useEffect } from 'react'
 import { Panel } from './components/Panel'
+import { CopyIndicatorCurve } from './components/CopyIndicatorCurve'
+import { PreviewFlyout } from './components/PreviewFlyout'
+import { IndicatorStyleFlyout } from './components/IndicatorStyleFlyout'
 import { useStore } from './store/appStore'
 import { edge } from './lib/edge'
-import { applyReduceMotion } from './lib/theme'
+import { applyReduceMotion, applyTheme } from './lib/theme'
 import { useEdgeHover } from './hooks/useEdgeHover'
 
 export default function App() {
@@ -150,9 +153,17 @@ export default function App() {
   // Apply theme whenever settings change.
   useEffect(() => {
     applyReduceMotion(settings.reduceMotion)
+    applyTheme(settings.themeColor ?? 'graphite')
     const scale = settings.fontSizeScale ?? 1.0
     document.documentElement.style.setProperty('--font-scale', String(scale))
-  }, [settings.reduceMotion, settings.fontSizeScale])
+  }, [settings.reduceMotion, settings.fontSizeScale, settings.themeColor])
 
-  return <Panel />
+  return (
+    <>
+      <Panel />
+      <CopyIndicatorCurve />
+      <PreviewFlyout isRight={settings.stickPosition === 'right'} />
+      <IndicatorStyleFlyout isRight={settings.stickPosition === 'right'} />
+    </>
+  )
 }

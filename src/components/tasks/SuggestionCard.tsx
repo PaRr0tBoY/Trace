@@ -58,9 +58,9 @@ export function SuggestionCard({ suggestion, onOpen }: Props) {
     // OS file drops were routed by preload (trace-os-drop).
   }
 
-  const apps = (suggestion.appIcons ?? [])
-    .filter((app) => !brokenIcons.has(app.iconUrl))
-    .slice(0, MAX_APPS)
+  const allApps = (suggestion.appIcons ?? []).filter((app) => !brokenIcons.has(app.iconUrl))
+  const apps = allApps.slice(0, MAX_APPS)
+  const overflowApps = allApps.slice(MAX_APPS)
   const chips = (suggestion.clipboardRefs ?? []).slice(0, MAX_CHIPS)
   const chipOverflow = (suggestion.clipboardRefs?.length ?? 0) - chips.length
 
@@ -90,16 +90,23 @@ export function SuggestionCard({ suggestion, onOpen }: Props) {
       <div className="task-suggestion-row">
         <div className="task-suggestion-apps">
           {apps.length > 0 ? (
-            apps.map((app, i) => (
-              <img
-                key={`${app.name}:${app.iconUrl}:${i}`}
-                className="task-suggestion-app"
-                src={app.iconUrl}
-                alt=""
-                draggable={false}
-                onError={() => setBrokenIcons((prev) => new Set(prev).add(app.iconUrl))}
-              />
-            ))
+            <>
+              {apps.map((app, i) => (
+                <img
+                  key={`${app.name}:${app.iconUrl}:${i}`}
+                  className="task-suggestion-app"
+                  src={app.iconUrl}
+                  alt=""
+                  draggable={false}
+                  onError={() => setBrokenIcons((prev) => new Set(prev).add(app.iconUrl))}
+                />
+              ))}
+              {overflowApps.length > 0 && (
+                <span className="task-app-icons-more" title={overflowApps.map((a) => a.name).join(', ')}>
+                  +{overflowApps.length}
+                </span>
+              )}
+            </>
           ) : (
             <span className="task-suggestion-apps-empty" title={suggestion.appNames.join(', ')}>
               <SparklesIcon width={12} height={12} />
@@ -128,7 +135,9 @@ export function SuggestionCard({ suggestion, onOpen }: Props) {
             type="button"
             className="task-suggestion-action danger"
             title={t('tasks.suggestionIgnore')}
-            onClick={() => void ignoreSuggestion(suggestion.id)}
+            onClick={() => {
+              void ignoreSuggestion(suggestion.id)
+            }}
           >
             <CloseIcon width={13} height={13} />
           </button>

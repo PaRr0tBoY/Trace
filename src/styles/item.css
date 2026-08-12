@@ -20,7 +20,6 @@
               background 0.22s ease,
               border-color 0.22s ease;
   overflow: hidden;
-  will-change: transform;
 }
 
 .item:hover {
@@ -216,11 +215,9 @@
   border-radius: 999px;
   opacity: 0;
   pointer-events: none;
-  /* Specific properties — prevents `all` from catching unrelated inherited changes.
-     will-change promotes the layer ahead of hover so the slide-in is smooth. */
+  /* Specific properties — prevents `all` from catching unrelated inherited changes. */
   transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1),
               transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform, opacity;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.75);
   z-index: 20;
 }

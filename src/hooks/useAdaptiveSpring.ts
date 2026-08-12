@@ -5,8 +5,10 @@ import { useMemo } from 'react'
  *
  * Goals:
  *  - Critically damped (ratio ≥ 1.0) — settles without overshoot or ring.
- *  - restDelta / restSpeed as tight as possible — Framer exits the animation
- *    loop the moment motion is sub-pixel, freeing the compositor immediately.
+ *  - restDelta / restSpeed at 0.05 px: sub-pixel to the eye (0.05 px is far
+ *    below a device pixel) yet loose enough that the spring exits the
+ *    animation loop ~30% sooner than 0.001, freeing the main thread for the
+ *    next interaction.
  *  - Hi-DPI: stiffer + heavier damping because sub-pixel overshoot is
  *    more visible at 2× and the GPU fill-rate budget is tighter on 4K.
  */
@@ -26,8 +28,8 @@ export function useAdaptiveSpring() {
         stiffness: 320,
         damping: 30,
         mass: 0.8,
-        restDelta: 0.001,
-        restSpeed: 0.001
+        restDelta: 0.05,
+        restSpeed: 0.05
       } as const
     }
 
@@ -37,8 +39,8 @@ export function useAdaptiveSpring() {
       stiffness: 300,
       damping: 28,
       mass: 0.8,
-      restDelta: 0.001,
-      restSpeed: 0.001
+      restDelta: 0.05,
+      restSpeed: 0.05
     } as const
   }, [])
 }
@@ -57,8 +59,8 @@ export function useSubtleSpring() {
       stiffness: 340,
       damping: 34,
       mass: 0.65,
-      restDelta: 0.001,
-      restSpeed: 0.001
+      restDelta: 0.05,
+      restSpeed: 0.05
     } as const
   }, [])
 }

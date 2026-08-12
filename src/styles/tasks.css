@@ -66,7 +66,7 @@
 /* Whole card is a drop target (t25). */
 .task-suggestion-card.drop-over {
   border-color: var(--accent);
-  background: rgba(139, 92, 246, 0.12);
+  background: rgba(var(--accent-rgb), 0.12);
 }
 
 .task-suggestion-head {
@@ -161,7 +161,7 @@
   color: rgba(255, 255, 255, 0.95);
 }
 .task-suggestion-action.accept:hover {
-  background: rgba(139, 92, 246, 0.18);
+  background: rgba(var(--accent-rgb), 0.18);
   color: var(--accent);
 }
 .task-suggestion-action.danger:hover {
@@ -374,15 +374,28 @@
   font-size: calc(10.5px * var(--font-scale, 1));
   color: rgba(74, 222, 128, 0.75);
 }
-.task-meta {
-  font-size: calc(10.5px * var(--font-scale, 1));
+.task-time.paused {
   color: rgba(255, 255, 255, 0.42);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-/* Hover-revealed row actions. */
+/* Row 2 of the card: app icons + content badges (left), actions (right). */
+.task-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  min-width: 0;
+}
+.task-card-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Hover-revealed row actions (placeholder-resident: opacity only, no layout shift). */
 .task-actions {
   flex-shrink: 0;
   display: flex;
@@ -390,7 +403,6 @@
   gap: 2px;
   opacity: 0;
   transition: opacity 0.15s ease;
-  padding-top: 1px;
 }
 .task-card:hover .task-actions,
 .task-card:focus-within .task-actions {
@@ -527,8 +539,8 @@
   color: #94a3b8;
 }
 .task-status-pill.completed {
-  background: rgba(139, 92, 246, 0.18);
-  color: #b79cf7;
+  background: rgba(var(--accent-rgb), 0.18);
+  color: var(--accent);
 }
 
 .task-detail-title-row {
@@ -784,7 +796,7 @@
 .drop-save-zone.over {
   border-color: var(--accent);
   border-style: solid;
-  background: rgba(139, 92, 246, 0.12);
+  background: rgba(var(--accent-rgb), 0.12);
 }
 .drop-save-zone-icon {
   flex-shrink: 0;
@@ -793,8 +805,8 @@
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: rgba(139, 92, 246, 0.14);
-  color: #a78bfa;
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent);
 }
 .drop-save-zone-text {
   flex: 1;
@@ -847,7 +859,7 @@
 }
 .task-drop-row.over {
   border-color: var(--accent);
-  background: rgba(139, 92, 246, 0.12);
+  background: rgba(var(--accent-rgb), 0.12);
 }
 .task-drop-row-title {
   flex: 1;
@@ -1144,7 +1156,7 @@
 }
 .task-editor-input:focus,
 .task-editor-textarea:focus {
-  border-color: rgba(139, 92, 246, 0.55);
+  border-color: rgba(var(--accent-rgb), 0.55);
   background: rgba(255, 255, 255, 0.07);
 }
 .task-editor-input::placeholder,
@@ -1196,8 +1208,8 @@
   background: rgba(255, 255, 255, 0.08);
 }
 .task-editor-app.selected {
-  background: rgba(139, 92, 246, 0.12);
-  border-color: rgba(139, 92, 246, 0.55);
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.55);
 }
 .task-editor-app-name {
   font-size: calc(10px * var(--font-scale, 1));
@@ -1207,6 +1219,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 
 /* Clipboard rows: icon + preview + time/check, capped height with scroll. */
 .task-editor-clipboard {
@@ -1238,8 +1251,8 @@
   background: rgba(255, 255, 255, 0.08);
 }
 .task-editor-row.checked {
-  background: rgba(139, 92, 246, 0.12);
-  border-color: rgba(139, 92, 246, 0.55);
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.55);
 }
 .task-editor-row.dead {
   opacity: 0.45;
@@ -1381,8 +1394,10 @@
 .task-app-icons {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
+  min-width: 0;
+  overflow: hidden;
 }
 .task-app-icons-more {
   padding: 1px 5px;

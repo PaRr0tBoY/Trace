@@ -6,11 +6,16 @@ export interface TranslationKeys {
     images: string
     files: string
     tasks: string
+    clipboard: string
+    existingTasks: string
+    candidateTasks: string
+    other: string
   }
   tabs: {
     behaviour: string
     position: string
     appearance: string
+    tasks: string
   }
   header: {
     searchPlaceholder: string
@@ -41,6 +46,18 @@ export interface TranslationKeys {
     never: string
     capacityTitle: string
     capacityDesc: string
+    landingTitle: string
+    landingDesc: string
+    restoreTimeTitle: string
+    restoreTimeDesc: string
+    restoreInstant: string
+    restoreInstantDesc: string
+    restoreRelaxed: string
+    restoreRelaxedDesc: string
+    restoreDelayed: string
+    restoreDelayedDesc: string
+    restoreForever: string
+    restoreForeverDesc: string
   }
   position: {
     edgePlacementTitle: string
@@ -69,6 +86,18 @@ export interface TranslationKeys {
     panelHeightDesc: string
   }
   appearance: {
+    themeTitle: string
+    themeDesc: string
+    themeGraphite: string
+    themeGraphiteDesc: string
+    themeCobalt: string
+    themeCobaltDesc: string
+    themeVerdigris: string
+    themeVerdigrisDesc: string
+    themeAmber: string
+    themeAmberDesc: string
+    themeViolet: string
+    themeVioletDesc: string
     copyIndicatorTitle: string
     copyIndicatorDesc: string
     indicatorStyleTitle: string
@@ -142,6 +171,8 @@ export interface TranslationKeys {
     links: string
     images: string
     files: string
+    filesEmpty: string
+    filesEmptyHint: string
   }
   onboarding: {
     welcomeTitle: string
@@ -218,12 +249,12 @@ export interface TranslationKeys {
     sectionTitle: string
     sectionDesc: string
     noProviders: string
-    addLocal: string
-    addCloud: string
-    detectOllama: string
+    addLocalModel: string
+    addCloudProvider: string
     detecting: string
     detectNotFound: string
     detectFound: string
+    edit: string
     test: string
     testing: string
     testOk: string
@@ -233,6 +264,7 @@ export interface TranslationKeys {
     baseUrl: string
     apiKey: string
     model: string
+    unnamedModel: string
     kindLocal: string
     kindCloud: string
     schemaOutput: string
@@ -265,6 +297,7 @@ export interface TranslationKeys {
     restore: string
     back: string
     activeAt: string
+    runningTime: string
     resourcesTitle: string
     resourceCount: string
     noResources: string
@@ -306,6 +339,8 @@ export interface TranslationKeys {
     saveZoneHint: string
     dragHint: string
     suggestionCreated: string
+    candidatesEmpty: string
+    candidatesEmptyHint: string
   }
   memory: {
     sectionTitle: string
@@ -527,11 +562,16 @@ export const en: TranslationKeys = {
     "images": "Images",
     "files": "Files",
     "tasks": "Tasks",
+    "clipboard": "Clipboard",
+    "existingTasks": "Existing tasks",
+    "candidateTasks": "Candidate tasks",
+    "other": "Other"
   },
   "tabs": {
     "behaviour": "Behaviour",
     "position": "Position",
-    "appearance": "Appearance"
+    "appearance": "Appearance",
+    "tasks": "Tasks"
   },
   "header": {
     "searchPlaceholder": "Search history...",
@@ -561,7 +601,19 @@ export const en: TranslationKeys = {
     "autoDeleteDesc": "Automatically purge copied items (preserves Pinned)",
     "never": "Never",
     "capacityTitle": "History capacity",
-    "capacityDesc": "Maximum unpinned items stored in history"
+    "capacityDesc": "Maximum unpinned items stored in history",
+    "landingTitle": "Landing page",
+    "landingDesc": "Default page when the panel opens",
+    "restoreTimeTitle": "Restore time",
+    "restoreTimeDesc": "How long the panel keeps your last page after closing",
+    "restoreInstant": "Instant",
+    "restoreInstantDesc": "Returns to the landing page as soon as the panel closes",
+    "restoreRelaxed": "Relaxed",
+    "restoreRelaxedDesc": "Keeps the last page for 10 seconds",
+    "restoreDelayed": "Delayed",
+    "restoreDelayedDesc": "Keeps the last page for 10 minutes",
+    "restoreForever": "Forever",
+    "restoreForeverDesc": "Always keeps the last page; landing page is ignored"
   },
   "position": {
     "edgePlacementTitle": "Edge Placement",
@@ -609,7 +661,19 @@ export const en: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Tick",
     "copyStyle": "Copy",
-    "sparkleStyle": "Sparkle"
+    "sparkleStyle": "Sparkle",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Copy",
@@ -662,7 +726,9 @@ export const en: TranslationKeys = {
     "textClips": "text clips",
     "links": "links",
     "images": "images",
-    "files": "files"
+    "files": "files",
+    "filesEmpty": "No files yet",
+    "filesEmptyHint": "Copy or drag files into the shelf to see them here"
   },
   "onboarding": {
     "welcomeTitle": "Welcome to Trace",
@@ -739,12 +805,12 @@ export const en: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -754,6 +820,7 @@ export const en: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -785,6 +852,7 @@ export const en: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -826,8 +894,9 @@ export const en: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "No candidate tasks right now",
+    "candidatesEmptyHint": "Candidates appear when Trace notices patterns in your apps and clipboard"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -881,11 +950,16 @@ export const es: TranslationKeys = {
     "images": "Imágenes",
     "files": "Archivos",
     "tasks": "Tasks",
+    "clipboard": "Portapapeles",
+    "existingTasks": "Tareas existentes",
+    "candidateTasks": "Tareas candidatas",
+    "other": "Otros"
   },
   "tabs": {
     "behaviour": "Comportamiento",
     "position": "Posición",
-    "appearance": "Apariencia"
+    "appearance": "Apariencia",
+    "tasks": "Tareas"
   },
   "header": {
     "searchPlaceholder": "Buscar en el historial...",
@@ -915,7 +989,19 @@ export const es: TranslationKeys = {
     "autoDeleteDesc": "Eliminar automáticamente elementos copiados (conserva los fijados)",
     "never": "Nunca",
     "capacityTitle": "Capacidad del historial",
-    "capacityDesc": "Máximo de elementos no fijados almacenados en el historial"
+    "capacityDesc": "Máximo de elementos no fijados almacenados en el historial",
+    "landingTitle": "Página inicial",
+    "landingDesc": "Página predeterminada al abrir el panel",
+    "restoreTimeTitle": "Tiempo de restauración",
+    "restoreTimeDesc": "Cuánto tiempo conserva el panel tu última página tras cerrarse",
+    "restoreInstant": "Instantáneo",
+    "restoreInstantDesc": "Vuelve a la página inicial en cuanto el panel se cierra",
+    "restoreRelaxed": "Relajado",
+    "restoreRelaxedDesc": "Conserva la última página durante 10 segundos",
+    "restoreDelayed": "Retrasado",
+    "restoreDelayedDesc": "Conserva la última página durante 10 minutos",
+    "restoreForever": "Permanente",
+    "restoreForeverDesc": "Conserva siempre la última página; la página inicial se ignora"
   },
   "position": {
     "edgePlacementTitle": "Borde de la pantalla",
@@ -963,7 +1049,19 @@ export const es: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Marca",
     "copyStyle": "Copiar",
-    "sparkleStyle": "Destello"
+    "sparkleStyle": "Destello",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Copiar",
@@ -1016,7 +1114,9 @@ export const es: TranslationKeys = {
     "textClips": "fragmentos de texto",
     "links": "enlaces",
     "images": "imágenes",
-    "files": "archivos"
+    "files": "archivos",
+    "filesEmpty": "Aún no hay archivos",
+    "filesEmptyHint": "Copia o arrastra archivos al panel para verlos aquí"
   },
   "onboarding": {
     "welcomeTitle": "Te damos la bienvenida a Trace",
@@ -1093,12 +1193,12 @@ export const es: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -1108,6 +1208,7 @@ export const es: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -1139,6 +1240,7 @@ export const es: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -1180,8 +1282,9 @@ export const es: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "No hay tareas candidatas ahora mismo",
+    "candidatesEmptyHint": "Aparecen candidatas cuando Trace detecta patrones en tus apps y el portapapeles"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -1235,11 +1338,16 @@ export const fr: TranslationKeys = {
     "images": "Images",
     "files": "Fichiers",
     "tasks": "Tasks",
+    "clipboard": "Presse-papiers",
+    "existingTasks": "Tâches existantes",
+    "candidateTasks": "Tâches candidates",
+    "other": "Autres"
   },
   "tabs": {
     "behaviour": "Comportement",
     "position": "Position",
-    "appearance": "Apparence"
+    "appearance": "Apparence",
+    "tasks": "Tâches"
   },
   "header": {
     "searchPlaceholder": "Rechercher dans l'historique...",
@@ -1269,7 +1377,19 @@ export const fr: TranslationKeys = {
     "autoDeleteDesc": "Supprimer automatiquement les éléments copiés (conserve les épinglés)",
     "never": "Jamais",
     "capacityTitle": "Capacité de l'historique",
-    "capacityDesc": "Nombre maximum d'éléments non épinglés stockés dans l'historique"
+    "capacityDesc": "Nombre maximum d'éléments non épinglés stockés dans l'historique",
+    "landingTitle": "Page de départ",
+    "landingDesc": "Page affichée par défaut à l’ouverture du panneau",
+    "restoreTimeTitle": "Durée de restauration",
+    "restoreTimeDesc": "Combien de temps le panneau garde votre dernière page après fermeture",
+    "restoreInstant": "Immédiat",
+    "restoreInstantDesc": "Revient à la page de départ dès que le panneau se ferme",
+    "restoreRelaxed": "Détendu",
+    "restoreRelaxedDesc": "Garde la dernière page pendant 10 secondes",
+    "restoreDelayed": "Retardé",
+    "restoreDelayedDesc": "Garde la dernière page pendant 10 minutes",
+    "restoreForever": "Permanent",
+    "restoreForeverDesc": "Garde toujours la dernière page ; la page de départ est ignorée"
   },
   "position": {
     "edgePlacementTitle": "Bord de l'écran",
@@ -1317,7 +1437,19 @@ export const fr: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Coche",
     "copyStyle": "Copier",
-    "sparkleStyle": "Étincelle"
+    "sparkleStyle": "Étincelle",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Copier",
@@ -1370,7 +1502,9 @@ export const fr: TranslationKeys = {
     "textClips": "extraits texte",
     "links": "liens",
     "images": "images",
-    "files": "fichiers"
+    "files": "fichiers",
+    "filesEmpty": "Aucun fichier pour le moment",
+    "filesEmptyHint": "Copiez ou glissez des fichiers dans le panneau pour les voir ici"
   },
   "onboarding": {
     "welcomeTitle": "Bienvenue dans Trace",
@@ -1447,12 +1581,12 @@ export const fr: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -1462,6 +1596,7 @@ export const fr: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -1493,6 +1628,7 @@ export const fr: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -1534,8 +1670,9 @@ export const fr: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Aucune tâche candidate pour le moment",
+    "candidatesEmptyHint": "Des candidates apparaissent quand Trace repère des schémas dans vos applications et le presse-papiers"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -1589,11 +1726,16 @@ export const de: TranslationKeys = {
     "images": "Bilder",
     "files": "Dateien",
     "tasks": "Tasks",
+    "clipboard": "Zwischenablage",
+    "existingTasks": "Vorhandene Aufgaben",
+    "candidateTasks": "Kandidaten-Aufgaben",
+    "other": "Sonstiges"
   },
   "tabs": {
     "behaviour": "Verhalten",
     "position": "Position",
-    "appearance": "Darstellung"
+    "appearance": "Darstellung",
+    "tasks": "Aufgaben"
   },
   "header": {
     "searchPlaceholder": "Verlauf durchsuchen...",
@@ -1623,7 +1765,19 @@ export const de: TranslationKeys = {
     "autoDeleteDesc": "Kopierte Elemente automatisch löschen (angepinnte bleiben erhalten)",
     "never": "Nie",
     "capacityTitle": "Verlaufskapazität",
-    "capacityDesc": "Maximale Anzahl unangepinnter Elemente im Verlauf"
+    "capacityDesc": "Maximale Anzahl unangepinnter Elemente im Verlauf",
+    "landingTitle": "Startseite",
+    "landingDesc": "Standardseite beim Öffnen des Panels",
+    "restoreTimeTitle": "Wiederherstellungszeit",
+    "restoreTimeDesc": "Wie lange das Panel nach dem Schließen Ihre letzte Seite behält",
+    "restoreInstant": "Sofort",
+    "restoreInstantDesc": "Kehrt sofort zur Startseite zurück, wenn das Panel schließt",
+    "restoreRelaxed": "Entspannt",
+    "restoreRelaxedDesc": "Behält die letzte Seite 10 Sekunden lang",
+    "restoreDelayed": "Verzögert",
+    "restoreDelayedDesc": "Behält die letzte Seite 10 Minuten lang",
+    "restoreForever": "Dauerhaft",
+    "restoreForeverDesc": "Behält immer die letzte Seite; die Startseite wird ignoriert"
   },
   "position": {
     "edgePlacementTitle": "Randplatzierung",
@@ -1671,7 +1825,19 @@ export const de: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Häkchen",
     "copyStyle": "Kopieren",
-    "sparkleStyle": "Funke"
+    "sparkleStyle": "Funke",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Kopieren",
@@ -1724,7 +1890,9 @@ export const de: TranslationKeys = {
     "textClips": "Textschnipsel",
     "links": "Links",
     "images": "Bilder",
-    "files": "Dateien"
+    "files": "Dateien",
+    "filesEmpty": "Noch keine Dateien",
+    "filesEmptyHint": "Kopieren oder ziehen Sie Dateien in das Panel, um sie hier zu sehen"
   },
   "onboarding": {
     "welcomeTitle": "Willkommen bei Trace",
@@ -1801,12 +1969,12 @@ export const de: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -1816,6 +1984,7 @@ export const de: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -1847,6 +2016,7 @@ export const de: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -1888,8 +2058,9 @@ export const de: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Derzeit keine Kandidaten-Aufgaben",
+    "candidatesEmptyHint": "Kandidaten erscheinen, wenn Trace Muster in Ihren Apps und der Zwischenablage erkennt"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -1943,11 +2114,16 @@ export const it: TranslationKeys = {
     "images": "Immagini",
     "files": "File",
     "tasks": "Tasks",
+    "clipboard": "Appunti",
+    "existingTasks": "Attività esistenti",
+    "candidateTasks": "Attività candidate",
+    "other": "Altro"
   },
   "tabs": {
     "behaviour": "Comportamento",
     "position": "Posizione",
-    "appearance": "Aspetto"
+    "appearance": "Aspetto",
+    "tasks": "Attività"
   },
   "header": {
     "searchPlaceholder": "Cerca nella cronologia...",
@@ -1977,7 +2153,19 @@ export const it: TranslationKeys = {
     "autoDeleteDesc": "Elimina automaticamente gli elementi copiati (mantiene i bloccati)",
     "never": "Mai",
     "capacityTitle": "Capacità cronologia",
-    "capacityDesc": "Numero massimo di elementi non bloccati memorizzati nella cronologia"
+    "capacityDesc": "Numero massimo di elementi non bloccati memorizzati nella cronologia",
+    "landingTitle": "Pagina iniziale",
+    "landingDesc": "Pagina predefinita all’apertura del pannello",
+    "restoreTimeTitle": "Tempo di ripristino",
+    "restoreTimeDesc": "Per quanto tempo il pannello conserva l’ultima pagina dopo la chiusura",
+    "restoreInstant": "Immediato",
+    "restoreInstantDesc": "Torna alla pagina iniziale appena il pannello si chiude",
+    "restoreRelaxed": "Rilassato",
+    "restoreRelaxedDesc": "Conserva l’ultima pagina per 10 secondi",
+    "restoreDelayed": "Ritardato",
+    "restoreDelayedDesc": "Conserva l’ultima pagina per 10 minuti",
+    "restoreForever": "Permanente",
+    "restoreForeverDesc": "Conserva sempre l’ultima pagina; la pagina iniziale viene ignorata"
   },
   "position": {
     "edgePlacementTitle": "Posizionamento bordo",
@@ -2025,7 +2213,19 @@ export const it: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Segno di spunta",
     "copyStyle": "Copia",
-    "sparkleStyle": "Scintilla"
+    "sparkleStyle": "Scintilla",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Copia",
@@ -2078,7 +2278,9 @@ export const it: TranslationKeys = {
     "textClips": "ritagli di testo",
     "links": "link",
     "images": "immagini",
-    "files": "file"
+    "files": "file",
+    "filesEmpty": "Ancora nessun file",
+    "filesEmptyHint": "Copia o trascina file nel pannello per vederli qui"
   },
   "onboarding": {
     "welcomeTitle": "Benvenuto in Trace",
@@ -2155,12 +2357,12 @@ export const it: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -2170,6 +2372,7 @@ export const it: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -2201,6 +2404,7 @@ export const it: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -2242,8 +2446,9 @@ export const it: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Nessuna attività candidata al momento",
+    "candidatesEmptyHint": "Le candidate compaiono quando Trace nota schemi nelle tue app e negli appunti"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -2297,11 +2502,16 @@ export const pt: TranslationKeys = {
     "images": "Imagens",
     "files": "Arquivos",
     "tasks": "Tasks",
+    "clipboard": "Área de transferência",
+    "existingTasks": "Tarefas existentes",
+    "candidateTasks": "Tarefas candidatas",
+    "other": "Outros"
   },
   "tabs": {
     "behaviour": "Comportamento",
     "position": "Posição",
-    "appearance": "Aparência"
+    "appearance": "Aparência",
+    "tasks": "Tarefas"
   },
   "header": {
     "searchPlaceholder": "Pesquisar no histórico...",
@@ -2331,7 +2541,19 @@ export const pt: TranslationKeys = {
     "autoDeleteDesc": "Excluir automaticamente itens copiados (preserva fixados)",
     "never": "Nunca",
     "capacityTitle": "Capacidade do histórico",
-    "capacityDesc": "Máximo de itens não fixados armazenados no histórico"
+    "capacityDesc": "Máximo de itens não fixados armazenados no histórico",
+    "landingTitle": "Página inicial",
+    "landingDesc": "Página padrão ao abrir o painel",
+    "restoreTimeTitle": "Tempo de restauração",
+    "restoreTimeDesc": "Por quanto tempo o painel mantém sua última página após fechar",
+    "restoreInstant": "Imediato",
+    "restoreInstantDesc": "Volta para a página inicial assim que o painel fecha",
+    "restoreRelaxed": "Relaxado",
+    "restoreRelaxedDesc": "Mantém a última página por 10 segundos",
+    "restoreDelayed": "Atrasado",
+    "restoreDelayedDesc": "Mantém a última página por 10 minutos",
+    "restoreForever": "Permanente",
+    "restoreForeverDesc": "Sempre mantém a última página; a página inicial é ignorada"
   },
   "position": {
     "edgePlacementTitle": "Posicionamento da borda",
@@ -2379,7 +2601,19 @@ export const pt: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Marca",
     "copyStyle": "Copiar",
-    "sparkleStyle": "Cintilação"
+    "sparkleStyle": "Cintilação",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Copiar",
@@ -2432,7 +2666,9 @@ export const pt: TranslationKeys = {
     "textClips": "trechos de texto",
     "links": "links",
     "images": "imagens",
-    "files": "arquivos"
+    "files": "arquivos",
+    "filesEmpty": "Ainda sem arquivos",
+    "filesEmptyHint": "Copie ou arraste arquivos para o painel para vê-los aqui"
   },
   "onboarding": {
     "welcomeTitle": "Bem-vindo ao Trace",
@@ -2509,12 +2745,12 @@ export const pt: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -2524,6 +2760,7 @@ export const pt: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -2555,6 +2792,7 @@ export const pt: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -2596,8 +2834,9 @@ export const pt: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Nenhuma tarefa candidata no momento",
+    "candidatesEmptyHint": "Candidatas aparecem quando o Trace nota padrões nos seus apps e na área de transferência"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -2651,11 +2890,16 @@ export const ru: TranslationKeys = {
     "images": "Фото",
     "files": "Файлы",
     "tasks": "Tasks",
+    "clipboard": "Буфер обмена",
+    "existingTasks": "Существующие задачи",
+    "candidateTasks": "Кандидаты",
+    "other": "Другое"
   },
   "tabs": {
     "behaviour": "Поведение",
     "position": "Положение",
-    "appearance": "Внешний вид"
+    "appearance": "Внешний вид",
+    "tasks": "Задачи"
   },
   "header": {
     "searchPlaceholder": "Поиск по истории...",
@@ -2685,7 +2929,19 @@ export const ru: TranslationKeys = {
     "autoDeleteDesc": "Автоматически удалять скопированные элементы (закреплённые сохраняются)",
     "never": "Никогда",
     "capacityTitle": "Объём истории",
-    "capacityDesc": "Максимум незакреплённых элементов в истории"
+    "capacityDesc": "Максимум незакреплённых элементов в истории",
+    "landingTitle": "Начальная страница",
+    "landingDesc": "Страница по умолчанию при открытии панели",
+    "restoreTimeTitle": "Время восстановления",
+    "restoreTimeDesc": "Как долго панель хранит последнюю страницу после закрытия",
+    "restoreInstant": "Мгновенно",
+    "restoreInstantDesc": "Возврат к начальной странице сразу после закрытия панели",
+    "restoreRelaxed": "Спокойно",
+    "restoreRelaxedDesc": "Хранит последнюю страницу 10 секунд",
+    "restoreDelayed": "Отложенно",
+    "restoreDelayedDesc": "Хранит последнюю страницу 10 минут",
+    "restoreForever": "Постоянно",
+    "restoreForeverDesc": "Всегда хранит последнюю страницу; начальная страница игнорируется"
   },
   "position": {
     "edgePlacementTitle": "Размещение у края",
@@ -2733,7 +2989,19 @@ export const ru: TranslationKeys = {
     "logoStyle": "Логотип",
     "tickStyle": "Галочка",
     "copyStyle": "Копирование",
-    "sparkleStyle": "Искра"
+    "sparkleStyle": "Искра",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Копировать",
@@ -2786,7 +3054,9 @@ export const ru: TranslationKeys = {
     "textClips": "текстовых фрагментов",
     "links": "ссылок",
     "images": "изображений",
-    "files": "файлов"
+    "files": "файлов",
+    "filesEmpty": "Пока нет файлов",
+    "filesEmptyHint": "Скопируйте или перетащите файлы в панель, чтобы увидеть их здесь"
   },
   "onboarding": {
     "welcomeTitle": "Добро пожаловать в Trace",
@@ -2863,12 +3133,12 @@ export const ru: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -2878,6 +3148,7 @@ export const ru: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -2909,6 +3180,7 @@ export const ru: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -2950,8 +3222,9 @@ export const ru: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Сейчас нет задач-кандидатов",
+    "candidatesEmptyHint": "Кандидаты появляются, когда Trace замечает закономерности в ваших приложениях и буфере обмена"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -3005,11 +3278,16 @@ export const ja: TranslationKeys = {
     "images": "画像",
     "files": "ファイル",
     "tasks": "Tasks",
+    "clipboard": "クリップボード",
+    "existingTasks": "既存のタスク",
+    "candidateTasks": "候補タスク",
+    "other": "その他"
   },
   "tabs": {
     "behaviour": "動作",
     "position": "位置",
-    "appearance": "外観"
+    "appearance": "外観",
+    "tasks": "タスク"
   },
   "header": {
     "searchPlaceholder": "履歴を検索...",
@@ -3039,7 +3317,19 @@ export const ja: TranslationKeys = {
     "autoDeleteDesc": "コピーした項目を自動的に消去 (ピン留めは保持)",
     "never": "なし",
     "capacityTitle": "履歴の容量",
-    "capacityDesc": "履歴に保存するピン留め以外の項目の最大数"
+    "capacityDesc": "履歴に保存するピン留め以外の項目の最大数",
+    "landingTitle": "初期ページ",
+    "landingDesc": "パネルを開いたときに表示する既定ページ",
+    "restoreTimeTitle": "復元時間",
+    "restoreTimeDesc": "パネルを閉じた後に最後のページを保持する時間",
+    "restoreInstant": "即時",
+    "restoreInstantDesc": "パネルが閉じるとすぐに初期ページへ戻ります",
+    "restoreRelaxed": "ゆっくり",
+    "restoreRelaxedDesc": "最後のページを10秒間保持します",
+    "restoreDelayed": "遅延",
+    "restoreDelayedDesc": "最後のページを10分間保持します",
+    "restoreForever": "永続",
+    "restoreForeverDesc": "常に最後のページを保持します。初期ページは無視されます"
   },
   "position": {
     "edgePlacementTitle": "エッジ配置",
@@ -3087,7 +3377,19 @@ export const ja: TranslationKeys = {
     "logoStyle": "ロゴ",
     "tickStyle": "チェック",
     "copyStyle": "コピー",
-    "sparkleStyle": "スパークル"
+    "sparkleStyle": "スパークル",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "コピー",
@@ -3140,7 +3442,9 @@ export const ja: TranslationKeys = {
     "textClips": "テキストクリップ",
     "links": "リンク",
     "images": "画像",
-    "files": "ファイル"
+    "files": "ファイル",
+    "filesEmpty": "ファイルはまだありません",
+    "filesEmptyHint": "ファイルをコピーまたはパネルにドラッグするとここに表示されます"
   },
   "onboarding": {
     "welcomeTitle": "Trace へようこそ",
@@ -3217,12 +3521,12 @@ export const ja: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -3232,6 +3536,7 @@ export const ja: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -3263,6 +3568,7 @@ export const ja: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -3304,8 +3610,9 @@ export const ja: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "現在候補タスクはありません",
+    "candidatesEmptyHint": "Trace がアプリやクリップボードのパターンに気づくと候補が表示されます"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -3359,11 +3666,16 @@ export const ko: TranslationKeys = {
     "images": "이미지",
     "files": "파일",
     "tasks": "Tasks",
+    "clipboard": "클립보드",
+    "existingTasks": "기존 작업",
+    "candidateTasks": "후보 작업",
+    "other": "기타"
   },
   "tabs": {
     "behaviour": "동작",
     "position": "위치",
-    "appearance": "모양"
+    "appearance": "모양",
+    "tasks": "작업"
   },
   "header": {
     "searchPlaceholder": "기록 검색...",
@@ -3393,7 +3705,19 @@ export const ko: TranslationKeys = {
     "autoDeleteDesc": "복사한 항목 자동 삭제 (고정 항목은 유지)",
     "never": "사용 안 함",
     "capacityTitle": "기록 용량",
-    "capacityDesc": "기록에 저장되는 고정 안 됨 항목의 최대 수"
+    "capacityDesc": "기록에 저장되는 고정 안 됨 항목의 최대 수",
+    "landingTitle": "시작 페이지",
+    "landingDesc": "패널을 열 때 기본으로 표시할 페이지",
+    "restoreTimeTitle": "복원 시간",
+    "restoreTimeDesc": "패널을 닫은 후 마지막 페이지를 유지할 시간",
+    "restoreInstant": "즉시",
+    "restoreInstantDesc": "패널이 닫히는 즉시 시작 페이지로 돌아갑니다",
+    "restoreRelaxed": "완만",
+    "restoreRelaxedDesc": "마지막 페이지를 10초간 유지합니다",
+    "restoreDelayed": "지연",
+    "restoreDelayedDesc": "마지막 페이지를 10분간 유지합니다",
+    "restoreForever": "영구",
+    "restoreForeverDesc": "항상 마지막 페이지를 유지합니다. 시작 페이지는 무시됩니다"
   },
   "position": {
     "edgePlacementTitle": "가장자리 배치",
@@ -3441,7 +3765,19 @@ export const ko: TranslationKeys = {
     "logoStyle": "로고",
     "tickStyle": "체크",
     "copyStyle": "복사",
-    "sparkleStyle": "반짝임"
+    "sparkleStyle": "반짝임",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "복사",
@@ -3494,7 +3830,9 @@ export const ko: TranslationKeys = {
     "textClips": "텍스트 클립",
     "links": "링크",
     "images": "이미지",
-    "files": "파일"
+    "files": "파일",
+    "filesEmpty": "아직 파일이 없습니다",
+    "filesEmptyHint": "파일을 복사하거나 패널로 끌어다 놓으면 여기에 표시됩니다"
   },
   "onboarding": {
     "welcomeTitle": "Trace에 오신 것을 환영합니다",
@@ -3571,12 +3909,12 @@ export const ko: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -3586,6 +3924,7 @@ export const ko: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -3617,6 +3956,7 @@ export const ko: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -3658,8 +3998,9 @@ export const ko: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "현재 후보 작업이 없습니다",
+    "candidatesEmptyHint": "Trace가 앱과 클립보드의 패턴을 감지하면 후보가 나타납니다"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -3713,11 +4054,16 @@ export const zhCN: TranslationKeys = {
     "images": "图片",
     "files": "文件",
     "tasks": "任务",
+    "clipboard": "剪贴板",
+    "existingTasks": "已有任务",
+    "candidateTasks": "候选任务",
+    "other": "其他"
   },
   "tabs": {
     "behaviour": "行为",
     "position": "位置",
-    "appearance": "外观"
+    "appearance": "外观",
+    "tasks": "任务"
   },
   "header": {
     "searchPlaceholder": "搜索历史记录...",
@@ -3747,7 +4093,19 @@ export const zhCN: TranslationKeys = {
     "autoDeleteDesc": "自动清除已复制的项（保留固定项）",
     "never": "从不",
     "capacityTitle": "历史记录容量",
-    "capacityDesc": "历史记录中存储的最大未固定项数量"
+    "capacityDesc": "历史记录中存储的最大未固定项数量",
+    "landingTitle": "初始页面",
+    "landingDesc": "展开面板时默认显示的页面",
+    "restoreTimeTitle": "恢复时间",
+    "restoreTimeDesc": "面板收回后保留上次页面状态的最长时长",
+    "restoreInstant": "立刻",
+    "restoreInstantDesc": "收回后即恢复初始页面",
+    "restoreRelaxed": "稍缓",
+    "restoreRelaxedDesc": "10 秒内重新展开则保留上次页面",
+    "restoreDelayed": "延时",
+    "restoreDelayedDesc": "10 分钟内重新展开则保留上次页面",
+    "restoreForever": "持久",
+    "restoreForeverDesc": "一直保持上次收回时的页面，初始页面不生效"
   },
   "position": {
     "edgePlacementTitle": "边缘位置",
@@ -3795,7 +4153,19 @@ export const zhCN: TranslationKeys = {
     "logoStyle": "徽标",
     "tickStyle": "勾选",
     "copyStyle": "复制",
-    "sparkleStyle": "闪光"
+    "sparkleStyle": "闪光",
+    "themeTitle": "主题色",
+    "themeDesc": "面板、拖拽幽灵与复制指示器的强调色",
+    "themeGraphite": "石墨灰 Graphite",
+    "themeGraphiteDesc": "中性低调，融入任何工作流",
+    "themeCobalt": "钴蓝 Cobalt",
+    "themeCobaltDesc": "沉稳蓝调，经典生产力氛围",
+    "themeVerdigris": "铜绿 Verdigris",
+    "themeVerdigrisDesc": "青绿清新，冷静专注",
+    "themeAmber": "琥珀 Amber",
+    "themeAmberDesc": "温暖琥珀，活力点缀",
+    "themeViolet": "紫罗兰 Violet",
+    "themeVioletDesc": "经典紫罗兰，Trace 原味",
   },
   "item": {
     "copy": "复制",
@@ -3848,7 +4218,9 @@ export const zhCN: TranslationKeys = {
     "textClips": "文本片段",
     "links": "链接",
     "images": "图片",
-    "files": "文件"
+    "files": "文件",
+    "filesEmpty": "还没有文件",
+    "filesEmptyHint": "复制文件或拖入面板，即可在这里查看"
   },
   "onboarding": {
     "welcomeTitle": "欢迎使用 Trace",
@@ -3925,12 +4297,12 @@ export const zhCN: TranslationKeys = {
     "sectionTitle": "AI Provider 配置",
     "sectionDesc": "配置任务建议所用的 AI 端点。列表首位为主 provider，失败时自动降级到链中下一个。",
     "noProviders": "尚未配置 provider，AI 建议功能不可用。",
-    "addLocal": "添加本地 (Ollama)",
-    "addCloud": "添加云端 (OpenAI 兼容)",
-    "detectOllama": "检测本地 Ollama",
+    "addLocalModel": "添加本地模型",
+    "addCloudProvider": "自定义云提供商",
     "detecting": "检测中…",
     "detectNotFound": "未检测到本地 Ollama（http://127.0.0.1:11434）",
-    "detectFound": "已检测到 Ollama，已添加 provider（{model}）",
+    "detectFound": "已检测到 Ollama（{model}）",
+    "edit": "编辑",
     "test": "测试",
     "testing": "测试中…",
     "testOk": "正常 · {ms} ms",
@@ -3940,6 +4312,7 @@ export const zhCN: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key（可选）",
     "model": "模型",
+    "unnamedModel": "未命名模型",
     "kindLocal": "本地",
     "kindCloud": "云端",
     "schemaOutput": "结构化输出 (json_schema)",
@@ -3971,6 +4344,7 @@ export const zhCN: TranslationKeys = {
     "restore": "重新激活",
     "back": "返回",
     "activeAt": "活跃于 {time}",
+    "runningTime": "已运行 {duration}",
     "resourcesTitle": "关联内容",
     "resourceCount": "{count} 项",
     "noResources": "还没有关联内容",
@@ -4012,8 +4386,9 @@ export const zhCN: TranslationKeys = {
     "saveZoneHint": "拖入即存入剪贴板栈",
     "dragHint": "拖到任务绑定，拖到备选创建任务",
     "suggestionCreated": "已创建任务并绑定",
+    "candidatesEmpty": "当前没有候选任务",
+    "candidatesEmptyHint": "Trace 注意到应用与剪贴板中的模式时会出现候选任务"
   },
-
   "memory": {
     "sectionTitle": "长期记忆",
     "sectionDesc": "从已确认的任务反馈沉淀出的记忆会影响未来的建议；未经你确认的内容不会存储。",
@@ -4067,11 +4442,16 @@ export const zhTW: TranslationKeys = {
     "images": "圖片",
     "files": "檔案",
     "tasks": "任務",
+    "clipboard": "剪貼簿",
+    "existingTasks": "既有任務",
+    "candidateTasks": "候選任務",
+    "other": "其他"
   },
   "tabs": {
     "behaviour": "行為",
     "position": "位置",
-    "appearance": "外觀"
+    "appearance": "外觀",
+    "tasks": "任務"
   },
   "header": {
     "searchPlaceholder": "搜尋歷史記錄...",
@@ -4101,7 +4481,19 @@ export const zhTW: TranslationKeys = {
     "autoDeleteDesc": "自動清除已複製的項目（保留固定項）",
     "never": "從不",
     "capacityTitle": "歷史記錄容量",
-    "capacityDesc": "歷史記錄中儲存的最大未固定項目數量"
+    "capacityDesc": "歷史記錄中儲存的最大未固定項目數量",
+    "landingTitle": "初始頁面",
+    "landingDesc": "展開面板時預設顯示的頁面",
+    "restoreTimeTitle": "還原時間",
+    "restoreTimeDesc": "面板收回後保留上次頁面狀態的最長時長",
+    "restoreInstant": "立即",
+    "restoreInstantDesc": "收回後即還原初始頁面",
+    "restoreRelaxed": "稍緩",
+    "restoreRelaxedDesc": "10 秒內重新展開則保留上次頁面",
+    "restoreDelayed": "延時",
+    "restoreDelayedDesc": "10 分鐘內重新展開則保留上次頁面",
+    "restoreForever": "永久",
+    "restoreForeverDesc": "一直保留上次收回時的頁面，初始頁面不生效"
   },
   "position": {
     "edgePlacementTitle": "邊緣位置",
@@ -4149,7 +4541,19 @@ export const zhTW: TranslationKeys = {
     "logoStyle": "標誌",
     "tickStyle": "勾選",
     "copyStyle": "複製",
-    "sparkleStyle": "閃光"
+    "sparkleStyle": "閃光",
+    "themeTitle": "主題色",
+    "themeDesc": "面板、拖曳幽靈與複製指示器的強調色",
+    "themeGraphite": "石墨灰 Graphite",
+    "themeGraphiteDesc": "中性低調，融入任何工作流程",
+    "themeCobalt": "鈷藍 Cobalt",
+    "themeCobaltDesc": "沉穩藍調，經典生產力氛圍",
+    "themeVerdigris": "銅綠 Verdigris",
+    "themeVerdigrisDesc": "青綠清新，冷靜專注",
+    "themeAmber": "琥珀 Amber",
+    "themeAmberDesc": "溫暖琥珀，活力點綴",
+    "themeViolet": "紫羅蘭 Violet",
+    "themeVioletDesc": "經典紫羅蘭，Trace 原味",
   },
   "item": {
     "copy": "複製",
@@ -4202,7 +4606,9 @@ export const zhTW: TranslationKeys = {
     "textClips": "文字片段",
     "links": "連結",
     "images": "圖片",
-    "files": "檔案"
+    "files": "檔案",
+    "filesEmpty": "還沒有檔案",
+    "filesEmptyHint": "複製檔案或拖入面板，即可在這裡查看"
   },
   "onboarding": {
     "welcomeTitle": "歡迎使用 Trace",
@@ -4279,12 +4685,12 @@ export const zhTW: TranslationKeys = {
     "sectionTitle": "AI Provider 設定",
     "sectionDesc": "設定任務建議所用的 AI 端點。清單首位為主 provider，失敗時自動降級到鏈中下一個。",
     "noProviders": "尚未設定 provider，AI 建議功能不可用。",
-    "addLocal": "新增本機 (Ollama)",
-    "addCloud": "新增雲端 (OpenAI 相容)",
-    "detectOllama": "偵測本機 Ollama",
+    "addLocalModel": "新增本機模型",
+    "addCloudProvider": "自訂雲端提供者",
     "detecting": "偵測中…",
     "detectNotFound": "未偵測到本機 Ollama（http://127.0.0.1:11434）",
-    "detectFound": "已偵測到 Ollama，已新增 provider（{model}）",
+    "detectFound": "已偵測到 Ollama（{model}）",
+    "edit": "編輯",
     "test": "測試",
     "testing": "測試中…",
     "testOk": "正常 · {ms} ms",
@@ -4294,6 +4700,7 @@ export const zhTW: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key（選填）",
     "model": "模型",
+    "unnamedModel": "未命名模型",
     "kindLocal": "本機",
     "kindCloud": "雲端",
     "schemaOutput": "結構化輸出 (json_schema)",
@@ -4325,6 +4732,7 @@ export const zhTW: TranslationKeys = {
     "restore": "重新啟用",
     "back": "返回",
     "activeAt": "活躍於 {time}",
+    "runningTime": "已運行 {duration}",
     "resourcesTitle": "關聯內容",
     "resourceCount": "{count} 項",
     "noResources": "還沒有關聯內容",
@@ -4366,8 +4774,9 @@ export const zhTW: TranslationKeys = {
     "saveZoneHint": "拖入即存入剪貼板堆疊",
     "dragHint": "拖到任務繫結，拖到備選建立任務",
     "suggestionCreated": "已建立任務並繫結",
+    "candidatesEmpty": "目前沒有候選任務",
+    "candidatesEmptyHint": "Trace 注意到應用程式與剪貼簿中的模式時會出現候選任務"
   },
-
   "memory": {
     "sectionTitle": "長期記憶",
     "sectionDesc": "從已確認的任務回饋沉澱出的記憶會影響未來的建議；未經你確認的內容不會儲存。",
@@ -4421,11 +4830,16 @@ export const hi: TranslationKeys = {
     "images": "छवियाँ",
     "files": "फ़ाइलें",
     "tasks": "Tasks",
+    "clipboard": "क्लिपबोर्ड",
+    "existingTasks": "मौजूदा कार्य",
+    "candidateTasks": "उम्मीदवार कार्य",
+    "other": "अन्य"
   },
   "tabs": {
     "behaviour": "व्यवहार",
     "position": "स्थिति",
-    "appearance": "रूप"
+    "appearance": "रूप",
+    "tasks": "कार्य"
   },
   "header": {
     "searchPlaceholder": "इतिहास खोजें...",
@@ -4455,7 +4869,19 @@ export const hi: TranslationKeys = {
     "autoDeleteDesc": "कॉपी किए गए आइटम स्वचालित रूप से हटाएँ (पिन किए गए सुरक्षित रखें)",
     "never": "कभी नहीं",
     "capacityTitle": "इतिहास क्षमता",
-    "capacityDesc": "इतिहास में संग्रहीत अधिकतम अनपिन किए गए आइटम"
+    "capacityDesc": "इतिहास में संग्रहीत अधिकतम अनपिन किए गए आइटम",
+    "landingTitle": "लैंडिंग पेज",
+    "landingDesc": "पैनल खुलने पर डिफ़ॉल्ट पेज",
+    "restoreTimeTitle": "पुनर्स्थापना समय",
+    "restoreTimeDesc": "बंद होने के बाद पैनल आपका अंतिम पेज कितनी देर रखता है",
+    "restoreInstant": "तुरंत",
+    "restoreInstantDesc": "पैनल बंद होते ही लैंडिंग पेज पर लौटता है",
+    "restoreRelaxed": "हल्का",
+    "restoreRelaxedDesc": "अंतिम पेज को 10 सेकंड तक रखता है",
+    "restoreDelayed": "विलंबित",
+    "restoreDelayedDesc": "अंतिम पेज को 10 मिनट तक रखता है",
+    "restoreForever": "स्थायी",
+    "restoreForeverDesc": "हमेशा अंतिम पेज रखता है; लैंडिंग पेज अनदेखा किया जाता है"
   },
   "position": {
     "edgePlacementTitle": "किनारा प्लेसमेंट",
@@ -4503,7 +4929,19 @@ export const hi: TranslationKeys = {
     "logoStyle": "लोगो",
     "tickStyle": "टिक",
     "copyStyle": "कॉपी",
-    "sparkleStyle": "स्पार्कल"
+    "sparkleStyle": "स्पार्कल",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "कॉपी",
@@ -4556,7 +4994,9 @@ export const hi: TranslationKeys = {
     "textClips": "टेक्स्ट क्लिप",
     "links": "लिंक",
     "images": "छवियाँ",
-    "files": "फ़ाइलें"
+    "files": "फ़ाइलें",
+    "filesEmpty": "अभी कोई फ़ाइल नहीं",
+    "filesEmptyHint": "फ़ाइलें कॉपी करें या पैनल में खींचें ताकि वे यहाँ दिखें"
   },
   "onboarding": {
     "welcomeTitle": "Trace में आपका स्वागत है",
@@ -4633,12 +5073,12 @@ export const hi: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -4648,6 +5088,7 @@ export const hi: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -4679,6 +5120,7 @@ export const hi: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -4720,8 +5162,9 @@ export const hi: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "अभी कोई उम्मीदवार कार्य नहीं",
+    "candidatesEmptyHint": "जब Trace आपके ऐप्स और क्लिपबोर्ड में पैटर्न देखता है तो उम्मीदवार दिखते हैं"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -4775,11 +5218,16 @@ export const ar: TranslationKeys = {
     "images": "صور",
     "files": "ملفات",
     "tasks": "Tasks",
+    "clipboard": "الحافظة",
+    "existingTasks": "المهام الحالية",
+    "candidateTasks": "المهام المرشحة",
+    "other": "أخرى"
   },
   "tabs": {
     "behaviour": "السلوك",
     "position": "الموضع",
-    "appearance": "المظهر"
+    "appearance": "المظهر",
+    "tasks": "المهام"
   },
   "header": {
     "searchPlaceholder": "البحث في السجل...",
@@ -4809,7 +5257,19 @@ export const ar: TranslationKeys = {
     "autoDeleteDesc": "حذف العناصر المنسوخة تلقائياً (يحافظ على المثبّتة)",
     "never": "أبداً",
     "capacityTitle": "سعة السجل",
-    "capacityDesc": "الحد الأقصى للعناصر غير المثبّتة المخزّنة في السجل"
+    "capacityDesc": "الحد الأقصى للعناصر غير المثبّتة المخزّنة في السجل",
+    "landingTitle": "الصفحة الافتتاحية",
+    "landingDesc": "الصفحة الافتراضية عند فتح اللوحة",
+    "restoreTimeTitle": "مدة الاستعادة",
+    "restoreTimeDesc": "كم من الوقت تحتفظ اللوحة بآخر صفحة بعد الإغلاق",
+    "restoreInstant": "فوري",
+    "restoreInstantDesc": "يعود إلى الصفحة الافتتاحية فور إغلاق اللوحة",
+    "restoreRelaxed": "هادئ",
+    "restoreRelaxedDesc": "يحتفظ بآخر صفحة لمدة 10 ثوانٍ",
+    "restoreDelayed": "متأخر",
+    "restoreDelayedDesc": "يحتفظ بآخر صفحة لمدة 10 دقائق",
+    "restoreForever": "دائم",
+    "restoreForeverDesc": "يحتفظ دائمًا بآخر صفحة؛ تُتجاهل الصفحة الافتتاحية"
   },
   "position": {
     "edgePlacementTitle": "موضع الحافة",
@@ -4857,7 +5317,19 @@ export const ar: TranslationKeys = {
     "logoStyle": "الشعار",
     "tickStyle": "علامة",
     "copyStyle": "نسخ",
-    "sparkleStyle": "وميض"
+    "sparkleStyle": "وميض",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "نسخ",
@@ -4910,7 +5382,9 @@ export const ar: TranslationKeys = {
     "textClips": "مقتطفات نصية",
     "links": "روابط",
     "images": "صور",
-    "files": "ملفات"
+    "files": "ملفات",
+    "filesEmpty": "لا توجد ملفات بعد",
+    "filesEmptyHint": "انسخ الملفات أو اسحبها إلى اللوحة لرؤيتها هنا"
   },
   "onboarding": {
     "welcomeTitle": "مرحباً بك في Trace",
@@ -4987,12 +5461,12 @@ export const ar: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -5002,6 +5476,7 @@ export const ar: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -5033,6 +5508,7 @@ export const ar: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -5074,8 +5550,9 @@ export const ar: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "لا توجد مهام مرشحة الآن",
+    "candidatesEmptyHint": "تظهر المرشحات عندما يلاحظ Trace أنماطًا في تطبيقاتك والحافظة"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -5129,11 +5606,16 @@ export const bn: TranslationKeys = {
     "images": "ছবি",
     "files": "ফাইল",
     "tasks": "Tasks",
+    "clipboard": "ক্লিপবোর্ড",
+    "existingTasks": "বিদ্যমান কাজ",
+    "candidateTasks": "প্রার্থী কাজ",
+    "other": "অন্যান্য"
   },
   "tabs": {
     "behaviour": "আচরণ",
     "position": "অবস্থান",
-    "appearance": "চেহারা"
+    "appearance": "চেহারা",
+    "tasks": "কার্য"
   },
   "header": {
     "searchPlaceholder": "ইতিহাস অনুসন্ধান...",
@@ -5163,7 +5645,19 @@ export const bn: TranslationKeys = {
     "autoDeleteDesc": "কপি করা আইটেম স্বয়ংক্রিয়ভাবে মুছে ফেলুন (পিন করা সংরক্ষণ)",
     "never": "কখনও না",
     "capacityTitle": "ইতিহাস ধারণক্ষমতা",
-    "capacityDesc": "ইতিহাসে সংরক্ষিত সর্বোচ্চ আনপিন করা আইটেম"
+    "capacityDesc": "ইতিহাসে সংরক্ষিত সর্বোচ্চ আনপিন করা আইটেম",
+    "landingTitle": "ল্যান্ডিং পৃষ্ঠা",
+    "landingDesc": "প্যানেল খুললে ডিফল্ট পৃষ্ঠা",
+    "restoreTimeTitle": "পুনরুদ্ধারের সময়",
+    "restoreTimeDesc": "বন্ধ হওয়ার পর প্যানেল কতক্ষণ আপনার শেষ পৃষ্ঠা রাখে",
+    "restoreInstant": "তাৎক্ষণিক",
+    "restoreInstantDesc": "প্যানেল বন্ধ হওয়ামাত্র ল্যান্ডিং পৃষ্ঠায় ফেরে",
+    "restoreRelaxed": "স্বচ্ছন্দ",
+    "restoreRelaxedDesc": "শেষ পৃষ্ঠাটি ১০ সেকেন্ড রাখে",
+    "restoreDelayed": "বিলম্বিত",
+    "restoreDelayedDesc": "শেষ পৃষ্ঠাটি ১০ মিনিট রাখে",
+    "restoreForever": "স্থায়ী",
+    "restoreForeverDesc": "সবসময় শেষ পৃষ্ঠাটি রাখে; ল্যান্ডিং পৃষ্ঠা উপেক্ষিত হয়"
   },
   "position": {
     "edgePlacementTitle": "প্রান্ত স্থাপনা",
@@ -5211,7 +5705,19 @@ export const bn: TranslationKeys = {
     "logoStyle": "লোগো",
     "tickStyle": "টিক",
     "copyStyle": "কপি",
-    "sparkleStyle": "স্পার্কল"
+    "sparkleStyle": "স্পার্কল",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "কপি",
@@ -5264,7 +5770,9 @@ export const bn: TranslationKeys = {
     "textClips": "টেক্সট ক্লিপ",
     "links": "লিংক",
     "images": "ছবি",
-    "files": "ফাইল"
+    "files": "ফাইল",
+    "filesEmpty": "এখনো কোনো ফাইল নেই",
+    "filesEmptyHint": "ফাইল কপি করুন বা প্যানেলে টেনে আনুন এখানে দেখতে"
   },
   "onboarding": {
     "welcomeTitle": "Trace-এ স্বাগতম",
@@ -5341,12 +5849,12 @@ export const bn: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -5356,6 +5864,7 @@ export const bn: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -5387,6 +5896,7 @@ export const bn: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -5428,8 +5938,9 @@ export const bn: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "এখন কোনো প্রার্থী কাজ নেই",
+    "candidatesEmptyHint": "Trace আপনার অ্যাপ ও ক্লিপবোর্ডে নিদর্শন দেখলে প্রার্থী দেখা যায়"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -5483,11 +5994,16 @@ export const tr: TranslationKeys = {
     "images": "Görseller",
     "files": "Dosyalar",
     "tasks": "Tasks",
+    "clipboard": "Pano",
+    "existingTasks": "Mevcut görevler",
+    "candidateTasks": "Aday görevler",
+    "other": "Diğer"
   },
   "tabs": {
     "behaviour": "Davranış",
     "position": "Konum",
-    "appearance": "Görünüm"
+    "appearance": "Görünüm",
+    "tasks": "Görevler"
   },
   "header": {
     "searchPlaceholder": "Geçmişte ara...",
@@ -5517,7 +6033,19 @@ export const tr: TranslationKeys = {
     "autoDeleteDesc": "Kopyalanan öğeleri otomatik temizle (Sabitlenenleri korur)",
     "never": "Asla",
     "capacityTitle": "Geçmiş kapasitesi",
-    "capacityDesc": "Geçmişte saklanan en fazla sabitlenmemiş öğe sayısı"
+    "capacityDesc": "Geçmişte saklanan en fazla sabitlenmemiş öğe sayısı",
+    "landingTitle": "Açılış sayfası",
+    "landingDesc": "Panel açıldığında varsayılan sayfa",
+    "restoreTimeTitle": "Geri yükleme süresi",
+    "restoreTimeDesc": "Panel kapatıldıktan sonra son sayfanızı ne kadar süre tutar",
+    "restoreInstant": "Anında",
+    "restoreInstantDesc": "Panel kapanır kapanmaz açılış sayfasına döner",
+    "restoreRelaxed": "Sakin",
+    "restoreRelaxedDesc": "Son sayfayı 10 saniye tutar",
+    "restoreDelayed": "Gecikmeli",
+    "restoreDelayedDesc": "Son sayfayı 10 dakika tutar",
+    "restoreForever": "Kalıcı",
+    "restoreForeverDesc": "Her zaman son sayfayı tutar; açılış sayfası yok sayılır"
   },
   "position": {
     "edgePlacementTitle": "Kenar Yerleşimi",
@@ -5565,7 +6093,19 @@ export const tr: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "İşaret",
     "copyStyle": "Kopyala",
-    "sparkleStyle": "Kıvılcım"
+    "sparkleStyle": "Kıvılcım",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Kopyala",
@@ -5618,7 +6158,9 @@ export const tr: TranslationKeys = {
     "textClips": "metin parçacığı",
     "links": "bağlantı",
     "images": "görsel",
-    "files": "dosya"
+    "files": "dosya",
+    "filesEmpty": "Henüz dosya yok",
+    "filesEmptyHint": "Dosyaları kopyalayın veya panele sürükleyin, burada görünsün"
   },
   "onboarding": {
     "welcomeTitle": "Trace'a Hoş Geldiniz",
@@ -5695,12 +6237,12 @@ export const tr: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -5710,6 +6252,7 @@ export const tr: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -5741,6 +6284,7 @@ export const tr: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -5782,8 +6326,9 @@ export const tr: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Şu anda aday görev yok",
+    "candidatesEmptyHint": "Trace uygulamalarınızda ve panoda örüntüler fark ettiğinde adaylar görünür"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -5837,11 +6382,16 @@ export const vi: TranslationKeys = {
     "images": "Hình ảnh",
     "files": "Tệp",
     "tasks": "Tasks",
+    "clipboard": "Bảng nhớ tạm",
+    "existingTasks": "Nhiệm vụ hiện có",
+    "candidateTasks": "Nhiệm vụ ứng viên",
+    "other": "Khác"
   },
   "tabs": {
     "behaviour": "Hành vi",
     "position": "Vị trí",
-    "appearance": "Giao diện"
+    "appearance": "Giao diện",
+    "tasks": "Nhiệm vụ"
   },
   "header": {
     "searchPlaceholder": "Tìm trong lịch sử...",
@@ -5871,7 +6421,19 @@ export const vi: TranslationKeys = {
     "autoDeleteDesc": "Tự động thanh lọc các mục đã sao chép (giữ mục đã ghim)",
     "never": "Không bao giờ",
     "capacityTitle": "Dung lượng lịch sử",
-    "capacityDesc": "Số mục chưa ghim tối đa được lưu trong lịch sử"
+    "capacityDesc": "Số mục chưa ghim tối đa được lưu trong lịch sử",
+    "landingTitle": "Trang khởi đầu",
+    "landingDesc": "Trang mặc định khi mở bảng điều khiển",
+    "restoreTimeTitle": "Thời gian khôi phục",
+    "restoreTimeDesc": "Bảng điều khiển giữ trang cuối của bạn bao lâu sau khi đóng",
+    "restoreInstant": "Tức thì",
+    "restoreInstantDesc": "Quay lại trang khởi đầu ngay khi bảng đóng",
+    "restoreRelaxed": "Thong thả",
+    "restoreRelaxedDesc": "Giữ trang cuối trong 10 giây",
+    "restoreDelayed": "Trì hoãn",
+    "restoreDelayedDesc": "Giữ trang cuối trong 10 phút",
+    "restoreForever": "Vĩnh viễn",
+    "restoreForeverDesc": "Luôn giữ trang cuối; trang khởi đầu bị bỏ qua"
   },
   "position": {
     "edgePlacementTitle": "Vị trí mép",
@@ -5919,7 +6481,19 @@ export const vi: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Dấu kiểm",
     "copyStyle": "Sao chép",
-    "sparkleStyle": "Lấp lánh"
+    "sparkleStyle": "Lấp lánh",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Sao chép",
@@ -5972,7 +6546,9 @@ export const vi: TranslationKeys = {
     "textClips": "đoạn văn bản",
     "links": "liên kết",
     "images": "hình ảnh",
-    "files": "tệp"
+    "files": "tệp",
+    "filesEmpty": "Chưa có tệp nào",
+    "filesEmptyHint": "Sao chép hoặc kéo tệp vào bảng để xem chúng ở đây"
   },
   "onboarding": {
     "welcomeTitle": "Chào mừng đến với Trace",
@@ -6049,12 +6625,12 @@ export const vi: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -6064,6 +6640,7 @@ export const vi: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -6095,6 +6672,7 @@ export const vi: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -6136,8 +6714,9 @@ export const vi: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Hiện không có nhiệm vụ ứng viên",
+    "candidatesEmptyHint": "Ứng viên xuất hiện khi Trace nhận thấy các mẫu trong ứng dụng và bảng nhớ tạm của bạn"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -6191,11 +6770,16 @@ export const pl: TranslationKeys = {
     "images": "Obrazy",
     "files": "Pliki",
     "tasks": "Tasks",
+    "clipboard": "Schowek",
+    "existingTasks": "Istniejące zadania",
+    "candidateTasks": "Zadania kandydujące",
+    "other": "Inne"
   },
   "tabs": {
     "behaviour": "Zachowanie",
     "position": "Pozycja",
-    "appearance": "Wygląd"
+    "appearance": "Wygląd",
+    "tasks": "Zadania"
   },
   "header": {
     "searchPlaceholder": "Szukaj w historii...",
@@ -6225,7 +6809,19 @@ export const pl: TranslationKeys = {
     "autoDeleteDesc": "Automatycznie usuwaj skopiowane elementy (zachowuje przypięte)",
     "never": "Nigdy",
     "capacityTitle": "Pojemność historii",
-    "capacityDesc": "Maksymalna liczba odpiętych elementów przechowywanych w historii"
+    "capacityDesc": "Maksymalna liczba odpiętych elementów przechowywanych w historii",
+    "landingTitle": "Strona startowa",
+    "landingDesc": "Domyślna strona po otwarciu panelu",
+    "restoreTimeTitle": "Czas przywracania",
+    "restoreTimeDesc": "Jak długo panel przechowuje ostatnią stronę po zamknięciu",
+    "restoreInstant": "Natychmiast",
+    "restoreInstantDesc": "Wraca do strony startowej zaraz po zamknięciu panelu",
+    "restoreRelaxed": "Spokojnie",
+    "restoreRelaxedDesc": "Przechowuje ostatnią stronę przez 10 sekund",
+    "restoreDelayed": "Z opóźnieniem",
+    "restoreDelayedDesc": "Przechowuje ostatnią stronę przez 10 minut",
+    "restoreForever": "Stale",
+    "restoreForeverDesc": "Zawsze przechowuje ostatnią stronę; strona startowa jest ignorowana"
   },
   "position": {
     "edgePlacementTitle": "Położenie krawędzi",
@@ -6273,7 +6869,19 @@ export const pl: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Znacznik",
     "copyStyle": "Kopiuj",
-    "sparkleStyle": "Iskra"
+    "sparkleStyle": "Iskra",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Kopiuj",
@@ -6326,7 +6934,9 @@ export const pl: TranslationKeys = {
     "textClips": "wycinki tekstu",
     "links": "linki",
     "images": "obrazy",
-    "files": "pliki"
+    "files": "pliki",
+    "filesEmpty": "Brak plików",
+    "filesEmptyHint": "Skopiuj lub przeciągnij pliki do panelu, aby je tutaj zobaczyć"
   },
   "onboarding": {
     "welcomeTitle": "Witaj w Trace",
@@ -6403,12 +7013,12 @@ export const pl: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -6418,6 +7028,7 @@ export const pl: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -6449,6 +7060,7 @@ export const pl: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -6490,8 +7102,9 @@ export const pl: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Brak zadań kandydujących",
+    "candidatesEmptyHint": "Kandydaci pojawiają się, gdy Trace zauważy wzorce w Twoich aplikacjach i schowku"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -6545,11 +7158,16 @@ export const nl: TranslationKeys = {
     "images": "Foto's",
     "files": "Bestanden",
     "tasks": "Tasks",
+    "clipboard": "Klembord",
+    "existingTasks": "Bestaande taken",
+    "candidateTasks": "Kandidaat-taken",
+    "other": "Overig"
   },
   "tabs": {
     "behaviour": "Gedrag",
     "position": "Positie",
-    "appearance": "Weergave"
+    "appearance": "Weergave",
+    "tasks": "Taken"
   },
   "header": {
     "searchPlaceholder": "Geschiedenis doorzoeken...",
@@ -6579,7 +7197,19 @@ export const nl: TranslationKeys = {
     "autoDeleteDesc": "Gekopieerde items automatisch wissen (behoudt vastgezette)",
     "never": "Nooit",
     "capacityTitle": "Geschiedeniscapaciteit",
-    "capacityDesc": "Maximum aantal niet-vastgezette items in geschiedenis"
+    "capacityDesc": "Maximum aantal niet-vastgezette items in geschiedenis",
+    "landingTitle": "Startpagina",
+    "landingDesc": "Standaardpagina wanneer het paneel opent",
+    "restoreTimeTitle": "Hersteltijd",
+    "restoreTimeDesc": "Hoe lang het paneel uw laatste pagina bewaart na sluiten",
+    "restoreInstant": "Onmiddellijk",
+    "restoreInstantDesc": "Keert terug naar de startpagina zodra het paneel sluit",
+    "restoreRelaxed": "Ontspannen",
+    "restoreRelaxedDesc": "Bewaart de laatste pagina 10 seconden",
+    "restoreDelayed": "Uitgesteld",
+    "restoreDelayedDesc": "Bewaart de laatste pagina 10 minuten",
+    "restoreForever": "Altijd",
+    "restoreForeverDesc": "Bewaart altijd de laatste pagina; de startpagina wordt genegeerd"
   },
   "position": {
     "edgePlacementTitle": "Randplaatsing",
@@ -6627,7 +7257,19 @@ export const nl: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Vinkje",
     "copyStyle": "Kopiëren",
-    "sparkleStyle": "Sprankel"
+    "sparkleStyle": "Sprankel",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Kopiëren",
@@ -6680,7 +7322,9 @@ export const nl: TranslationKeys = {
     "textClips": "tekstfragmenten",
     "links": "links",
     "images": "afbeeldingen",
-    "files": "bestanden"
+    "files": "bestanden",
+    "filesEmpty": "Nog geen bestanden",
+    "filesEmptyHint": "Kopieer of sleep bestanden naar het paneel om ze hier te zien"
   },
   "onboarding": {
     "welcomeTitle": "Welkom bij Trace",
@@ -6757,12 +7401,12 @@ export const nl: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -6772,6 +7416,7 @@ export const nl: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -6803,6 +7448,7 @@ export const nl: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -6844,8 +7490,9 @@ export const nl: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Momenteel geen kandidaat-taken",
+    "candidatesEmptyHint": "Kandidaten verschijnen wanneer Trace patronen in uw apps en klembord opmerkt"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -6899,11 +7546,16 @@ export const sv: TranslationKeys = {
     "images": "Bilder",
     "files": "Filer",
     "tasks": "Tasks",
+    "clipboard": "Urklipp",
+    "existingTasks": "Befintliga uppgifter",
+    "candidateTasks": "Kandidatuppgifter",
+    "other": "Annat"
   },
   "tabs": {
     "behaviour": "Beteende",
     "position": "Position",
-    "appearance": "Utseende"
+    "appearance": "Utseende",
+    "tasks": "Uppgifter"
   },
   "header": {
     "searchPlaceholder": "Sök i historik...",
@@ -6933,7 +7585,19 @@ export const sv: TranslationKeys = {
     "autoDeleteDesc": "Rensa automatiskt kopierade objekt (bevarar fästa)",
     "never": "Aldrig",
     "capacityTitle": "Historikkapacitet",
-    "capacityDesc": "Maximalt antal ofästa objekt i historik"
+    "capacityDesc": "Maximalt antal ofästa objekt i historik",
+    "landingTitle": "Startsida",
+    "landingDesc": "Standardsida när panelen öppnas",
+    "restoreTimeTitle": "Återställningstid",
+    "restoreTimeDesc": "Hur länge panelen behåller din senaste sida efter stängning",
+    "restoreInstant": "Direkt",
+    "restoreInstantDesc": "Återgår till startsidan så snart panelen stängs",
+    "restoreRelaxed": "Avslappnad",
+    "restoreRelaxedDesc": "Behåller den senaste sidan i 10 sekunder",
+    "restoreDelayed": "Fördröjd",
+    "restoreDelayedDesc": "Behåller den senaste sidan i 10 minuter",
+    "restoreForever": "Alltid",
+    "restoreForeverDesc": "Behåller alltid den senaste sidan; startsidan ignoreras"
   },
   "position": {
     "edgePlacementTitle": "Kantplacering",
@@ -6981,7 +7645,19 @@ export const sv: TranslationKeys = {
     "logoStyle": "Logotyp",
     "tickStyle": "Kryss",
     "copyStyle": "Kopiera",
-    "sparkleStyle": "Gnista"
+    "sparkleStyle": "Gnista",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Kopiera",
@@ -7034,7 +7710,9 @@ export const sv: TranslationKeys = {
     "textClips": "textklipp",
     "links": "länkar",
     "images": "bilder",
-    "files": "filer"
+    "files": "filer",
+    "filesEmpty": "Inga filer ännu",
+    "filesEmptyHint": "Kopiera eller dra filer till panelen för att se dem här"
   },
   "onboarding": {
     "welcomeTitle": "Välkommen till Trace",
@@ -7111,12 +7789,12 @@ export const sv: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -7126,6 +7804,7 @@ export const sv: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -7157,6 +7836,7 @@ export const sv: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -7198,8 +7878,9 @@ export const sv: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Inga kandidatuppgifter just nu",
+    "candidatesEmptyHint": "Kandidater visas när Trace upptäcker mönster i dina appar och urklipp"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -7253,11 +7934,16 @@ export const id: TranslationKeys = {
     "images": "Gambar",
     "files": "Berkas",
     "tasks": "Tasks",
+    "clipboard": "Papan klip",
+    "existingTasks": "Tugas yang ada",
+    "candidateTasks": "Tugas kandidat",
+    "other": "Lainnya"
   },
   "tabs": {
     "behaviour": "Perilaku",
     "position": "Posisi",
-    "appearance": "Tampilan"
+    "appearance": "Tampilan",
+    "tasks": "Tugas"
   },
   "header": {
     "searchPlaceholder": "Cari riwayat...",
@@ -7287,7 +7973,19 @@ export const id: TranslationKeys = {
     "autoDeleteDesc": "Bersihkan item yang disalin secara otomatis (mempertahankan Disematkan)",
     "never": "Tidak pernah",
     "capacityTitle": "Kapasitas riwayat",
-    "capacityDesc": "Jumlah maksimum item tidak disematkan yang disimpan dalam riwayat"
+    "capacityDesc": "Jumlah maksimum item tidak disematkan yang disimpan dalam riwayat",
+    "landingTitle": "Halaman awal",
+    "landingDesc": "Halaman default saat panel terbuka",
+    "restoreTimeTitle": "Waktu pemulihan",
+    "restoreTimeDesc": "Berapa lama panel menyimpan halaman terakhir Anda setelah ditutup",
+    "restoreInstant": "Seketika",
+    "restoreInstantDesc": "Kembali ke halaman awal segera setelah panel ditutup",
+    "restoreRelaxed": "Santai",
+    "restoreRelaxedDesc": "Menyimpan halaman terakhir selama 10 detik",
+    "restoreDelayed": "Tertunda",
+    "restoreDelayedDesc": "Menyimpan halaman terakhir selama 10 menit",
+    "restoreForever": "Selamanya",
+    "restoreForeverDesc": "Selalu menyimpan halaman terakhir; halaman awal diabaikan"
   },
   "position": {
     "edgePlacementTitle": "Penempatan Tepi",
@@ -7335,7 +8033,19 @@ export const id: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Centang",
     "copyStyle": "Salin",
-    "sparkleStyle": "Kilau"
+    "sparkleStyle": "Kilau",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Salin",
@@ -7388,7 +8098,9 @@ export const id: TranslationKeys = {
     "textClips": "klip teks",
     "links": "tautan",
     "images": "gambar",
-    "files": "berkas"
+    "files": "berkas",
+    "filesEmpty": "Belum ada file",
+    "filesEmptyHint": "Salin atau seret file ke panel untuk melihatnya di sini"
   },
   "onboarding": {
     "welcomeTitle": "Selamat datang di Trace",
@@ -7465,12 +8177,12 @@ export const id: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -7480,6 +8192,7 @@ export const id: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -7511,6 +8224,7 @@ export const id: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -7552,8 +8266,9 @@ export const id: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Belum ada tugas kandidat",
+    "candidatesEmptyHint": "Kandidat muncul saat Trace melihat pola di aplikasi dan papan klip Anda"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -7607,11 +8322,16 @@ export const uk: TranslationKeys = {
     "images": "Фото",
     "files": "Файли",
     "tasks": "Tasks",
+    "clipboard": "Буфер обміну",
+    "existingTasks": "Наявні завдання",
+    "candidateTasks": "Завдання-кандидати",
+    "other": "Інше"
   },
   "tabs": {
     "behaviour": "Поведінка",
     "position": "Позиція",
-    "appearance": "Вигляд"
+    "appearance": "Вигляд",
+    "tasks": "Завдання"
   },
   "header": {
     "searchPlaceholder": "Пошук в історії...",
@@ -7641,7 +8361,19 @@ export const uk: TranslationKeys = {
     "autoDeleteDesc": "Автоматично очищати скопійовані елементи (зберігає прикріплені)",
     "never": "Ніколи",
     "capacityTitle": "Об'єм історії",
-    "capacityDesc": "Максимум неприкріплених елементів в історії"
+    "capacityDesc": "Максимум неприкріплених елементів в історії",
+    "landingTitle": "Початкова сторінка",
+    "landingDesc": "Сторінка за замовчуванням під час відкриття панелі",
+    "restoreTimeTitle": "Час відновлення",
+    "restoreTimeDesc": "Скільки панель зберігає останню сторінку після закриття",
+    "restoreInstant": "Миттєво",
+    "restoreInstantDesc": "Повертається на початкову сторінку щойно панель закривається",
+    "restoreRelaxed": "Спокійно",
+    "restoreRelaxedDesc": "Зберігає останню сторінку 10 секунд",
+    "restoreDelayed": "Із затримкою",
+    "restoreDelayedDesc": "Зберігає останню сторінку 10 хвилин",
+    "restoreForever": "Постійно",
+    "restoreForeverDesc": "Завжди зберігає останню сторінку; початкова сторінка ігнорується"
   },
   "position": {
     "edgePlacementTitle": "Розміщення краю",
@@ -7689,7 +8421,19 @@ export const uk: TranslationKeys = {
     "logoStyle": "Логотип",
     "tickStyle": "Галочка",
     "copyStyle": "Копіювати",
-    "sparkleStyle": "Іскра"
+    "sparkleStyle": "Іскра",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Копіювати",
@@ -7742,7 +8486,9 @@ export const uk: TranslationKeys = {
     "textClips": "текстових фрагментів",
     "links": "посилань",
     "images": "зображень",
-    "files": "файлів"
+    "files": "файлів",
+    "filesEmpty": "Поки немає файлів",
+    "filesEmptyHint": "Скопіюйте або перетягніть файли в панель, щоб побачити їх тут"
   },
   "onboarding": {
     "welcomeTitle": "Ласкаво просимо до Trace",
@@ -7819,12 +8565,12 @@ export const uk: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -7834,6 +8580,7 @@ export const uk: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -7865,6 +8612,7 @@ export const uk: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -7906,8 +8654,9 @@ export const uk: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Зараз немає завдань-кандидатів",
+    "candidatesEmptyHint": "Кандидати з’являються, коли Trace помічає закономірності у ваших застосунках і буфері обміну"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -7961,11 +8710,16 @@ export const el: TranslationKeys = {
     "images": "Φωτό",
     "files": "Αρχεία",
     "tasks": "Tasks",
+    "clipboard": "Πρόχειρο",
+    "existingTasks": "Υπάρχουσες εργασίες",
+    "candidateTasks": "Υποψήφιες εργασίες",
+    "other": "Άλλα"
   },
   "tabs": {
     "behaviour": "Συμπεριφορά",
     "position": "Θέση",
-    "appearance": "Εμφάνιση"
+    "appearance": "Εμφάνιση",
+    "tasks": "Εργασίες"
   },
   "header": {
     "searchPlaceholder": "Αναζήτηση στο ιστορικό...",
@@ -7995,7 +8749,19 @@ export const el: TranslationKeys = {
     "autoDeleteDesc": "Αυτόματη εκκαθάριση αντιγραμμένων στοιχείων (διατηρεί τα Καρφιτσωμένα)",
     "never": "Ποτέ",
     "capacityTitle": "Χωρητικότητα ιστορικού",
-    "capacityDesc": "Μέγιστος αριθμός μη καρφιτσωμένων στοιχείων στο ιστορικό"
+    "capacityDesc": "Μέγιστος αριθμός μη καρφιτσωμένων στοιχείων στο ιστορικό",
+    "landingTitle": "Αρχική σελίδα",
+    "landingDesc": "Προεπιλεγμένη σελίδα κατά το άνοιγμα του πίνακα",
+    "restoreTimeTitle": "Χρόνος επαναφοράς",
+    "restoreTimeDesc": "Πόσο διατηρεί ο πίνακας την τελευταία σας σελίδα μετά το κλείσιμο",
+    "restoreInstant": "Άμεσα",
+    "restoreInstantDesc": "Επιστρέφει στην αρχική σελίδα μόλις κλείσει ο πίνακας",
+    "restoreRelaxed": "Χαλαρά",
+    "restoreRelaxedDesc": "Διατηρεί την τελευταία σελίδα για 10 δευτερόλεπτα",
+    "restoreDelayed": "Με καθυστέρηση",
+    "restoreDelayedDesc": "Διατηρεί την τελευταία σελίδα για 10 λεπτά",
+    "restoreForever": "Μόνιμα",
+    "restoreForeverDesc": "Διατηρεί πάντα την τελευταία σελίδα· η αρχική σελίδα αγνοείται"
   },
   "position": {
     "edgePlacementTitle": "Τοποθέτηση άκρης",
@@ -8043,7 +8809,19 @@ export const el: TranslationKeys = {
     "logoStyle": "Λογότυπο",
     "tickStyle": "Τικ",
     "copyStyle": "Αντιγραφή",
-    "sparkleStyle": "Σπίθα"
+    "sparkleStyle": "Σπίθα",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Αντιγραφή",
@@ -8096,7 +8874,9 @@ export const el: TranslationKeys = {
     "textClips": "αποσπάσματα κειμένου",
     "links": "σύνδεσμοι",
     "images": "εικόνες",
-    "files": "αρχεία"
+    "files": "αρχεία",
+    "filesEmpty": "Δεν υπάρχουν αρχεία ακόμα",
+    "filesEmptyHint": "Αντιγράψτε ή σύρετε αρχεία στον πίνακα για να τα δείτε εδώ"
   },
   "onboarding": {
     "welcomeTitle": "Καλώς ήρθατε στο Trace",
@@ -8173,12 +8953,12 @@ export const el: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -8188,6 +8968,7 @@ export const el: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -8219,6 +9000,7 @@ export const el: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -8260,8 +9042,9 @@ export const el: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Δεν υπάρχουν υποψήφιες εργασίες αυτή τη στιγμή",
+    "candidatesEmptyHint": "Οι υποψήφιες εμφανίζονται όταν το Trace εντοπίζει μοτίβα στις εφαρμογές και το πρόχειρό σας"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -8315,11 +9098,16 @@ export const cs: TranslationKeys = {
     "images": "Fotky",
     "files": "Soubory",
     "tasks": "Tasks",
+    "clipboard": "Schránka",
+    "existingTasks": "Existující úkoly",
+    "candidateTasks": "Kandidátské úkoly",
+    "other": "Ostatní"
   },
   "tabs": {
     "behaviour": "Chování",
     "position": "Pozice",
-    "appearance": "Vzhled"
+    "appearance": "Vzhled",
+    "tasks": "Úkoly"
   },
   "header": {
     "searchPlaceholder": "Hledat v historii...",
@@ -8349,7 +9137,19 @@ export const cs: TranslationKeys = {
     "autoDeleteDesc": "Automaticky odstranit zkopírované položky (zachová připnuté)",
     "never": "Nikdy",
     "capacityTitle": "Kapacita historie",
-    "capacityDesc": "Maximální počet nepřipnutých položek v historii"
+    "capacityDesc": "Maximální počet nepřipnutých položek v historii",
+    "landingTitle": "Vstupní stránka",
+    "landingDesc": "Výchozí stránka při otevření panelu",
+    "restoreTimeTitle": "Doba obnovení",
+    "restoreTimeDesc": "Jak dlouho si panel po zavření ponechá vaši poslední stránku",
+    "restoreInstant": "Okamžitě",
+    "restoreInstantDesc": "Vrátí se na vstupní stránku, jakmile se panel zavře",
+    "restoreRelaxed": "Uvolněně",
+    "restoreRelaxedDesc": "Ponechá poslední stránku po dobu 10 sekund",
+    "restoreDelayed": "Se zpožděním",
+    "restoreDelayedDesc": "Ponechá poslední stránku po dobu 10 minut",
+    "restoreForever": "Trvale",
+    "restoreForeverDesc": "Vždy ponechá poslední stránku; vstupní stránka se ignoruje"
   },
   "position": {
     "edgePlacementTitle": "Umístění na okraji",
@@ -8397,7 +9197,19 @@ export const cs: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Zaškrtnutí",
     "copyStyle": "Kopírovat",
-    "sparkleStyle": "Jiskra"
+    "sparkleStyle": "Jiskra",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Kopírovat",
@@ -8450,7 +9262,9 @@ export const cs: TranslationKeys = {
     "textClips": "textové výstřižky",
     "links": "odkazy",
     "images": "obrázky",
-    "files": "soubory"
+    "files": "soubory",
+    "filesEmpty": "Zatím žádné soubory",
+    "filesEmptyHint": "Zkopírujte nebo přetáhněte soubory do panelu, aby se zobrazily zde"
   },
   "onboarding": {
     "welcomeTitle": "Vítejte v Trace",
@@ -8527,12 +9341,12 @@ export const cs: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -8542,6 +9356,7 @@ export const cs: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -8573,6 +9388,7 @@ export const cs: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -8614,8 +9430,9 @@ export const cs: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Zatím žádné kandidátské úkoly",
+    "candidatesEmptyHint": "Kandidáti se objeví, když Trace zaznamená vzorce ve vašich aplikacích a schránce"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -8669,11 +9486,16 @@ export const ro: TranslationKeys = {
     "images": "Poze",
     "files": "Fișiere",
     "tasks": "Tasks",
+    "clipboard": "Clipboard",
+    "existingTasks": "Sarcini existente",
+    "candidateTasks": "Sarcini candidate",
+    "other": "Altele"
   },
   "tabs": {
     "behaviour": "Comportament",
     "position": "Poziție",
-    "appearance": "Aspect"
+    "appearance": "Aspect",
+    "tasks": "Sarcini"
   },
   "header": {
     "searchPlaceholder": "Caută în istoric...",
@@ -8703,7 +9525,19 @@ export const ro: TranslationKeys = {
     "autoDeleteDesc": "Șterge automat elementele copiate (păstrează Pinate)",
     "never": "Niciodată",
     "capacityTitle": "Capacitate istoric",
-    "capacityDesc": "Numărul maxim de elemente nepinate stocate în istoric"
+    "capacityDesc": "Numărul maxim de elemente nepinate stocate în istoric",
+    "landingTitle": "Pagină de start",
+    "landingDesc": "Pagina implicită la deschiderea panoului",
+    "restoreTimeTitle": "Timp de restaurare",
+    "restoreTimeDesc": "Cât timp păstrează panoul ultima pagină după închidere",
+    "restoreInstant": "Imediat",
+    "restoreInstantDesc": "Revine la pagina de start imediat ce panoul se închide",
+    "restoreRelaxed": "Relaxat",
+    "restoreRelaxedDesc": "Păstrează ultima pagină timp de 10 secunde",
+    "restoreDelayed": "Întârziat",
+    "restoreDelayedDesc": "Păstrează ultima pagină timp de 10 minute",
+    "restoreForever": "Permanent",
+    "restoreForeverDesc": "Păstrează întotdeauna ultima pagină; pagina de start este ignorată"
   },
   "position": {
     "edgePlacementTitle": "Plasare margine",
@@ -8751,7 +9585,19 @@ export const ro: TranslationKeys = {
     "logoStyle": "Siglă",
     "tickStyle": "Bifă",
     "copyStyle": "Copiază",
-    "sparkleStyle": "Scânteie"
+    "sparkleStyle": "Scânteie",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Copiază",
@@ -8804,7 +9650,9 @@ export const ro: TranslationKeys = {
     "textClips": "fragment text",
     "links": "linkuri",
     "images": "imagini",
-    "files": "fișiere"
+    "files": "fișiere",
+    "filesEmpty": "Încă nu există fișiere",
+    "filesEmptyHint": "Copiază sau trage fișiere în panou pentru a le vedea aici"
   },
   "onboarding": {
     "welcomeTitle": "Bun venit la Trace",
@@ -8881,12 +9729,12 @@ export const ro: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -8896,6 +9744,7 @@ export const ro: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -8927,6 +9776,7 @@ export const ro: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -8968,8 +9818,9 @@ export const ro: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Nicio sarcină candidată momentan",
+    "candidatesEmptyHint": "Candidatele apar când Trace observă tipare în aplicațiile și clipboardul tău"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -9023,11 +9874,16 @@ export const hu: TranslationKeys = {
     "images": "Képek",
     "files": "Fájlok",
     "tasks": "Tasks",
+    "clipboard": "Vágólap",
+    "existingTasks": "Meglévő feladatok",
+    "candidateTasks": "Jelölt feladatok",
+    "other": "Egyéb"
   },
   "tabs": {
     "behaviour": "Viselkedés",
     "position": "Pozíció",
-    "appearance": "Megjelenés"
+    "appearance": "Megjelenés",
+    "tasks": "Feladatok"
   },
   "header": {
     "searchPlaceholder": "Keresés az előzményekben...",
@@ -9057,7 +9913,19 @@ export const hu: TranslationKeys = {
     "autoDeleteDesc": "Másolt elemek automatikus tisztítása (a rögzítetteket megőrzi)",
     "never": "Soha",
     "capacityTitle": "Előzmények kapacitása",
-    "capacityDesc": "Az előzményekben tárolt nem rögzített elemek maximális száma"
+    "capacityDesc": "Az előzményekben tárolt nem rögzített elemek maximális száma",
+    "landingTitle": "Kezdőlap",
+    "landingDesc": "Alapértelmezett oldal a panel megnyitásakor",
+    "restoreTimeTitle": "Visszaállítási idő",
+    "restoreTimeDesc": "Mennyi ideig őrzi a panel az utolsó oldalt bezárás után",
+    "restoreInstant": "Azonnal",
+    "restoreInstantDesc": "Visszatér a kezdőlapra, amint a panel bezárul",
+    "restoreRelaxed": "Laza",
+    "restoreRelaxedDesc": "10 másodpercig őrzi az utolsó oldalt",
+    "restoreDelayed": "Késleltetett",
+    "restoreDelayedDesc": "10 percig őrzi az utolsó oldalt",
+    "restoreForever": "Végleges",
+    "restoreForeverDesc": "Mindig az utolsó oldalt őrzi; a kezdőlap figyelmen kívül marad"
   },
   "position": {
     "edgePlacementTitle": "Szél-elhelyezés",
@@ -9105,7 +9973,19 @@ export const hu: TranslationKeys = {
     "logoStyle": "Logó",
     "tickStyle": "Pipa",
     "copyStyle": "Másolás",
-    "sparkleStyle": "Szikra"
+    "sparkleStyle": "Szikra",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Másolás",
@@ -9158,7 +10038,9 @@ export const hu: TranslationKeys = {
     "textClips": "szöveges kivonatok",
     "links": "hivatkozások",
     "images": "képek",
-    "files": "fájlok"
+    "files": "fájlok",
+    "filesEmpty": "Még nincsenek fájlok",
+    "filesEmptyHint": "Másoljon vagy húzzon fájlokat a panelre, hogy itt lássa őket"
   },
   "onboarding": {
     "welcomeTitle": "Üdvözli az Trace",
@@ -9235,12 +10117,12 @@ export const hu: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -9250,6 +10132,7 @@ export const hu: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -9281,6 +10164,7 @@ export const hu: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -9322,8 +10206,9 @@ export const hu: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Jelenleg nincs jelölt feladat",
+    "candidatesEmptyHint": "A jelöltek akkor jelennek meg, amikor a Trace mintákat észlel az alkalmazásaiban és a vágólapon"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -9377,11 +10262,16 @@ export const da: TranslationKeys = {
     "images": "Billeder",
     "files": "Filer",
     "tasks": "Tasks",
+    "clipboard": "Udklipsholder",
+    "existingTasks": "Eksisterende opgaver",
+    "candidateTasks": "Kandidatopgaver",
+    "other": "Andet"
   },
   "tabs": {
     "behaviour": "Adfærd",
     "position": "Position",
-    "appearance": "Udseende"
+    "appearance": "Udseende",
+    "tasks": "Opgaver"
   },
   "header": {
     "searchPlaceholder": "Søg i historik...",
@@ -9411,7 +10301,19 @@ export const da: TranslationKeys = {
     "autoDeleteDesc": "Ryd automatisk kopierede elementer (bevarer Fastgjorte)",
     "never": "Aldrig",
     "capacityTitle": "Historikkapacitet",
-    "capacityDesc": "Maksimalt antal ikke-fastgjorte elementer gemt i historik"
+    "capacityDesc": "Maksimalt antal ikke-fastgjorte elementer gemt i historik",
+    "landingTitle": "Startside",
+    "landingDesc": "Standardside, når panelet åbnes",
+    "restoreTimeTitle": "Gendannelsestid",
+    "restoreTimeDesc": "Hvor længe panelet beholder din sidste side efter lukning",
+    "restoreInstant": "Øjeblikkelig",
+    "restoreInstantDesc": "Vender tilbage til startsiden, så snart panelet lukkes",
+    "restoreRelaxed": "Afslappet",
+    "restoreRelaxedDesc": "Beholder den sidste side i 10 sekunder",
+    "restoreDelayed": "Forsinket",
+    "restoreDelayedDesc": "Beholder den sidste side i 10 minutter",
+    "restoreForever": "Altid",
+    "restoreForeverDesc": "Beholder altid den sidste side; startsiden ignoreres"
   },
   "position": {
     "edgePlacementTitle": "Kantplacering",
@@ -9459,7 +10361,19 @@ export const da: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Hak",
     "copyStyle": "Kopier",
-    "sparkleStyle": "Gnist"
+    "sparkleStyle": "Gnist",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Kopier",
@@ -9512,7 +10426,9 @@ export const da: TranslationKeys = {
     "textClips": "tekstklip",
     "links": "links",
     "images": "billeder",
-    "files": "filer"
+    "files": "filer",
+    "filesEmpty": "Ingen filer endnu",
+    "filesEmptyHint": "Kopier eller træk filer ind i panelet for at se dem her"
   },
   "onboarding": {
     "welcomeTitle": "Velkommen til Trace",
@@ -9589,12 +10505,12 @@ export const da: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -9604,6 +10520,7 @@ export const da: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -9635,6 +10552,7 @@ export const da: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -9676,8 +10594,9 @@ export const da: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Ingen kandidatopgaver lige nu",
+    "candidatesEmptyHint": "Kandidater vises, når Trace opdager mønstre i dine apps og udklipsholder"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -9731,11 +10650,16 @@ export const fi: TranslationKeys = {
     "images": "Kuvat",
     "files": "Tiedostot",
     "tasks": "Tasks",
+    "clipboard": "Leikepöytä",
+    "existingTasks": "Olemassa olevat tehtävät",
+    "candidateTasks": "Ehdokastehtävät",
+    "other": "Muut"
   },
   "tabs": {
     "behaviour": "Toiminta",
     "position": "Sijainti",
-    "appearance": "Ulkoasu"
+    "appearance": "Ulkoasu",
+    "tasks": "Tehtävät"
   },
   "header": {
     "searchPlaceholder": "Hae historiasta...",
@@ -9765,7 +10689,19 @@ export const fi: TranslationKeys = {
     "autoDeleteDesc": "Poista kopioidut kohteet automaattisesti (säilyttää Kiinnitetyt)",
     "never": "Ei koskaan",
     "capacityTitle": "Historian kapasiteetti",
-    "capacityDesc": "Historiassa säilytettyjen kiinnittämättömien kohteiden enimmäismäärä"
+    "capacityDesc": "Historiassa säilytettyjen kiinnittämättömien kohteiden enimmäismäärä",
+    "landingTitle": "Aloitussivu",
+    "landingDesc": "Oletussivu, kun paneeli avataan",
+    "restoreTimeTitle": "Palautusaika",
+    "restoreTimeDesc": "Kuinka kauan paneeli säilyttää viimeisimmän sivun sulkemisen jälkeen",
+    "restoreInstant": "Välittömästi",
+    "restoreInstantDesc": "Palaa aloitussivulle heti, kun paneeli sulkeutuu",
+    "restoreRelaxed": "Rento",
+    "restoreRelaxedDesc": "Säilyttää viimeisimmän sivun 10 sekuntia",
+    "restoreDelayed": "Viivästetty",
+    "restoreDelayedDesc": "Säilyttää viimeisimmän sivun 10 minuuttia",
+    "restoreForever": "Aina",
+    "restoreForeverDesc": "Säilyttää aina viimeisimmän sivun; aloitussivua ei käytetä"
   },
   "position": {
     "edgePlacementTitle": "Reunan sijoitus",
@@ -9813,7 +10749,19 @@ export const fi: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Rasti",
     "copyStyle": "Kopioi",
-    "sparkleStyle": "Kipinä"
+    "sparkleStyle": "Kipinä",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Kopioi",
@@ -9866,7 +10814,9 @@ export const fi: TranslationKeys = {
     "textClips": "tekstileikettä",
     "links": "linkkiä",
     "images": "kuvaa",
-    "files": "tiedostoa"
+    "files": "tiedostoa",
+    "filesEmpty": "Ei vielä tiedostoja",
+    "filesEmptyHint": "Kopioi tai vedä tiedostoja paneeliin nähdäksesi ne täällä"
   },
   "onboarding": {
     "welcomeTitle": "Tervetuloa Traceiin",
@@ -9943,12 +10893,12 @@ export const fi: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -9958,6 +10908,7 @@ export const fi: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -9989,6 +10940,7 @@ export const fi: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -10030,8 +10982,9 @@ export const fi: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Ei ehdokastehtäviä juuri nyt",
+    "candidatesEmptyHint": "Ehdokkaat ilmestyvät, kun Trace huomaa kaavoja sovelluksissasi ja leikepöydällä"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -10085,11 +11038,16 @@ export const th: TranslationKeys = {
     "images": "รูปภาพ",
     "files": "ไฟล์",
     "tasks": "Tasks",
+    "clipboard": "คลิปบอร์ด",
+    "existingTasks": "งานที่มีอยู่",
+    "candidateTasks": "งานผู้สมัคร",
+    "other": "อื่นๆ"
   },
   "tabs": {
     "behaviour": "พฤติกรรม",
     "position": "ตำแหน่ง",
-    "appearance": "ลักษณะ"
+    "appearance": "ลักษณะ",
+    "tasks": "งาน"
   },
   "header": {
     "searchPlaceholder": "ค้นหาในประวัติ...",
@@ -10119,7 +11077,19 @@ export const th: TranslationKeys = {
     "autoDeleteDesc": "ล้างรายการที่คัดลอกอัตโนมัติ (คงรายการที่ปักหมุดไว้)",
     "never": "ไม่เคย",
     "capacityTitle": "ความจุประวัติ",
-    "capacityDesc": "จำนวนรายการที่ไม่ได้ปักหมุดสูงสุดที่เก็บในประวัติ"
+    "capacityDesc": "จำนวนรายการที่ไม่ได้ปักหมุดสูงสุดที่เก็บในประวัติ",
+    "landingTitle": "หน้าเริ่มต้น",
+    "landingDesc": "หน้าเริ่มต้นเมื่อเปิดแผง",
+    "restoreTimeTitle": "เวลาคืนค่า",
+    "restoreTimeDesc": "แผงจะเก็บหน้าสุดท้ายของคุณไว้นานเท่าใดหลังปิด",
+    "restoreInstant": "ทันที",
+    "restoreInstantDesc": "กลับไปหน้าเริ่มต้นทันทีที่แผงปิด",
+    "restoreRelaxed": "ผ่อนคลาย",
+    "restoreRelaxedDesc": "เก็บหน้าสุดท้ายไว้ 10 วินาที",
+    "restoreDelayed": "หน่วงเวลา",
+    "restoreDelayedDesc": "เก็บหน้าสุดท้ายไว้ 10 นาที",
+    "restoreForever": "ถาวร",
+    "restoreForeverDesc": "เก็บหน้าสุดท้ายเสมอ ไม่ใช้หน้าเริ่มต้น"
   },
   "position": {
     "edgePlacementTitle": "ตำแหน่งขอบ",
@@ -10167,7 +11137,19 @@ export const th: TranslationKeys = {
     "logoStyle": "โลโก้",
     "tickStyle": "เครื่องหมายถูก",
     "copyStyle": "คัดลอก",
-    "sparkleStyle": "ประกาย"
+    "sparkleStyle": "ประกาย",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "คัดลอก",
@@ -10220,7 +11202,9 @@ export const th: TranslationKeys = {
     "textClips": "คลิปข้อความ",
     "links": "ลิงก์",
     "images": "รูปภาพ",
-    "files": "ไฟล์"
+    "files": "ไฟล์",
+    "filesEmpty": "ยังไม่มีไฟล์",
+    "filesEmptyHint": "คัดลอกหรือลากไฟล์ไปที่แผงเพื่อดูที่นี่"
   },
   "onboarding": {
     "welcomeTitle": "ยินดีต้อนรับสู่ Trace",
@@ -10297,12 +11281,12 @@ export const th: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -10312,6 +11296,7 @@ export const th: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -10343,6 +11328,7 @@ export const th: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -10384,8 +11370,9 @@ export const th: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "ยังไม่มีงานผู้สมัครในตอนนี้",
+    "candidatesEmptyHint": "ผู้สมัครจะปรากฏเมื่อ Trace เห็นรูปแบบในแอปและคลิปบอร์ดของคุณ"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -10439,11 +11426,16 @@ export const he: TranslationKeys = {
     "images": "תמונות",
     "files": "קבצים",
     "tasks": "Tasks",
+    "clipboard": "לוח",
+    "existingTasks": "משימות קיימות",
+    "candidateTasks": "משימות מועמדות",
+    "other": "אחר"
   },
   "tabs": {
     "behaviour": "התנהגות",
     "position": "מיקום",
-    "appearance": "מראה"
+    "appearance": "מראה",
+    "tasks": "משימות"
   },
   "header": {
     "searchPlaceholder": "חיפוש בהיסטוריה...",
@@ -10473,7 +11465,19 @@ export const he: TranslationKeys = {
     "autoDeleteDesc": "מחק אוטומטית פריטים שהועתקו (שומר על מוצמדים)",
     "never": "לעולם לא",
     "capacityTitle": "קיבולת היסטוריה",
-    "capacityDesc": "מספר מרבי של פריטים לא מוצמדים בהיסטוריה"
+    "capacityDesc": "מספר מרבי של פריטים לא מוצמדים בהיסטוריה",
+    "landingTitle": "עמוד פתיחה",
+    "landingDesc": "העמוד המוגדר כברירת מחדל בפתיחת הפאנל",
+    "restoreTimeTitle": "זמן שחזור",
+    "restoreTimeDesc": "כמה זמן הפאנל שומר את העמוד האחרון שלך לאחר הסגירה",
+    "restoreInstant": "מיידי",
+    "restoreInstantDesc": "חוזר לעמוד הפתיחה ברגע שהפאנל נסגר",
+    "restoreRelaxed": "רגוע",
+    "restoreRelaxedDesc": "שומר את העמוד האחרון למשך 10 שניות",
+    "restoreDelayed": "מושהה",
+    "restoreDelayedDesc": "שומר את העמוד האחרון למשך 10 דקות",
+    "restoreForever": "קבוע",
+    "restoreForeverDesc": "תמיד שומר את העמוד האחרון; עמוד הפתיחה מתעלם"
   },
   "position": {
     "edgePlacementTitle": "מיקום קצה",
@@ -10521,7 +11525,19 @@ export const he: TranslationKeys = {
     "logoStyle": "לוגו",
     "tickStyle": "סימן",
     "copyStyle": "העתק",
-    "sparkleStyle": "ניצוץ"
+    "sparkleStyle": "ניצוץ",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "העתק",
@@ -10574,7 +11590,9 @@ export const he: TranslationKeys = {
     "textClips": "קטעי טקסט",
     "links": "קישורים",
     "images": "תמונות",
-    "files": "קבצים"
+    "files": "קבצים",
+    "filesEmpty": "אין עדיין קבצים",
+    "filesEmptyHint": "העתק או גרור קבצים לפאנל כדי לראות אותם כאן"
   },
   "onboarding": {
     "welcomeTitle": "ברוכים הבאים ל-Trace",
@@ -10651,12 +11669,12 @@ export const he: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -10666,6 +11684,7 @@ export const he: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -10697,6 +11716,7 @@ export const he: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -10738,8 +11758,9 @@ export const he: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "אין כרגע משימות מועמדות",
+    "candidatesEmptyHint": "מועמדות מופיעות כשטרייס מזהה דפוסים באפליקציות ובלוח שלך"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",
@@ -10793,11 +11814,16 @@ export const no: TranslationKeys = {
     "images": "Bilder",
     "files": "Filer",
     "tasks": "Tasks",
+    "clipboard": "Utklippstavle",
+    "existingTasks": "Eksisterende oppgaver",
+    "candidateTasks": "Kandidatoppgaver",
+    "other": "Annet"
   },
   "tabs": {
     "behaviour": "Oppførsel",
     "position": "Posisjon",
-    "appearance": "Utseende"
+    "appearance": "Utseende",
+    "tasks": "Oppgaver"
   },
   "header": {
     "searchPlaceholder": "Søk i historikk...",
@@ -10827,7 +11853,19 @@ export const no: TranslationKeys = {
     "autoDeleteDesc": "Fjern kopierte elementer automatisk (beholder Festede)",
     "never": "Aldri",
     "capacityTitle": "Historikk-kapasitet",
-    "capacityDesc": "Maksimalt antall ikke-festede elementer lagret i historikk"
+    "capacityDesc": "Maksimalt antall ikke-festede elementer lagret i historikk",
+    "landingTitle": "Startside",
+    "landingDesc": "Standardside når panelet åpnes",
+    "restoreTimeTitle": "Gjenopprettingstid",
+    "restoreTimeDesc": "Hvor lenge panelet beholder din siste side etter lukking",
+    "restoreInstant": "Umiddelbart",
+    "restoreInstantDesc": "Vender tilbake til startsiden så snart panelet lukkes",
+    "restoreRelaxed": "Avslappet",
+    "restoreRelaxedDesc": "Beholder den siste siden i 10 sekunder",
+    "restoreDelayed": "Forsinket",
+    "restoreDelayedDesc": "Beholder den siste siden i 10 minutter",
+    "restoreForever": "Alltid",
+    "restoreForeverDesc": "Beholder alltid den siste siden; startsiden ignoreres"
   },
   "position": {
     "edgePlacementTitle": "Kant-plassering",
@@ -10875,7 +11913,19 @@ export const no: TranslationKeys = {
     "logoStyle": "Logo",
     "tickStyle": "Hake",
     "copyStyle": "Kopier",
-    "sparkleStyle": "Gnist"
+    "sparkleStyle": "Gnist",
+    "themeTitle": "Theme color",
+    "themeDesc": "Accent color for the panel, drag ghosts, and the copy indicator",
+    "themeGraphite": "Graphite",
+    "themeGraphiteDesc": "Neutral gray — quiet, fits any workflow",
+    "themeCobalt": "Cobalt",
+    "themeCobaltDesc": "Deep blue — classic focus feel",
+    "themeVerdigris": "Verdigris",
+    "themeVerdigrisDesc": "Teal — fresh and calm",
+    "themeAmber": "Amber",
+    "themeAmberDesc": "Warm orange — energetic highlights",
+    "themeViolet": "Violet",
+    "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
     "copy": "Kopier",
@@ -10928,7 +11978,9 @@ export const no: TranslationKeys = {
     "textClips": "tekstklipp",
     "links": "lenker",
     "images": "bilder",
-    "files": "filer"
+    "files": "filer",
+    "filesEmpty": "Ingen filer ennå",
+    "filesEmptyHint": "Kopier eller dra filer inn i panelet for å se dem her"
   },
   "onboarding": {
     "welcomeTitle": "Velkommen til Trace",
@@ -11005,12 +12057,12 @@ export const no: TranslationKeys = {
     "sectionTitle": "AI Providers",
     "sectionDesc": "Configure AI endpoints for task suggestions. The first provider is primary; failures fail over to the next in the chain.",
     "noProviders": "No providers configured — AI suggestions are disabled.",
-    "addLocal": "Add local (Ollama)",
-    "addCloud": "Add cloud (OpenAI-compatible)",
-    "detectOllama": "Detect local Ollama",
+    "addLocalModel": "Add local model",
+    "addCloudProvider": "Add cloud provider",
+    "edit": "Edit",
     "detecting": "Detecting…",
     "detectNotFound": "No local Ollama detected at http://127.0.0.1:11434",
-    "detectFound": "Ollama detected — added provider ({model})",
+    "detectFound": "Ollama detected ({model})",
     "test": "Test",
     "testing": "Testing…",
     "testOk": "OK · {ms} ms",
@@ -11020,6 +12072,7 @@ export const no: TranslationKeys = {
     "baseUrl": "Base URL",
     "apiKey": "API Key (optional)",
     "model": "Model",
+    "unnamedModel": "Unnamed model",
     "kindLocal": "Local",
     "kindCloud": "Cloud",
     "schemaOutput": "Structured output (json_schema)",
@@ -11051,6 +12104,7 @@ export const no: TranslationKeys = {
     "restore": "Restore",
     "back": "Back",
     "activeAt": "Active {time}",
+    "runningTime": "Running {duration}",
     "resourcesTitle": "Content",
     "resourceCount": "{count} items",
     "noResources": "Nothing attached yet",
@@ -11092,8 +12146,9 @@ export const no: TranslationKeys = {
     "saveZoneHint": "Drop to save into clipboard shelf",
     "dragHint": "Drop on a task to link it, on a suggestion to create one",
     "suggestionCreated": "Task created and linked",
+    "candidatesEmpty": "Ingen kandidatoppgaver akkurat nå",
+    "candidatesEmptyHint": "Kandidater vises når Trace oppdager mønstre i appene og utklippstavlen din"
   },
-
   "memory": {
     "sectionTitle": "Long-term memory",
     "sectionDesc": "Memories distilled from confirmed task feedback shape future suggestions. Nothing is stored without your confirmation.",

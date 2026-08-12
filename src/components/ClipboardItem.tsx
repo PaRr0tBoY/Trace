@@ -32,6 +32,12 @@ import { t } from '../i18n'
 
 interface Props {
   item: ClipboardItemDto
+  /** Skip the enter animation (used when the type filter/search changes —
+      cards swap instantly instead of "clearing then falling back in"). */
+  instant?: boolean
+  /** FLIP position animation on list reorder; disabled on long lists (the
+      O(n) layout pass + spring on every card is the reorder-frame cost). */
+  animateLayout?: boolean
 }
 
 
@@ -42,7 +48,7 @@ interface Props {
 /* Main item card                                                      */
 /* ------------------------------------------------------------------ */
 
-function ClipboardItemBase({ item }: Props) {
+function ClipboardItemBase({ item, instant, animateLayout }: Props) {
   const copy = useStore.getState().copy
   const paste = useStore.getState().paste
   const togglePin = useStore.getState().togglePin
@@ -92,31 +98,22 @@ function ClipboardItemBase({ item }: Props) {
   }, [])
 
   const handleDragStart = useCallback((e: React.DragEvent, req: DragRequest) => {
-    if (item.data.kind === 'text') {
-      // In-panel HTML5 drag: lets the user drop the item onto a task (drop
-      // bar) to link it. Text never OLE-drags out of the app, so the payload
-      // only matters inside the panel. The drag itself must run (no
-      // preventDefault) for dragover/drop to fire on the drop targets.
-      setInternalDragReq(req)
-      e.dataTransfer.setData('application/x-trace-item', item.id)
-      e.dataTransfer.setData('text/plain', previewText(item.data.text, 200))
-      return
-    } else {
-      // Images and files need OS-level file handles via Electron's startDrag.
-      // Cancel the HTML5 drag (preventDefault) so the browser doesn't run its
-      // own ghost in parallel; Electron's startDrag starts an independent OLE
-      // drag managed by the OS. Fire the IPC synchronously so main calls
-      // event.sender.startDrag(...) on the same tick.
-      setInternalDragReq(req)
-      e.preventDefault()
-      startDrag(req)
-    }
-  }, [item.data, startDrag, setInternalDragReq])
+    // Every kind OLE-drags out of the app from the main process via
+    // Electron's startDrag (text is staged as a temp .txt in main). Cancel
+    // the HTML5 drag (preventDefault) so the browser doesn't run its own
+    // ghost in parallel, and fire the IPC synchronously so main starts the
+    // OS drag on the same tick. In-panel drops still work: the drop
+    // target resolves `item:internal-drop` against internalDragReq (set
+    // below), the same path images/files already use.
+    setInternalDragReq(req)
+    e.preventDefault()
+    startDrag(req)
+  }, [startDrag, setInternalDragReq])
 
   return (
     <motion.div
-      layout="position"
-      initial={open ? { opacity: 0, scale: 0.96, y: 6 } : false}
+      layout={animateLayout ? 'position' : false}
+      initial={!instant && open ? { opacity: 0, scale: 0.96, y: 6 } : false}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: -4, transition: { duration: 0.12, ease: [0.32, 0, 0.67, 0] } }}
       transition={{
@@ -125,10 +122,9 @@ function ClipboardItemBase({ item }: Props) {
         stiffness: 300,
         damping: 30,
         mass: 0.8,
-        restDelta: 0.001,
-        restSpeed: 0.001
+        restDelta: 0.05,
+        restSpeed: 0.05
       }}
-      style={{ willChange: 'transform, opacity' }}
       className={`item${item.pinned ? ' pinned' : ''}${isBundle ? ' bundle' : ''}`}
     >
       {copied && (
@@ -303,8 +299,8 @@ const rowVariants = {
     y: 0,
     scale: 1,
     transition: {
-      y: { type: 'spring', stiffness: 500, damping: 38, mass: 0.6, restDelta: 0.001 },
-      scale: { type: 'spring', stiffness: 500, damping: 38, mass: 0.6, restDelta: 0.001 },
+      y: { type: 'spring', stiffness: 500, damping: 38, mass: 0.6, restDelta: 0.05 },
+      scale: { type: 'spring', stiffness: 500, damping: 38, mass: 0.6, restDelta: 0.05 },
       opacity: { duration: 0.16, ease: 'easeOut' }
     }
   },
@@ -326,7 +322,7 @@ const stackVariants = {
     opacity: 1,
     scale: 1,
     transition: {
-      scale: { type: 'spring', stiffness: 480, damping: 38, mass: 0.6, restDelta: 0.001 },
+      scale: { type: 'spring', stiffness: 480, damping: 38, mass: 0.6, restDelta: 0.05 },
       opacity: { duration: 0.18, ease: 'easeOut' }
     }
   },
@@ -411,6 +407,8 @@ function BundleFluidPreview({
                     src={img.preview}
                     style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 4, background: 'rgba(0,0,0,0.5)' }}
                     draggable={false}
+                    loading="lazy"
+                    decoding="async"
                   />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)' }}>
@@ -448,6 +446,8 @@ function BundleFluidPreview({
                       key={img.imageId}
                       src={img.preview}
                       className="bundle-stack-card"
+                      loading="lazy"
+                      decoding="async"
                       animate={{ 
                         x: realIndex * 20 - 20, 
                         y: realIndex * 6, 
@@ -526,6 +526,8 @@ function BundleFluidPreview({
                           src={entry.preview} 
                           alt="" 
                           draggable={false} 
+                          loading="lazy" 
+                          decoding="async" 
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} 
                         />
                       </div>
@@ -589,6 +591,8 @@ function BundleFluidPreview({
                           src={entry.preview} 
                           alt="" 
                           draggable={false} 
+                          loading="lazy" 
+                          decoding="async" 
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} 
                         />
                       ) : (
@@ -639,6 +643,8 @@ function Preview({ item }: { item: ClipboardItemDto }) {
               src={item.data.preview}
               alt=""
               draggable={false}
+              loading="lazy"
+              decoding="async"
             />
           ) : (
             <div className="preview">[{t('item.imageItem')}]</div>
@@ -665,6 +671,8 @@ function Preview({ item }: { item: ClipboardItemDto }) {
                   src={entry.preview}
                   alt=""
                   draggable={false}
+                  loading="lazy"
+                  decoding="async"
                 />
               ) : (
                 <div className="preview">[image: {displayName}]</div>

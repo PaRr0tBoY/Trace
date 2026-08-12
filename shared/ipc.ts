@@ -199,6 +199,9 @@ export interface InvokeMap {
    */
   'app:icons': { args: [exePaths: string[]]; result: Record<string, string | null> }
 
+  /** Switch to the app's linked window (ADR-0005): pid hit → activate; app alive → its newest window; else launch exe. */
+  'app:open-linked-window': { args: [app: import('./types').AppRef]; result: { ok: boolean; method: 'window' | 'launch' } }
+
   /* --------------------------- ai provider --------------------------- */
 
   /** Test a provider connection (one 1-token chat completion). */

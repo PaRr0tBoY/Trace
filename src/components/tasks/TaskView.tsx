@@ -1,12 +1,14 @@
 /**
  * TaskView — the task layer root inside the panel.
  *
- * List mode is ONE scroll column (t24): suggestion cards on top when any are
- * pending, a hairline divider, then the grouped task list — no more split
- * panes. Detail and create/edit forms are full-page sub-views, and the
- * suggestion convert panel (TaskEditor in suggestion mode) is one too —
- * same structure as create/edit, closed loop: edit + convert in place.
- * Delete is always a confirmed hard delete.
+ * Two second-level tabs (ADR-0004): "existing tasks" (the grouped task list,
+ * completed last) and "candidate tasks" (suggestion cards). Detail and
+ * create/edit forms are full-page sub-views, and the suggestion convert
+ * panel (TaskEditor in suggestion mode) is one too — same structure as
+ * create/edit, closed loop: edit + convert in place. Delete is always a
+ * confirmed hard delete. Navigation state lives in the store so the
+ * restore mechanism (ADR-0004) can remember/reset it and edit protection
+ * can see it; the convert panel is a local edit session.
  */
 import { useEffect, useState } from 'react'
 import { useStore } from '../../store/appStore'
@@ -23,32 +25,35 @@ export function TaskView() {
   const { t } = useTranslation()
   const tasks = useStore((s) => s.tasks)
   const suggestions = useStore((s) => s.suggestions)
+  const tasksFilter = useStore((s) => s.tasksFilter)
   const createTask = useStore((s) => s.createTask)
   const updateTask = useStore((s) => s.updateTask)
   const deleteTask = useStore((s) => s.deleteTask)
   const acceptSuggestion = useStore((s) => s.acceptSuggestion)
 
-  /** Task whose detail is open (null = list). */
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  /** 'new' = create form; a task id = edit form; null = no form. */
-  const [editing, setEditing] = useState<string | 'new' | null>(null)
+  const selectedId = useStore((s) => s.selectedTaskId)
+  const setSelectedTaskId = useStore((s) => s.setSelectedTaskId)
+  const editing = useStore((s) => s.editingTask)
+  const setEditingTask = useStore((s) => s.setEditingTask)
+  const confirmDeleteTaskId = useStore((s) => s.confirmDeleteTaskId)
+  const setConfirmDeleteTaskId = useStore((s) => s.setConfirmDeleteTaskId)
+  const pickerTaskId = useStore((s) => s.pickerTaskId)
+  const setPickerTaskId = useStore((s) => s.setPickerTaskId)
   /** Suggestion whose convert panel is open (null = closed). */
   const [convertId, setConvertId] = useState<string | null>(null)
-  /** Task awaiting hard-delete confirmation. */
-  const [confirmDelete, setConfirmDelete] = useState<TaskDto | null>(null)
-  /** Task whose content picker (add content) is open. */
-  const [pickerTaskId, setPickerTaskId] = useState<string | null>(null)
 
   const selected = selectedId ? (tasks.find((task) => task.id === selectedId) ?? null) : null
   const converting = convertId ? (suggestions.find((s) => s.id === convertId) ?? null) : null
+  const confirmDelete = confirmDeleteTaskId ? (tasks.find((task) => task.id === confirmDeleteTaskId) ?? null) : null
 
   // The selected task vanished (deleted here or elsewhere): fall back to the list.
   useEffect(() => {
     if (selectedId && !selected) {
-      setSelectedId(null)
-      setEditing((e) => (e !== null && e !== 'new' ? null : e))
+      setSelectedTaskId(null)
+      const s = useStore.getState()
+      if (s.editingTask !== null && s.editingTask !== 'new') s.setEditingTask(null)
     }
-  }, [selectedId, selected])
+  }, [selectedId, selected, setSelectedTaskId])
 
   // A new analysis replaced the pending list: close the convert panel too.
   useEffect(() => {
@@ -58,9 +63,9 @@ export function TaskView() {
   const handleDeleteConfirm = async () => {
     if (!confirmDelete) return
     await deleteTask(confirmDelete.id)
-    if (selectedId === confirmDelete.id) setSelectedId(null)
-    if (editing === confirmDelete.id) setEditing(null)
-    setConfirmDelete(null)
+    if (selectedId === confirmDelete.id) setSelectedTaskId(null)
+    if (editing === confirmDelete.id) setEditingTask(null)
+    setConfirmDeleteTaskId(null)
   }
 
   return (
@@ -74,9 +79,9 @@ export function TaskView() {
             } else if (selected) {
               await updateTask(selected.id, { title, note, apps, clipboardItemIds })
             }
-            setEditing(null)
+            setEditingTask(null)
           }}
-          onCancel={() => setEditing(null)}
+          onCancel={() => setEditingTask(null)}
         />
       ) : converting ? (
         <TaskEditor
@@ -90,29 +95,34 @@ export function TaskView() {
       ) : selected ? (
         <TaskDetail
           task={selected}
-          onBack={() => setSelectedId(null)}
-          onEdit={() => setEditing(selected.id)}
-          onDeleteRequest={setConfirmDelete}
+          onBack={() => setSelectedTaskId(null)}
+          onEdit={() => setEditingTask(selected.id)}
+          onDeleteRequest={(task) => setConfirmDeleteTaskId(task.id)}
           onAddContent={() => setPickerTaskId(selected.id)}
         />
       ) : (
         <div className="task-scroll">
-          {suggestions.length > 0 && (
-            <>
+          {tasksFilter === 'candidates' ? (
+            suggestions.length > 0 ? (
               <div className="task-suggest-list">
                 {suggestions.map((s) => (
                   <SuggestionCard key={s.id} suggestion={s} onOpen={setConvertId} />
                 ))}
               </div>
-              <div className="task-suggest-divider" />
-            </>
+            ) : (
+              <div className="task-empty">
+                <div className="title">{t('tasks.candidatesEmpty')}</div>
+                <div className="hint">{t('tasks.candidatesEmptyHint')}</div>
+              </div>
+            )
+          ) : (
+            <TaskList
+              tasks={tasks}
+              onOpen={(task) => setSelectedTaskId(task.id)}
+              onCreate={() => setEditingTask('new')}
+              onDeleteRequest={(task) => setConfirmDeleteTaskId(task.id)}
+            />
           )}
-          <TaskList
-            tasks={tasks}
-            onOpen={(task) => setSelectedId(task.id)}
-            onCreate={() => setEditing('new')}
-            onDeleteRequest={setConfirmDelete}
-          />
         </div>
       )}
 
@@ -132,9 +142,11 @@ export function TaskView() {
           description={t('tasks.deleteDesc')}
           confirmLabel={t('tasks.deleteConfirm')}
           onConfirm={handleDeleteConfirm}
-          onCancel={() => setConfirmDelete(null)}
+          onCancel={() => setConfirmDeleteTaskId(null)}
         />
       )}
     </div>
   )
 }
+
+export type { TaskDto }

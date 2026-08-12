@@ -129,6 +129,7 @@ const api = {
   setInteractive: (value: boolean) => invoke('window:set-interactive', value),
   setPreviewMode: (active: boolean) => invoke('window:set-preview-mode', active),
   revealFile: (path: string) => invoke('file:reveal', path),
+  openLinkedWindow: (app: import('../../shared/types').AppRef) => invoke('app:open-linked-window', app),
   minimizeWindow: () => invoke('window:minimize'),
   setInternalDrag: (active: boolean) => { internalDrag = active },
   broadcastTutorialStep: (step: number) => send('tutorial:set-step', step),

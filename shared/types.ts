@@ -22,15 +22,51 @@ export type ItemKind = ItemData['kind']
 
 /**
  * The foreground app at capture time (ADR-0001). Same source and privacy gate
- * as the t14 clipboard attribution event; absent when the gate was off or the
- * foreground could not be read. `exePath` is what AppRef.id normalizes.
+ * as the clipboard event; absent when the gate was off or the foreground
+ * could not be read. `exePath` is what AppRef.id normalizes.
  */
 export interface SourceApp {
   name: string
   exePath?: string
 }
 
-export type TypeFilter = 'all' | 'text' | 'links' | 'images' | 'files'
+/**
+ * Second-level filter inside the clipboard view (ADR-0004).
+ * 'all' never includes file entries — files live in the files view.
+ */
+export type ClipboardFilter = 'all' | 'text' | 'links' | 'images'
+
+/**
+ * Second-level filter inside the files view (ADR-0004): the dynamic
+ * extension tabs ('.pdf', …) are added by the renderer; 'other' holds
+ * extension-less members. The value is the raw `path.extname` result.
+ */
+export type FilesFilter = 'all' | 'other' | (string & {})
+
+/** Second-level filter inside the tasks view (ADR-0004). */
+export type TasksFilter = 'existing' | 'candidates'
+
+/** Top-level panel views (ADR-0004). */
+export type View = 'clipboard' | 'files' | 'tasks'
+
+/** Restore-time preset: how long the panel keeps its last page after closing. */
+export type RestoreTime = 'instant' | 'relaxed' | 'delayed' | 'forever'
+
+/**
+ * Accent theme id (values in shared/themes.ts). Color names are not
+ * translated; localized labels live in i18n under `appearance.theme*`.
+ */
+export type ThemeColor = 'graphite' | 'cobalt' | 'verdigris' | 'amber' | 'violet'
+
+/**
+ * Landing page applied on first launch and after the restore time expires
+ * (ADR-0004). The files view has no second level — it always lands on 'all'
+ * because dynamic extension tabs may not exist.
+ */
+export type LandingPage =
+  | { view: 'clipboard'; filter: ClipboardFilter }
+  | { view: 'files' }
+  | { view: 'tasks'; filter: TasksFilter }
 
 /**
  * A single clipboard entry. `id` is stable across the lifetime of the entry;
@@ -135,6 +171,12 @@ export interface AppRef {
     workspace?: string
     cwd?: string
   }
+  /**
+   * Foreground-window snapshot recorded when the app first joined a task
+   * (ADR-0005): the detail view's "open app" button switches to this window.
+   * Unlike `lastContext` it is never refreshed after being set.
+   */
+  linkedWindow?: { pid: number; title: string; ts: number }
 }
 
 /**
@@ -170,6 +212,12 @@ export interface Task {
   createdAt: number
   updatedAt: number
   lastActiveAt: number
+  /**
+   * Cumulative time the task has spent in 'active' (ms, ADR-0006). Settled
+   * whenever the task leaves active (manual pause/complete + idle timeout);
+   * never reset on resume. Displayed as "Running {duration}".
+   */
+  activeMs: number
 }
 
 /**
@@ -316,6 +364,11 @@ export interface Settings {
   autoDeleteHours: number
   /** UI visual style density ('modern' | 'compact'). */
   uiStyle: 'modern' | 'compact'
+  /**
+   * Accent theme for the panel UI, drag ghosts, and the copy indicator
+   * (ADR-0007/Ticket 3). The five color values live in shared/themes.ts.
+   */
+  themeColor: ThemeColor
   /** Flag to track if the onboarding tutorial is completed. */
   tutorialCompleted: boolean
   stickPosition: StickPosition
@@ -367,8 +420,6 @@ export interface Settings {
   l0CaptureEnabled: boolean
   /** Minutes without an attribution event before an Active task auto-pauses (1-120). */
   taskPauseThresholdMinutes: number
-  /** Auto-attach clipboard copies to tasks by source process. */
-  autoAttributionEnabled: boolean
   /** Minimum new events before a suggestion pass triggers (1-50). */
   suggestionMinEvents: number
   /** Silence duration before a suggestion pass triggers (30-300s). */
@@ -385,6 +436,16 @@ export interface Settings {
   memoryCleanupScore: number
   /** Provider chain in priority order (first = primary, auto-failover within the list). */
   aiProviders: ProviderConfig[]
+  /**
+   * Landing page applied on first launch and after the restore time expires
+   * (ADR-0004). The files view has no second level.
+   */
+  landing: LandingPage
+  /**
+   * How long the panel keeps its last page after closing before restoring
+   * the landing page (ADR-0004). 'forever' disables restoring entirely.
+   */
+  restoreTime: RestoreTime
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -398,6 +459,7 @@ export const DEFAULT_SETTINGS: Settings = {
   clearUnpinnedOnRestart: false,
   autoDeleteHours: 0,
   uiStyle: 'modern',
+  themeColor: 'graphite',
   tutorialCompleted: false,
   stickPosition: 'left',
   stickDisplayId: undefined,
@@ -418,7 +480,6 @@ export const DEFAULT_SETTINGS: Settings = {
   taskCaptureEnabled: true,
   l0CaptureEnabled: true,
   taskPauseThresholdMinutes: 15,
-  autoAttributionEnabled: true,
   suggestionMinEvents: 5,
   suggestionSilenceSeconds: 60,
   confidenceHigh: 0.7,
@@ -426,7 +487,9 @@ export const DEFAULT_SETTINGS: Settings = {
   memoryLambda: 0.25,
   memoryStaleDays: 60,
   memoryCleanupScore: 0.1,
-  aiProviders: []
+  aiProviders: [],
+  landing: { view: 'tasks', filter: 'existing' },
+  restoreTime: 'relaxed'
 }
 
 

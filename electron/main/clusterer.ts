@@ -200,7 +200,7 @@ export function tokenizeTitle(title: string): string[] {
 }
 
 /** Lowercase + slash-normalize an app identity string. */
-function normalizeAppKey(s: string): string {
+export function normalizeAppKey(s: string): string {
   return s.trim().toLowerCase().replace(/\\/g, '/')
 }
 

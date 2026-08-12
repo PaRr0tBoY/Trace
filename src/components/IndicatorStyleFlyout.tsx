@@ -95,7 +95,7 @@ export function IndicatorStyleFlyout({ isRight }: { isRight: boolean }) {
             transition={{
               ...adaptiveSpring,
               opacity: { type: 'tween', duration: 0.16, ease: 'easeOut' },
-              y: { type: 'spring', stiffness: 420, damping: 36, mass: 0.65, restDelta: 0.001 }
+              y: { type: 'spring', stiffness: 420, damping: 36, mass: 0.65, restDelta: 0.05 }
             }}
             style={{
               width: '100%',

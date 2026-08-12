@@ -20,17 +20,37 @@ import { playExpandSound } from '../lib/soundEffects'
 import { useTranslation } from '../i18n'
 
 export function ItemList() {
+  // Only the first screenful of cards plays the enter animation on panel
+  // open; the rest mount instantly. With historyLimit up to 500, animating
+  // every card simultaneously is the dominant open-panel frame cost.
+  const ENTER_ANIM_LIMIT = 12
+
   const { t } = useTranslation()
   const { pinned, recent } = useFilteredItems()
   const query = useStore((s) => s.query)
   const listRef = useRef<HTMLDivElement>(null)
 
   const total = pinned.length + recent.length
+  // FLIP reorder animation costs an O(n) layout pass + spring per card;
+  // past ~30 cards it degrades the very moment it should feel smooth.
+  const animateLayout = total <= 30
   
   const isDraggingAny = useStore((s) => !!s.dragActive || !!s.internalDragReq)
   const open = useStore((s) => s.open)
   
-  const typeFilter = useStore((s) => s.typeFilter) || 'all'
+  const clipboardFilter = useStore((s) => s.clipboardFilter) || 'all'
+  // When the type filter or search query changes, newly-mounted cards skip
+  // their enter animation — the list swaps in place instead of the old batch
+  // clearing out and the new one springing back in (jank + blank gap).
+  const filterKey = `${clipboardFilter}|${query}`
+  const [filterInstant, setFilterInstant] = useState<{ key: string; instant: boolean }>({ key: filterKey, instant: true })
+  if (filterInstant.key !== filterKey) {
+    setFilterInstant({ key: filterKey, instant: true })
+  }
+  useEffect(() => {
+    if (filterInstant.instant) setFilterInstant((s) => ({ ...s, instant: false }))
+  }, [filterInstant])
+
   const [showScrollTop, setShowScrollTop] = useState(false)
   const [collapsedMap, setCollapsedMap] = useState<Record<string, boolean>>(() => {
     try {
@@ -40,11 +60,11 @@ export function ItemList() {
     return { all: true, text: true, image: true, file: true, link: true }
   })
 
-  const pinnedCollapsed = collapsedMap[typeFilter] ?? true
+  const pinnedCollapsed = collapsedMap[clipboardFilter] ?? true
 
   const setPinnedCollapsed = (val: boolean) => {
     setCollapsedMap((prev) => {
-      const next = { ...prev, [typeFilter]: val }
+      const next = { ...prev, [clipboardFilter]: val }
       localStorage.setItem('trace_pinned_collapsed_map', JSON.stringify(next))
       return next
     })
@@ -138,6 +158,9 @@ export function ItemList() {
 
   const startScrolling = () => {
     if (scrollRaf.current !== null) return
+    // The rAF loop assigns scrollTop every frame; scroll-behavior: smooth
+    // would interpolate each assignment and lag behind the pointer.
+    listRef.current?.classList.add('drag-scrolling')
 
     let lastTime = performance.now()
     const loop = (time: number) => {
@@ -161,6 +184,7 @@ export function ItemList() {
       cancelAnimationFrame(scrollRaf.current)
       scrollRaf.current = null
     }
+    listRef.current?.classList.remove('drag-scrolling')
   }
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -232,8 +256,8 @@ export function ItemList() {
                     transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                     style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}
                   >
-                    {pinned.map((it) => (
-                      <ClipboardItemCard key={it.id} item={it} />
+                    {pinned.map((it, idx) => (
+                      <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} />
                     ))}
                   </motion.div>
                 )}
@@ -245,8 +269,8 @@ export function ItemList() {
             <section>
               {pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
               <AnimatePresence initial={false}>
-                {recent.map((it) => (
-                  <ClipboardItemCard key={it.id} item={it} />
+                {recent.map((it, idx) => (
+                  <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} />
                 ))}
               </AnimatePresence>
             </section>

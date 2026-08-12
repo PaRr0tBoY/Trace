@@ -1,16 +1,18 @@
 import { useEffect, useState, useRef, type CSSProperties } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useStore } from '../store/appStore'
-import type { DisplayInfo, Memory, MemoryAction, ProviderConfig } from '../../shared/types'
+import { useStore, type SettingsTab } from '../store/appStore'
+import type { DisplayInfo, Memory, MemoryAction, ProviderConfig, ClipboardFilter, RestoreTime } from '../../shared/types'
+import { THEME_ACCENTS, THEME_COLORS } from '../../shared/themes'
 import { LiquidOctopusLoader } from './LiquidOctopusLoader'
 import { TickIndicatorIcon, CopyIndicatorIcon, SparkleIndicatorIcon } from './CopyIndicatorCurve'
-import { ChevronRightIcon, CloseIcon, LogOutIcon, StarIcon, GithubOctocatLogo } from './icons'
+import { ChevronRightIcon, CloseIcon, LogOutIcon, StarIcon, GithubOctocatLogo, ChevronDownIcon, PlusIcon } from './icons'
 import { ChangelogView } from './ChangelogView'
+import kofiSupportImg from '../assets/kofi-support.webp'
 import { playDialTickSound, playToggleSound, playButtonClickSound } from '../lib/soundEffects'
 import { useTranslation } from '../i18n'
 import '../styles/settings.css'
 
-type SettingsTab = 'behaviour' | 'position' | 'appearance'
+export type { SettingsTab }
 
 export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: boolean }) {
   const { t } = useTranslation()
@@ -20,6 +22,7 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
     { id: 'behaviour',  label: t('tabs.behaviour') },
     { id: 'position',   label: t('tabs.position') },
     { id: 'appearance', label: t('tabs.appearance') },
+    { id: 'tasks',      label: t('tabs.tasks') },
   ]
   const patch = useStore((s) => s.patchSettings)
   const currentVersion = useStore((s) => s.currentVersion)
@@ -70,12 +73,16 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
   }, [])
 
   // ── Tab state & Independent Scroll Memory per section ──────────────────────
-  const [activeTab, setActiveTab] = useState<SettingsTab>('behaviour')
+  // activeTab lives in the store so the restore mechanism can remember it
+  // across panel opens (ADR-0004).
+  const activeTab = useStore((s) => s.settingsTab)
+  const setActiveTab = useStore((s) => s.setSettingsTab)
   const scrollListRef = useRef<HTMLDivElement>(null)
   const tabScrollPositions = useRef<Record<SettingsTab, number>>({
     behaviour: 0,
     position: 0,
-    appearance: 0
+    appearance: 0,
+    tasks: 0
   })
 
   const handleTabSwitch = (newTab: SettingsTab) => {
@@ -97,10 +104,74 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
   }, [activeTab])
 
   // ── Persistent footer shared across all tabs ───────────────────────────
+  const [footerOpen, setFooterOpen] = useState(false)
+  const footerContentRef = useRef<HTMLDivElement>(null)
+  // Auto-expand: scrolling past the bottom of the settings list opens the
+  // collapsed Community & Support section. Damped: the overscroll distance
+  // must accumulate past 600px (several wheel notches) — a single nudge or
+  // trackpad inertia at the bottom won't trigger. Any upward scroll or
+  // leaving the bottom resets the accumulator.
+  const footerOverscrollAcc = useRef(0)
+  const handleFooterOverscroll = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (footerOpen) return
+    const el = scrollListRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8
+    if (atBottom && e.deltaY > 0) {
+      // Normalize wheel units (line/page) to pixels
+      const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1
+      footerOverscrollAcc.current += e.deltaY * scale
+      if (footerOverscrollAcc.current >= 600) {
+        footerOverscrollAcc.current = 0
+        playButtonClickSound()
+        setFooterOpen(true)
+      }
+    } else {
+      footerOverscrollAcc.current = 0
+    }
+  }
+  // Auto-collapse: once the expanded footer content has scrolled fully out of
+  // the settings list's viewport above, fold it back up. Compare against the
+  // container's top — the scroll area sits below the fixed header, so the
+  // window coordinate 0 is never reached.
+  const handleFooterScroll = () => {
+    if (!footerOpen) return
+    const el = footerContentRef.current
+    const container = scrollListRef.current
+    if (!el || !container) return
+    const containerRect = container.getBoundingClientRect()
+    if (el.getBoundingClientRect().bottom <= containerRect.top) {
+      footerOverscrollAcc.current = 0
+      setFooterOpen(false)
+    }
+  }
   const PersistentFooter = (
     <>
-      {/* Community & Support */}
-      <div className="setting-group-label" style={{ marginTop: 20 }}>{t('footer.communityAndSupport')}</div>
+      {/* Community & Support — collapsible */}
+      <button
+        type="button"
+        className="settings-collapse-header"
+        onClick={() => { playButtonClickSound(); setFooterOpen(!footerOpen) }}
+      >
+        <span>{t('footer.communityAndSupport')}</span>
+        <ChevronDownIcon
+          width={13}
+          height={13}
+          style={{ transform: footerOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.22s ease', flexShrink: 0 }}
+        />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {footerOpen && (
+        <motion.div
+          key="footer-content"
+          ref={footerContentRef}
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          style={{ overflow: 'hidden' }}
+        >
 
       <div className="setting-row vertical" style={{ gap: 10 }}>
         <div className="setting-info">
@@ -127,20 +198,19 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
           {t('footer.supportPromo')}
         </div>
         <div className="support-buttons-group">
-          {/* Primary Action: Support via Ko-fi / UPI */}
+          {/* Primary Action: Support via Ko-fi (image button) */}
           <button
             className="kofi-support-btn"
             onClick={() => {
               playButtonClickSound()
-              window.open('https://edgedrop.vercel.app/supportedgedrop', '_blank')
+              window.open('https://acidev.cc', '_blank')
             }}
           >
-            <div className="support-btn-heart-badge">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="#ff5252" stroke="none">
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-              </svg>
-            </div>
-            <span>{t('footer.supportOnKofi')}</span>
+            <img
+              src={kofiSupportImg}
+              alt={t('footer.supportOnKofi')}
+              style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 12 }}
+            />
           </button>
 
           {/* Secondary Action: GitHub Star */}
@@ -174,6 +244,9 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
           <span>{t('tray.quit')}</span>
         </button>
       </div>
+        </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 
@@ -227,7 +300,7 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
           </div>
 
           {/* ── Scrollable Content Area (Independent per section) ───────── */}
-          <div className="settings-scroll-list" ref={scrollListRef}>
+          <div className="settings-scroll-list" ref={scrollListRef} onWheel={handleFooterOverscroll} onScroll={handleFooterScroll}>
 
             {/* ── Tab 1: Behaviour (First) ──────────────────────────────── */}
             <AnimatePresence mode="wait">
@@ -241,6 +314,115 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                 >
                   {/* ── GROUP: Behaviour ─────────────────────────────────── */}
                   <div className="setting-group-label">{t('tabs.behaviour')}</div>
+
+                  {/* ── Landing page & restore time (ADR-0004) ── */}
+                  <div className="setting-row vertical" style={{ gap: 8 }}>
+                    <div className="setting-info">
+                      <div className="setting-title">{t('behaviour.landingTitle')}</div>
+                      <div className="setting-desc">{t('behaviour.landingDesc')}</div>
+                    </div>
+                    {/* Level 1: top-level view, one row. */}
+                    <div className="setting-pills" style={{ opacity: settings.restoreTime === 'forever' ? 0.45 : 1, transition: 'opacity 0.2s ease' }}>
+                      {([
+                        { id: 'clipboard' as const, label: t('filters.clipboard') },
+                        { id: 'tasks' as const, label: t('filters.tasks') },
+                        { id: 'files' as const, label: t('filters.files') }
+                      ]).map((opt) => (
+                        <button
+                          key={opt.id}
+                          className={`pill ${settings.landing.view === opt.id ? 'active' : ''}`}
+                          disabled={settings.restoreTime === 'forever'}
+                          onClick={() => {
+                            playButtonClickSound()
+                            // Switching the level-1 view resets the level-2
+                            // filter to that view's default.
+                            if (opt.id === 'clipboard') patch({ landing: { view: 'clipboard', filter: 'all' } })
+                            else if (opt.id === 'tasks') patch({ landing: { view: 'tasks', filter: 'existing' } })
+                            else patch({ landing: { view: 'files' } })
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Level 2: follows the selected view. Files has no
+                        second level — always 'all' (ADR-0004). */}
+                    <div className="setting-pills" style={{ opacity: settings.restoreTime === 'forever' ? 0.45 : 1, transition: 'opacity 0.2s ease' }}>
+                      {settings.landing.view === 'clipboard' && (
+                        ([
+                          { id: 'all', label: t('filters.all') },
+                          { id: 'text', label: t('filters.text') },
+                          { id: 'links', label: t('filters.links') },
+                          { id: 'images', label: t('filters.images') }
+                        ]).map((opt) => (
+                          <button
+                            key={opt.id}
+                            className={`pill ${settings.landing.view === 'clipboard' && settings.landing.filter === opt.id ? 'active' : ''}`}
+                            disabled={settings.restoreTime === 'forever'}
+                            onClick={() => { playButtonClickSound(); patch({ landing: { view: 'clipboard', filter: opt.id as ClipboardFilter } }) }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))
+                      )}
+                      {settings.landing.view === 'tasks' && (
+                        ([
+                          { id: 'existing', label: t('filters.existingTasks') },
+                          { id: 'candidates', label: t('filters.candidateTasks') }
+                        ]).map((opt) => (
+                          <button
+                            key={opt.id}
+                            className={`pill ${settings.landing.view === 'tasks' && settings.landing.filter === opt.id ? 'active' : ''}`}
+                            disabled={settings.restoreTime === 'forever'}
+                            onClick={() => { playButtonClickSound(); patch({ landing: { view: 'tasks', filter: opt.id as 'existing' | 'candidates' } }) }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))
+                      )}
+                      {settings.landing.view === 'files' && (
+                        <button
+                          className="pill active"
+                          disabled
+                        >
+                          {t('filters.all')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="setting-divider" />
+
+                  <div className="setting-row vertical" style={{ gap: 8 }}>
+                    <div className="setting-info">
+                      <div className="setting-title">{t('behaviour.restoreTimeTitle')}</div>
+                      <div className="setting-desc">{t('behaviour.restoreTimeDesc')}</div>
+                    </div>
+                    <div className="setting-pills">
+                      {([
+                        { id: 'instant' as const, label: t('behaviour.restoreInstant') },
+                        { id: 'relaxed' as const, label: t('behaviour.restoreRelaxed') },
+                        { id: 'delayed' as const, label: t('behaviour.restoreDelayed') },
+                        { id: 'forever' as const, label: t('behaviour.restoreForever') }
+                      ]).map((opt) => (
+                        <button
+                          key={opt.id}
+                          className={`pill ${settings.restoreTime === opt.id ? 'active' : ''}`}
+                          onClick={() => { playButtonClickSound(); patch({ restoreTime: opt.id as RestoreTime }) }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="setting-desc" style={{ fontSize: 11 }}>
+                      {settings.restoreTime === 'instant' ? t('behaviour.restoreInstantDesc')
+                        : settings.restoreTime === 'relaxed' ? t('behaviour.restoreRelaxedDesc')
+                        : settings.restoreTime === 'delayed' ? t('behaviour.restoreDelayedDesc')
+                        : t('behaviour.restoreForeverDesc')}
+                    </div>
+                  </div>
+
+                  <div className="setting-divider" />
 
                   {/* ── Language Selector ── */}
                   <div style={{
@@ -391,12 +573,6 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                   </div>
 
                   <div className="setting-divider" />
-
-                  <AIProviderSection />
-
-                  <div className="setting-divider" />
-
-                  <MemorySection />
 
                   {PersistentFooter}
                 </motion.div>
@@ -697,6 +873,64 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                   exit={{ opacity: 0, scale: 0.98, y: -4 }}
                   transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                 >
+                  {/* ── GROUP: Theme color ──────────────────────────────── */}
+                  <div className="setting-group-label">{t('appearance.themeTitle')}</div>
+
+                  <div className="setting-row vertical">
+                    <div className="setting-info">
+                      <div className="setting-title">{t('appearance.themeTitle')}</div>
+                      <div className="setting-desc">{t('appearance.themeDesc')}</div>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: 10,
+                        marginTop: 10
+                      }}
+                    >
+                      {THEME_COLORS.map((color) => {
+                        const selected = (settings.themeColor ?? 'graphite') === color
+                        return (
+                          <div
+                            key={color}
+                            role="button"
+                            title={t(`appearance.theme${color.charAt(0).toUpperCase() + color.slice(1)}`)}
+                            onClick={() => {
+                              playButtonClickSound()
+                              patch({ themeColor: color })
+                            }}
+                            style={{
+                              cursor: 'pointer',
+                              width: 26,
+                              height: 26,
+                              borderRadius: '50%',
+                              background: THEME_ACCENTS[color].color,
+                              border: selected ? '2px solid #ffffff' : '2px solid rgba(255,255,255,0.2)',
+                              boxShadow: selected ? '0 0 0 2px rgba(255,255,255,0.35)' : 'none',
+                              transform: selected ? 'scale(1.08)' : 'scale(1)',
+                              transition: 'all 0.15s ease',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        )
+                      })}
+                    </div>
+                    {(() => {
+                      const selected = settings.themeColor ?? 'graphite'
+                      const name = 'theme' + selected.charAt(0).toUpperCase() + selected.slice(1)
+                      return (
+                        <div style={{ marginTop: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: THEME_ACCENTS[selected].color }}>
+                            {t(`appearance.${name}`)}
+                          </div>
+                          <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, marginTop: 2 }}>
+                            {t(`appearance.${name}Desc`)}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+
                   {/* ── GROUP: Copy Indicator ────────────────────────────── */}
                   <div className="setting-group-label">{t('appearance.copyIndicatorTitle')}</div>
 
@@ -908,6 +1142,28 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                       }}
                     />
                   </div>
+
+                  {PersistentFooter}
+                </motion.div>
+              )}
+
+              {/* ── Tab 4: Tasks (fork additions: AI providers & memory) ── */}
+              {activeTab === 'tasks' && (
+                <motion.div
+                  key="tab-tasks"
+                  initial={{ opacity: 0, scale: 0.98, y: 4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: -4 }}
+                  transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  {/* ── GROUP: Tasks ──────────────────────────────────────── */}
+                  <div className="setting-group-label">{t('tabs.tasks')}</div>
+
+                  <AIProviderSection />
+
+                  <div className="setting-divider" />
+
+                  <MemorySection />
 
                   {PersistentFooter}
                 </motion.div>
@@ -1166,20 +1422,71 @@ function AIProviderSection() {
     setProviders(next)
   }
 
-  const addProvider = (kind: 'local' | 'cloud') => {
-    const provider: ProviderConfig = kind === 'local'
-      ? { id: `local-${Date.now().toString(36)}`, baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen3:8b', kind, supportsSchemaOutput: true }
-      : { id: `cloud-${Date.now().toString(36)}`, baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-v4-flash', kind, supportsSchemaOutput: false }
+  /** Add a blank custom cloud provider and open it for editing right away. */
+  const addCloudProvider = () => {
+    const provider: ProviderConfig = {
+      id: `cloud-${Date.now().toString(36)}`,
+      baseUrl: '',
+      model: '',
+      apiKey: '',
+      kind: 'cloud',
+      supportsSchemaOutput: false
+    }
     playButtonClickSound()
     setProviders([...providers, provider])
     setExpandedId(provider.id)
     setDraft({ ...provider })
   }
 
-  const commitDraft = () => {
-    if (draft && draft.id === expandedId) {
-      setProviders(providers.map((p) => (p.id === draft.id ? { ...draft, baseUrl: draft.baseUrl.trim() } : p)))
+  /**
+   * Add local model = detect Ollama on the machine, then wire it up. When a
+   * local provider already exists the card is revealed instead of duplicated.
+   */
+  const addLocalModel = async () => {
+    playButtonClickSound()
+    setDetectState({ status: 'detecting' })
+    const res = await window.edge.detectOllama()
+    if (!res.found) {
+      setDetectState({ status: 'fail', detail: res.error ?? '' })
+      return
     }
+    const existing = providers.find((p) => p.kind === 'local' && p.baseUrl.includes('127.0.0.1:11434'))
+    if (existing) {
+      setDetectState({ status: 'ok', detail: res.models?.join(', ') ?? '' })
+      setExpandedId(existing.id)
+      setDraft({ ...existing })
+      return
+    }
+    const model = res.models?.find((m) => /qwen3/i.test(m)) ?? res.models?.[0] ?? 'qwen3:8b'
+    const provider: ProviderConfig = {
+      id: `local-${Date.now().toString(36)}`,
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      model,
+      kind: 'local',
+      supportsSchemaOutput: true
+    }
+    setProviders([...providers, provider])
+    setExpandedId(provider.id)
+    setDraft({ ...provider })
+    setDetectState({ status: 'ok', detail: model })
+  }
+
+  /** Click a card to open/close its editor; reopening syncs the draft. */
+  const toggleExpand = (id: string) => {
+    playButtonClickSound()
+    if (expandedId === id) {
+      setExpandedId(null)
+      setDraft(null)
+      return
+    }
+    const provider = providers.find((p) => p.id === id)
+    setExpandedId(id)
+    setDraft(provider ? { ...provider } : null)
+  }
+
+  const commitDraft = () => {
+    if (!draft || draft.id !== expandedId) return
+    setProviders(providers.map((p) => (p.id === draft.id ? { ...draft, baseUrl: draft.baseUrl.trim() } : p)))
   }
 
   const testProvider = async (p: ProviderConfig) => {
@@ -1191,23 +1498,6 @@ function AIProviderSection() {
         ? { status: 'ok', detail: String(res.latencyMs ?? 0), thinkingModel: res.thinkingModel }
         : { status: 'fail', detail: res.error ?? '' }
     }))
-  }
-
-  const detectOllama = async () => {
-    setDetectState({ status: 'detecting' })
-    const res = await window.edge.detectOllama()
-    if (!res.found) {
-      setDetectState({ status: 'fail', detail: res.error ?? '' })
-      return
-    }
-    const existing = providers.find((p) => p.kind === 'local' && p.baseUrl.includes('127.0.0.1:11434'))
-    if (existing) {
-      setDetectState({ status: 'ok', detail: res.models?.join(', ') ?? '' })
-      return
-    }
-    const model = res.models?.find((m) => /qwen3/i.test(m)) ?? res.models?.[0] ?? 'qwen3:8b'
-    setProviders([...providers, { id: `local-ollama-${Date.now().toString(36)}`, baseUrl: 'http://127.0.0.1:11434/v1', model, kind: 'local', supportsSchemaOutput: true }])
-    setDetectState({ status: 'ok', detail: model })
   }
 
   const inputStyle: CSSProperties = {
@@ -1254,8 +1544,29 @@ function AIProviderSection() {
         const isDraft = draft && draft.id === p.id ? draft : p
         return (
           <div key={p.id} className="setting-row vertical" style={{ gap: 8 }}>
-            {/* Layer 1: status dot + model name (own line) + reorder/remove */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+            {/* Layer 1: click-to-edit summary (chevron + status + model + actions) */}
+            <div
+              className="provider-summary"
+              role="button"
+              tabIndex={0}
+              aria-expanded={isExpanded}
+              title={t('ai.edit')}
+              onClick={() => toggleExpand(p.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  toggleExpand(p.id)
+                }
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', cursor: 'pointer', outline: 'none' }}
+            >
+              <motion.span
+                animate={{ rotate: isExpanded ? 90 : 0 }}
+                transition={{ duration: 0.15 }}
+                style={{ display: 'flex', alignItems: 'center', flexShrink: 0, color: 'rgba(255, 255, 255, 0.5)' }}
+              >
+                <ChevronRightIcon width={12} height={12} />
+              </motion.span>
               <span
                 style={{
                   width: 8,
@@ -1266,20 +1577,50 @@ function AIProviderSection() {
                 }}
                 title={p.kind === 'local' ? t('ai.kindLocal') : t('ai.kindCloud')}
               />
-              <div
+              <span
                 className="setting-title"
-                style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                title={isDraft.model}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: 13,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  ...(isDraft.model ? {} : { color: 'rgba(255, 255, 255, 0.45)', fontWeight: 500 })
+                }}
+                title={isDraft.model || t('ai.unnamedModel')}
               >
-                {isDraft.model}
-              </div>
-              <button style={{ ...iconBtn, ...(i === 0 ? { opacity: 0.35, cursor: 'default' } : {}) }} disabled={i === 0} title={t('ai.moveUp')} onClick={() => moveProvider(i, -1)}>
+                {isDraft.model || t('ai.unnamedModel')}
+              </span>
+              <button
+                style={{ ...iconBtn, ...(i === 0 ? { opacity: 0.35, cursor: 'default' } : {}) }}
+                disabled={i === 0}
+                title={t('ai.moveUp')}
+                onClick={(e) => { e.stopPropagation(); moveProvider(i, -1) }}
+              >
                 <ChevronRightIcon width={12} height={12} style={{ transform: 'rotate(-90deg)' }} />
               </button>
-              <button style={{ ...iconBtn, ...(i === providers.length - 1 ? { opacity: 0.35, cursor: 'default' } : {}) }} disabled={i === providers.length - 1} title={t('ai.moveDown')} onClick={() => moveProvider(i, 1)}>
+              <button
+                style={{ ...iconBtn, ...(i === providers.length - 1 ? { opacity: 0.35, cursor: 'default' } : {}) }}
+                disabled={i === providers.length - 1}
+                title={t('ai.moveDown')}
+                onClick={(e) => { e.stopPropagation(); moveProvider(i, 1) }}
+              >
                 <ChevronRightIcon width={12} height={12} style={{ transform: 'rotate(90deg)' }} />
               </button>
-              <button style={iconBtn} title={t('ai.remove')} onClick={() => { playButtonClickSound(); setProviders(providers.filter((x) => x.id !== p.id)); if (expandedId === p.id) { setExpandedId(null); setDraft(null) } }}>
+              <button
+                style={iconBtn}
+                title={t('ai.remove')}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  playButtonClickSound()
+                  setProviders(providers.filter((x) => x.id !== p.id))
+                  if (expandedId === p.id) {
+                    setExpandedId(null)
+                    setDraft(null)
+                  }
+                }}
+              >
                 <CloseIcon width={10} height={10} />
               </button>
             </div>
@@ -1287,10 +1628,10 @@ function AIProviderSection() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', flexWrap: 'wrap' }}>
               <div
                 className="setting-desc"
-                style={{ flex: 1, minWidth: 0, fontSize: 10.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                style={{ flex: 1, minWidth: 0, fontSize: 10.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...(p.baseUrl ? {} : { color: 'rgba(255, 255, 255, 0.35)' }) }}
                 title={p.baseUrl}
               >
-                {p.baseUrl}
+                {p.baseUrl || 'https://api.example.com/v1'}
               </div>
               <button
                 className="pill display-pill"
@@ -1309,46 +1650,57 @@ function AIProviderSection() {
               )}
             </div>
 
-            {isExpanded && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
-                  {t('ai.baseUrl')}
-                  <input
-                    style={{ ...inputStyle, marginTop: 4 }}
-                    value={isDraft.baseUrl}
-                    onChange={(e) => setDraft({ ...isDraft, baseUrl: e.target.value })}
-                    onBlur={commitDraft}
-                  />
-                </label>
-                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
-                  {t('ai.apiKey')}
-                  <input
-                    style={{ ...inputStyle, marginTop: 4 }}
-                    value={isDraft.apiKey ?? ''}
-                    onChange={(e) => setDraft({ ...isDraft, apiKey: e.target.value })}
-                    onBlur={commitDraft}
-                  />
-                </label>
-                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
-                  {t('ai.model')}
-                  <input
-                    style={{ ...inputStyle, marginTop: 4 }}
-                    value={isDraft.model}
-                    onChange={(e) => setDraft({ ...isDraft, model: e.target.value })}
-                    onBlur={commitDraft}
-                  />
-                </label>
-                <div className="setting-row" style={{ width: '100%' }}>
-                  <div className="setting-info">
-                    <div className="setting-title" style={{ fontSize: 12 }}>{t('ai.schemaOutput')}</div>
+            <AnimatePresence initial={false}>
+              {isExpanded && (
+                <motion.div
+                  className="provider-editor"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.16, ease: 'easeOut' }}
+                >
+                  <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                    {t('ai.baseUrl')}
+                    <input
+                      style={{ ...inputStyle, marginTop: 4 }}
+                      value={isDraft.baseUrl}
+                      placeholder="https://api.example.com/v1"
+                      onChange={(e) => setDraft({ ...isDraft, baseUrl: e.target.value })}
+                      onBlur={commitDraft}
+                    />
+                  </label>
+                  <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                    {t('ai.apiKey')}
+                    <input
+                      style={{ ...inputStyle, marginTop: 4 }}
+                      value={isDraft.apiKey ?? ''}
+                      placeholder="sk-…"
+                      onChange={(e) => setDraft({ ...isDraft, apiKey: e.target.value })}
+                      onBlur={commitDraft}
+                    />
+                  </label>
+                  <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                    {t('ai.model')}
+                    <input
+                      style={{ ...inputStyle, marginTop: 4 }}
+                      value={isDraft.model}
+                      placeholder="model-name"
+                      onChange={(e) => setDraft({ ...isDraft, model: e.target.value })}
+                      onBlur={commitDraft}
+                    />
+                  </label>
+                  <div className="setting-row" style={{ width: '100%' }}>
+                    <div className="setting-info">
+                      <div className="setting-title" style={{ fontSize: 12 }}>{t('ai.schemaOutput')}</div>
+                    </div>
+                    <Toggle
+                      checked={isDraft.supportsSchemaOutput !== false}
+                      onChange={(v) => { setDraft({ ...isDraft, supportsSchemaOutput: v }); setProviders(providers.map((x) => (x.id === p.id ? { ...x, supportsSchemaOutput: v } : x))) }}
+                    />
                   </div>
-                  <Toggle
-                    checked={isDraft.supportsSchemaOutput !== false}
-                    onChange={(v) => { setDraft({ ...isDraft, supportsSchemaOutput: v }); setProviders(providers.map((x) => (x.id === p.id ? { ...x, supportsSchemaOutput: v } : x))) }}
-                  />
-                </div>
-              </div>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )
       })}
@@ -1356,24 +1708,19 @@ function AIProviderSection() {
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         <button
           className="pill display-pill"
-          style={{ padding: '6px 12px', cursor: 'pointer', fontSize: 12 }}
-          onClick={() => addProvider('local')}
+          style={{ flex: '1 1 auto', minWidth: 'max-content', flexDirection: 'row', gap: 6, padding: '8px 12px', cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}
+          onClick={() => void addLocalModel()}
         >
-          {t('ai.addLocal')}
+          <PlusIcon width={12} height={12} />
+          {t('ai.addLocalModel')}
         </button>
         <button
           className="pill display-pill"
-          style={{ padding: '6px 12px', cursor: 'pointer', fontSize: 12 }}
-          onClick={() => addProvider('cloud')}
+          style={{ flex: '1 1 auto', minWidth: 'max-content', flexDirection: 'row', gap: 6, padding: '8px 12px', cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}
+          onClick={addCloudProvider}
         >
-          {t('ai.addCloud')}
-        </button>
-        <button
-          className="pill display-pill"
-          style={{ padding: '6px 12px', cursor: 'pointer', fontSize: 12 }}
-          onClick={() => { playButtonClickSound(); void detectOllama() }}
-        >
-          {t('ai.detectOllama')}
+          <PlusIcon width={12} height={12} />
+          {t('ai.addCloudProvider')}
         </button>
       </div>
 

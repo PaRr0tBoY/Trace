@@ -4,7 +4,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { LocalModelError, LocalModelManager, type ModelSpec } from '../electron/store/localModelManager'
+import { LocalModelError, LocalModelManager, shouldLoadLocalModel, type ModelSpec } from '../electron/store/localModelManager'
+import type { LocalModelStatus } from '../shared/types'
 
 /**
  * Downloader tests (t53) — everything runs against a fake fetch + a tiny
@@ -247,5 +248,18 @@ describe('local model manager: manual path', () => {
 
     m.selectSource('auto')
     expect(m.status()).toMatchObject({ state: 'ready', source: 'auto', modelFilePath: m.modelFilePath() })
+  })
+})
+
+describe('shouldLoadLocalModel — runtime load gate (t54)', () => {
+  const ready: LocalModelStatus = { state: 'ready', source: 'auto', progress: null, error: null, modelFilePath: 'C:/models/qwen.gguf' }
+
+  it('loads only when enabled and the manager reports a ready file', () => {
+    expect(shouldLoadLocalModel(true, ready)).toBe(true)
+    expect(shouldLoadLocalModel(false, ready)).toBe(false) // 关闭 → 不加载
+    expect(shouldLoadLocalModel(true, { ...ready, state: 'none', modelFilePath: null })).toBe(false)
+    expect(shouldLoadLocalModel(true, { ...ready, state: 'downloading', modelFilePath: null })).toBe(false)
+    expect(shouldLoadLocalModel(true, { ...ready, state: 'error', modelFilePath: null })).toBe(false)
+    expect(shouldLoadLocalModel(true, { ...ready, modelFilePath: null })).toBe(false)
   })
 })

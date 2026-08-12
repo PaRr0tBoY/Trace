@@ -42,17 +42,24 @@
  * per accept/ignore. No per-event noise.
  */
 import type { ActivityLedger } from '../store/activityLedger'
+import { recommendationFingerprint } from '../store/activityLedger'
+import { ignoreReasonToActionReason, type RecommendationHistory } from '../store/recommendationHistory'
 import type { ChatRequest, ChatResult } from './provider'
 import type { SuggestTitleContext } from '../../shared/ipc'
 import { algorithmicTitle } from '../../shared/titles'
 import { createId } from '../store/ids'
 import { normalizeAppKey } from '../../shared/appKey'
+import { normalizeExePath, type PrivacyPolicy } from '../store/privacyGate'
 import { buildClipboardRef, type TaskStore } from '../store/TaskStore'
+import { MAX_LOCAL_CANDIDATES, type CandidateOptimizer } from '../store/localModelOptimizer'
 import type {
   AppRef,
+  CandidateActivity,
   ClipboardItem,
+  IgnoreReason,
   Memory,
   MemoryType,
+  RecommendationLevel,
   ResourceRef,
   TaskProposal,
   Task,
@@ -61,7 +68,8 @@ import type {
 
 const MAX_TITLE_CHARS = 60
 const MAX_REASON_CHARS = 300
-const MAX_LLM_CANDIDATES = 8
+/** Batched LLM annotation budget — the local optimizer's input bound is kept equal (t54). */
+export const MAX_LLM_CANDIDATES = 8
 const TICK_INTERVAL_MS = 2_000
 const LLM_TIMEOUT_MS = 20_000
 
@@ -168,11 +176,45 @@ export interface SuggestionEngineOptions {
   log?: (entry: Record<string, unknown>) => void
   /** Feedback sink: called with a memory candidate after a successful accept. */
   onMemorySuggestion?: (candidate: MemoryCandidate) => void
+  /**
+   * Privacy policy supplier (t44): the denied-app list the analysis filter
+   * checks before candidacy. Absent = no filtering (engine behavior
+   * unchanged). Only the denied-app dimension gates candidates — the master
+   * switch / time range gate AI *services* (OCR, prefill, tools), while the
+   * algorithmic pipeline must keep working locally (spec story 33).
+   */
+  getPolicy?: () => PrivacyPolicy
+  /**
+   * Trace sink for denied-app interceptions (t44): one call per blocked
+   * activity, payload per TracePrivacyPayload (kind 'privacy' lands in the
+   * AI-rationale UI as "已被隐私政策过滤"). Absent = interceptions still
+   * filter candidates, but nothing is recorded.
+   */
+  recordPrivacy?: (input: { reason: string; access?: string; appExePath?: string; contentType?: string }) => void
+  /**
+   * Recommendation history (t46, spec 决策 9): accept/ignore 处记录 outcome 与
+   * actionReason（回填）。Absent = 不记录历史（既有测试与无 DB 环境）。
+   */
+  history?: RecommendationHistory
+  /**
+   * 建议的展示分级（L1/L2/L3）解析，随历史记录落库。缺省按 1（当前全部卡片
+   * 都是 L1 主动建议）；t47 评级接入后在此注入真实分级。
+   */
+  getLevel?: (suggestion: TaskProposal) => RecommendationLevel
+  /**
+   * Local model candidate optimizer (t54, spec 决策 6/11): 聚类候选 →
+   * CandidateActivity → 过滤 ≤3 / 标题草稿 / 排序（接入点 = runAnalysis
+   * 候选后处理）。Absent = 纯算法路径（不变量 H：功能等价）。优化器返回
+   * null（关闭 / 失败）时算法候选原样传递，绝不污染决策数据。
+   */
+  localModel?: CandidateOptimizer
 }
 
 /** Per-suggestion engine-side material the renderer never needs. */
 interface TaskProposalMeta {
   appRefs: AppRef[]
+  /** Activity id (ledger Activity.id) — the CandidateActivity identity key (t54). */
+  activityId: string
   segmentStartTs: number
   signature: string
   /** Window titles of the source segment (LLM material only). */
@@ -215,8 +257,13 @@ export interface SuggestionEngine {
    * replaced by a newer analysis).
    */
   accept(id: string, opts?: AcceptOptions): Task['id'] | null
-  /** Ignore: drop the card and write its signature into the table. */
-  ignore(id: string): boolean
+  /**
+   * Ignore: drop the card and write its signature into the table (existing
+   * LRU behavior, unchanged), plus record outcome + actionReason into the
+   * recommendation history (t46). `reason` is the user's ignore reason;
+   * absent = 不感兴趣.
+   */
+  ignore(id: string, reason?: IgnoreReason): boolean
   /** Wire the provider chain after construction (index.ts). */
   setChat(chat: ChatFn): void
   /** Wire the OCR capture after construction (index.ts); optional, silent when absent. */
@@ -385,7 +432,6 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
     }
   }
 
-  /** One analysis pass: cluster the new batch, dedupe, annotate, push. */
   /** One analysis pass: ledger clusters the pending batch, we build proposals. */
   async function runAnalysis(): Promise<TaskProposal[]> {
     analyzing = true
@@ -397,6 +443,39 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         ledger.analyze(),
         chat ? runOcrOnce() : Promise.resolve(null)
       ])
+
+      // Privacy (t44, spec story 33/36): denied apps' activities never
+      // become suggestion candidates — the algorithm layer (ledger
+      // clustering / attribution) ran untouched above; only the AI-facing
+      // candidacy is filtered. Each interception is recorded (kind
+      // 'privacy', reason included) so the AI-rationale UI can show
+      // "已被隐私政策过滤". The gate checks the denied list only: the AI
+      // master switch / time range gate AI services, while the local
+      // algorithmic pipeline keeps working (no-provider fallback).
+      let blockedByPrivacy = 0
+      const privacyBlocks: Array<{ app: string; reason: string }> = []
+      const policy = options.getPolicy?.()
+      if (policy && policy.deniedApps.length > 0) {
+        const blockedIdx = new Set<number>()
+        for (let i = 0; i < analysis.activities.length; i++) {
+          const denied = analysis.activities[i].apps.find((a) =>
+            policy.deniedApps.some((d) => normalizeExePath(d) === normalizeExePath(a.id))
+          )
+          if (!denied) continue
+          blockedIdx.add(i)
+          const key = normalizeExePath(denied.id)
+          const reason = `app on denied list: ${key}`
+          privacyBlocks.push({ app: key, reason })
+          // Same reason format as privacyGate's aiAllowed deny — trace
+          // payloads stay consistent across gate sites.
+          options.recordPrivacy?.({ reason, access: 'activities', appExePath: key })
+        }
+        if (blockedIdx.size > 0) {
+          analysis.activities = analysis.activities.filter((_, i) => !blockedIdx.has(i))
+          analysis.details = analysis.details.filter((_, i) => !blockedIdx.has(i))
+          blockedByPrivacy = blockedIdx.size
+        }
+      }
 
       const built: Array<{ suggestion: TaskProposal; meta: TaskProposalMeta }> = []
       for (let i = 0; i < analysis.activities.length; i++) {
@@ -431,7 +510,7 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
           // a task's resources — the card and the convert panel show these).
           clipboardRefs: resolveClipboardRefs(activity.clipboardRefs)
         }
-        built.push({ suggestion, meta: { appRefs, segmentStartTs: activity.startAt, signature, windowTitles: detail.windowTitles.slice(0, 3), memoryContext: [] } })
+        built.push({ suggestion, meta: { appRefs, activityId: activity.id, segmentStartTs: activity.startAt, signature, windowTitles: detail.windowTitles.slice(0, 3), memoryContext: [] } })
       }
 
       // Context-prior: confirmed project/workflow memories matching a segment
@@ -453,9 +532,51 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       const llmCandidates = built.slice(0, MAX_LLM_CANDIDATES)
       const llmOk = llmCandidates.length > 0 ? await annotateWithLlm(llmCandidates, ocrText) : false
 
-      pending = built.map((b) => b.suggestion)
+      // Local model candidate optimization (t54, spec 决策 6/11 接入点):
+      // 聚类候选 → CandidateActivity → 过滤 ≤3 / 标题草稿 / 排序。关闭或失败
+      // → 算法候选原样传递（不变量 H：功能等价，绝不污染决策数据）。归因
+      // （confidence / algorithmReason）始终来自算法层 — 本地模型只改顺序、
+      // 数量与标题草稿。
+      let finalBuilt = built
+      let localModelMode: 'off' | 'ok' | 'degraded' = 'off'
+      if (options.localModel && built.length > 0) {
+        const candidates: CandidateActivity[] = built.map((b) => ({
+          activityId: b.meta.activityId,
+          candidateTaskId: b.suggestion.taskId,
+          semanticLabel: b.suggestion.title,
+          score: b.suggestion.confidence,
+          evidenceRefs: [...b.meta.windowTitles, b.suggestion.evidence.appCombination]
+        }))
+        try {
+          const optimized = await options.localModel.optimize(candidates)
+          if (optimized !== null && optimized.length > 0) {
+            const ordered: typeof built = []
+            for (const c of optimized) {
+              const entry = built.find((b) => b.meta.activityId === c.activityId)
+              if (!entry) continue
+              const draft = sanitizeString(c.semanticLabel, MAX_TITLE_CHARS)
+              if (draft) entry.suggestion.title = draft
+              ordered.push(entry)
+              if (ordered.length >= MAX_LOCAL_CANDIDATES) break
+            }
+            if (ordered.length > 0) {
+              finalBuilt = ordered
+              localModelMode = 'ok'
+            } else {
+              localModelMode = 'degraded'
+            }
+          } else {
+            localModelMode = 'degraded'
+          }
+        } catch (err) {
+          localModelMode = 'degraded'
+          console.log(`[Suggestion] local model optimization failed: ${err instanceof Error ? err.message : String(err)}`)
+        }
+      }
+
+      pending = finalBuilt.map((b) => b.suggestion)
       meta.clear()
-      for (const b of built) meta.set(b.suggestion.id, b.meta)
+      for (const b of finalBuilt) meta.set(b.suggestion.id, b.meta)
 
       const mode = llmOk ? 'llm' : 'algorithm'
       const ocrNote = ocrText ? `, ocr: ${ocrText.length} chars` : ''
@@ -465,7 +586,10 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       log({
         kind: 'analysis',
         activities: analysis.activities.length,
+        blockedByPrivacy,
+        privacyBlocks,
         mode,
+        localModelMode,
         ocrChars: ocrText?.length,
         segments: analysis.activities.map((a, idx) => ({
           apps: a.apps.slice(0, 5).map((app) => app.name),
@@ -475,7 +599,7 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
           zone: analysis.details[idx].zone,
           taskId: a.attribution?.taskId ?? null
         })),
-        suggestions: built.map((b) => ({
+        suggestions: finalBuilt.map((b) => ({
           id: b.suggestion.id,
           title: b.suggestion.title,
           llmTitle: llmOk,
@@ -535,6 +659,9 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       onSuggestions(pending)
 
       const title = opts?.title?.trim() || suggestion.title
+      // t46 pattern learning: a user-edited title is the strongest signal
+      // (intent tier user-edit) — detect it here, before the title lands.
+      const titleEdited = title !== suggestion.title
       const apps = opts?.apps ?? m?.appRefs ?? []
       const resources = opts?.clipboardRefs ?? suggestion.clipboardRefs ?? []
       const emitMemoryCandidate = (): void => {
@@ -561,16 +688,39 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
           : `[Suggestion] accepted ${id} -> new task ${taskId ?? '(none)'}`
       )
       emitMemoryCandidate()
-      log({ kind: 'accept', suggestionId: id, title, taskId: taskId ?? null, merged, apps: apps.length, clipboardRefs: resources.length })
+      log({ kind: 'accept', suggestionId: id, title, taskId: taskId ?? null, merged, apps: apps.length, clipboardRefs: resources.length, titleEdited })
+      // t46 record point: accepted outcome + actionReason (user_confirmed, or
+      // user_edited_title when the user rewrote the title — strongest signal).
+      if (m && options.history) {
+        options.history.record({
+          fingerprint: recommendationFingerprint(m.appRefs.map((a) => a.id), m.segmentStartTs),
+          level: options.getLevel ? options.getLevel(suggestion) : 1,
+          outcome: 'accepted',
+          actionReason: titleEdited ? 'user_edited_title' : 'user_confirmed'
+        })
+      }
       return taskId
     },
-    ignore(id: string): boolean {
+    ignore(id: string, reason?: IgnoreReason): boolean {
+      const suggestion = pending.find((s) => s.id === id)
       const m = meta.get(id)
       pending = pending.filter((s) => s.id !== id)
       meta.delete(id)
-      if (m) ledger.dismiss(m.signature)
+      if (m) {
+        ledger.dismiss(m.signature)
+        // t46 record point: ignored outcome + actionReason（忽略原因，缺省
+        // 视为不感兴趣）。忽略仍走既有 LRU（ledger.dismiss），行为不回归。
+        if (options.history) {
+          options.history.record({
+            fingerprint: recommendationFingerprint(m.appRefs.map((a) => a.id), m.segmentStartTs),
+            level: suggestion && options.getLevel ? options.getLevel(suggestion) : 1,
+            outcome: 'ignored',
+            actionReason: reason ? ignoreReasonToActionReason(reason) : 'user_manually_dismissed'
+          })
+        }
+      }
       onSuggestions(pending)
-      if (m) log({ kind: 'ignore', suggestionId: id, signature: m.signature })
+      if (m) log({ kind: 'ignore', suggestionId: id, signature: m.signature, actionReason: reason ? ignoreReasonToActionReason(reason) : 'user_manually_dismissed' })
       return m !== undefined
     },
     setChat(fn: ChatFn): void {

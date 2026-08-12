@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo, type CSSProperties } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore, type SettingsTab } from '../store/appStore'
-import type { DisplayInfo, Memory, MemoryAction, ProviderConfig, ClipboardFilter, RestoreTime, AppRef, ContentType } from '../../shared/types'
+import type { DisplayInfo, Memory, MemoryAction, ProviderConfig, ClipboardFilter, RestoreTime, AppRef, ContentType, LocalModelSource, LocalModelStatus } from '../../shared/types'
 import { THEME_ACCENTS, THEME_COLORS } from '../../shared/themes'
 import { LiquidOctopusLoader } from './LiquidOctopusLoader'
 import { TickIndicatorIcon, CopyIndicatorIcon, SparkleIndicatorIcon } from './CopyIndicatorCurve'
@@ -1156,6 +1156,10 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
 
                   <MemorySection />
 
+                  <div className="setting-divider" />
+
+                  <LocalModelSection />
+
                   {PersistentFooter}
                 </motion.div>
               )}
@@ -1818,6 +1822,238 @@ function MemorySection() {
       ) : (
         memories.banned.map((m) => memoryRow(m, [{ action: 'unban', label: t('memory.unban') }]))
       )}
+    </>
+  )
+}
+
+/**
+ * Local model settings (t54, spec 决策 11): 开关 / 下载进度 / 手动路径。
+ * Status is fetched on mount and pushed by main on every change
+ * ('local-model:status' event: state / progress / error). First enable with
+ * source 'auto' auto-starts the download (spec: 首次启用自动下载); failures
+ * surface through the status error text and a retry button. All mutations
+ * persist via the localModel settings fields (三处登记 + 钳制).
+ */
+function LocalModelSection() {
+  const { t } = useTranslation()
+  const settings = useStore((s) => s.settings)
+  const patch = useStore((s) => s.patchSettings)
+  const [status, setStatus] = useState<LocalModelStatus | null>(null)
+  const [pathDraft, setPathDraft] = useState('')
+  const pathInputStyle: CSSProperties = {
+    width: '100%',
+    padding: '6px 8px',
+    borderRadius: 6,
+    border: '1px solid rgba(255, 255, 255, 0.15)',
+    background: 'rgba(255, 255, 255, 0.06)',
+    color: '#fff',
+    fontSize: 12,
+    outline: 'none',
+    boxSizing: 'border-box'
+  }
+
+  const enabled = settings.localModelEnabled === true
+  const source = settings.localModelSource ?? 'auto'
+  // Last-seen enabled state — the auto-download fires only on the false→true
+  // edge (首次启用), so Remove (state back to 'none') and a failed download
+  // ('error') can never re-trigger it into a loop. Retries are the button.
+  const enabledRef = useRef(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void window.edge.getLocalModelStatus()
+      .then((s) => { if (!cancelled) setStatus(s) })
+      .catch(() => {})
+    const unsubscribe = window.edge.onLocalModelStatus((s) => { if (!cancelled) setStatus(s) })
+    return () => { cancelled = true; unsubscribe() }
+  }, [])
+
+  // Sync the manual-path draft whenever the persisted path changes.
+  useEffect(() => {
+    setPathDraft(settings.localModelManualPath ?? '')
+  }, [settings.localModelManualPath])
+
+  const startDownload = (): void => {
+    void window.edge.startLocalModelDownload().catch(() => {})
+  }
+
+  // 首次启用自动下载：只在 enabled 从 false→true 跃迁且状态为 'none'（从未
+  // 下载）时触发一次。Remove 后的 'none' 与下载失败后的 'error' 均不自动拉起
+  // —— 手动「下载」按钮负责重试，避免 650MB 重复下载与失败死循环。
+  useEffect(() => {
+    const wasEnabled = enabledRef.current
+    enabledRef.current = enabled
+    if (!wasEnabled && enabled && source === 'auto' && status?.state === 'none') {
+      startDownload()
+    }
+  }, [enabled, source, status?.state])
+
+  const dim = enabled ? undefined : { opacity: 0.45, transition: 'opacity 0.2s ease' }
+
+  const switchSource = (next: LocalModelSource): void => {
+    playButtonClickSound()
+    void window.edge.setLocalModelSource(next).catch(() => {})
+  }
+
+  const commitPath = (): void => {
+    const trimmed = pathDraft.trim()
+    void window.edge.setLocalModelPath(trimmed.length > 0 ? trimmed : null).catch(() => {})
+  }
+
+  const browsePath = (): void => {
+    void window.edge.pickLocalModelPath()
+      .then((picked) => {
+        if (picked) {
+          setPathDraft(picked)
+          void window.edge.setLocalModelPath(picked).catch(() => {})
+        }
+      })
+      .catch(() => {})
+  }
+
+  const percent = status?.progress ? Math.round(status.progress.percent * 100) : 0
+  const isDownloading = status?.state === 'downloading'
+  const statusText =
+    status === null ? '' :
+    status.state === 'ready' ? t('localModel.statusReady') :
+    status.state === 'downloading' ? t('localModel.statusDownloading') :
+    status.state === 'error' ? t('localModel.statusError') :
+    t('localModel.statusNone')
+
+  return (
+    <>
+      <div className="setting-group-label">{t('localModel.group')}</div>
+
+      <div className="setting-row">
+        <div className="setting-info">
+          <div className="setting-title">{t('localModel.enabledTitle')}</div>
+          <div className="setting-desc">{t('localModel.enabledDesc')}</div>
+        </div>
+        <Toggle
+          checked={enabled}
+          onChange={(v) => patch({ localModelEnabled: v })}
+        />
+      </div>
+
+      <div style={dim}>
+        <div className="setting-divider" />
+
+        <div className="setting-row vertical" style={{ gap: 8 }}>
+          <div className="setting-info">
+            <div className="setting-title" style={{ fontSize: 12 }}>{t('localModel.sourceAuto')} / {t('localModel.sourceManual')}</div>
+          </div>
+          <div className="setting-pills">
+            <button
+              type="button"
+              className={`pill ${source === 'auto' ? 'active' : ''}`}
+              disabled={!enabled}
+              onClick={() => switchSource('auto')}
+            >
+              {t('localModel.sourceAuto')}
+            </button>
+            <button
+              type="button"
+              className={`pill ${source === 'manual' ? 'active' : ''}`}
+              disabled={!enabled}
+              onClick={() => switchSource('manual')}
+            >
+              {t('localModel.sourceManual')}
+            </button>
+          </div>
+        </div>
+
+        {source === 'auto' && (
+          <>
+            <div className="setting-divider" />
+            <div className="setting-row vertical" style={{ gap: 8 }}>
+              <div className="setting-info">
+                <div className="setting-title" style={{ fontSize: 12 }}>{statusText}</div>
+                {status?.state === 'error' && status.error && (
+                  <div className="setting-desc" style={{ fontSize: 10.5, color: '#ff6b6b', overflowWrap: 'anywhere' }}>{status.error}</div>
+                )}
+                {status?.state === 'ready' && status.modelFilePath && (
+                  <div className="setting-desc" style={{ fontSize: 10.5, overflowWrap: 'anywhere' }} title={status.modelFilePath}>{status.modelFilePath}</div>
+                )}
+              </div>
+              {isDownloading ? (
+                <div className="setting-desc" style={{ fontSize: 10.5, opacity: 0.7 }}>
+                  {t('localModel.statusDownloading')} {percent}%
+                </div>
+              ) : (
+                <div className="setting-pills" style={{ gap: 8 }}>
+                  {status?.state === 'ready' ? (
+                    <button
+                      type="button"
+                      className="pill display-pill"
+                      style={{ padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}
+                      onClick={() => { playButtonClickSound(); void window.edge.removeLocalModel().catch(() => {}) }}
+                    >
+                      {t('localModel.remove')}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="pill display-pill"
+                      style={{ padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}
+                      onClick={() => { playButtonClickSound(); startDownload() }}
+                    >
+                      {t('localModel.download')}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {source === 'manual' && (
+          <>
+            <div className="setting-divider" />
+            <div className="setting-row vertical" style={{ gap: 8 }}>
+              <div className="setting-info">
+                <div className="setting-title" style={{ fontSize: 12 }}>{t('localModel.pathTitle')}</div>
+                <div className="setting-desc">{t('localModel.pathDesc')}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, width: '100%', flexWrap: 'wrap' }}>
+                <input
+                  style={{ ...pathInputStyle, flex: 1, minWidth: 0 }}
+                  value={pathDraft}
+                  placeholder={t('localModel.pathPlaceholder')}
+                  disabled={!enabled}
+                  onChange={(e) => setPathDraft(e.target.value)}
+                  onBlur={commitPath}
+                />
+                <button
+                  type="button"
+                  className="pill display-pill"
+                  style={{ padding: '4px 10px', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}
+                  disabled={!enabled}
+                  onClick={() => { playButtonClickSound(); browsePath() }}
+                >
+                  {t('localModel.browse')}
+                </button>
+                {pathDraft.length > 0 && (
+                  <button
+                    type="button"
+                    className="pill display-pill"
+                    style={{ padding: '4px 10px', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}
+                    disabled={!enabled}
+                    onClick={() => { playButtonClickSound(); setPathDraft(''); void window.edge.setLocalModelPath(null).catch(() => {}) }}
+                  >
+                    {t('localModel.clear')}
+                  </button>
+                )}
+              </div>
+              {status?.state === 'error' && status.error && (
+                <div className="setting-desc" style={{ fontSize: 10.5, color: '#ff6b6b', overflowWrap: 'anywhere' }}>{status.error}</div>
+              )}
+              {status?.state === 'ready' && status.modelFilePath && (
+                <div className="setting-desc" style={{ fontSize: 10.5, overflowWrap: 'anywhere' }} title={status.modelFilePath}>{status.modelFilePath}</div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </>
   )
 }

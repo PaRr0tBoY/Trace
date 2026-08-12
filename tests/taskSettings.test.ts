@@ -152,6 +152,29 @@ describe('clampSettings — privacy domain (t45, spec 决策 12)', () => {
   })
 })
 
+describe('clampSettings — local model domain (t54, spec 决策 11)', () => {
+  it('turns localModelEnabled on only for an explicit true (default off)', () => {
+    expect(clampSettings(DEFAULT_SETTINGS).localModelEnabled).toBe(false)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, localModelEnabled: true }).localModelEnabled).toBe(true)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, localModelEnabled: false }).localModelEnabled).toBe(false)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, localModelEnabled: 'yes' as never }).localModelEnabled).toBe(false)
+  })
+
+  it('restricts localModelSource to auto/manual with auto as fallback', () => {
+    expect(clampSettings(DEFAULT_SETTINGS).localModelSource).toBe('auto')
+    expect(clampSettings({ ...DEFAULT_SETTINGS, localModelSource: 'manual' }).localModelSource).toBe('manual')
+    expect(clampSettings({ ...DEFAULT_SETTINGS, localModelSource: 'cloud' as never }).localModelSource).toBe('auto')
+    expect(clampSettings({ ...DEFAULT_SETTINGS, localModelSource: undefined as never }).localModelSource).toBe('auto')
+  })
+
+  it('keeps a trimmed manual path, dropping blank or non-string values', () => {
+    expect(clampSettings(DEFAULT_SETTINGS).localModelManualPath).toBeUndefined()
+    expect(clampSettings({ ...DEFAULT_SETTINGS, localModelManualPath: '  C:\\models\\qwen3.gguf  ' }).localModelManualPath).toBe('C:\\models\\qwen3.gguf')
+    expect(clampSettings({ ...DEFAULT_SETTINGS, localModelManualPath: '   ' }).localModelManualPath).toBeUndefined()
+    expect(clampSettings({ ...DEFAULT_SETTINGS, localModelManualPath: 42 as never }).localModelManualPath).toBeUndefined()
+  })
+})
+
 describe('clampSettings — existing fields keep their behaviour', () => {
   it('preserves the legacy slider/enum clamps', () => {
     const out = clampSettings(corrupt())

@@ -70,6 +70,18 @@ export class LocalModelError extends Error {
 /* Model spec                                                          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Pure readiness gate for loading the runtime (t54): a load is worth
+ * attempting only when the enhancement is enabled and the manager reports a
+ * model file on disk (state 'ready' implies `modelFilePath` resolves).
+ * Returns false in every other case, so the lazy optimizer degrades to the
+ * pure algorithm path — enabling the toggle without a model file can never
+ * error the suggestion pipeline (不变量 H).
+ */
+export function shouldLoadLocalModel(enabled: boolean, status: LocalModelStatus): boolean {
+  return enabled && status.state === 'ready' && status.modelFilePath !== null
+}
+
 export interface ModelSpec {
   id: string
   name: string

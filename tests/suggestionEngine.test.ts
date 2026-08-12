@@ -3,9 +3,17 @@ import { createSuggestionEngine, type SuggestionEngine } from '../electron/main/
 import { createIgnoredTable, type IgnoredTable } from '../electron/main/ignored'
 import { createActivityLedger, DEFAULT_SEGMENT_PARAMS, suggestionSignature } from '../electron/store/activityLedger'
 import { createMemoryEvidenceStore, evidenceFromUsageEvent, type EvidenceStore } from '../electron/store/evidenceStore'
+import { DEFAULT_POLICY, type PrivacyPolicy } from '../electron/store/privacyGate'
 import { TaskStore } from '../electron/store/TaskStore'
 import type { AppSwitchEvent, ClipboardItem, Memory, TaskProposal, UsageEvent } from '../shared/types'
 import type { ChatFn, ChatResult } from '../electron/main/provider'
+
+/** Privacy interceptions recorded via the engine's recordPrivacy sink (t44). */
+interface PrivacyRecord {
+  reason: string
+  access?: string
+  appExePath?: string
+}
 
 /** Single-app event batch; gaps are small so the whole batch is one segment. */
 function ev(appName: string, ts: number, title = ''): AppSwitchEvent {
@@ -58,9 +66,15 @@ interface Harness {
   ignored: IgnoredTable
   pushed: TaskProposal[][]
   chat: ChatFn | undefined
+  /** Privacy interceptions captured through the engine's sink (t44). */
+  privacyRecords: PrivacyRecord[]
 }
 
-function makeHarness(initialEvents: UsageEvent[] = [], items: Map<string, ClipboardItem> = new Map()): Harness {
+function makeHarness(
+  initialEvents: UsageEvent[] = [],
+  items: Map<string, ClipboardItem> = new Map(),
+  policy?: PrivacyPolicy
+): Harness {
   const h: Harness = {
     events: [...initialEvents],
     now: 1_000_000,
@@ -68,6 +82,7 @@ function makeHarness(initialEvents: UsageEvent[] = [], items: Map<string, Clipbo
     ignored: createIgnoredTable({ load: () => null, save: () => {} }),
     pushed: [],
     chat: undefined,
+    privacyRecords: [],
     store: new TaskStore({ load: () => null, save: () => {} }),
     evidence: createMemoryEvidenceStore()
   }
@@ -88,7 +103,8 @@ function makeHarness(initialEvents: UsageEvent[] = [], items: Map<string, Clipbo
       ignored: h.ignored
     }),
     onSuggestions: (sugs) => h.pushed.push(sugs),
-    readItem: (itemId) => items.get(itemId)
+    readItem: (itemId) => items.get(itemId),
+    ...(policy ? { getPolicy: () => policy, recordPrivacy: (r) => h.privacyRecords.push(r) } : {})
   })
   return h
 }
@@ -790,5 +806,62 @@ describe('accept with convert-panel payload', () => {
     expect(task.title).toBe('Writing report') // unchanged without a title override
     expect(task.note).toBe('edited note')
     expect(task.confidence).toBe(s.confidence)
+  })
+})
+
+describe('privacy: denied-app candidacy filter (t44)', () => {
+  it('blocks an activity containing a denied app and records the interception', async () => {
+    // batch() is Code+Chrome in one segment → Chrome on the denied list
+    // blocks the whole activity (its data would leak via the suggestion).
+    const h = makeHarness([], new Map(), { ...DEFAULT_POLICY, deniedApps: ['c:/apps/chrome.exe'] })
+    h.engine.start()
+    await trigger(h, batch())
+    expect(h.pushed[0]).toHaveLength(0)
+    expect(h.privacyRecords).toHaveLength(1)
+    expect(h.privacyRecords[0].reason).toContain('app on denied list')
+    expect(h.privacyRecords[0].appExePath).toBe('c:/apps/chrome.exe')
+    expect(h.privacyRecords[0].access).toBe('activities')
+  })
+
+  it('keeps allowed activities when another activity is blocked', async () => {
+    const h = makeHarness([], new Map(), { ...DEFAULT_POLICY, deniedApps: ['c:/apps/chrome.exe'] })
+    h.engine.start()
+    // First batch: Code only → one allowed suggestion.
+    await trigger(h, [ev('Code', 10_000), ev('Code', 11_000), ev('Code', 12_000), ev('Code', 13_000), ev('Code', 14_000)])
+    expect(h.pushed[0]).toHaveLength(1)
+    expect(h.pushed[0][0].appNames).toEqual(['Code'])
+    // Second batch: Chrome only → filtered, recorded, no card.
+    await trigger(h, [ev('Chrome', 20_000), ev('Chrome', 21_000), ev('Chrome', 22_000), ev('Chrome', 23_000), ev('Chrome', 24_000)])
+    expect(h.pushed[1]).toHaveLength(0)
+    expect(h.privacyRecords).toHaveLength(1)
+  })
+
+  it('matches the denied list with normalized exePath keys', async () => {
+    // Settings stores normalized keys; the activity's app id is normalized
+    // too, so original-case raw paths never appear here — but mixed case
+    // must still match (same normalizeExePath rule as the gate).
+    const h = makeHarness([], new Map(), { ...DEFAULT_POLICY, deniedApps: ['C:/Apps/CODE.EXE'] })
+    h.engine.start()
+    await trigger(h, batch())
+    expect(h.pushed[0]).toHaveLength(0)
+    expect(h.privacyRecords[0].appExePath).toBe('c:/apps/code.exe')
+  })
+
+  it('keeps the algorithmic pipeline when the AI master switch is off', async () => {
+    // aiEnabled gates AI services (OCR / prefill / tools), NOT the local
+    // candidacy — the no-AI fallback must keep producing suggestions.
+    const h = makeHarness([], new Map(), { ...DEFAULT_POLICY, aiEnabled: false })
+    h.engine.start()
+    await trigger(h, batch())
+    expect(h.pushed[0]).toHaveLength(1)
+    expect(h.privacyRecords).toHaveLength(0)
+  })
+
+  it('does not filter and records nothing when no policy is injected', async () => {
+    const h = makeHarness()
+    h.engine.start()
+    await trigger(h, batch())
+    expect(h.pushed[0]).toHaveLength(1)
+    expect(h.privacyRecords).toHaveLength(0)
   })
 })

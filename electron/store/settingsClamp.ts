@@ -88,6 +88,18 @@ export function clampSettings(input: Settings): Settings {
   out.clipboardAccess = out.clipboardAccess !== false
   out.memoryAccess = out.memoryAccess !== false
   out.memoryEnabled = out.memoryEnabled !== false
+  // Local model (t54, spec 决策 11): optional enhancement — must be
+  // EXPLICITLY true to enable (default off; 不变量 H: 关闭 = 功能等价).
+  out.localModelEnabled = out.localModelEnabled === true
+  // Source is the manager's LocalModelSource union; garbage → 'auto'.
+  out.localModelSource = out.localModelSource === 'manual' ? 'manual' : 'auto'
+  // Manual .gguf path: trimmed non-empty string or undefined. Existence is
+  // validated by the manager at load time (fs belongs to the Electron glue,
+  // not the pure clamp).
+  out.localModelManualPath =
+    typeof out.localModelManualPath === 'string' && out.localModelManualPath.trim().length > 0
+      ? out.localModelManualPath.trim()
+      : undefined
   // Landing page (ADR-0004): view must be a valid top-level view, filters
   // must match the view's second level; anything else falls back to defaults.
   const landing = out.landing

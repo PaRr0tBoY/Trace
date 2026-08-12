@@ -11,6 +11,7 @@
  * shows an amber dot when suggestions are pending.
  */
 import { motion, AnimatePresence } from 'framer-motion'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from '../store/appStore'
 import { GearIcon, CloseIcon, InfoIcon } from './icons'
 import { playButtonClickSound } from '../lib/soundEffects'
@@ -23,6 +24,58 @@ import { useTranslation } from '../i18n'
 const PRIMARY_CHIP_WIDTH = 58
 const PRIMARY_GAP = 2
 const TRACK_LEFT = 3
+
+/**
+ * Row 2 (secondary chips) with the same sliding selector as the primary row.
+ * The selector measures the active chip (offsetLeft/offsetWidth) and springs
+ * to it with the primary row's spring; `layout` animates the position/width
+ * change. The measurement set is deduped so re-renders never loop.
+ */
+function SecondaryRow({ children }: { children: React.ReactNode }) {
+  const rowRef = useRef<HTMLDivElement>(null)
+  const [selector, setSelector] = useState<{ left: number; width: number } | null>(null)
+
+  useLayoutEffect(() => {
+    const row = rowRef.current
+    if (!row) return
+    const chip = row.querySelector<HTMLElement>('[data-chip-active="true"]')
+    if (!chip) return
+    const left = chip.offsetLeft
+    const width = chip.offsetWidth
+    setSelector((prev) => (prev && prev.left === left && prev.width === width ? prev : { left, width }))
+  })
+
+  return (
+    <motion.div
+      ref={rowRef}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.14 }}
+      style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}
+    >
+      {selector && (
+        <motion.div
+          initial={false}
+          animate={{ left: selector.left, width: selector.width }}
+          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+          style={{
+            position: 'absolute',
+            top: 2,
+            bottom: 2,
+            borderRadius: 999,
+            background: 'rgba(255, 255, 255, 0.16)',
+            border: '1px solid rgba(255, 255, 255, 0.22)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
+            pointerEvents: 'none',
+            zIndex: 0
+          }}
+        />
+      )}
+      {children}
+    </motion.div>
+  )
+}
 
 export function Header() {
   const { t } = useTranslation()
@@ -99,8 +152,9 @@ export function Header() {
     transition: 'color 0.18s ease',
     zIndex: 1,
     whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis'
+    // visible lets the corner badges sit slightly outside the pill; chip
+    // labels are short enough that ellipsis never matters here.
+    overflow: 'visible'
   })
 
   const secondaryChipStyle = (active: boolean): React.CSSProperties => ({
@@ -124,16 +178,17 @@ export function Header() {
     transition: 'color 0.18s ease, background 0.18s ease, border-color 0.18s ease',
     zIndex: 1,
     whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis'
+    // visible lets the corner badges sit slightly outside the pill; chip
+    // labels are short enough that ellipsis never matters here.
+    overflow: 'visible'
   })
 
   const redBadge = (count: number) => (
     <span
       style={{
         position: 'absolute',
-        top: 1,
-        right: 1,
+        top: -3,
+        right: -3,
         minWidth: 11,
         height: 11,
         padding: '0 2px',
@@ -157,8 +212,8 @@ export function Header() {
       title={title}
       style={{
         position: 'absolute',
-        bottom: 2,
-        right: 2,
+        top: -3,
+        right: -3,
         width: 6,
         height: 6,
         borderRadius: '50%',
@@ -400,14 +455,7 @@ export function Header() {
             >
               <AnimatePresence initial={false} mode="wait">
                 {view === 'clipboard' && (
-              <motion.div
-                key="row-clipboard"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.14 }}
-                style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}
-              >
+              <SecondaryRow key="row-clipboard">
                 {([
                   { id: 'all' as const, label: t('filters.all') },
                   { id: 'text' as const, label: t('filters.text') },
@@ -417,6 +465,7 @@ export function Header() {
                   <button
                     key={f.id}
                     type="button"
+                    data-chip-active={clipboardFilter === f.id}
                     className={`filter-chip${clipboardFilter === f.id ? ' active' : ''}`}
                     onClick={() => {
                       playButtonClickSound()
@@ -427,18 +476,11 @@ export function Header() {
                     <span>{f.label}</span>
                   </button>
                 ))}
-              </motion.div>
+              </SecondaryRow>
             )}
 
             {view === 'files' && (
-              <motion.div
-                key="row-files"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.14 }}
-                style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}
-              >
+              <SecondaryRow key="row-files">
                 <AnimatePresence initial={false}>
                   {hasFiles ? (
                     <motion.div
@@ -451,6 +493,7 @@ export function Header() {
                     >
                       <button
                         type="button"
+                        data-chip-active={filesFilter === 'all'}
                         className={`filter-chip${filesFilter === 'all' ? ' active' : ''}`}
                         onClick={() => {
                           playButtonClickSound()
@@ -464,6 +507,7 @@ export function Header() {
                         <button
                           key={tab.ext}
                           type="button"
+                          data-chip-active={filesFilter === tab.ext}
                           className={`filter-chip${filesFilter === tab.ext ? ' active' : ''}`}
                           onClick={() => {
                             playButtonClickSound()
@@ -477,6 +521,7 @@ export function Header() {
                       {files.otherCount > 0 && (
                         <button
                           type="button"
+                          data-chip-active={filesFilter === 'other'}
                           className={`filter-chip${filesFilter === 'other' ? ' active' : ''}`}
                           onClick={() => {
                             playButtonClickSound()
@@ -490,20 +535,14 @@ export function Header() {
                     </motion.div>
                   ) : null}
                 </AnimatePresence>
-              </motion.div>
+              </SecondaryRow>
             )}
 
             {view === 'tasks' && (
-              <motion.div
-                key="row-tasks"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.14 }}
-                style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}
-              >
+              <SecondaryRow key="row-tasks">
                 <button
                   type="button"
+                  data-chip-active={tasksFilter === 'existing'}
                   className={`filter-chip${tasksFilter === 'existing' ? ' active' : ''}`}
                   onClick={() => {
                     playButtonClickSound()
@@ -516,6 +555,7 @@ export function Header() {
                 </button>
                 <button
                   type="button"
+                  data-chip-active={tasksFilter === 'candidates'}
                   className={`filter-chip${tasksFilter === 'candidates' ? ' active' : ''}`}
                   onClick={() => {
                     playButtonClickSound()
@@ -526,7 +566,7 @@ export function Header() {
                   <span>{t('filters.candidateTasks')}</span>
                   {tasksFilter === 'candidates' && suggestions.length > 0 && amberDot(t('tasks.suggestionBadge', { count: suggestions.length }))}
                 </button>
-              </motion.div>
+              </SecondaryRow>
             )}
           </AnimatePresence>
             </div>

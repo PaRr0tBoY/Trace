@@ -166,8 +166,9 @@ describe('analysis output', () => {
     expect(s.title).toBe(ALGO_TITLE)
     expect(s.lowConfidence).toBe(false) // no candidate at all -> 'new' zone, not the low band
     expect(s.appNames).toEqual(['Chrome', 'Code'])
-    // appExePaths parallel appNames (t28 fills them for t26's icon fetch).
-    expect(s.appExePaths).toEqual(['c:/apps/chrome.exe', 'c:/apps/code.exe'])
+    // appExePaths parallel appNames; original-case paths feed icon
+    // extraction (normalized keys are the fallback when no raw path exists).
+    expect(s.appExePaths).toEqual(['C:\\Apps\\chrome.exe', 'C:\\Apps\\code.exe'])
     expect(s.algorithmReason).toContain('New activity pattern')
     expect(s.reason).toBeUndefined()
   })

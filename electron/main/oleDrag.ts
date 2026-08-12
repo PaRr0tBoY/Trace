@@ -418,18 +418,24 @@ function unregisterDragCallbacks(cbs: DragCallbacks): void {
 /**
  * Run a blocking OLE drag for `text` (CF_UNICODETEXT) from the main process.
  *
- * Returns true when DoDragDrop ran to completion (drop or cancel) and false
- * when OLE is unavailable (koffi failed to load, OleInitialize failed, a
- * callback could not be registered) or an exception escaped. Never throws.
+ * Returns 'drop' when the target accepted the payload, 'cancel' when the
+ * gesture ended without a drop (esc, release over a non-target), and
+ * 'failed' when OLE is unavailable (koffi failed to load, OleInitialize
+ * failed, a callback could not be registered) or an exception escaped.
+ * Never throws. Callers must only treat 'drop' as a real drop: 'cancel' and
+ * 'failed' mean the cursor never left the source gesture meaningfully, so
+ * in-panel drop resolution must be skipped for them.
  */
-export function startTextOleDrag(text: string): boolean {
-  if (!doDragDrop || !globalAlloc || !globalLock || !globalUnlock || !globalFree) return false
-  if (!ensureOleInitialized()) return false
+export type TextDragResult = 'drop' | 'cancel' | 'failed'
+
+export function startTextOleDrag(text: string): TextDragResult {
+  if (!doDragDrop || !globalAlloc || !globalLock || !globalUnlock || !globalFree) return 'failed'
+  if (!ensureOleInitialized()) return 'failed'
 
   // koffi.register reads the call-memory pool, which is only allocated by
   // the first real FFI call — OleInitialize above guarantees it exists.
   const callbacks = registerDragCallbacks()
-  if (!callbacks) return false
+  if (!callbacks) return 'failed'
 
   dragText = text
   enumCursor = 0
@@ -481,11 +487,12 @@ export function startTextOleDrag(text: string): boolean {
 
     // Blocks until the gesture ends (drop / cancel / escape); the callbacks
     // above serve the drop target while it runs.
-    doDragDrop(koffi.address(dataObj), koffi.address(dropSource), DROPEFFECT_COPY | DROPEFFECT_MOVE, effectOut)
-    return true
+    const hr = doDragDrop(koffi.address(dataObj), koffi.address(dropSource), DROPEFFECT_COPY | DROPEFFECT_MOVE, effectOut)
+    console.log(`[OleDrag] DoDragDrop returned hr=0x${hr.toString(16)} effect=${effectOut[0]}`)
+    return hr === DRAGDROP_S_DROP ? 'drop' : 'cancel'
   } catch (err) {
     console.error('[OleDrag] DoDragDrop failed:', err)
-    return false
+    return 'failed'
   } finally {
     dragText = ''
     enumCursor = 0

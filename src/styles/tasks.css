@@ -391,26 +391,6 @@
   gap: 4px;
   min-width: 0;
 }
-.task-content-badges {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.task-content-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  font-size: calc(10px * var(--font-scale, 1));
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.08);
-  white-space: nowrap;
-}
-.task-content-badge svg {
-  display: block;
-}
 
 /* Hover-revealed row actions (placeholder-resident: opacity only, no layout shift). */
 .task-actions {
@@ -1304,8 +1284,10 @@
 .task-app-icons {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px;
+  min-width: 0;
+  overflow: hidden;
 }
 .task-app-icons-more {
   padding: 1px 5px;

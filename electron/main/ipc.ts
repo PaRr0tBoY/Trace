@@ -16,7 +16,7 @@ import { getMainWindow } from './window'
 import { setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData } from './drag'
-import { startTextOleDrag } from './oleDrag'
+import { startTextOleDrag, type TextDragResult } from './oleDrag'
 import { activateAppWindow } from './windowSwitch'
 import { clipboardSignature } from '../clipboard/formats'
 import { buildClipboardRef } from '../store/TaskStore'
@@ -660,6 +660,7 @@ export function registerSendListeners(): void {
       return
     }
     console.log('[IPC] start-drag: kind=', data.kind)
+    let textDragResult: TextDragResult | null = null
 
     // Pause the always-on-top heartbeat for the duration of the drag.
     // The heartbeat fires SetWindowPos(HWND_TOPMOST) every 500 ms, which
@@ -671,7 +672,7 @@ export function registerSendListeners(): void {
       // Text cannot ride the DWM drag-out (transparent panel window), so it
       // drags through a native OLE DoDragDrop from the main process instead.
       if (data.kind === 'text') {
-        startTextOleDrag(data.text)
+        textDragResult = startTextOleDrag(data.text)
       } else {
         startDragOut(sender, data)
       }
@@ -682,6 +683,11 @@ export function registerSendListeners(): void {
       // Re-enable the heartbeat now that the drag is over.
       setHeartbeatPaused(false)
     }
+
+    // A cancelled/failed text drag never left the panel as a real gesture —
+    // resolving it as an in-panel drop would mis-fire merge/split/task-link
+    // actions on the element under the cursor (the source item itself).
+    if (data.kind === 'text' && textDragResult !== 'drop') return
 
     // Workaround for Electron/Windows not firing drop events on the source window:
     // Check if the user dropped the item back onto our window!

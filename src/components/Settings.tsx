@@ -883,52 +883,52 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                     </div>
                     <div
                       style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(5, 1fr)',
-                        gap: 8,
+                        display: 'flex',
+                        gap: 10,
                         marginTop: 10
                       }}
                     >
                       {THEME_COLORS.map((color) => {
                         const selected = (settings.themeColor ?? 'graphite') === color
-                        const name = 'theme' + color.charAt(0).toUpperCase() + color.slice(1)
                         return (
                           <div
                             key={color}
+                            role="button"
+                            title={t(`appearance.theme${color.charAt(0).toUpperCase() + color.slice(1)}`)}
                             onClick={() => {
                               playButtonClickSound()
                               patch({ themeColor: color })
                             }}
                             style={{
                               cursor: 'pointer',
-                              borderRadius: 10,
-                              padding: '10px 4px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: 6,
-                              background: selected ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
-                              border: selected ? '1px solid rgba(255,255,255,0.3)' : '1px solid rgba(255,255,255,0.06)'
+                              width: 26,
+                              height: 26,
+                              borderRadius: '50%',
+                              background: THEME_ACCENTS[color].color,
+                              border: selected ? '2px solid #ffffff' : '2px solid rgba(255,255,255,0.2)',
+                              boxShadow: selected ? '0 0 0 2px rgba(255,255,255,0.35)' : 'none',
+                              transform: selected ? 'scale(1.08)' : 'scale(1)',
+                              transition: 'all 0.15s ease',
+                              boxSizing: 'border-box'
                             }}
-                          >
-                            <div
-                              style={{
-                                width: 22,
-                                height: 22,
-                                borderRadius: '50%',
-                                background: THEME_ACCENTS[color].color
-                              }}
-                            />
-                            <div style={{ fontSize: 10.5, fontWeight: 600, color: '#fff', textAlign: 'center' }}>
-                              {t(`appearance.${name}`)}
-                            </div>
-                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', textAlign: 'center', lineHeight: 1.3 }}>
-                              {t(`appearance.${name}Desc`)}
-                            </div>
-                          </div>
+                          />
                         )
                       })}
                     </div>
+                    {(() => {
+                      const selected = settings.themeColor ?? 'graphite'
+                      const name = 'theme' + selected.charAt(0).toUpperCase() + selected.slice(1)
+                      return (
+                        <div style={{ marginTop: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: THEME_ACCENTS[selected].color }}>
+                            {t(`appearance.${name}`)}
+                          </div>
+                          <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, marginTop: 2 }}>
+                            {t(`appearance.${name}Desc`)}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* ── GROUP: Copy Indicator ────────────────────────────── */}

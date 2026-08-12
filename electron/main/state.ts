@@ -16,9 +16,15 @@ import {
   createMemoryEvidenceStore,
   createSqliteEvidenceStore,
   evidenceFromUsageEvent,
+  MAX_EVIDENCE_QUERY_LIMIT,
   type EvidenceStore
 } from '../store/evidenceStore'
 import { createSqliteTraceStore, type TraceStore } from '../store/traceStore'
+import {
+  createMemoryRecommendationHistory,
+  createSqliteRecommendationHistory,
+  type RecommendationHistory
+} from '../store/recommendationHistory'
 import {
   createMemoryIndexAdapter,
   createSqliteMemoryGraph,
@@ -43,7 +49,13 @@ import { buildClipboardEvent } from './attributor'
 import { createSuggestionEngine, TICK_INTERVAL_MS, type ChatFn, type OcrFn, type SuggestionEngine } from './suggestionEngine'
 import { createIgnoredTable } from './ignored'
 import { createActivityLedger, DEFAULT_SEGMENT_PARAMS, type ActivityLedger } from '../store/activityLedger'
+import { createChatEpisodeExtractor, createEpisodeConsolidator, type EpisodeConsolidator } from '../store/episodeConsolidator'
+import { aiAllowed, memoryAllowed, policyFromSettings } from '../store/privacyGate'
 import { logAi } from './aiLog'
+import { LocalModelManager, shouldLoadLocalModel } from '../store/localModelManager'
+import { LocalModelRuntime } from '../store/localModelRuntime'
+import { createWorkerModelEngine } from '../store/localModelWorkerEngine'
+import { createCandidateOptimizer, type CandidateOptimizer } from '../store/localModelOptimizer'
 
 const store = new ItemStore()
 const watcher = new ClipboardWatcher(600)
@@ -64,8 +76,22 @@ let traceDb: TraceDatabase | null = null
 let evidenceStore: EvidenceStore | null = null
 /** AI-rationale store over the same traceDb (t42); null when the DB failed to open. */
 let traceStore: TraceStore | null = null
+/** Recommendation history + cooldown (t46) over the same traceDb; memory fallback on DB failure. */
+let recommendationHistory: RecommendationHistory | null = null
+/** Local model manager (t54): registry / download / checksum / source / lifecycle. */
+let localModelManager: LocalModelManager | null = null
+/** Local model runtime (t53/54): load / infer / queue over the worker-thread engine. */
+let localModelRuntime: LocalModelRuntime | null = null
 let evidenceUnsubscribe: (() => void) | null = null
 let evidencePurgeTimer: ReturnType<typeof setInterval> | null = null
+let recommendationPurgeTimer: ReturnType<typeof setInterval> | null = null
+/** Episode consolidator (t49): 时段整理器；null = DB 故障降级。 */
+let episodeConsolidator: EpisodeConsolidator | null = null
+let consolidationTimer: ReturnType<typeof setInterval> | null = null
+/** Provider 链聊天入口（setSuggestionChat 注入；null = AI 未接线）。 */
+let suggestionChat: ChatFn | null = null
+/** 时段整理检查节流（t49）：5 分钟粒度，会话结束/时段边界/6h 兜底都经它。 */
+const CONSOLIDATION_CHECK_MS = 5 * 60_000
 /** Retention sweep cadence (t39): hourly, single indexed DELETE — never blocks capture. */
 const EVIDENCE_RETENTION_CHECK_MS = 3_600_000
 
@@ -250,12 +276,16 @@ export function initState(): void {
     taskStore.attachSessionStore(createSqliteSessionStore(traceDb))
     evidenceStore = createSqliteEvidenceStore(traceDb)
     traceStore = createSqliteTraceStore(traceDb)
+    recommendationHistory = createSqliteRecommendationHistory(traceDb)
   } catch (err) {
     traceDb = null
     // In-memory timeline fallback (t40): capture keeps flowing and the
     // suggestion pipeline stays fully functional; only persistence is lost.
     evidenceStore = createMemoryEvidenceStore()
     traceStore = null
+    // In-memory recommendation history (t46): cooldown/pattern learning stay
+    // live for the session even when the DB failed; nothing survives restart.
+    recommendationHistory = createMemoryRecommendationHistory()
     console.error('[Store] trace.db open failed; sessions/evidence/trace will not persist:', err)
   }
   // Subscribed regardless of the store backend so a degraded DB never breaks
@@ -364,12 +394,47 @@ export function initState(): void {
   if (evidencePurgeTimer !== null) clearInterval(evidencePurgeTimer)
   evidencePurgeTimer = setInterval(runEvidencePurge, EVIDENCE_RETENTION_CHECK_MS)
 
+  // Recommendation retention (t46, spec 决策 8/9): 未采纳推荐记录与其 trace
+  // 随推荐历史 30 天清（Settings.traceRetentionDays 可调）。同一个 hourly 扫
+  // 描：两处 cleanupBefore 用同一 cutoff，未采纳 trace 才能与推荐记录同步消失。
+  const runRecommendationPurge = (): void => {
+    if (runtime.quitting) return
+    const settings = loadSettings()
+    const cutoff = Date.now() - settings.traceRetentionDays * 86_400_000
+    const records = getRecommendationHistory()
+    const recRemoved = records ? records.cleanupBefore(cutoff) : 0
+    const traceRemoved = traceStore !== null ? traceStore.cleanupBefore(cutoff) : 0
+    if (recRemoved > 0 || traceRemoved > 0) {
+      console.log(
+        `[Recommendation] purged ${recRemoved} records, ${traceRemoved} unadopted trace rows (retention ${settings.traceRetentionDays}d)`
+      )
+    }
+  }
+  runRecommendationPurge()
+  if (recommendationPurgeTimer !== null) clearInterval(recommendationPurgeTimer)
+  recommendationPurgeTimer = setInterval(runRecommendationPurge, EVIDENCE_RETENTION_CHECK_MS)
+
   if (suggestionTimer !== null) clearInterval(suggestionTimer)
   suggestionTimer = setInterval(() => {
     if (runtime.quitting) return
     getSuggestionEngine().tick()
   }, TICK_INTERVAL_MS)
   getSuggestionEngine().start()
+
+  // 时段整理（t49, spec 决策 10）：周期检查 → 会话结束/时段边界/6h 兜底触发
+  // → 整批 combined extraction（≤2 次 LLM 调用）→ 去重/矛盾消解入库。门：
+  // memoryAllowed（记忆写入主开关）+ aiAllowed（AI 总开关）——任一关则整轮
+  // 跳过（不花 LLM、不写事实），episode 保持 pending（免费），重开后自动补。
+  if (consolidationTimer !== null) clearInterval(consolidationTimer)
+  consolidationTimer = setInterval(() => {
+    runConsolidation()
+  }, CONSOLIDATION_CHECK_MS)
+
+  // Local model (t54): hydrate the manager from persisted source/path and
+  // preload the model when enabled + ready, so the first optimization pass
+  // never stalls on a lazy load. Download/remove flow through IPC.
+  getLocalModelManager()
+  ensureLocalModelLoaded()
 }
 
 /**
@@ -430,6 +495,20 @@ export function stopStateTimers(): void {
     clearInterval(evidencePurgeTimer)
     evidencePurgeTimer = null
   }
+  if (recommendationPurgeTimer !== null) {
+    clearInterval(recommendationPurgeTimer)
+    recommendationPurgeTimer = null
+  }
+  if (consolidationTimer !== null) {
+    clearInterval(consolidationTimer)
+    consolidationTimer = null
+  }
+  // Local model (t54): release the worker + model memory on quit. Best-effort
+  // (a disposed runtime is recreated on the next getLocalModelRuntime()).
+  if (localModelRuntime !== null) {
+    localModelRuntime.dispose().catch(() => {})
+    localModelRuntime = null
+  }
   evidenceUnsubscribe?.()
   evidenceUnsubscribe = null
   if (traceDb !== null) {
@@ -461,11 +540,62 @@ export function getTraceStore(): TraceStore | null {
 }
 
 /**
+ * Recommendation history + cooldown (t46) over the same SQLite handle
+ * (recommendation_history table, spec 决策 9); memory fallback when the DB
+ * failed to open. initState() always assigns one of the two before the
+ * suggestion timer starts, so engine/ledger callers never see null there.
+ */
+export function getRecommendationHistory(): RecommendationHistory | null {
+  return recommendationHistory
+}
+
+/**
  * Memory graph handle (t48): null when trace.db failed to open (degrade path).
  * Exposed so settings:update can sync memoryLambda into the graph at runtime.
  */
 export function getMemoryGraph(): MemoryGraphStore | null {
   return memoryGraph
+}
+
+/**
+ * Episode consolidator（t49）单例：memoryGraph 可用（DB 健康）时惰性构建；
+ * DB 故障 → null，不落库不整理，其余功能照常。
+ */
+export function getEpisodeConsolidator(): EpisodeConsolidator | null {
+  if (episodeConsolidator === null && memoryGraph !== null) {
+    episodeConsolidator = createEpisodeConsolidator({
+      now: () => Date.now(),
+      graph: memoryGraph,
+      // 会话来源：TaskStore 内存会话（sqlite 落库经 attachSessionStore 同步），
+      // 重启后经 load() 水合，两端覆盖。
+      readSessions: () => taskStore.toDto().flatMap((t) => t.sessions ?? []),
+      taskTitle: (taskId) => taskStore.get(taskId)?.title ?? '',
+      // L0 证据材料（应用/窗口，无剪贴板正文）：episode 原始材料的一部分。
+      readEvidence: (from, to) =>
+        (evidenceStore?.query({ from, to, limit: MAX_EVIDENCE_QUERY_LIMIT }).map((e) => ({
+          source: e.source,
+          windowTitle: e.windowTitle
+        })) ?? []),
+      // AI 未接线（provider 未配置/未注入）→ 提取跳过；episode 落库照常（免费）。
+      getExtractor: () => (suggestionChat ? createChatEpisodeExtractor(suggestionChat) : null),
+      log: (entry) => logAi(entry)
+    })
+  }
+  return episodeConsolidator
+}
+
+/**
+ * 时段整理周期入口（t49）。隐私门：记忆写入主开关关（memoryEnabled）或 AI
+ * 总开关关（aiEnabled）→ 整轮跳过——不花 LLM、不写事实；episode 保持
+ * pending，门重开后下一触发自动补整理。失败静默（run 内部捕获，不抛）。
+ */
+function runConsolidation(): void {
+  if (runtime.quitting) return
+  const consolidator = getEpisodeConsolidator()
+  if (consolidator === null) return
+  const policy = policyFromSettings(loadSettings())
+  if (!memoryAllowed(policy, {}).allowed || !aiAllowed(policy, {}).allowed) return
+  void consolidator.run()
 }
 
 /**
@@ -509,7 +639,13 @@ export function getActivityLedger(): ActivityLedger {
           confidenceLow: s.confidenceLow
         }
       },
-      ignored: createIgnoredTable({ load: loadIgnoredSignatures, save: saveIgnoredSignatures })
+      ignored: createIgnoredTable({ load: loadIgnoredSignatures, save: saveIgnoredSignatures }),
+      // t46 cooldown gate: 指纹在冷却期内（含已采纳的永久抑制）的活动本趟
+      // 跳过。忽略 LRU 优先于冷却检查（ledger analyze 顺序），行为不回归。
+      cooling: (fingerprint) => {
+        const h = getRecommendationHistory()
+        return h !== null && h.cooldownMs(fingerprint) > 0
+      }
     })
   }
   return activityLedger
@@ -535,10 +671,40 @@ export function getSuggestionEngine(): SuggestionEngine {
       readItem: (itemId) => store.get(itemId),
       // Observability: the pipeline's algorithm outputs land in ai-log.jsonl.
       log: (entry) => logAi(entry),
-      // Feedback distillation: accepted suggestions become suggested candidates.
+      // Privacy (t44): live policy for the denied-app candidacy filter.
+      getPolicy: () => policyFromSettings(loadSettings()),
+      // Privacy (t44): denied-app interceptions land in the trace store
+      // (kind 'privacy') for the AI-rationale UI ("已被隐私政策过滤");
+      // each record is its own decision chain. DB-degraded → dropped.
+      recordPrivacy: (input) => {
+        const trace = getTraceStore()
+        if (!trace) return
+        trace.append({
+          decisionId: `privacy_${createId()}`,
+          kind: 'privacy',
+          payload: {
+            reason: input.reason,
+            access: input.access,
+            appExePath: input.appExePath,
+            contentType: input.contentType
+          }
+        })
+      },
+      // Feedback distillation: accepted suggestions become suggested
+      // candidates. Privacy (t44): memoryEnabled=false blocks the automatic
+      // write here at the caller — the pure store/graph never sees it.
       onMemorySuggestion: (candidate) => {
+        if (!memoryAllowed(policyFromSettings(loadSettings()), {}).allowed) return
         getMemoryStore().suggestMemory({ ...candidate, source: 'task-feedback' })
-      }
+      },
+      // Recommendation history (t46): accept/ignore 记录与回填；DB 故障时用
+      // 内存实现，冷却/模式学习本会话内仍生效。getLevel 未在此注入（缺省 L1）
+      // —— L2/L3 分级由 t47 评级接入后经 engine 的 getLevel 选项注入。
+      history: getRecommendationHistory() ?? undefined,
+      // Local model candidate optimizer (t54, spec 决策 6/11): 候选后处理
+      // 过滤 ≤3 / 标题草稿 / 排序。内部按设置与模型可用性逐次判定 — 关闭 /
+      // 未就绪 / 失败一律返回 null，算法候选原样传递（不变量 H）。
+      localModel: createLazyLocalModelOptimizer()
     })
   }
   return suggestionEngine
@@ -546,12 +712,77 @@ export function getSuggestionEngine(): SuggestionEngine {
 
 /** Wire the provider chain into the engine (index.ts, after registerIpc). */
 export function setSuggestionChat(chat: ChatFn): void {
+  suggestionChat = chat
   getSuggestionEngine().setChat(chat)
 }
 
 /** Wire the OCR capture into the engine (index.ts, after registerIpc). */
 export function setSuggestionOcr(ocrFn: OcrFn): void {
   getSuggestionEngine().setOcr(ocrFn)
+}
+
+/* --------------------------- local model (t54) --------------------------- */
+
+/** Local model manager singleton (t54); hydrated from persisted settings. */
+export function getLocalModelManager(): LocalModelManager {
+  if (!localModelManager) {
+    localModelManager = new LocalModelManager({ baseDir: PATHS.modelsDir() })
+    const s = loadSettings()
+    if (s.localModelSource) localModelManager.selectSource(s.localModelSource)
+    if (s.localModelManualPath) localModelManager.setManualPath(s.localModelManualPath)
+  }
+  return localModelManager
+}
+
+/** Local model runtime singleton (t53/54) over the worker-thread engine. */
+export function getLocalModelRuntime(): LocalModelRuntime {
+  if (!localModelRuntime) {
+    localModelRuntime = new LocalModelRuntime({ engine: createWorkerModelEngine() })
+  }
+  return localModelRuntime
+}
+
+/** Drop the runtime singleton (removal / teardown): releases the model memory. */
+export function resetLocalModelRuntime(): void {
+  localModelRuntime = null
+}
+
+/**
+ * Load the model into the runtime when it is enabled and the file is ready.
+ * Idempotent (the runtime no-ops on the same target). Called at startup and
+ * after any IPC transition that lands the manager in 'ready', so the first
+ * optimization pass never stalls on a lazy load.
+ */
+export function ensureLocalModelLoaded(): void {
+  const manager = getLocalModelManager()
+  const { modelFilePath } = manager.status()
+  if (!shouldLoadLocalModel(loadSettings().localModelEnabled === true, manager.status()) || modelFilePath === null) return
+  getLocalModelRuntime()
+    .load({ modelPath: modelFilePath, spec: manager.specOf() })
+    .catch((err: unknown) => console.error(`[LocalModel] load failed: ${err instanceof Error ? err.message : String(err)}`))
+}
+
+/**
+ * Candidate optimizer seam (t54, spec 决策 6/11): the production wrapper checks
+ * the enable switch + manager readiness on every call, so a runtime settings
+ * change (toggle / remove / manual path) takes effect without a restart. Any
+ * failure degrades to `null` — the engine then passes the algorithm
+ * candidates through unchanged (不变量 H: 功能等价, 绝不污染决策数据).
+ */
+export function createLazyLocalModelOptimizer(): CandidateOptimizer {
+  return {
+    async optimize(candidates) {
+      const settings = loadSettings()
+      if (!settings.localModelEnabled) return null
+      const manager = getLocalModelManager()
+      const status = manager.status()
+      if (status.state !== 'ready' || !status.modelFilePath) return null
+      const optimizer = createCandidateOptimizer({
+        inferJson: (req) => getLocalModelRuntime().inferJson(req)
+      })
+      return optimizer.optimize(candidates)
+    }
+  }
 }
 
 /** Push updates to all open windows (main window, onboarding window, etc.). */

@@ -8,13 +8,17 @@
  * attempt with a hard timeout; silent degradation keeps the task system
  * untouched on any failure.
  *
- * Privacy: the whole pipeline is gated on the three capture switches
- * (task-capture master / L0 / incognito). Log lines never carry OCR text —
- * only a character count, so screen content can't leak into logs.
+ * Privacy (t44, spec story 37): the pipeline is a DOUBLE gate — the three
+ * capture switches (task-capture master / L0 / incognito) AND the AI
+ * permission gate (access 'ocr': AI master switch / time range / …). AI off
+ * means no screen capture at all, so no meaningless capture ever runs. Log
+ * lines never carry OCR text — only a character count, so screen content
+ * can't leak into logs.
  */
 import koffi from 'koffi'
 import { psHost } from './powershell'
 import { loadSettings } from './state'
+import { aiAllowed, captureAllowed, policyFromSettings, type PrivacyDecision } from '../store/privacyGate'
 import type { Settings } from '../../shared/types'
 
 const OCR_TIMEOUT_MS = 10_000
@@ -58,6 +62,38 @@ export function isOcrAllowed(
   settings: Pick<Settings, 'taskCaptureEnabled' | 'l0CaptureEnabled' | 'incognito'>
 ): boolean {
   return settings.taskCaptureEnabled && settings.l0CaptureEnabled && !settings.incognito
+}
+
+/**
+ * OCR 双过门判定 (t44): capture gate (three switches, via privacyGate's
+ * single source of truth) AND the AI gate (access 'ocr' — AI master switch
+ * first, then denied list / content types / time range). Pure so the gate
+ * behavior is vitest-direct; the capture switches live in the context and
+ * fail closed when absent (privacy module default).
+ */
+export function ocrGateDecision(
+  settings: Pick<
+    Settings,
+    | 'taskCaptureEnabled'
+    | 'l0CaptureEnabled'
+    | 'incognito'
+    | 'aiEnabled'
+    | 'deniedApps'
+    | 'allowedContentTypes'
+    | 'aiTimeRangeHours'
+    | 'clipboardAccess'
+    | 'memoryAccess'
+    | 'memoryEnabled'
+  >
+): PrivacyDecision {
+  const policy = policyFromSettings(settings)
+  const capture = captureAllowed(policy, {
+    captureEnabled: settings.taskCaptureEnabled,
+    l0Enabled: settings.l0CaptureEnabled,
+    incognito: settings.incognito
+  })
+  if (!capture.allowed) return capture
+  return aiAllowed(policy, { access: 'ocr' })
 }
 
 export interface ScreenRect {
@@ -165,7 +201,9 @@ $bitmap.Dispose();
  * gate closed, no window, timeout, decode error). Never throws.
  */
 export async function ocrFromForeground(): Promise<string | null> {
-  if (!isOcrAllowed(loadSettings())) return null
+  // Double gate (t44): three capture switches AND the AI permission gate
+  // (AI off / outside the AI window / … ⇒ no capture). Silent on denial.
+  if (!ocrGateDecision(loadSettings()).allowed) return null
   const rect = queryForegroundRect()
   if (!rect) return null
   try {

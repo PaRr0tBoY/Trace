@@ -25,7 +25,15 @@
  *   master switch → denied-app list → content type → time range → tool switch.
  * - OCR (spec story 37) is the double gate: captureAllowed AND
  *   aiAllowed({ access: 'ocr' }); wiring lives in ticket 44.
+ *
+ * Ticket 44 (落点接入) consumes the gate via policyFromSettings(): the
+ * Settings privacy fields (t45) project 1:1 onto PrivacyPolicy, so callers
+ * (ocr.ts / suggestionEngine.ts / state.ts) build the policy once per
+ * judgement from the live settings object. The clamp layer (t45) guarantees
+ * the fields are always present and in-range.
  */
+import type { Settings } from '../../shared/types'
+
 export type ContentType = 'text' | 'image' | 'files'
 
 /** Evidence depth of a piece of data — orthogonal to privacy sensitivity. */
@@ -107,6 +115,30 @@ export function normalizeExePath(p: string): string {
   return p.trim().toLowerCase().replace(/\\/g, '/')
 }
 
+/** Settings 隐私字段 → 政策投影（1:1；钳制层保证字段必在且在界内）。 */
+export function policyFromSettings(
+  s: Pick<
+    Settings,
+    | 'aiEnabled'
+    | 'deniedApps'
+    | 'allowedContentTypes'
+    | 'aiTimeRangeHours'
+    | 'clipboardAccess'
+    | 'memoryAccess'
+    | 'memoryEnabled'
+  >
+): PrivacyPolicy {
+  return {
+    aiEnabled: s.aiEnabled,
+    deniedApps: s.deniedApps,
+    allowedContentTypes: s.allowedContentTypes,
+    aiTimeRangeHours: s.aiTimeRangeHours,
+    clipboardAccess: s.clipboardAccess,
+    memoryAccess: s.memoryAccess,
+    memoryEnabled: s.memoryEnabled
+  }
+}
+
 function allow(): PrivacyDecision {
   return { allowed: true }
 }
@@ -158,7 +190,7 @@ export function aiAllowed(policy: PrivacyPolicy, ctx: PrivacyContext): PrivacyDe
     // 本地时区墙钟小时（epoch % 24 是 UTC，会把 UTC+8 用户的 18:00 截止推迟到本地 22:00）。
     const hourOfDay = new Date(ctx.now ?? Date.now()).getHours()
     if (hourOfDay >= hours) {
-      return deny(`outside ai time range (hour ${hourOfDay.toFixed(1)} >= ${hours})`)
+      return deny(`outside ai time range (hour ${hourOfDay} >= ${hours})`)
     }
   }
   const access = ctx.access

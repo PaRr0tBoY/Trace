@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { truncateUtf8, decodeOcrOutput, isOcrAllowed } from '../electron/main/ocr'
+import { truncateUtf8, decodeOcrOutput, isOcrAllowed, ocrGateDecision } from '../electron/main/ocr'
 
 describe('truncateUtf8', () => {
   it('keeps text under the byte budget untouched', () => {
@@ -66,5 +66,47 @@ describe('isOcrAllowed', () => {
     expect(isOcrAllowed({ ...on, taskCaptureEnabled: false })).toBe(false)
     expect(isOcrAllowed({ ...on, l0CaptureEnabled: false })).toBe(false)
     expect(isOcrAllowed({ ...on, incognito: true })).toBe(false)
+  })
+})
+
+describe('ocrGateDecision — OCR 双过门 (t44)', () => {
+  const open = {
+    taskCaptureEnabled: true,
+    l0CaptureEnabled: true,
+    incognito: false,
+    aiEnabled: true,
+    deniedApps: [],
+    allowedContentTypes: ['text', 'image', 'files'],
+    clipboardAccess: true,
+    memoryAccess: true,
+    memoryEnabled: true
+  }
+
+  it('allows capture when both gates are open', () => {
+    expect(ocrGateDecision(open).allowed).toBe(true)
+  })
+
+  it('blocks when any capture switch is off (capture gate first)', () => {
+    expect(ocrGateDecision({ ...open, taskCaptureEnabled: false }).allowed).toBe(false)
+    expect(ocrGateDecision({ ...open, l0CaptureEnabled: false }).allowed).toBe(false)
+    expect(ocrGateDecision({ ...open, incognito: true }).allowed).toBe(false)
+    // Both gates closed → the capture reason wins (first gate in the pair).
+    expect(ocrGateDecision({ ...open, taskCaptureEnabled: false, aiEnabled: false }).reason).toContain('capture')
+  })
+
+  it('blocks when the AI permission gate is closed (AI off = no capture)', () => {
+    const d = ocrGateDecision({ ...open, aiEnabled: false })
+    expect(d.allowed).toBe(false)
+    expect(d.reason).toContain('ai disabled')
+  })
+
+  // The foreground app is unknown at the capture point (queryForegroundRect
+  // only returns bounds), so the denied-app dimension can't apply here — the
+  // engine-level candidate filter (suggestionEngine, t44) is the interception
+  // point for denied apps.
+
+  it('fails closed when capture switches are missing from the context', () => {
+    const { taskCaptureEnabled: _t, l0CaptureEnabled: _l, incognito: _i, ...rest } = open
+    expect(ocrGateDecision(rest as typeof open).allowed).toBe(false)
   })
 })

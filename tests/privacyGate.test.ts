@@ -7,6 +7,7 @@ import {
   captureAllowed,
   memoryAllowed,
   normalizeExePath,
+  policyFromSettings,
   type PrivacyPolicy
 } from '../electron/store/privacyGate'
 
@@ -187,6 +188,23 @@ describe('memoryAllowed — 记忆写入主开关', () => {
     const d = memoryAllowed(policy({ memoryEnabled: false }), {})
     expect(d.allowed).toBe(false)
     expect(d.reason).toBeTruthy()
+  })
+
+  it('设置投影路径（t44 记忆写入门）— memoryEnabled=false 拒绝、true 放行', () => {
+    // state.ts 的记忆写入门调用 memoryAllowed(policyFromSettings(loadSettings()), {})；
+    // policyFromSettings 与 memoryAllowed 均为纯函数，这里直连断言整条判定路径。
+    const settings = {
+      aiEnabled: true,
+      deniedApps: [],
+      allowedContentTypes: ['text', 'image', 'files'],
+      clipboardAccess: true,
+      memoryAccess: true,
+      memoryEnabled: false
+    }
+    const denied = memoryAllowed(policyFromSettings(settings), {})
+    expect(denied.allowed).toBe(false)
+    expect(denied.reason).toBeTruthy()
+    expect(memoryAllowed(policyFromSettings({ ...settings, memoryEnabled: true }), {}).allowed).toBe(true)
   })
 })
 

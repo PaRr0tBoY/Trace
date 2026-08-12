@@ -56,11 +56,11 @@ export const STORAGE_VERSION = 1
 const MEMORY_ID_PREFIX = 'm_'
 const DAY_MS = 24 * 60 * 60 * 1000
 const WEEK_MS = 7 * DAY_MS
-const DEFAULT_LAMBDA = 0.25
+export const DEFAULT_LAMBDA = 0.25
 const DEFAULT_STALE_DAYS = 60
 const DEFAULT_CLEANUP_SCORE = 0.1
-const MIN_LAMBDA = 0.01
-const MAX_LAMBDA = 1
+export const MIN_LAMBDA = 0.01
+export const MAX_LAMBDA = 1
 const MIN_STALE_DAYS = 7
 const MAX_STALE_DAYS = 365
 const VALID_TYPES: readonly MemoryType[] = ['identity', 'tool', 'project', 'workflow']
@@ -88,8 +88,22 @@ function nonEmptyString(v: unknown): v is string {
 }
 
 /** Bounded reinforcement: sat(hitCount) = hitCount/(hitCount+1), asymptotes to 1. */
-function saturation(hitCount: number): number {
+export function saturation(hitCount: number): number {
   return hitCount / (hitCount + 1)
+}
+
+/**
+ * 指数时间衰减项（从 effectiveConfidence 抽出共享，t48 记忆图复用）：
+ * exp(-λ·周数)，λ 为每周衰减率。返回 [0, 1]。
+ */
+export function expDecay(lastSeenAt: number, now: number, lambda: number): number {
+  const weeks = Math.max(0, (now - lastSeenAt) / WEEK_MS)
+  return Math.exp(-lambda * weeks)
+}
+
+/** 现有衰减全式（本类置信度）：sat(hitCount) × exp(-λ·周数)。 */
+export function memoryDecay(hitCount: number, lastSeenAt: number, now: number, lambda: number): number {
+  return saturation(hitCount) * expDecay(lastSeenAt, now, lambda)
 }
 
 /** Salvage a persisted record: drop structurally broken ones, repair weak fields. */
@@ -345,8 +359,7 @@ export class MemoryStore {
 
   /** Time-aware confidence: sat(hitCount) × exp(-λ·weeksSinceLastSeen). */
   private effectiveConfidence(memory: Memory, now: number): number {
-    const weeks = Math.max(0, (now - memory.lastSeenAt) / WEEK_MS)
-    return saturation(memory.hitCount) * Math.exp(-this.lambda * weeks)
+    return memoryDecay(memory.hitCount, memory.lastSeenAt, now, this.lambda)
   }
 
   private withEffectiveConfidence(memory: Memory, now: number): Memory {

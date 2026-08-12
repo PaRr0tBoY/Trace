@@ -188,6 +188,19 @@ const MIGRATIONS: readonly Migration[] = [
         END;
       `)
     }
+  },
+  {
+    version: 2,
+    name: 'facts: hitCount / lastSeenAt / intent (t48 memory graph)',
+    up: (db) => {
+      // MemoryStore 面板适配器与事实权重（五档 × 衰减 × 时段）需要命中计数、
+      // 最近命中时刻与意图档位；v1 建表时未含，后补（有默认值，旧行安全）。
+      db.exec(`
+        ALTER TABLE facts ADD COLUMN hitCount INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE facts ADD COLUMN lastSeenAt INTEGER;
+        ALTER TABLE facts ADD COLUMN intent TEXT NOT NULL DEFAULT 'system-infer';
+      `)
+    }
   }
 ]
 

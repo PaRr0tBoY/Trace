@@ -276,6 +276,33 @@ export type UnlinkTarget =
 /** Task as pushed to the renderer: resources carry a liveness flag computed against ItemStore. */
 export interface TaskDto extends Task {
   resources: (ResourceRef & { alive: boolean })[]
+  /** Session history for this task, newest first (the open run on top). */
+  sessions: TaskSession[]
+}
+
+/**
+ * One continuous run of a task (spec 实现决策 4). Opens when a task enters
+ * RUNNING, settles when it leaves RUNNING. A task has many sessions; at most
+ * one session is open globally (the RUNNING task's). Sessions are the
+ * container for the activities observed during the run (1:N — an activity
+ * never maps 1:1 to a session) and provide instance-level history on top of
+ * the aggregate `activeMs` (ADR-0006), whose semantics are unchanged.
+ */
+export interface TaskSession {
+  id: string // 's_' prefix
+  taskId: string // references tasks.json entries — TaskStore stays JSON-backed
+  startedAt: number // epoch ms
+  endedAt?: number // epoch ms; absent while the run is open
+  /** 0-1 confidence of the run — the task's confidence at settle time. */
+  confidence: number
+  /**
+   * Why the run ended: auto_switch / activity_lost / user_paused /
+   * user_completed / user_archived / user_merged / user_deleted. Empty
+   * string while the session is open.
+   */
+  transitionReason: string
+  /** The task that was RUNNING before this session's task took over; absent on the first run. */
+  previousTaskId?: string
 }
 
 /** L0 foreground/window switch event (t12 collector emits, t16 clustering consumes). */
@@ -310,7 +337,6 @@ export interface ProviderConfig {
   baseUrl: string
   apiKey?: string
   model: string
-  kind: 'local' | 'cloud'
   /** Structured (json_schema) output support; defaults to true, DeepSeek-style endpoints set false. */
   supportsSchemaOutput?: boolean
 }

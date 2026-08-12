@@ -672,6 +672,51 @@
   background: rgba(255, 255, 255, 0.35);
 }
 
+/* Session history (t37): one row per continuous run — time range + duration
+   head, settle reason + previous task meta. */
+.task-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.task-session {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.task-session-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.task-session-time {
+  min-width: 0;
+  font-size: calc(11.5px * var(--font-scale, 1));
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.85);
+}
+.task-session-open {
+  color: #4ade80;
+}
+.task-session-duration {
+  flex-shrink: 0;
+  font-size: calc(10.5px * var(--font-scale, 1));
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.5);
+}
+.task-session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: calc(10.5px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.45);
+}
+
 /* Confidence row: label + 3px status-colored track + percent. */
 .task-detail-conf {
   display: flex;

@@ -7,11 +7,11 @@
 import { useState } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
-import { basename } from '../../lib/format'
+import { basename, formatDuration } from '../../lib/format'
 import { taskStatusHintKey } from '../../lib/taskGroups'
 import { useDragOut } from '../../hooks/useDragOut'
 import { AppIcon } from './AppIcon'
-import type { AppRef, ResourceRef, TaskDto, TaskStatus } from '../../../shared/types'
+import type { AppRef, ResourceRef, TaskDto, TaskSession, TaskStatus } from '../../../shared/types'
 import {
   ChevronLeftIcon,
   EditIcon,
@@ -45,6 +45,57 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
 
 /** Confidence floor below which the bar turns amber (settings θ_low, t27). */
 const DEFAULT_CONFIDENCE_LOW = 0.45
+
+/** Session settle reasons (spec 实现决策 4) -> i18n key; unknown reasons show raw. */
+const SESSION_REASON_KEYS: Record<string, string> = {
+  auto_switch: 'taskSession.reasonAutoSwitch',
+  activity_lost: 'taskSession.reasonActivityLost',
+  user_paused: 'taskSession.reasonUserPaused',
+  user_completed: 'taskSession.reasonUserCompleted',
+  user_archived: 'taskSession.reasonUserArchived',
+  user_merged: 'taskSession.reasonUserMerged',
+  user_deleted: 'taskSession.reasonUserDeleted'
+}
+
+/** Compact timestamp for a session boundary: "Jul 4, 09:30". */
+function formatSessionTime(ts: number): string {
+  return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+/** One session history row: time range + duration + reason + previous task. */
+function SessionRow({ session, previousTitle }: { session: TaskSession; previousTitle?: string }) {
+  const { t } = useTranslation()
+  const open = session.endedAt === undefined
+  return (
+    <div className="task-session">
+      <div className="task-session-head">
+        <span className="task-session-time">
+          {formatSessionTime(session.startedAt)} →{' '}
+          {open ? (
+            <span className="task-session-open">{t('taskSession.running')}</span>
+          ) : (
+            formatSessionTime(session.endedAt!)
+          )}
+        </span>
+        <span className="task-session-duration">
+          {formatDuration((session.endedAt ?? Date.now()) - session.startedAt)}
+        </span>
+      </div>
+      {(session.transitionReason || previousTitle) && (
+        <div className="task-session-meta">
+          {session.transitionReason && (
+            <span>{t(SESSION_REASON_KEYS[session.transitionReason] ?? session.transitionReason)}</span>
+          )}
+          {previousTitle && (
+            <span>
+              {t('taskSession.previousTask')}: {previousTitle}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function ResourceRow({ resource }: { resource: ResourceRef & { alive: boolean } }) {
   const { t } = useTranslation()
@@ -180,6 +231,7 @@ function AppRow({ app, onOpen }: { app: AppRef; onOpen: (app: AppRef) => void })
 export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent }: Props) {
   const { t } = useTranslation()
   const updateTask = useStore((s) => s.updateTask)
+  const tasks = useStore((s) => s.tasks)
   const confidenceLow = useStore((s) => s.settings.confidenceLow ?? DEFAULT_CONFIDENCE_LOW)
 
   const actions: { key: string; label: string; icon: JSX.Element; next: TaskStatus }[] = []
@@ -267,6 +319,29 @@ export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent
           </div>
         </div>
       )}
+
+      <div className="task-detail-section">
+        <div className="task-resources-title">{t('taskSession.sectionTitle')}</div>
+        {task.sessions.length === 0 ? (
+          <div className="task-empty">
+            <div className="hint">{t('taskSession.empty')}</div>
+          </div>
+        ) : (
+          <div className="task-session-list">
+            {task.sessions.map((session) => (
+              <SessionRow
+                key={session.id}
+                session={session}
+                previousTitle={
+                  session.previousTaskId
+                    ? tasks.find((t) => t.id === session.previousTaskId)?.title
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="task-detail-section">
         <div className="task-resources-head">

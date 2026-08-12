@@ -9,6 +9,8 @@ import { ItemStore } from '../store/ItemStore'
 import { ClipboardWatcher } from '../clipboard/ClipboardWatcher'
 import { loadSettings, saveSettings } from '../store/settings'
 import { TaskStore, type TaskIndex } from '../store/TaskStore'
+import { openDatabase, closeDatabase, type TraceDatabase } from '../store/db'
+import { createSqliteSessionStore } from '../store/sessionStore'
 import { MemoryStore, type MemoryIndex } from '../store/MemoryStore'
 import type { ClipboardItem, ClipboardItemDto, Settings, TaskProposal, TaskDto } from '../../shared/types'
 import { MAX_STACK } from '../../shared/types'
@@ -35,6 +37,8 @@ let taskSweepTimer: ReturnType<typeof setInterval> | null = null
 let suggestionTimer: ReturnType<typeof setInterval> | null = null
 let suggestionEngine: SuggestionEngine | null = null
 let memoryStore: MemoryStore | null = null
+/** SQLite canonical store handle (opened after app ready; closed on quit). */
+let traceDb: TraceDatabase | null = null
 
 /**
  * Task persistence adapter: tasks.json with DPAPI encryption when available
@@ -175,6 +179,18 @@ function handleSystemWake(): void {
 /** Initialize persistence + start the clipboard watcher. */
 export function initState(): void {
   store.load()
+  // Task sessions persist in the SQLite canonical store (task_sessions,
+  // t37). Open the handle after app ready and attach before taskStore.load()
+  // so startup hydration sees every previously recorded session. A corrupt
+  // or ABI-mismatched database degrades to in-memory sessions only — the
+  // app must still start, the TaskStore just loses cross-restart history.
+  try {
+    traceDb = openDatabase(PATHS.dbFile())
+    taskStore.attachSessionStore(createSqliteSessionStore(traceDb))
+  } catch (err) {
+    traceDb = null
+    console.error('[Sessions] trace.db open failed; sessions will not persist:', err)
+  }
   taskStore.load()
   taskStore.setPauseThreshold(loadSettings().taskPauseThresholdMinutes)
   const settings = loadSettings()
@@ -296,6 +312,10 @@ export function stopStateTimers(): void {
     suggestionTimer = null
   }
   suggestionEngine?.stop()
+  if (traceDb !== null) {
+    closeDatabase(traceDb)
+    traceDb = null
+  }
 }
 
 export function getStore(): ItemStore {

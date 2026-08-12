@@ -25,6 +25,7 @@
  *     system, reason migration).
  */
 import { createId } from './ids'
+import type { TaskSessionStore } from './sessionStore'
 import type {
   AppRef,
   ClipboardItem,
@@ -35,6 +36,7 @@ import type {
   Task,
   TaskDto,
   TaskPatch,
+  TaskSession,
   TaskStatus,
   UnlinkTarget
 } from '../../shared/types'
@@ -50,10 +52,17 @@ export interface TaskStoreDeps {
   now?: () => number
   /** Liveness probe for linked clipboard items (wired to ItemStore in main). */
   isItemAlive?: (itemId: string) => boolean
+  /**
+   * Durable session sink (task_sessions, t37). May be attached later via
+   * attachSessionStore when the SQLite handle opens after app ready —
+   * either way it must be in place before load() so startup hydration works.
+   */
+  sessionStore?: TaskSessionStore
 }
 
 export const STORAGE_VERSION = 2
 const TASK_ID_PREFIX = 't_'
+const SESSION_ID_PREFIX = 's_'
 const TEXT_PREVIEW_LENGTH = 200
 const DEFAULT_PAUSE_THRESHOLD_MINUTES = 15
 const MIN_PAUSE_THRESHOLD_MINUTES = 1
@@ -304,14 +313,54 @@ export class TaskStore {
   private tasks: Task[] = []
   private pauseThresholdMinutes = DEFAULT_PAUSE_THRESHOLD_MINUTES
   private readonly deps: TaskStoreDeps
+  /** Session history per task (spec 实现决策 4); hydrated from the sink at load(). */
+  private sessionsByTask = new Map<string, TaskSession[]>()
+  private sessionStore: TaskSessionStore | null
 
   constructor(deps: TaskStoreDeps) {
     this.deps = deps
+    this.sessionStore = deps.sessionStore ?? null
+  }
+
+  /**
+   * Attach the durable session sink (t37). MUST be called before load():
+   * the SQLite handle only opens after app ready, so main wires this in
+   * initState() ahead of taskStore.load(). Attaching later still records
+   * new sessions but skips hydration and leaves backfilled legacy sessions
+   * unpersisted — their later settles would target rows that never existed.
+   */
+  attachSessionStore(store: TaskSessionStore): void {
+    this.sessionStore = store
   }
 
   /** Load persisted state from disk. Called once at startup. */
   load(): void {
     this.tasks = sanitizeIndex(this.deps.load())
+    this.sessionsByTask.clear()
+    if (this.sessionStore) {
+      for (const session of this.sessionStore.loadAll()) {
+        const list = this.sessionsByTask.get(session.taskId)
+        if (list) list.push(session)
+        else this.sessionsByTask.set(session.taskId, [session])
+      }
+    }
+    // Orphan repair: an open session on a non-RUNNING task (crash between a
+    // transition and its settle write, or partial legacy data) would render
+    // as a forever-"Running" row. Close it at the last known status change,
+    // using the task's own statusReason — why it entered its current,
+    // non-RUNNING state (auto_switch / activity_lost / user_paused / …).
+    for (const task of this.tasks) {
+      const open = this.openSessionFor(task.id)
+      if (!open || task.status === 'running') continue
+      this.settleSession(task, Math.max(open.startedAt, task.updatedAt), task.statusReason ?? 'migration')
+    }
+    // Restart continuity: a RUNNING task must have an open session. Backfill
+    // runs that predate session recording (startedAt = last known activity).
+    for (const task of this.tasks) {
+      if (task.status === 'running' && !this.openSessionFor(task.id)) {
+        this.openSession(task, Math.max(task.lastActiveAt, task.createdAt), undefined)
+      }
+    }
   }
 
   /** RUNNING -> WAITING for tasks idle past the threshold. Returns transitions. */
@@ -448,9 +497,14 @@ export class TaskStore {
 
   /** Hard delete. Returns whether a task was removed. */
   delete(id: string): boolean {
-    const before = this.tasks.length
+    const task = this.tasks.find((t) => t.id === id)
+    if (!task) return false
+    if (task.status === 'running') {
+      // Deleting a RUNNING task still closes its open session — no run may
+      // stay open after the task is gone (session rows keep the history).
+      this.settleSession(task, this.now(), 'user_deleted')
+    }
     this.tasks = this.tasks.filter((t) => t.id !== id)
-    if (this.tasks.length === before) return false
     this.finish()
     return true
   }
@@ -474,8 +528,13 @@ export class TaskStore {
     target.activeMs = Math.max(target.activeMs, source.activeMs)
     // A RUNNING source leaves RUNNING when it is absorbed — settle its
     // in-flight segment first (runningTaskCount only ever decreases here;
-    // the target status is untouched by a merge).
-    if (source.status === 'running') this.settleActiveSegment(source, this.now())
+    // the target status is untouched by a merge), then close its session:
+    // the merged-away task ceases to exist, so its run cannot stay open.
+    if (source.status === 'running') {
+      const now = this.now()
+      this.settleActiveSegment(source, now)
+      this.settleSession(source, now, 'user_merged')
+    }
     target.updatedAt = this.now()
     this.tasks = this.tasks.filter((t) => t.id !== sourceId)
     this.finish()
@@ -560,7 +619,8 @@ export class TaskStore {
         r.kind === 'clipboard'
           ? { ...r, alive: this.isItemAlive(r.itemId) }
           : { ...r, alive: true }
-      )
+      ),
+      sessions: this.sessionsFor(t.id)
     }))
   }
 
@@ -636,8 +696,12 @@ export class TaskStore {
       }
     }
 
-    // Leaving RUNNING settles the in-flight active segment (ADR-0006).
-    if (from === 'running') this.settleActiveSegment(task, now)
+    // Leaving RUNNING settles the in-flight active segment (ADR-0006) and
+    // the open session (spec 实现决策 4) — one atomic transition.
+    if (from === 'running') {
+      this.settleActiveSegment(task, now)
+      this.settleSession(task, now, this.reasonFor(from, to, source))
+    }
 
     if (to === 'running') {
       // Switching = the old RUNNING task leaves (-> WAITING, auto_switch) +
@@ -654,13 +718,18 @@ export class TaskStore {
 
   /**
    * Make `task` RUNNING. The previous RUNNING task (if any) leaves RUNNING
-   * for WAITING (system, auto_switch), settling its active segment — the
-   * runningTaskCount <= 1 invariant holds on every path that enters RUNNING.
+   * for WAITING (system, auto_switch), settling its active segment AND its
+   * open session — the runningTaskCount <= 1 invariant holds on every path
+   * that enters RUNNING, and so does the "one open session" invariant: the
+   * displaced run settles and the incoming task's run opens atomically.
    */
   private makeRunning(task: Task, now: number): void {
+    let previousTaskId: string | undefined
     for (const other of this.tasks) {
       if (other.status !== 'running' || other.id === task.id) continue
       this.settleActiveSegment(other, now)
+      this.settleSession(other, now, 'auto_switch')
+      previousTaskId = other.id
       other.status = 'waiting'
       other.statusSource = 'system'
       other.statusReason = 'auto_switch'
@@ -668,6 +737,7 @@ export class TaskStore {
     }
     task.status = 'running'
     task.lastActiveAt = now
+    this.openSession(task, now, previousTaskId)
   }
 
   /** The transition table's reason vocabulary (statusSource/statusReason contract). */
@@ -709,6 +779,53 @@ export class TaskStore {
   private settleActiveSegment(task: Task, now: number): void {
     if (task.status !== 'running' || task.lastActiveAt <= 0) return
     task.activeMs = Math.max(0, task.activeMs + (now - task.lastActiveAt))
+  }
+
+  /** The task's open session (endedAt undefined), if any. */
+  private openSessionFor(taskId: string): TaskSession | undefined {
+    return (this.sessionsByTask.get(taskId) ?? []).find((s) => s.endedAt === undefined)
+  }
+
+  /**
+   * Open a session for a task entering RUNNING (spec 实现决策 4). One session
+   * per continuous run; the displaced task (if any) is passed as
+   * previousTaskId. Write-through to the durable sink when attached.
+   */
+  private openSession(task: Task, now: number, previousTaskId?: string): void {
+    const session: TaskSession = {
+      id: `${SESSION_ID_PREFIX}${createId()}`,
+      taskId: task.id,
+      startedAt: now,
+      confidence: task.confidence ?? 0,
+      transitionReason: '',
+      previousTaskId
+    }
+    const list = this.sessionsByTask.get(task.id)
+    if (list) list.push(session)
+    else this.sessionsByTask.set(task.id, [session])
+    this.sessionStore?.recordSessionStart(session)
+  }
+
+  /**
+   * Settle the task's open session: endedAt + why the run ended + the task's
+   * confidence at settle time. Idempotent — a task without an open session
+   * (e.g. legacy data that predates recording) has nothing to settle.
+   */
+  private settleSession(task: Task, now: number, transitionReason: string): void {
+    const session = this.openSessionFor(task.id)
+    if (!session) return
+    session.endedAt = now
+    session.transitionReason = transitionReason
+    session.confidence = task.confidence ?? 0
+    this.sessionStore?.settleSession(task.id, now, transitionReason, session.confidence)
+  }
+
+  /** Session history for the DTO: newest first, the open run on top. */
+  private sessionsFor(taskId: string): TaskSession[] {
+    const list = this.sessionsByTask.get(taskId) ?? []
+    return [...list].sort(
+      (a, b) => (b.endedAt ?? Number.POSITIVE_INFINITY) - (a.endedAt ?? Number.POSITIVE_INFINITY)
+    )
   }
 
   private persist(): void {

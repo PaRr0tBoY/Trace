@@ -21,7 +21,7 @@ import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import { DropIcon } from '../icons'
 import { AppIcon } from './AppIcon'
-import { SuggestionCard } from './SuggestionCard'
+import { TaskProposalCard } from './TaskProposalCard'
 import { linkDraggedItem } from './dropActions'
 
 /** Clear an internal drag on drop; split sub-items (the shelf-level drop semantics). */
@@ -130,7 +130,7 @@ export function TaskDropPanel() {
               </div>
             ))}
             {suggestions.map((s) => (
-              <SuggestionCard key={s.id} suggestion={s} />
+              <TaskProposalCard key={s.id} suggestion={s} />
             ))}
           </div>
         </motion.div>

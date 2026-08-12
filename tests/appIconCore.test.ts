@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 import { createAppIconService, type IconFetcher } from '../electron/main/appIconCore'
-import type { Suggestion, TaskDto } from '../shared/types'
+import type { TaskProposal, TaskDto } from '../shared/types'
 
 function makeFetcher(icons: Record<string, string>): { fetcher: IconFetcher; calls: string[] } {
   const calls: string[] = []
@@ -36,7 +36,7 @@ function makeTask(partial: Partial<TaskDto> = {}): TaskDto {
   }
 }
 
-function makeSuggestion(partial: Partial<Suggestion> = {}): Suggestion {
+function makeSuggestion(partial: Partial<TaskProposal> = {}): TaskProposal {
   return {
     id: 's_1',
     title: 'suggestion',

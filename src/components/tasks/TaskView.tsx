@@ -19,7 +19,7 @@ import { TaskDetail } from './TaskDetail'
 import { TaskEditor } from './TaskEditor'
 import { ConfirmDialog } from './ConfirmDialog'
 import { ContentPicker } from './ContentPicker'
-import { SuggestionCard } from './SuggestionCard'
+import { TaskProposalCard } from './TaskProposalCard'
 
 export function TaskView() {
   const { t } = useTranslation()
@@ -39,7 +39,7 @@ export function TaskView() {
   const setConfirmDeleteTaskId = useStore((s) => s.setConfirmDeleteTaskId)
   const pickerTaskId = useStore((s) => s.pickerTaskId)
   const setPickerTaskId = useStore((s) => s.setPickerTaskId)
-  /** Suggestion whose convert panel is open (null = closed). */
+  /** TaskProposal whose convert panel is open (null = closed). */
   const [convertId, setConvertId] = useState<string | null>(null)
 
   const selected = selectedId ? (tasks.find((task) => task.id === selectedId) ?? null) : null
@@ -106,7 +106,7 @@ export function TaskView() {
             suggestions.length > 0 ? (
               <div className="task-suggest-list">
                 {suggestions.map((s) => (
-                  <SuggestionCard key={s.id} suggestion={s} onOpen={setConvertId} />
+                  <TaskProposalCard key={s.id} suggestion={s} onOpen={setConvertId} />
                 ))}
               </div>
             ) : (

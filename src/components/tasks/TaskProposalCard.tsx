@@ -1,5 +1,5 @@
 /**
- * SuggestionCard — one task suggestion (t19), compact two-row card (t23).
+ * TaskProposalCard — one task proposal (t19), compact two-row card (t23).
  *
  * Line 1: title (+ low-confidence badge). Line 2: app icons and the
  * clipboard material copied during the segment (isomorphic with a task's
@@ -13,12 +13,12 @@ import { useState } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import { basename } from '../../lib/format'
-import type { ResourceRef, Suggestion } from '../../../shared/types'
+import type { ResourceRef, TaskProposal } from '../../../shared/types'
 import { CheckIcon, EditIcon, CloseIcon, FileIcon, ImageIcon, SparklesIcon } from '../icons'
 import { acceptSuggestionDrop } from './dropActions'
 
 interface Props {
-  suggestion: Suggestion
+  suggestion: TaskProposal
   /** Open the convert panel for this suggestion (absent in drop surfaces). */
   onOpen?: (id: string) => void
 }
@@ -33,7 +33,7 @@ function chipLabel(ref: ResourceRef): string {
   return ref.snapshot.preview
 }
 
-export function SuggestionCard({ suggestion, onOpen }: Props) {
+export function TaskProposalCard({ suggestion, onOpen }: Props) {
   const { t } = useTranslation()
   const acceptSuggestion = useStore((s) => s.acceptSuggestion)
   const ignoreSuggestion = useStore((s) => s.ignoreSuggestion)

@@ -10,7 +10,7 @@ import { create } from 'zustand'
 import { edge } from '../lib/edge'
 import { shouldRestoreToLanding } from '../lib/restore'
 import type { SuggestTitleContext, SuggestionAcceptOptions, DropResource } from '../../shared/ipc'
-import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, Suggestion, MemoryAction, MemoryListPayload, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View } from '../../shared/types'
+import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
@@ -28,7 +28,7 @@ export type SettingsTab = 'behaviour' | 'position' | 'appearance' | 'tasks'
 interface AppState {
   items: ClipboardItemDto[]
   tasks: TaskDto[]
-  suggestions: Suggestion[]
+  suggestions: TaskProposal[]
   settings: Settings
   /** True until the first `state:load` resolves. */
   hydrated: boolean
@@ -105,7 +105,7 @@ interface AppState {
   hydrate: () => Promise<void>
   setItems: (items: ClipboardItemDto[]) => void
   setTasks: (tasks: TaskDto[]) => void
-  setSuggestions: (suggestions: Suggestion[]) => void
+  setSuggestions: (suggestions: TaskProposal[]) => void
   setSettings: (next: Settings) => void
 
   /* UI */

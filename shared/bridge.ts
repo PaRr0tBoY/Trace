@@ -5,7 +5,7 @@
  * contract lives in one place. The actual implementation lives in the preload;
  * the renderer only ever sees `window.edge` typed as this interface.
  */
-import type { Settings, Suggestion, TaskDto, TaskPatch, UnlinkTarget } from './types'
+import type { Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
 import type { DragRequest, ProviderConfig } from './types'
 import type { OllamaDetectionResult, ProviderTestResult, SuggestTitleContext, SuggestionAcceptOptions, DropResource } from './ipc'
 
@@ -90,7 +90,7 @@ export interface EdgeApi {
   onItems: (cb: (items: import('./types').ClipboardItemDto[]) => void) => () => void
   onTasks: (cb: (tasks: TaskDto[]) => void) => () => void
   onSettings: (cb: (settings: Settings) => void) => () => void
-  onSuggestions: (cb: (suggestions: Suggestion[]) => void) => () => void
+  onSuggestions: (cb: (suggestions: TaskProposal[]) => void) => () => void
   onToggle: (cb: (open?: boolean) => void) => () => void
   onOpenSettings: (cb: () => void) => () => void
   onDragEnd: (cb: () => void) => () => void

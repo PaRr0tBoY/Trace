@@ -10,7 +10,7 @@
  *   1. Trigger — at least `suggestionMinEvents` events arrived since the
  *      last analysis AND no new event for `suggestionSilenceSeconds`.
  *   2. clusterEvents (t16) attributes segments to tasks; each attribution
- *      becomes a Suggestion unless its signature is on the ignored table.
+ *      becomes a TaskProposal unless its signature is on the ignored table.
  *   3. Context-prior (spec 实现决策 7): confirmed project/workflow memories
  *      matching a segment nudge its confidence up and travel as
  *      memoryContext into the LLM annotation.
@@ -26,7 +26,7 @@
  *      is configured or the chain fails, the pass degrades silently to pure
  *      algorithm: temporary titles like "Code + Chrome task", no rationale.
  *
- * Suggestion lifecycle: pending suggestions are transient and in-memory
+ * TaskProposal lifecycle: pending proposals are transient and in-memory
  * only — never persisted (restart clears them). Accept merges into the
  * candidate task (type-safe, TaskStore.merge) or creates a new one; ignore
  * writes the signature into the ignored table and drops the card. A new
@@ -57,7 +57,7 @@ import type {
   Memory,
   MemoryType,
   ResourceRef,
-  Suggestion,
+  TaskProposal,
   Task,
   TaskPatch,
   UsageEvent
@@ -161,7 +161,7 @@ export interface SuggestionEngineOptions {
   /** Provider chain; undefined until the main process wires it (index.ts). */
   chat?: ChatFn
   /** Full-list push to the renderer (state.ts pushState.suggestions). */
-  onSuggestions: (suggestions: Suggestion[]) => void
+  onSuggestions: (suggestions: TaskProposal[]) => void
   /**
    * Long-term memories (context-prior input; only confirmed project/workflow
    * entries are used). Absent = context-prior disabled.
@@ -179,7 +179,7 @@ export interface SuggestionEngineOptions {
 }
 
 /** Per-suggestion engine-side material the renderer never needs. */
-interface SuggestionMeta {
+interface TaskProposalMeta {
   appRefs: AppRef[]
   segmentStartTs: number
   signature: string
@@ -210,11 +210,11 @@ export interface SuggestionEngine {
    * triggered analysis (if any) finished — the production timer ignores the
    * promise, tests await it.
    */
-  tick(): Promise<Suggestion[]> | undefined
+  tick(): Promise<TaskProposal[]> | undefined
   /** Run one analysis pass immediately (tests). Returns the pushed list. */
-  analyzeNow(): Promise<Suggestion[]>
-  /** Pending suggestions (transient). */
-  suggestions(): readonly Suggestion[]
+  analyzeNow(): Promise<TaskProposal[]>
+  /** Pending proposals (transient). */
+  suggestions(): readonly TaskProposal[]
   /**
    * Accept: merge into the candidate task or create a new one. `opts`
    * overrides what the suggestion itself carries — the convert panel sends
@@ -246,8 +246,8 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
   let analyzing = false
   /** Max event ts covered by the last analysis; only newer events re-trigger. */
   let lastAnalyzedTs = 0
-  let pending: Suggestion[] = []
-  const meta = new Map<string, SuggestionMeta>()
+  let pending: TaskProposal[] = []
+  const meta = new Map<string, TaskProposalMeta>()
 
   function buildParams(settings: SuggestionSettings): ClusterParams {
     return {
@@ -331,7 +331,7 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
 
   /** Batched LLM annotation for the built suggestions (bounded by MAX_LLM_CANDIDATES). */
   async function annotateWithLlm(
-    candidates: Array<{ suggestion: Suggestion; meta: SuggestionMeta }>,
+    candidates: Array<{ suggestion: TaskProposal; meta: TaskProposalMeta }>,
     ocrText: string | null
   ): Promise<boolean> {
     if (!chat || candidates.length === 0) return false
@@ -418,7 +418,7 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
   }
 
   /** One analysis pass: cluster the new batch, dedupe, annotate, push. */
-  async function runAnalysis(newEvents: UsageEvent[]): Promise<Suggestion[]> {
+  async function runAnalysis(newEvents: UsageEvent[]): Promise<TaskProposal[]> {
     analyzing = true
     try {
       const settings = getSettings()
@@ -433,7 +433,7 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       ])
       const refsBySegment = clipboardRefsBySegment(result.attributions.map((a) => a.segment), clipEvents)
 
-      const built: Array<{ suggestion: Suggestion; meta: SuggestionMeta }> = []
+      const built: Array<{ suggestion: TaskProposal; meta: TaskProposalMeta }> = []
       for (let i = 0; i < result.attributions.length; i++) {
         const attr = result.attributions[i]
         const appRefs = appRefsFromSegment(attr.segment.appKeys, attr.segment.appNames)
@@ -445,7 +445,7 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         // Icon extraction prefers original-case exePaths; the normalized
         // identity key is the fallback when no raw path is known.
         const appExePaths = attr.segment.appKeys.slice(0, 5).map((key) => latestSwitchFor(key)?.exePath ?? key)
-        const suggestion: Suggestion = {
+        const suggestion: TaskProposal = {
           id: `s_${createId()}`,
           title: target ? target.title : algorithmicTitle(attr.segment.appNames),
           appNames: attr.segment.appNames.slice(0, 5),
@@ -538,7 +538,7 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       running = false
       console.log('[Suggestion] engine stopped')
     },
-    tick(): Promise<Suggestion[]> | undefined {
+    tick(): Promise<TaskProposal[]> | undefined {
       if (!running || analyzing) return undefined
       const settings = getSettings()
       const events = readEvents().filter((e) => e.ts > lastAnalyzedTs)
@@ -555,13 +555,13 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       // material for the suggestions' clipboardRefs.
       return runAnalysis(events)
     },
-    analyzeNow(): Promise<Suggestion[]> {
+    analyzeNow(): Promise<TaskProposal[]> {
       const events = readEvents().filter((e) => e.ts > lastAnalyzedTs)
       const switches = events.filter((e): e is AppSwitchEvent => e.type === 'app-switch')
       if (switches.length === 0) return Promise.resolve([])
       return runAnalysis(events)
     },
-    suggestions(): readonly Suggestion[] {
+    suggestions(): readonly TaskProposal[] {
       return pending
     },
     accept(id: string, opts?: AcceptOptions): Task['id'] | null {

@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from '../../i18n'
 import { useStore } from '../../store/appStore'
 import type { SuggestTitleContext } from '../../../shared/ipc'
-import type { AppRef, ResourceSnapshot, Suggestion, TaskDto } from '../../../shared/types'
+import type { AppRef, ResourceSnapshot, TaskProposal, TaskDto } from '../../../shared/types'
 import { appKeyFromIdentity } from '../../../shared/appKey'
 import { AppIcon } from './AppIcon'
 import { CheckIcon, FileIcon, ImageIcon, LinkIcon } from '../icons'
@@ -50,7 +50,7 @@ interface Props {
   /** The task being edited, or null when creating a new one. */
   task?: TaskDto | null
   /** The suggestion being converted (mutually exclusive with task). */
-  suggestion?: Suggestion | null
+  suggestion?: TaskProposal | null
   onSave: (payload: TaskSavePayload) => void
   onCancel: () => void
 }

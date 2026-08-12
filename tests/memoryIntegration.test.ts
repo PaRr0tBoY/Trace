@@ -10,7 +10,7 @@ import {
 import { createIgnoredTable } from '../electron/main/ignored'
 import { MemoryStore, type MemoryIndex } from '../electron/store/MemoryStore'
 import { TaskStore } from '../electron/store/TaskStore'
-import type { AppSwitchEvent, Memory, MemoryType, Suggestion, UsageEvent } from '../shared/types'
+import type { AppSwitchEvent, Memory, MemoryType, TaskProposal, UsageEvent } from '../shared/types'
 import type { ChatFn } from '../electron/main/provider'
 
 /** One segment's events (same shape as suggestionEngine.test.ts). */
@@ -31,7 +31,7 @@ interface Harness {
   now: number
   settings: { suggestionMinEvents: number; suggestionSilenceSeconds: number; confidenceHigh: number; confidenceLow: number }
   ignored: ReturnType<typeof createIgnoredTable>
-  pushed: Suggestion[][]
+  pushed: TaskProposal[][]
   chat: ChatFn | undefined
 }
 

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createSuggestionEngine, type SuggestionEngine } from '../electron/main/suggestionEngine'
 import { createIgnoredTable, suggestionSignature, type IgnoredTable } from '../electron/main/ignored'
 import { TaskStore } from '../electron/store/TaskStore'
-import type { AppSwitchEvent, ClipboardItem, Memory, Suggestion, UsageEvent } from '../shared/types'
+import type { AppSwitchEvent, ClipboardItem, Memory, TaskProposal, UsageEvent } from '../shared/types'
 import type { ChatFn, ChatResult } from '../electron/main/provider'
 
 /** Single-app event batch; gaps are small so the whole batch is one segment. */
@@ -53,7 +53,7 @@ interface Harness {
   now: number
   settings: { suggestionMinEvents: number; suggestionSilenceSeconds: number; confidenceHigh: number; confidenceLow: number }
   ignored: IgnoredTable
-  pushed: Suggestion[][]
+  pushed: TaskProposal[][]
   chat: ChatFn | undefined
 }
 
@@ -240,7 +240,7 @@ describe('accept', () => {
     expect(tasks[0].title).toBe(ALGO_TITLE)
     expect(tasks[0].apps.map((a) => a.id)).toEqual(['c:/apps/chrome.exe', 'c:/apps/code.exe'])
     expect(tasks[0].apps.map((a) => a.name)).toEqual(['Chrome', 'Code'])
-    // Suggestion left the pending list.
+    // TaskProposal left the pending list.
     expect(h.engine.suggestions()).toHaveLength(0)
     expect(h.pushed[h.pushed.length - 1]).toHaveLength(0)
   })

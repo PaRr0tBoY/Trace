@@ -6,7 +6,7 @@
  * before broadcasting state:tasks / state:suggestions.
  */
 import { app } from 'electron'
-import type { Suggestion, TaskDto } from '../../shared/types'
+import type { TaskProposal, TaskDto } from '../../shared/types'
 import { createAppIconService } from './appIconCore'
 
 /** Resolve an exePath to a PNG dataURL, or null on any failure (missing file, empty icon). */
@@ -27,8 +27,8 @@ export function attachAppIcons(tasks: TaskDto[]): Promise<TaskDto[]> {
   return service.attachToTasks(tasks)
 }
 
-/** Fill Suggestion.appIcons from the engine-provided appExePaths. */
-export function attachSuggestionIcons(suggestions: Suggestion[]): Promise<Suggestion[]> {
+/** Fill TaskProposal.appIcons from the engine-provided appExePaths. */
+export function attachSuggestionIcons(suggestions: TaskProposal[]): Promise<TaskProposal[]> {
   return service.attachToSuggestions(suggestions)
 }
 

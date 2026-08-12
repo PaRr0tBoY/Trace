@@ -9,7 +9,7 @@
  *   - `Renderer -> Main` calls (invoke/handle) are listed in `InvokeMap`.
  *   - `Main -> Renderer` events (send/on) are listed in `EventMap`.
  */
-import type { AppRef, ClipboardItemDto, DragRequest, MergeResult, ProviderConfig, Settings, Suggestion, TaskDto, TaskPatch, UnlinkTarget } from './types'
+import type { AppRef, ClipboardItemDto, DragRequest, MergeResult, ProviderConfig, Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
 
 /** Result of a connection test against one provider (ai:test-provider). */
 export interface ProviderTestResult {
@@ -250,7 +250,7 @@ export interface EventMap {
   /** Full task list whenever the task domain changes. */
   'state:tasks': [tasks: TaskDto[]]
   /** Pending suggestion cards (transient, replaced on each analysis). */
-  'state:suggestions': [suggestions: Suggestion[]]
+  'state:suggestions': [suggestions: TaskProposal[]]
   /** Settings changed (e.g. from the tray menu). */
   'state:settings': [settings: Settings]
   /** Toggle the panel open/closed from the main process (e.g. tray). */

@@ -99,7 +99,7 @@
 - `focus.ts` — 输入框焦点桥（见注意事项"输入框焦点（t21）"）。
 - `windowSwitch.ts` — ADR-0005：`app:open-linked-window` 的实现（pid 命中 → 激活窗口；应用存活 → 最新窗口；否则启动 exe）。`suggestionEngine.ts` 的 `latestSwitchFor` 提供链接窗口快照（linkedWindow）。
 - `aiLog.ts` — JSONL 可观测日志（`ai-log.jsonl`）：聊天调用、引擎算法输出、记忆写入各留一条；`provider.ts` 的 `log` 钩子 + `MemoryStore`/`suggestionEngine` 的 `log` 均汇入。
-- `appIcons.ts` — APP 图标：`attachAppIcons`/`attachSuggestionIcons` 在 `pushState.tasks/suggestions` 推送前批量填充（`AppRef.iconUrl` / `Suggestion.appIcons`），`app:icons` 通道按需补取（LRU 128 缓存）；`appIconCore.ts` 是纯逻辑（缓存/占位），可注入测试。
+- `appIcons.ts` — APP 图标：`attachAppIcons`/`attachSuggestionIcons` 在 `pushState.tasks/suggestions` 推送前批量填充（`AppRef.iconUrl` / `TaskProposal.appIcons`），`app:icons` 通道按需补取（LRU 128 缓存）；`appIconCore.ts` 是纯逻辑（缓存/占位），可注入测试。
 - `imageProtocol.ts` — `tracelocal://thumb` 缩略图协议（ADR-0004 性能项，图片预览 base64 移出 IPC DTO）。
 - `ocr.ts` — Windows.Media.Ocr（WinRT，经 PowerShell 单行脚本）识别前台窗口文字，作为 LLM 建议的 `ocrContext` 输入。**只作 AI 资料不进 UI、不持久化**；隐私三开关（incognito/L0/总开关）任一关闭即跳过；分析触发时才跑，超时放弃。
 - `suggestionDrop.ts` — 拖到备选卡"自动建任务并绑定"的纯逻辑组合（`acceptWithResource`），IPC 层薄封装。
@@ -114,7 +114,7 @@
 - 导航（ADR-0004）：三视图 `View`（clipboard/files/tasks），tasks 视图二级 tab（existing/candidates），导航状态全在 store（restore 机制记忆/重置，`src/lib/restore.ts` + `shouldRestoreToLanding`）。
 - 文件视图：FileListView + FileMemberRow + `src/lib/fileTabs.ts`（动态扩展名 tab）；任务详情 TaskDetail（关联应用/窗口/关联内容/置信度/创建原因）。
 - 主题（ADR-0004）：`shared/themes.ts`（`THEME_ACCENTS`/`THEME_COLORS`，5 主题）+ `src/lib/theme.ts`（`applyTheme` 运行时换 accent）；`--accent-rgb` 供 rgba 用。
-- 任务层 UI：`tasks/` 下 TaskView（二级 tab + 全页子视图：TaskEditor 创建/编辑/convert panel、TaskDetail、ContentPicker）、SuggestionCard（两行卡 + 剪贴板 chips + 点击开 convert panel，卡内无编辑/展开）、TaskEditor（引导式：标题/app 网格/剪贴板列表/AI 标题，suggestion 模式展示 "why"）、TaskDropPanel（拖入绑定面板：保存区 + 任务列表 + 备选卡落点）、dropActions.ts（`linkDraggedItem`/`acceptSuggestionDrop`）；`data-drop-task-id`/`data-drop-suggestion-id`/`.drop-save-zone` 是 Panel `onInternalDrop` 的解析锚点。
+- 任务层 UI：`tasks/` 下 TaskView（二级 tab + 全页子视图：TaskEditor 创建/编辑/convert panel、TaskDetail、ContentPicker）、TaskProposalCard（两行卡 + 剪贴板 chips + 点击开 convert panel，卡内无编辑/展开）、TaskEditor（引导式：标题/app 网格/剪贴板列表/AI 标题，suggestion 模式展示 "why"）、TaskDropPanel（拖入绑定面板：保存区 + 任务列表 + 备选卡落点）、dropActions.ts（`linkDraggedItem`/`acceptSuggestionDrop`）；`data-drop-task-id`/`data-drop-suggestion-id`/`.drop-save-zone` 是 Panel `onInternalDrop` 的解析锚点。
 - 样式分层：tokens.css（主题变量：`--accent` 主题色、`--bg-2`/`--divider` 中性色）→ global → panel/item/settings/tasks。
 
 ## 注意事项

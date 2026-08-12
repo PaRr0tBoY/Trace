@@ -43,7 +43,7 @@ export function clampSettings(input: Settings): Settings {
   out.l0CaptureEnabled = out.l0CaptureEnabled !== false
   // State machine: idle-to-paused threshold in minutes (1-120, default 15).
   out.taskPauseThresholdMinutes = clampInt(out.taskPauseThresholdMinutes, 1, 120, 15)
-  // Suggestion triggers.
+  // Proposal triggers.
   out.suggestionMinEvents = clampInt(out.suggestionMinEvents, 1, 50, 5)
   out.suggestionSilenceSeconds = clampInt(out.suggestionSilenceSeconds, 30, 300, 60)
   // Confidence thresholds: θ_low in [0,1]; θ_high in [0,1] and strictly above θ_low.

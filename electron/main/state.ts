@@ -10,7 +10,7 @@ import { ClipboardWatcher } from '../clipboard/ClipboardWatcher'
 import { loadSettings, saveSettings } from '../store/settings'
 import { TaskStore, type TaskIndex } from '../store/TaskStore'
 import { MemoryStore, type MemoryIndex } from '../store/MemoryStore'
-import type { ClipboardItem, ClipboardItemDto, Settings, Suggestion, TaskDto } from '../../shared/types'
+import type { ClipboardItem, ClipboardItemDto, Settings, TaskProposal, TaskDto } from '../../shared/types'
 import { MAX_STACK } from '../../shared/types'
 import { createId } from '../store/ids'
 import { nativeImage, BrowserWindow, powerMonitor, safeStorage, app } from 'electron'
@@ -385,8 +385,8 @@ export const pushState = {
     const dto: TaskDto[] = await attachAppIcons(taskStore.toDto())
     send('state:tasks', dto)
   },
-  async suggestions(suggestions: Suggestion[]): Promise<void> {
-    const dto: Suggestion[] = await attachSuggestionIcons(suggestions)
+  async suggestions(suggestions: TaskProposal[]): Promise<void> {
+    const dto: TaskProposal[] = await attachSuggestionIcons(suggestions)
     send('state:suggestions', dto)
   },
   settings(next: Settings): void {

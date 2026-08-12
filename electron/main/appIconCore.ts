@@ -5,7 +5,7 @@
  * the fetcher, so vitest can drive the cache and batch-assembly logic without
  * an Electron runtime (same split as geometry/power).
  */
-import type { Suggestion, TaskDto } from '../../shared/types'
+import type { TaskProposal, TaskDto } from '../../shared/types'
 
 /** Resolve one exePath to a dataURL, or null when extraction fails. */
 export interface IconFetcher {
@@ -16,7 +16,7 @@ export interface AppIconService {
   /** Synchronous for cached paths, async fetch on miss; never rejects. */
   resolve(exePath: string): Promise<string | null>
   attachToTasks(tasks: TaskDto[]): Promise<TaskDto[]>
-  attachToSuggestions(suggestions: Suggestion[]): Promise<Suggestion[]>
+  attachToSuggestions(suggestions: TaskProposal[]): Promise<TaskProposal[]>
 }
 
 export const APP_ICON_CACHE_MAX = 128
@@ -67,7 +67,7 @@ export function createAppIconService(fetcher: IconFetcher, max = APP_ICON_CACHE_
   }
 
   /** Unique exePaths across a batch, normalized; returns original-cased path per key. */
-  function collectPaths(tasks: TaskDto[], suggestions: Suggestion[]): Map<string, string> {
+  function collectPaths(tasks: TaskDto[], suggestions: TaskProposal[]): Map<string, string> {
     const paths = new Map<string, string>()
     for (const task of tasks) {
       for (const app of task.apps) {
@@ -103,7 +103,7 @@ export function createAppIconService(fetcher: IconFetcher, max = APP_ICON_CACHE_
     return tasks
   }
 
-  async function attachToSuggestions(suggestions: Suggestion[]): Promise<Suggestion[]> {
+  async function attachToSuggestions(suggestions: TaskProposal[]): Promise<TaskProposal[]> {
     if (suggestions.length === 0) return suggestions
     const paths = collectPaths([], suggestions)
     if (paths.size === 0) return suggestions

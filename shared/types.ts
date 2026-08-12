@@ -315,8 +315,8 @@ export interface ProviderConfig {
   supportsSchemaOutput?: boolean
 }
 
-/** A task suggestion card (t16 produces, t19/20 refine). */
-export interface Suggestion {
+/** A task proposal card (t16 produces, t19/20 refine). */
+export interface TaskProposal {
   id: string
   title: string
   appNames: string[]
@@ -341,7 +341,7 @@ export interface Suggestion {
   appIcons?: { name: string; iconUrl: string }[]
   /**
    * Clipboard material copied during the segment's window (same shape as a
-   * task's resources). Suggestion cards and the convert panel show these;
+   * task's resources). Proposal cards and the convert panel show these;
    * accepting binds them to the created task. Absent on older payloads.
    */
   clipboardRefs?: ResourceRef[]

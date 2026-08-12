@@ -632,12 +632,23 @@ export interface ActivityDetail {
   }
 }
 
-/** One analysis pass: the observable activities plus engine-side detail. */
+/**
+ * One analysis pass: the observable activities plus engine-side detail.
+ * Activities are observations (t55: the current-task controller sees every
+ * one); the ignore/cooldown gates only decide which become suggestions —
+ * `blockedSignatures` carries that decision to the suggestion builder.
+ */
 export interface ActivityAnalysis {
-  /** Non-ignored activities in time order. */
+  /** All clustered activities in time order (including suggestion-blocked). */
   activities: Activity[]
   /** Index-aligned with activities. */
   details: ActivityDetail[]
+  /**
+   * Signatures gated from suggestion building this pass (ignored table or
+   * cooldown). The controller push still sees the corresponding activities;
+   * the engine's proposal loop skips them by signature.
+   */
+  blockedSignatures: string[]
 }
 
 export interface ActivityLedgerOptions {
@@ -682,9 +693,11 @@ export interface ActivityLedger {
   markSeen(): void
   /**
    * Cluster the pending batch into activities and advance the cursor.
-   * Activities whose signature is on the ignored table are dropped. On
-   * failure (invalid params, unexpected store error) the cursor is left
-   * untouched — the batch stays pending and the next pass retries it.
+   * Activities are observations and all are returned (t55: the current-task
+   * controller sees every one); ignored/cooldown signatures land in
+   * `blockedSignatures` so the suggestion builder skips them. On failure
+   * (invalid params, unexpected store error) the cursor is left untouched —
+   * the batch stays pending and the next pass retries it.
    */
   analyze(): Promise<ActivityAnalysis>
   /**
@@ -847,7 +860,7 @@ export function createActivityLedger(options: ActivityLedgerOptions): ActivityLe
         // semantics, matches the engine's clipboard-only tick path).
         advanceTo(rows)
         trace = new Map()
-        return { activities: [], details: [] }
+        return { activities: [], details: [], blockedSignatures: [] }
       }
       const clips = rows.filter((r) => r.kind === 'clipboard')
       // Cluster BEFORE advancing the cursor: a failure (invalid params,
@@ -861,11 +874,15 @@ export function createActivityLedger(options: ActivityLedgerOptions): ActivityLe
       const traceNext = new Map<string, EvidenceEvent[]>()
       const activities: Activity[] = []
       const details: ActivityDetail[] = []
+      const blockedSignatures: string[] = []
       for (let i = 0; i < result.attributions.length; i++) {
         const attr = result.attributions[i]
-        if (ignored.has(suggestionSignature(attr.segment.appKeys, attr.segment.startTs))) continue
-        if (options.cooling && options.cooling(recommendationFingerprint(attr.segment.appKeys, attr.segment.startTs))) continue
         const { activity, detail } = buildActivity(attr, clipAssignments[i].itemIds, classifierVersion, promptVersion)
+        // 忽略表 / 冷却只挡“建议构建”（t46 推荐限频），不挡任务跟踪：
+        // 活动照常进分析结果（控制器推送可见，t55），签名交引擎跳过建议。
+        if (ignored.has(activity.signature) || (options.cooling && options.cooling(recommendationFingerprint(attr.segment.appKeys, attr.segment.startTs)))) {
+          blockedSignatures.push(activity.signature)
+        }
         // The app-switch rows inside [startAt, endAt] — segments partition the
         // batch, so the window is exact — plus the clipboard rows assigned
         // here, time-ordered (stable for equal timestamps).
@@ -877,7 +894,7 @@ export function createActivityLedger(options: ActivityLedgerOptions): ActivityLe
         details.push(detail)
       }
       trace = traceNext
-      return { activities, details }
+      return { activities, details, blockedSignatures }
     },
     eventsOf(activityId: string): EvidenceEvent[] {
       const rows = trace.get(activityId)

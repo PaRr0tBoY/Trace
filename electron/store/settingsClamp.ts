@@ -49,6 +49,10 @@ export function clampSettings(input: Settings): Settings {
   out.evidenceRetentionDays = clampInt(out.evidenceRetentionDays, 1, 365, 30)
   // State machine: idle-to-paused threshold in minutes (1-120, default 15).
   out.taskPauseThresholdMinutes = clampInt(out.taskPauseThresholdMinutes, 1, 120, 15)
+  // Current-task switch hysteresis (t55, spec 决策 5): candidate dwell 30-60s
+  // (default 45), score margin 0-1 (default 0.1) — both gate switch execution.
+  out.switchDwellSeconds = clampInt(out.switchDwellSeconds, 30, 60, 45)
+  out.switchMargin = clampNum(out.switchMargin, 0, 1, 0.1)
   // Proposal triggers.
   out.suggestionMinEvents = clampInt(out.suggestionMinEvents, 1, 50, 5)
   out.suggestionSilenceSeconds = clampInt(out.suggestionSilenceSeconds, 30, 300, 60)

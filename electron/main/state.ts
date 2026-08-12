@@ -29,6 +29,7 @@ import {
   createMemoryIndexAdapter,
   createSqliteMemoryGraph,
   LEGACY_MEMORY_TYPES,
+  normalizeContent,
   type MemoryGraphStore,
   type MemoryIndexAdapter
 } from '../store/memoryGraph'
@@ -57,6 +58,16 @@ import { LocalModelRuntime } from '../store/localModelRuntime'
 import { createWorkerModelEngine } from '../store/localModelWorkerEngine'
 import { createCandidateOptimizer, type CandidateOptimizer } from '../store/localModelOptimizer'
 import { gradeProposal } from '../store/proposalGrading'
+import {
+  createCurrentTaskController,
+  type CurrentTaskController,
+  type MatchedMemory
+} from '../store/currentTaskController'
+import {
+  createAgentDecisionProvider,
+  createAlgorithmDecisionProvider,
+  createLocalModelDecisionProvider
+} from '../store/decisionProvider'
 
 const store = new ItemStore()
 const watcher = new ClipboardWatcher(600)
@@ -66,6 +77,10 @@ let taskSweepTimer: ReturnType<typeof setInterval> | null = null
 let suggestionTimer: ReturnType<typeof setInterval> | null = null
 let suggestionEngine: SuggestionEngine | null = null
 let activityLedger: ActivityLedger | null = null
+/** Current-task controller (t55, spec 决策 5): 主 seam，惰性构造。 */
+let currentTaskController: CurrentTaskController | null = null
+/** onActivities 在途守卫（t55 review NIT-2）：上一趟未消化完本趟跳过。 */
+let activitiesInFlight = false
 let memoryStore: MemoryStore | null = null
 /** Memory graph (t48): 三表事实图 over trace.db；null = DB 故障降级。 */
 let memoryGraph: MemoryGraphStore | null = null
@@ -653,6 +668,68 @@ export function getActivityLedger(): ActivityLedger {
 }
 
 /**
+ * Current-task controller singleton (t55, spec 实现决策 5). 惰性构造：活动
+ * 推送路径（引擎 onActivities）首次命中才建。决策链 = 本地模型包装（候选
+ * 优化，失败 → 原样）→ Agent（无 AI 配置 / 失败 → 算法兜底）—— 决策者可
+ * 替换，控制器不感知谁在做。滞回参数（switchDwellSeconds / switchMargin /
+ * 阈值）与长 idle 窗口（taskPauseThresholdMinutes）来自 Settings。
+ */
+function getCurrentTaskController(): CurrentTaskController {
+  if (!currentTaskController) {
+    const algorithm = createAlgorithmDecisionProvider()
+    const agent = createAgentDecisionProvider({
+      // 惰性取值：index.ts 的 setSuggestionChat 在 registerIpc 后注入，
+      // 首次构造可能早于它（启动即触发的 analyze）。
+      getChat: () => suggestionChat,
+      fallback: algorithm
+    })
+    currentTaskController = createCurrentTaskController({
+      taskStore,
+      decide: createLocalModelDecisionProvider({
+        inner: agent,
+        optimizer: createLazyLocalModelOptimizer()
+      }),
+      trace: getTraceStore(),
+      getParams: () => {
+        const s = loadSettings()
+        return {
+          switchDwellSeconds: s.switchDwellSeconds,
+          switchMargin: s.switchMargin,
+          confidenceHigh: s.confidenceHigh,
+          confidenceLow: s.confidenceLow,
+          idleResumeMs: s.taskPauseThresholdMinutes * 60_000
+        }
+      },
+      // 已匹配记忆预筛（t50，spec 决策 6 最小预填）：活动键（app 名 + 窗口
+      // 标题，归一化）+ 活动时间窗 → memoryGraph.retrieveMemories。门：
+      // memoryAccess（预填含记忆须过它）+ DB 健康（graph 非 null）。
+      readMemories: (activity) => {
+        const s = loadSettings()
+        if (!s.memoryAccess) return []
+        const graph = getMemoryGraph()
+        if (!graph) return []
+        const keys = [
+          ...activity.apps.map((a) => a.name),
+          ...activity.apps.flatMap((a) => a.windows)
+        ].map(normalizeContent).filter((k) => k.length >= 2)
+        if (keys.length === 0) return []
+        const result = graph.retrieveMemories({
+          activityKeys: keys,
+          windowStart: activity.startAt,
+          windowEnd: activity.endAt
+        })
+        return result.hits.slice(0, 10).map((h): MatchedMemory => ({
+          content: h.fact.content,
+          reasons: [...h.reasons],
+          hops: h.hops
+        }))
+      }
+    })
+  }
+  return currentTaskController
+}
+
+/**
  * Suggestion engine singleton (t19). Lazily constructed so the IPC layer can
  * reach it without ordering constraints; the provider chain is wired in
  * index.ts via setSuggestionChat once both sides exist.
@@ -727,7 +804,42 @@ export function getSuggestionEngine(): SuggestionEngine {
       // Local model candidate optimizer (t54, spec 决策 6/11): 候选后处理
       // 过滤 ≤3 / 标题草稿 / 排序。内部按设置与模型可用性逐次判定 — 关闭 /
       // 未就绪 / 失败一律返回 null，算法候选原样传递（不变量 H）。
-      localModel: createLazyLocalModelOptimizer()
+      localModel: createLazyLocalModelOptimizer(),
+      // Current-task controller (t55, spec 决策 5): 活动推送路径（ledger
+      // analyze 后、建议构建前，只见隐私过滤后的活动）。控制器输出驱动状态
+      // 迁移与会话（switch 已在 observe 内原子完成）；这里只补渲染推送与
+      // 诊断日志。不 await：决策（可能含 LLM）延迟不阻塞建议推送。
+      // in-flight 守卫：上一趟未消化完（LLM 慢）本趟跳过——决策是尽力而为，
+      // 重叠推送只会让控制器状态与真实证据竞速。
+      onActivities: async (analysis) => {
+        if (activitiesInFlight) return
+        activitiesInFlight = true
+        try {
+          const controller = getCurrentTaskController()
+          for (let i = 0; i < analysis.activities.length; i++) {
+            try {
+              const outcome = await controller.observe(analysis.activities[i], analysis.details[i])
+              if (outcome.switchedTo) {
+                pushState.tasks()
+                console.log(
+                  `[Task] current-task switch -> ${outcome.switchedTo} (decision: ${outcome.decision?.action}, ` +
+                    `triggers: ${outcome.triggers.join(',') || 'none'})`
+                )
+              } else if (outcome.decisionCalls > 0) {
+                console.log(
+                  `[Task] decision ${outcome.decision?.action} (calls: ${outcome.decisionCalls}, ` +
+                    `triggers: ${outcome.triggers.join(',')}, ${outcome.rejected ?? 'applied'})`
+                )
+              }
+            } catch (err) {
+              // 控制器永不把 LLM / 域层错误带上活动推送路径；此处兜底仅日志。
+              console.log(`[Task] current-task observe failed: ${err instanceof Error ? err.message : String(err)}`)
+            }
+          }
+        } finally {
+          activitiesInFlight = false
+        }
+      }
     })
   }
   return suggestionEngine

@@ -413,6 +413,58 @@ export interface Memory {
 }
 
 /* ------------------------------------------------------------------ */
+/* 记忆图面板（t51 记忆可审查）：facts / 冲突对 / 来源链 DTO             */
+/* ------------------------------------------------------------------ */
+
+/** 来源链摘要：事实起源 episode 的时段与整理摘要（面板展示用）。 */
+export interface MemoryEpisodeRefDto {
+  id: string
+  startedAt: number
+  endedAt: number | null
+  summary: string | null
+}
+
+/** 记忆图单条事实 DTO（t51）：时间有效性 + 来源链 + 用户状态。 */
+export interface MemoryFactDto {
+  id: string
+  type: string
+  content: string
+  source: 'ai-suggest' | 'task-feedback' | 'user' | 'inferred'
+  userState: MemoryUserState
+  intent: string
+  weight: number
+  validAt: number | null
+  invalidAt: number | null
+  expiredAt: number | null
+  createdAt: number
+  updatedAt: number
+  hitCount: number
+  episodeId: string | null
+  /** 来源链摘要（null = 无起源 episode）。 */
+  episode: MemoryEpisodeRefDto | null
+}
+
+/** 冲突对（t51，spec 决策 10）：同 (type, 主语键) 的有效方 + 被自动失效方，并排展示。 */
+export interface MemoryFactConflictDto {
+  active: MemoryFactDto
+  invalidated: MemoryFactDto
+}
+
+/** 冲突裁决三选（spec 决策 10：不自动覆盖，用户显式决定）。 */
+export type MemoryConflictResolution = 'keep-active' | 'keep-invalidated' | 'keep-none'
+
+/**
+ * 记忆图面板载荷：未失效 facts（全 userState，UI 按 type 过滤分组）+
+ * 待裁决冲突对（含被失效方，各自内联来源链）。每次操作后整体刷新返回。
+ */
+export interface MemoryFactPanelPayload {
+  facts: MemoryFactDto[]
+  conflicts: MemoryFactConflictDto[]
+  /** 主进程 memory graph 不可用（DB 故障）时为 true，面板显示降级文案而非空库文案。 */
+  degraded: boolean
+}
+
+/* ------------------------------------------------------------------ */
 /* AI rationale trace (t42) — renderer view of traceStore rows          */
 /* ------------------------------------------------------------------ */
 
@@ -566,6 +618,18 @@ export interface Settings {
   evidenceRetentionDays: number
   /** Minutes without an attribution event before an Active task auto-pauses (1-120). */
   taskPauseThresholdMinutes: number
+  /**
+   * Current-task switch hysteresis (t55, spec 决策 5): a candidate must persist
+   * this long (seconds, 30-60) before a switch to it may execute — short
+   * detours never flip the running task.
+   */
+  switchDwellSeconds: number
+  /**
+   * Current-task switch hysteresis (t55, spec 决策 5): the score difference a
+   * candidate must hold over the current task (0-1) for a switch — with the
+   * threshold and dwell it gates every switch execution.
+   */
+  switchMargin: number
   /** Minimum new events before a suggestion pass triggers (1-50). */
   suggestionMinEvents: number
   /** Silence duration before a suggestion pass triggers (30-300s). */
@@ -654,6 +718,8 @@ export const DEFAULT_SETTINGS: Settings = {
   l0CaptureEnabled: true,
   evidenceRetentionDays: 30,
   taskPauseThresholdMinutes: 15,
+  switchDwellSeconds: 45,
+  switchMargin: 0.1,
   suggestionMinEvents: 5,
   suggestionSilenceSeconds: 60,
   confidenceHigh: 0.7,

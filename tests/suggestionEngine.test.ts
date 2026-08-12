@@ -6,7 +6,8 @@ import {
   DEFAULT_SEGMENT_PARAMS,
   recommendationFingerprint,
   recommendationPatternKey,
-  suggestionSignature
+  suggestionSignature,
+  type ActivityAnalysis
 } from '../electron/store/activityLedger'
 import { createMemoryEvidenceStore, evidenceFromUsageEvent, type EvidenceStore } from '../electron/store/evidenceStore'
 import { DEFAULT_POLICY, type PrivacyPolicy } from '../electron/store/privacyGate'
@@ -910,6 +911,8 @@ interface GradeHarness {
   pushed: TaskProposal[][]
   /** 任务比对命中（模式记忆沉淀载荷）。 */
   matches: PatternMatch[]
+  /** 控制器推送收到的分析（t55 MINOR-4：冷却/忽略活动仍送达）。 */
+  activityPushes: ActivityAnalysis[]
 }
 
 /** 与 state.ts 同形的 t47 装配：history + getLevel = gradeProposal 直通 +
@@ -926,6 +929,7 @@ function makeGradeHarness(localModel?: CandidateOptimizer): GradeHarness {
     ignored: createIgnoredTable({ load: () => null, save: () => {} }),
     pushed: [],
     matches: [],
+    activityPushes: [],
     store: new TaskStore({ load: () => null, save: () => {} })
   }
   h.engine = createSuggestionEngine({
@@ -941,6 +945,7 @@ function makeGradeHarness(localModel?: CandidateOptimizer): GradeHarness {
       cooling: (fingerprint) => h.history.cooldownMs(fingerprint) > 0
     }),
     onSuggestions: (sugs) => h.pushed.push(sugs),
+    onActivities: (analysis) => h.activityPushes.push(analysis),
     history: h.history,
     // state.ts 同形：真实分级直通（引擎已组装 pattern/lastRecord 判据）。
     getLevel: (input) => gradeProposal(input),
@@ -1001,6 +1006,30 @@ describe('评级接入（t47）', () => {
     expect(drop?.level).toBe(3)
     expect(drop?.outcome).toBe('noop')
     expect(h.history.cooldownMs(BATCH_FP)).toBeGreaterThan(0)
+  })
+
+  it('冷却只挡建议构建，活动仍送达控制器推送（t55 MINOR-4）', async () => {
+    const h = makeGradeHarness()
+    h.history.record({
+      fingerprint: 'semantic@1:seed-rej',
+      patternKey: BATCH_PK,
+      level: 1,
+      outcome: 'ignored',
+      actionReason: 'wrong_task'
+    })
+    h.engine.start()
+    // Pass 1：强拒模式学习 → L3 丢弃 + 落 noop L3 记录（本趟无冷却，建议被挡）。
+    await trigger(h, batch())
+    expect(h.pushed[0]).toHaveLength(0)
+    const drop = h.history.list().find((r) => r.fingerprint === BATCH_FP)
+    expect(drop?.level).toBe(3)
+    expect(h.history.cooldownMs(BATCH_FP)).toBeGreaterThan(0)
+    // Pass 2：同指纹冷却中 → 建议仍被挡，但活动送达控制器推送（含 blocked 标记）。
+    await trigger(h, batch(2_000_000)) // 同小时桶（hour 0）→ 同指纹
+    expect(h.pushed[1]).toHaveLength(0)
+    const last = h.activityPushes.at(-1)!
+    expect(last.activities).toHaveLength(1)
+    expect(last.blockedSignatures).toHaveLength(1)
   })
 
   it('近期同类轻拒（not_now）→ L2 观察，不主动打扰', async () => {

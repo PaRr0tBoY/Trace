@@ -35,6 +35,18 @@ describe('clampSettings — task domain fields', () => {
     expect(clampSettings({ ...DEFAULT_SETTINGS, taskPauseThresholdMinutes: NaN }).taskPauseThresholdMinutes).toBe(15)
   })
 
+  it('clamps switch hysteresis params: dwell 30-60s, margin 0-1 (t55, spec 决策 5)', () => {
+    // Dwell: integer seconds in [30, 60], default 45.
+    expect(clampSettings({ ...DEFAULT_SETTINGS, switchDwellSeconds: 5 }).switchDwellSeconds).toBe(30)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, switchDwellSeconds: 999 }).switchDwellSeconds).toBe(60)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, switchDwellSeconds: 44.6 }).switchDwellSeconds).toBe(45)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, switchDwellSeconds: NaN }).switchDwellSeconds).toBe(45)
+    // Margin: fraction in [0, 1], default 0.1.
+    expect(clampSettings({ ...DEFAULT_SETTINGS, switchMargin: -1 }).switchMargin).toBe(0)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, switchMargin: 2 }).switchMargin).toBe(1)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, switchMargin: NaN }).switchMargin).toBe(0.1)
+  })
+
   it('clamps suggestion triggers to their ranges with defaults on garbage', () => {
     expect(clampSettings({ ...DEFAULT_SETTINGS, suggestionMinEvents: 0 }).suggestionMinEvents).toBe(1)
     expect(clampSettings({ ...DEFAULT_SETTINGS, suggestionMinEvents: 99 }).suggestionMinEvents).toBe(50)

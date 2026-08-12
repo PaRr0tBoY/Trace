@@ -882,8 +882,12 @@ export class TaskStore {
     task.activeMs = Math.max(0, task.activeMs + (now - task.lastActiveAt))
   }
 
-  /** The task's open session (endedAt undefined), if any. */
-  private openSessionFor(taskId: string): TaskSession | undefined {
+  /**
+   * The task's open session (endedAt undefined), if any — also consumed by
+   * the current-task controller (t55) for the decision context (当前任务会话,
+   * spec 决策 6) and its session-boundary bookkeeping.
+   */
+  openSessionFor(taskId: string): TaskSession | undefined {
     return (this.sessionsByTask.get(taskId) ?? []).find((s) => s.endedAt === undefined)
   }
 

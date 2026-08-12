@@ -50,7 +50,7 @@
  * Logging: `[Suggestion]` tag, one line per analysis (with mode), one line
  * per accept/ignore. No per-event noise.
  */
-import type { ActivityLedger } from '../store/activityLedger'
+import type { ActivityAnalysis, ActivityLedger } from '../store/activityLedger'
 import { recommendationFingerprint, recommendationPatternKey } from '../store/activityLedger'
 import {
   derivePatternScore,
@@ -241,6 +241,13 @@ export interface SuggestionEngineOptions {
    * null（关闭 / 失败）时算法候选原样传递，绝不污染决策数据。
    */
   localModel?: CandidateOptimizer
+  /**
+   * Current-task controller hook (t55, spec 决策 5): called once per analysis
+   * pass with the privacy-filtered activities (denied apps never reach the
+   * decision maker — 不变量 D 在决策源头成立)。引擎不 await 结果：控制器
+   * 内部自行消化（LLM 延迟绝不阻塞建议推送）。Absent = 控制器未接线。
+   */
+  onActivities?: (analysis: ActivityAnalysis) => Promise<void> | void
 }
 
 /**
@@ -596,14 +603,25 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
         }
       }
 
+      // Current-task controller (t55, spec 决策 5): 活动推送路径 = ledger
+      // analyze 之后、建议构建之前；只看到隐私过滤后的活动。不 await：
+      // 决策（可能含 LLM）延迟不阻塞本趟建议推送，控制器内部消化错误。
+      // 忽略表 / 冷却不挡此推送（blockedSignatures 只挡建议构建，见下）。
+      void options.onActivities?.(analysis)
+
       const built: Array<{ suggestion: TaskProposal; meta: TaskProposalMeta }> = []
+      // Ignore/cooldown (t46) gate only suggestion building — the activities
+      // themselves are observations the controller already consumed. Ledger
+      // computes the marks; here we skip by stable signature (immune to the
+      // privacy filter's reindexing above).
+      const blocked = new Set(analysis.blockedSignatures)
       for (let i = 0; i < analysis.activities.length; i++) {
         const activity = analysis.activities[i]
         const detail = analysis.details[i]
+        if (blocked.has(activity.signature)) continue
         const appRefs = appRefsFromSegment(activity.apps.map((a) => a.id), activity.apps.map((a) => a.name))
         if (appRefs.length === 0) continue
-        // The ledger already dropped ignored signatures; the activity's own
-        // signature travels as the proposal's dismissal key.
+        // The activity's own signature travels as the proposal's dismissal key.
         const signature = activity.signature
 
         const attribution = activity.attribution

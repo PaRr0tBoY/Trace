@@ -289,22 +289,25 @@ describe('ActivityLedger — trigger cursor over the evidence timeline', () => {
 })
 
 describe('ActivityLedger — ignore gate and dismiss', () => {
-  it('drops activities whose signature is on the ignored table', async () => {
+  it('ignored signatures gate suggestion building, not activity delivery (t55)', async () => {
     const h = makeLedger(batch())
     const { activities } = await h.ledger.analyze()
     expect(activities).toHaveLength(1)
     h.ledger.dismiss(activities[0].signature)
     expect(h.ignored.has(activities[0].signature)).toBe(true)
 
-    // Same activity again: the ledger filters it out.
+    // Same activity again: the ledger keeps it as an observation (the
+    // current-task controller sees it) but marks it blocked for the
+    // suggestion builder.
     h.evidence.record(evidenceFromUsageEvent(ev('Code', 20_000)))
     h.evidence.record(evidenceFromUsageEvent(ev('Code', 21_000)))
     h.evidence.record(evidenceFromUsageEvent(ev('Chrome', 22_000)))
     h.evidence.record(evidenceFromUsageEvent(ev('Chrome', 23_000)))
     h.evidence.record(evidenceFromUsageEvent(ev('Code', 24_000)))
     const again = await h.ledger.analyze()
-    expect(again.activities).toHaveLength(0)
-    expect(again.details).toHaveLength(0)
+    expect(again.activities).toHaveLength(1)
+    expect(again.details).toHaveLength(1)
+    expect(again.blockedSignatures).toEqual([activities[0].signature])
   })
 })
 

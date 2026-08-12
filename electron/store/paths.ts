@@ -30,6 +30,11 @@ export const PATHS = {
   dbFile: () => join(root(), 'trace.db'),
   /** JSONL observability log: AI calls + algorithm outputs + memory writes. */
   aiLogFile: () => join(root(), 'ai-log.jsonl'),
+  /**
+   * Directory for the local model (t53): the downloaded GGUF plus its `.part`
+   * resume file. Lives under userData, never in the repo (no bundled model).
+   */
+  modelsDir: () => join(root(), 'models'),
   /** Path to the settings JSON. */
   settingsFile: () => join(root(), 'settings.json'),
   /** Scratch dir for temp files handed to native drag-out. */
@@ -42,7 +47,7 @@ export const PATHS = {
 
 /** Idempotently create every directory the app needs. Safe to call repeatedly. */
 export function ensureDirs(): void {
-  for (const dir of [PATHS.imagesDir(), PATHS.tempDir()]) {
+  for (const dir of [PATHS.imagesDir(), PATHS.tempDir(), PATHS.modelsDir()]) {
     mkdirSync(dir, { recursive: true })
   }
 }

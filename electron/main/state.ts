@@ -8,7 +8,7 @@
 import { ItemStore } from '../store/ItemStore'
 import { ClipboardWatcher } from '../clipboard/ClipboardWatcher'
 import { loadSettings, saveSettings } from '../store/settings'
-import { TaskStore, type TaskIndex, buildClipboardRef } from '../store/TaskStore'
+import { TaskStore, type TaskIndex } from '../store/TaskStore'
 import { MemoryStore, type MemoryIndex } from '../store/MemoryStore'
 import type { ClipboardItem, ClipboardItemDto, Settings, Suggestion, TaskDto } from '../../shared/types'
 import { MAX_STACK } from '../../shared/types'
@@ -22,7 +22,7 @@ import { attachAppIcons, attachSuggestionIcons } from './appIcons'
 import { runtime } from './config'
 import { queryForegroundSnapshot } from './foreground'
 import { emit, recentEvents } from './eventBus'
-import { buildClipboardEvent, decideClipboardAttribution } from './attributor'
+import { buildClipboardEvent } from './attributor'
 import { createSuggestionEngine, TICK_INTERVAL_MS, type ChatFn, type OcrFn, type SuggestionEngine } from './suggestionEngine'
 import { createIgnoredTable } from './ignored'
 
@@ -206,10 +206,9 @@ export function initState(): void {
     }
     store.add(data, loadSettings().historyLimit)
     pushState.items()
-    attributeClipboardCapture(store.list()[0])
+    logClipboardCapture(store.list()[0])
   })
   watcher.setPaused(loadSettings().incognito)
-  console.log(`[Attributor] clipboard auto-attribution ${loadSettings().autoAttributionEnabled ? 'on' : 'off'}`)
 
   powerMonitor.removeAllListeners('suspend')
   powerMonitor.removeAllListeners('lock-screen')
@@ -253,30 +252,26 @@ export function initState(): void {
 }
 
 /**
- * t14 clipboard -> task auto-attribution, wired into the capture callback.
+ * Log a clipboard capture onto the event bus (suggestion engine input).
  *
  * The source app is the foreground at capture time, read through t12's
  * collector query (the ForegroundWatcher instance is owned by main/index.ts,
  * so this module reads the OS directly — same Win32 call, nothing added to
- * the clipboard poll loop). The clipboard event is logged on the bus, then
- * the item links to the attributed task when auto-attribution is on. Both
- * steps share the L0 collector's gate: with task capture or L0 capture off
- * there is no foreground identity, so nothing is recorded or linked
- * (incognito is already gated at the watcher before this runs).
+ * the clipboard poll loop). Task resources are NOT auto-linked here: a
+ * task's clipboard content is fixed at creation time and only changes when
+ * the user explicitly links/unlinks (drop-to-bind, task:link-item).
+ * Both steps share the L0 collector's gate: with task capture or L0 capture
+ * off there is no foreground identity, so nothing is recorded (incognito is
+ * already gated at the watcher before this runs).
  */
-function attributeClipboardCapture(item: ClipboardItem | undefined): void {
+function logClipboardCapture(item: ClipboardItem | undefined): void {
   if (!item) return
   const settings = loadSettings()
   if (!settings.taskCaptureEnabled || !settings.l0CaptureEnabled) return
   const foreground = queryForegroundSnapshot()
   if (!foreground) return
 
-  const event = buildClipboardEvent(foreground, item.capturedAt)
-  emit(event)
-
-  const taskId = decideClipboardAttribution(event, taskStore.list(), settings.autoAttributionEnabled)
-  if (!taskId) return
-  if (taskStore.linkItem(taskId, buildClipboardRef(item))) pushState.tasks()
+  emit(buildClipboardEvent(foreground, item.capturedAt))
 }
 
 export function stopStateTimers(): void {

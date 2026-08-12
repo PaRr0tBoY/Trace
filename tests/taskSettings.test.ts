@@ -66,16 +66,13 @@ describe('clampSettings — task domain fields', () => {
   it('keeps master switches on unless explicitly false', () => {
     expect(clampSettings({ ...DEFAULT_SETTINGS }).taskCaptureEnabled).toBe(true)
     expect(clampSettings({ ...DEFAULT_SETTINGS }).l0CaptureEnabled).toBe(true)
-    expect(clampSettings({ ...DEFAULT_SETTINGS }).autoAttributionEnabled).toBe(true)
     const off = clampSettings({
       ...DEFAULT_SETTINGS,
       taskCaptureEnabled: false,
-      l0CaptureEnabled: false,
-      autoAttributionEnabled: false
+      l0CaptureEnabled: false
     })
     expect(off.taskCaptureEnabled).toBe(false)
     expect(off.l0CaptureEnabled).toBe(false)
-    expect(off.autoAttributionEnabled).toBe(false)
   })
 
   it('clamps the landing page to a valid view + matching second level', () => {

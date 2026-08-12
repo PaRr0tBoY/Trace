@@ -388,8 +388,6 @@ export interface Settings {
   l0CaptureEnabled: boolean
   /** Minutes without an attribution event before an Active task auto-pauses (1-120). */
   taskPauseThresholdMinutes: number
-  /** Auto-attach clipboard copies to tasks by source process. */
-  autoAttributionEnabled: boolean
   /** Minimum new events before a suggestion pass triggers (1-50). */
   suggestionMinEvents: number
   /** Silence duration before a suggestion pass triggers (30-300s). */
@@ -450,7 +448,6 @@ export const DEFAULT_SETTINGS: Settings = {
   taskCaptureEnabled: true,
   l0CaptureEnabled: true,
   taskPauseThresholdMinutes: 15,
-  autoAttributionEnabled: true,
   suggestionMinEvents: 5,
   suggestionSilenceSeconds: 60,
   confidenceHigh: 0.7,

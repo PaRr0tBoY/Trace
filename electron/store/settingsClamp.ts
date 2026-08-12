@@ -41,7 +41,6 @@ export function clampSettings(input: Settings): Settings {
   // Task domain (t11): master switches default on; anything but an explicit false is true.
   out.taskCaptureEnabled = out.taskCaptureEnabled !== false
   out.l0CaptureEnabled = out.l0CaptureEnabled !== false
-  out.autoAttributionEnabled = out.autoAttributionEnabled !== false
   // State machine: idle-to-paused threshold in minutes (1-120, default 15).
   out.taskPauseThresholdMinutes = clampInt(out.taskPauseThresholdMinutes, 1, 120, 15)
   // Suggestion triggers.

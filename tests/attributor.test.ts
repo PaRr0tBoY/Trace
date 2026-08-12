@@ -153,7 +153,7 @@ const CHROME_KEY = 'c:/program files/google/chrome/application/chrome.exe'
     expect(apps[1].lastContext).toBeUndefined()
   })
 
-  it('ignores non-app-switch events (clipboard attribution is a later ticket)', () => {
+  it('ignores non-app-switch events (clipboard events feed the suggestion engine only)', () => {
     const { store } = makeHarness()
     const task = store.create('写周报', { apps: [app('code.exe')] })!
     const { bus, onAttributed } = makeAttributor(store)

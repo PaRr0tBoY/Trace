@@ -16,12 +16,12 @@
  * collector (foreground.ts): no events leave it while disabled, so there is
  * nothing to re-check here.
  *
- * Clipboard auto-attribution (ticket 14) lives here as pure functions too:
- * buildClipboardEvent constructs the logged event, decideClipboardAttribution
- * is the link decision (event + tasks + switch -> task id). state.ts wires
- * them into the clipboard capture callback.
+ * Clipboard capture events (t14) are logged here via buildClipboardEvent for
+ * the suggestion engine; they are never auto-linked to tasks — a task's
+ * clipboard content is fixed at creation and only changes by explicit user
+ * action (drop-to-bind, task:link-item / unlink).
  */
-import type { AppSwitchEvent, ClipboardEvent, Task, UsageEvent } from '../../shared/types'
+import type { AppSwitchEvent, ClipboardEvent, UsageEvent } from '../../shared/types'
 import type { TaskStore } from '../store/TaskStore'
 
 /** App identity carried by L0 events; app-switch and clipboard events share it. */
@@ -59,7 +59,7 @@ export function createAttributor(options: AttributorOptions): Attributor {
   let unsubscribe: (() => void) | null = null
 
   const handleEvent = (event: UsageEvent): void => {
-    if (event.type !== 'app-switch') return // clipboard attribution is t14's job
+    if (event.type !== 'app-switch') return // clipboard events feed the suggestion engine only
     const key = appKeyFromEvent(event)
     if (key.length === 0) return
     const taskId = store.applyAttribution(key, { windowTitle: event.windowTitle })
@@ -89,31 +89,4 @@ export function buildClipboardEvent(
   ts: number
 ): ClipboardEvent {
   return { type: 'clipboard', appName: snapshot.appName, exePath: snapshot.exePath, pid: snapshot.pid, ts }
-}
-
-/**
- * Decide whether a captured clipboard item links to a task.
- *
- * Same rules as t13's app-switch attribution (spec decision 4): only Active
- * or Paused tasks qualify; the event's app identity must match a task AppRef
- * id; when several tasks share the app, the most recently active wins.
- * `enabled` is the "clipboard auto-attribution" setting — off degrades to
- * manual linking only. Pure: never mutates tasks or the store.
- */
-export function decideClipboardAttribution(
-  event: ClipboardEvent,
-  tasks: readonly Task[],
-  enabled: boolean
-): string | null {
-  if (!enabled) return null
-  const key = appKeyFromEvent(event)
-  if (key.length === 0) return null
-  let best: Task | null = null
-  for (const t of tasks) {
-    if (t.status !== 'active' && t.status !== 'paused') continue
-    if (t.apps.some((a) => a.id === key) && (!best || t.lastActiveAt > best.lastActiveAt)) {
-      best = t
-    }
-  }
-  return best ? best.id : null
 }

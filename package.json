@@ -31,7 +31,17 @@
     "files": [
       "out/**/*",
       "resources/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/@node-llama-cpp/win-x64-cuda{,/**/*}",
+      "!node_modules/@node-llama-cpp/win-x64-cuda-ext{,/**/*}",
+      "!node_modules/@node-llama-cpp/win-x64-vulkan{,/**/*}",
+      "!node_modules/@node-llama-cpp/win-arm64{,/**/*}",
+      "!node_modules/node-llama-cpp/llama/gitRelease.bundle"
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/build/Release/*.node",
+      "**/node_modules/@node-llama-cpp/win-x64/**/*",
+      "**/node_modules/node-llama-cpp/bins/**/*"
     ],
     "publish": {
       "provider": "github",
@@ -91,10 +101,12 @@
     "@radix-ui/react-scroll-area": "^1.2.13",
     "@radix-ui/react-separator": "^1.1.11",
     "@resvg/resvg-js": "^2.6.2",
+    "better-sqlite3": "^12.11.1",
     "framer-motion": "^11.0.24",
     "gsap": "^3.15.0",
     "koffi": "^3.1.2",
     "lucide-react": "^1.26.0",
+    "node-llama-cpp": "^3.20.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "svg-path-bbox": "^2.1.0",
@@ -102,6 +114,8 @@
   },
   "allowScripts": {
     "electron@34.5.8": true,
-    "koffi@3.1.4": true
+    "koffi@3.1.4": true,
+    "node-llama-cpp@3.20.0": true,
+    "better-sqlite3@12.11.1": true
   }
 }

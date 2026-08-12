@@ -231,6 +231,13 @@ export interface CurrentTaskController {
   lastEvidenceAt(): number
   /** 当前未决决策提案（≤3；spec 决策 6，new/merge 产出）。 */
   pendingProposals(): TaskProposal[]
+  /**
+   * 用户已消费（采纳/忽略）的决策提案从缓冲剔除（t57 review BLOCK-1）：
+   * 引擎 accept/ignore 经 onProposalConsumed 回流——缓冲只随
+   * handleDecisionOutputs 变更，不回流会导致已消费卡随下批 onProposals
+   * 整批复活成幽灵卡片。
+   */
+  consume(ids: string[]): void
 }
 
 export function createCurrentTaskController(options: CurrentTaskControllerOptions): CurrentTaskController {
@@ -430,6 +437,10 @@ export function createCurrentTaskController(options: CurrentTaskControllerOption
         id: `prop_${decisionId}`,
         title: decision.title,
         appNames: activity.apps.map((a) => a.name),
+        // t57: 决策提案的身份数据（推荐指纹/冷却键输入）——app 键与段起始
+        // 时刻随卡携带，引擎 accept/ignore 在无 meta 时据此落推荐历史。
+        appExePaths: activity.apps.map((a) => a.id),
+        segmentStartTs: activity.startAt,
         confidence: decision.confidence,
         lowConfidence: decision.confidence < params().confidenceLow,
         algorithmReason: decision.reason,
@@ -440,7 +451,10 @@ export function createCurrentTaskController(options: CurrentTaskControllerOption
         },
         reason: decision.reason,
         decisionId,
-        level: 1
+        // t57 review MINOR-2：展示分级不硬编码——低置信度决策提案 = L2
+        // 候选区语义（用户忽略冷却 48h），高置信度 = L1（24h），与 Path A
+        // 同档同冷却；不再让"忽略同一不感兴趣语义"冷差距 24h vs 48h/7d。
+        level: decision.confidence < params().confidenceLow ? 2 : 1
       }
     }
     if (decision.action === 'merge') {
@@ -450,6 +464,10 @@ export function createCurrentTaskController(options: CurrentTaskControllerOption
         id: `prop_${decisionId}`,
         title: target.title,
         appNames: activity.apps.map((a) => a.name),
+        // t57: 决策提案的身份数据（推荐指纹/冷却键输入）——app 键与段起始
+        // 时刻随卡携带，引擎 accept/ignore 在无 meta 时据此落推荐历史。
+        appExePaths: activity.apps.map((a) => a.id),
+        segmentStartTs: activity.startAt,
         confidence: decision.confidence,
         lowConfidence: decision.confidence < params().confidenceLow,
         algorithmReason: decision.reason,
@@ -461,7 +479,8 @@ export function createCurrentTaskController(options: CurrentTaskControllerOption
         reason: decision.reason,
         taskId: decision.toTaskId,
         decisionId,
-        level: 1
+        // t57 review MINOR-2：同 new 分支——低置信度 = L2，高置信度 = L1。
+        level: decision.confidence < params().confidenceLow ? 2 : 1
       }
     }
     return null
@@ -643,6 +662,10 @@ export function createCurrentTaskController(options: CurrentTaskControllerOption
     currentSessionId: () => currentSessionId,
     candidateSince: () => pending?.since ?? null,
     lastEvidenceAt: () => lastEvidenceAt,
-    pendingProposals: () => pendingProposals
+    pendingProposals: () => pendingProposals,
+    consume(ids: string[]): void {
+      if (ids.length === 0) return
+      pendingProposals = pendingProposals.filter((p) => !ids.includes(p.id))
+    }
   }
 }

@@ -26,6 +26,7 @@ import {
   type RecommendationHistory
 } from '../store/recommendationHistory'
 import {
+  applyPatternFeedback,
   createMemoryIndexAdapter,
   createSqliteMemoryGraph,
   LEGACY_MEMORY_TYPES,
@@ -759,14 +760,16 @@ function getCurrentTaskController(): CurrentTaskController {
         }))
       },
       // t56 决策产出接线（spec 决策 6）：ignore → 推荐历史（指纹冷却防同类
-      // 反复打扰）；new/merge → 提案缓冲（≤3）——提案的 UI 消费面是后续票，
-      // 此处先落 ai-log 与 trace（决策链已含 observed/decision 行）。
+      // 反复打扰）；new/merge → 提案缓冲（≤3 FIFO / 同 key 替换在控制器内
+      // 完成）——t57 收尾：缓冲经引擎 propose 并入待定列表并推送渲染层
+      // （候选任务卡），ai-log 保留为可观测性。
       history: getRecommendationHistory() ?? undefined,
       onProposals: (proposals) => {
         logAi({
           kind: 'decision.proposals',
           proposals: proposals.map((p) => ({ title: p.title, taskId: p.taskId, confidence: p.confidence, decisionId: p.decisionId }))
         })
+        getSuggestionEngine().propose(proposals)
       }
     })
   }
@@ -917,6 +920,21 @@ export function getSuggestionEngine(): SuggestionEngine {
       // Recommendation history (t46): accept/ignore 记录与回填；DB 故障时用
       // 内存实现，冷却/模式学习本会话内仍生效。
       history: getRecommendationHistory() ?? undefined,
+      // t57 采纳/忽略反馈沉淀模式记忆（spec 决策 9 闭环，用户故事 46）：采纳
+      // → 匹配的 pattern 事实确认强化（意图档升 adopt-suggestion + hitCount+1
+      // + 权重上调）；忽略 → 按 actionReason 置 ignored（默认检索排除；原因级
+      // 衰减由 t46 derivePatternScore 按 ACTION_REASON_DECAY 兑现）。与
+      // onPatternMatch 同门（记忆主开关 + DB 健康）；定位/转换规则在
+      // memoryGraph.applyPatternFeedback（vitest 直测）。
+      onPatternFeedback: (feedback) => {
+        if (!memoryAllowed(policyFromSettings(loadSettings()), {}).allowed) return
+        const graph = getMemoryGraph()
+        if (!graph) return
+        applyPatternFeedback(graph, feedback)
+      },
+      // t57 决策链结果回填（spec 决策 8）：采纳/忽略追加 kind='result' 行，
+      // 与 observed/decision 共享 decisionId；DB 降级（null）丢弃。
+      trace: getTraceStore() ?? undefined,
       // t47 评级接入（46 预留位注入）：真实分级 = proposalGrading 纯模块的
       // gradeProposal。引擎已把聚类证据、任务比对、模式学习得分与最近记录
       // （recommendationPatternKey 跨小时桶同类累积）组装进 LevelInput，
@@ -978,7 +996,11 @@ export function getSuggestionEngine(): SuggestionEngine {
         } finally {
           activitiesInFlight = false
         }
-      }
+      },
+      // t57 review BLOCK-1：引擎采纳/忽略的决策提案回流控制器缓冲剔除
+      // （consume），防下批 onProposals 整批推送复活成幽灵卡片。惰性 getter：
+      // 回调在引擎 accept/ignore（构造后）运行，此时控制器已就绪。
+      onProposalConsumed: (ids) => getCurrentTaskController().consume(ids)
     })
   }
   return suggestionEngine

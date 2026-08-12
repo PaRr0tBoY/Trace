@@ -461,6 +461,31 @@ export interface MemoryIndexAdapter {
   save(index: MemoryIndex): void
 }
 
+/**
+ * 采纳/忽略反馈落到模式记忆（t57，spec 决策 9 闭环）：按证据串（pattern 事实
+ * content 的主语侧，`${appCombination} → ${taskTitle}`）定位 pattern 事实——
+ * 采纳 → 确认强化（updateFactState 'confirmed'：意图档升 adopt-suggestion +
+ * hitCount+1 + 权重上调）；忽略 → 置 ignored（默认检索排除；原因级衰减由
+ * recommendationHistory 的 ACTION_REASON_DECAY / derivePatternScore 兑现）。
+ * 宾语侧不参与匹配：用户编辑标题（最强信号）时任务标题已变，按宾语匹配会漏。
+ * 返回发生状态转换的事实数。
+ */
+export function applyPatternFeedback(
+  graph: MemoryGraphStore,
+  feedback: { kind: 'accepted' | 'ignored'; appCombination: string }
+): number {
+  const subject = (content: string): string => {
+    const sep = content.indexOf(' → ')
+    return sep === -1 ? content : content.slice(0, sep)
+  }
+  let changed = 0
+  for (const fact of graph.listFacts({ types: ['pattern'], includeInvalidated: true })) {
+    if (subject(fact.content) !== feedback.appCombination) continue
+    if (graph.updateFactState(fact.id, feedback.kind === 'accepted' ? 'confirmed' : 'ignored')) changed++
+  }
+  return changed
+}
+
 /* ------------------------------------------------------------------ */
 /* 纯函数：归一化 / 去重 / 余弦 / 权重                                  */
 /* ------------------------------------------------------------------ */

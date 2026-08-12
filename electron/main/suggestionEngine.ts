@@ -73,6 +73,7 @@ import { normalizeExePath, type PrivacyPolicy } from '../store/privacyGate'
 import { buildClipboardRef, type TaskStore } from '../store/TaskStore'
 import { MAX_LOCAL_CANDIDATES, type CandidateOptimizer } from '../store/localModelOptimizer'
 import { matchMemories } from '../store/decisionProvider'
+import type { TraceStore } from '../store/traceStore'
 import type {
   AppRef,
   CandidateActivity,
@@ -80,6 +81,7 @@ import type {
   IgnoreReason,
   Memory,
   MemoryType,
+  RecommendationActionReason,
   RecommendationLevel,
   RecommendationRecord,
   ResourceRef,
@@ -108,6 +110,26 @@ export const MEMORY_CONFIDENCE_BOOST = 0.05
 export interface MemoryCandidate {
   type: MemoryType
   content: string
+}
+
+/**
+ * 采纳/忽略 → 模式记忆反馈载荷（t57，spec 决策 9 闭环）。调用方（state.ts）
+ * 按载荷定位 memoryGraph 的 pattern 事实：采纳 → updateFactState 'confirmed'
+ * （意图档升 adopt-suggestion + hitCount+1 + 权重上调，即"addFact 确认态"）；
+ * 忽略 → 'ignored'（默认检索排除；原因级衰减由 t46 derivePatternScore 按
+ * ACTION_REASON_DECAY 兑现）。纯载荷，无图依赖。
+ */
+export interface PatternFeedback {
+  kind: 'accepted' | 'ignored'
+  /** 采纳/忽略原因（spec 决策 9 值域；accepted = user_confirmed / user_edited_title）。 */
+  actionReason: RecommendationActionReason
+  /** 证据串（pattern 事实 content 的主语侧，与 onPatternMatch 同源）。 */
+  appCombination: string
+  /** 应用显示名（pattern 事实实体）。 */
+  appNames: string[]
+  /** 采纳后的任务标题（pattern 事实 content 的宾语侧）；忽略时无。 */
+  taskTitle?: string
+  now: number
 }
 
 /**
@@ -167,6 +189,12 @@ export interface SuggestionEngineOptions {
   /** Feedback sink: called with a memory candidate after a successful accept. */
   onMemorySuggestion?: (candidate: MemoryCandidate) => void
   /**
+   * 已消费提案回调（t57 review BLOCK-1）：采纳/忽略的决策提案 id 回流控制器
+   * （其缓冲只随 handleDecisionOutputs 变更，不回流会导致已消费卡随下批
+   * onProposals 整批复活）。
+   */
+  onProposalConsumed?: (ids: string[]) => void
+  /**
    * Privacy policy supplier (t44): the denied-app list the analysis filter
    * checks before candidacy. Absent = no filtering (engine behavior
    * unchanged). Only the denied-app dimension gates candidates — the master
@@ -213,6 +241,17 @@ export interface SuggestionEngineOptions {
    * 内部自行消化（LLM 延迟绝不阻塞建议推送）。Absent = 控制器未接线。
    */
   onActivities?: (analysis: ActivityAnalysis) => Promise<void> | void
+  /**
+   * 采纳/忽略模式反馈（t57，spec 决策 9 闭环）：采纳 → 调用方（state.ts）把
+   * 匹配的 pattern 事实确认强化；忽略 → 按 actionReason 置 ignored（默认检索
+   * 排除）。Absent = 不沉淀（既有测试与无图环境）。
+   */
+  onPatternFeedback?: (feedback: PatternFeedback) => void
+  /**
+   * 决策链结果回填（t57，spec 决策 8）：采纳/忽略后追加 kind='result' 行，
+   * 与决策链（observed/decision）共享 decisionId。Absent = 不回填。
+   */
+  trace?: Pick<TraceStore, 'append'>
 }
 
 /**
@@ -308,6 +347,13 @@ export interface SuggestionEngine {
   tick(): Promise<TaskProposal[]> | undefined
   /** Run one analysis pass immediately (tests). Returns the pushed list. */
   analyzeNow(): Promise<TaskProposal[]>
+  /**
+   * 决策路径提案消费（t57）：控制器（56）的 ≤3 FIFO / 同 key 替换缓冲并入
+   * 引擎待定列表并推送渲染层。控制器是该子集的唯一事实源——新到缓冲整体
+   * 替换上一批决策提案（引擎不重复实现 FIFO/替换，沿用 56 的
+   * handleDecisionOutputs）。
+   */
+  propose(proposals: TaskProposal[]): void
   /** Pending proposals (transient). */
   suggestions(): readonly TaskProposal[]
   /**
@@ -370,6 +416,26 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
   let analyzing = false
   let pending: TaskProposal[] = []
   const meta = new Map<string, TaskProposalMeta>()
+  /** 决策路径提案 id 集（t57）：propose 整体替换的"上一批"标识。 */
+  let decisionProposalIds = new Set<string>()
+  /**
+   * 已采纳/已忽略的决策提案 id（t57 review BLOCK-1 双保险）：控制器 consume
+   * 已从缓冲剔除，入站批再滤一遍防在途推送复活。有界：仅决策提案经用户动作
+   * 积累，会话级忽略不计。
+   */
+  let consumedDecisionIds = new Set<string>()
+
+  /** 决策提案的 app 键（身份/指纹输入）：appExePaths 平行数组优先，缺省按显示名归一化。 */
+  function appKeysFromProposal(p: TaskProposal): string[] {
+    if (p.appExePaths && p.appExePaths.length > 0) return p.appExePaths.map((x) => normalizeAppKey(x))
+    return p.appNames.map((n) => normalizeAppKey(n))
+  }
+
+  /** 决策提案的 AppRef（采纳落库的 apps 兜底）：id 遵循 AppRef.id 约定（归一化 exePath 或进程名）。 */
+  function appRefsFromProposal(p: TaskProposal): AppRef[] {
+    const keys = appKeysFromProposal(p)
+    return p.appNames.map((name, i) => ({ id: keys[i] ?? normalizeAppKey(name), name }))
+  }
 
   /**
    * Most recent app-switch event whose normalized exePath or appName matches
@@ -936,19 +1002,39 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
     suggestions(): readonly TaskProposal[] {
       return pending
     },
+    propose(proposals: TaskProposal[]): void {
+      // 控制器（56）的缓冲是决策提案的唯一事实源：上一批整体移除，新缓冲
+      // 追加（其 ≤3 FIFO / 同 key 替换已在 handleDecisionOutputs 完成）。
+      // t57 review BLOCK-1 双保险：已采纳/已忽略的决策提案即使仍在入站批
+      // （在途推送）也不复活。
+      const fresh = proposals.filter((p) => !consumedDecisionIds.has(p.id))
+      pending = pending.filter((p) => !decisionProposalIds.has(p.id))
+      for (const p of fresh) {
+        if (!pending.some((x) => x.id === p.id)) pending.push(p)
+      }
+      decisionProposalIds = new Set(fresh.map((p) => p.id))
+      onSuggestions(pending)
+    },
     accept(id: string, opts?: AcceptOptions): Task['id'] | null {
       const suggestion = pending.find((s) => s.id === id)
       if (!suggestion) return null
       const m = meta.get(id)
       pending = pending.filter((s) => s.id !== id)
       meta.delete(id)
+      // t57 review BLOCK-1：决策提案消费回流控制器缓冲（防下批复活）。
+      if (suggestion.decisionId) {
+        consumedDecisionIds.add(id)
+        options.onProposalConsumed?.([id])
+      }
       onSuggestions(pending)
 
       const title = opts?.title?.trim() || suggestion.title
       // t46 pattern learning: a user-edited title is the strongest signal
       // (intent tier user-edit) — detect it here, before the title lands.
       const titleEdited = title !== suggestion.title
-      const apps = opts?.apps ?? m?.appRefs ?? []
+      // t57: 决策提案无引擎 meta——apps 按卡自身身份数据兜底（appExePaths 平行
+      // 数组优先，缺省按显示名归一化），与 Path A 卡的 meta.appRefs 同构。
+      const apps = opts?.apps ?? m?.appRefs ?? appRefsFromProposal(suggestion)
       const resources = opts?.clipboardRefs ?? suggestion.clipboardRefs ?? []
       const emitMemoryCandidate = (): void => {
         // Feedback distillation (spec decision 7): a confirmed work pattern
@@ -978,40 +1064,96 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       // t46 record point: accepted outcome + actionReason (user_confirmed, or
       // user_edited_title when the user rewrote the title — strongest signal).
       // t47: level = 展示时刻分级（随 noop 落库后回填，分级结果落记录）；patternKey
-      // 携带跨小时桶的"同类"键供评级消费。
-      if (m && options.history) {
+      // 携带跨小时桶的"同类"键供评级消费。t57: 决策提案（无 meta）按卡自身
+      // 身份数据推导指纹/分级键，其余语义与 Path A 一致。
+      if (options.history) {
+        const appKeys = m ? m.appRefs.map((a) => a.id) : appKeysFromProposal(suggestion)
+        // 缺段起始时刻用当前时钟（t57 review NIT-4）：?? 0 落 epoch 小时桶
+        // 会与所有缺字段卡共享冷却键，失真。
+        const startTs = m ? m.segmentStartTs : (suggestion.segmentStartTs ?? now())
         options.history.record({
-          fingerprint: recommendationFingerprint(m.appRefs.map((a) => a.id), m.segmentStartTs),
-          patternKey: recommendationPatternKey(m.appRefs.map((a) => a.id)),
-          level: m.level,
+          fingerprint: recommendationFingerprint(appKeys, startTs),
+          patternKey: recommendationPatternKey(appKeys),
+          level: m?.level ?? suggestion.level ?? 1,
           outcome: 'accepted',
           actionReason: titleEdited ? 'user_edited_title' : 'user_confirmed'
+        })
+      }
+      // t57 模式反馈（spec 决策 9）：采纳 → 调用方把匹配的 pattern 事实确认
+      // 强化（意图档升档 + hitCount+1 + 权重上调）。
+      options.onPatternFeedback?.({
+        kind: 'accepted',
+        actionReason: titleEdited ? 'user_edited_title' : 'user_confirmed',
+        appCombination: suggestion.evidence.appCombination,
+        appNames: suggestion.appNames,
+        taskTitle: title,
+        now: now()
+      })
+      // t57 决策链结果回填（spec 决策 8）：结果行与 observed/decision 共享
+      // decisionId；Path A 卡（无 decisionId）不写（无链可回填）。
+      if (options.trace && suggestion.decisionId) {
+        const actionReason = titleEdited ? 'user_edited_title' : 'user_confirmed'
+        options.trace.append({
+          decisionId: suggestion.decisionId,
+          kind: 'result',
+          payload: { outcome: merged ? 'merged' : 'accepted', proposalId: id, taskId: taskId ?? undefined, actionReason },
+          taskId: taskId ?? undefined
         })
       }
       return taskId
     },
     ignore(id: string, reason?: IgnoreReason): boolean {
+      const suggestion = pending.find((s) => s.id === id)
       const m = meta.get(id)
       pending = pending.filter((s) => s.id !== id)
       meta.delete(id)
+      // t57 review BLOCK-1：决策提案消费回流控制器缓冲（防下批复活）。
+      if (suggestion?.decisionId) {
+        consumedDecisionIds.add(id)
+        options.onProposalConsumed?.([id])
+      }
       if (m) {
         ledger.dismiss(m.signature)
-        // t46 record point: ignored outcome + actionReason（忽略原因，缺省
-        // 视为不感兴趣）。忽略仍走既有 LRU（ledger.dismiss），行为不回归。
-        // t47: level = 展示时刻分级（回填保持展示分级），patternKey 同类键。
-        if (options.history) {
-          options.history.record({
-            fingerprint: recommendationFingerprint(m.appRefs.map((a) => a.id), m.segmentStartTs),
-            patternKey: recommendationPatternKey(m.appRefs.map((a) => a.id)),
-            level: m.level,
-            outcome: 'ignored',
-            actionReason: reason ? ignoreReasonToActionReason(reason) : 'user_manually_dismissed'
+      }
+      // t46 record point: ignored outcome + actionReason（忽略原因，缺省
+      // 视为不感兴趣）。忽略仍走既有 LRU（ledger.dismiss），行为不回归。
+      // t47: level = 展示时刻分级（回填保持展示分级），patternKey 同类键。
+      // t57: 决策提案（无 meta、无签名）同样落历史——指纹冷却防同类反复
+      // 打扰（blockedSignatures 含历史冷却，建议构建与后续决策都受益）。
+      if (options.history && suggestion) {
+        const appKeys = m ? m.appRefs.map((a) => a.id) : appKeysFromProposal(suggestion)
+        // 缺段起始时刻用当前时钟（t57 review NIT-4），理由同 accept。
+        const startTs = m ? m.segmentStartTs : (suggestion.segmentStartTs ?? now())
+        const actionReason = reason ? ignoreReasonToActionReason(reason) : 'user_manually_dismissed'
+        options.history.record({
+          fingerprint: recommendationFingerprint(appKeys, startTs),
+          patternKey: recommendationPatternKey(appKeys),
+          level: m?.level ?? suggestion.level ?? 1,
+          outcome: 'ignored',
+          actionReason
+        })
+        // t57 模式反馈（spec 决策 9）：忽略 → 调用方把匹配的 pattern 事实置
+        // ignored（默认检索排除；原因级衰减在 t46 已按 ACTION_REASON_DECAY 兑现）。
+        options.onPatternFeedback?.({
+          kind: 'ignored',
+          actionReason,
+          appCombination: suggestion.evidence.appCombination,
+          appNames: suggestion.appNames,
+          now: now()
+        })
+        // t57 决策链结果回填（spec 决策 8）：结果行与决策链共享 decisionId。
+        if (options.trace && suggestion.decisionId) {
+          options.trace.append({
+            decisionId: suggestion.decisionId,
+            kind: 'result',
+            payload: { outcome: 'ignored', proposalId: id, actionReason }
           })
         }
+        if (m) log({ kind: 'ignore', suggestionId: id, signature: m.signature, actionReason })
+        else log({ kind: 'ignore', suggestionId: id, actionReason })
       }
       onSuggestions(pending)
-      if (m) log({ kind: 'ignore', suggestionId: id, signature: m.signature, actionReason: reason ? ignoreReasonToActionReason(reason) : 'user_manually_dismissed' })
-      return m !== undefined
+      return suggestion !== undefined
     },
     setChat(fn: ChatFn): void {
       chat = fn

@@ -369,6 +369,12 @@ export interface TaskProposal {
   decisionId?: string
   /** exePaths parallel to appNames; filled by the suggestion engine so main can fetch icons (t26). */
   appExePaths?: string[]
+  /**
+   * 来源活动段起始时间戳（t57 决策路径提案）：推荐指纹 / 冷却键的时段输入
+   * （activityLedger.recommendationFingerprint 的小时桶）。引擎 Path A 卡片
+   * 经 meta 携带等价信息，不设此字段。
+   */
+  segmentStartTs?: number
   /** 展示分级 L1/L2/L3（t47 评级产出，runAnalysis 时随卡片写入；UI 与 accept/ignore 记录消费）。 */
   level?: RecommendationLevel
   /** Resolved app icons, one entry per app with an extractable exePath; filled by main at push time (t26). */

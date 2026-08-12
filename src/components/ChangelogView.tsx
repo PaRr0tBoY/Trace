@@ -20,7 +20,7 @@ const CHANGELOG_DATA: ChangelogRelease[] = [
     version: 'v2026.08.12',
     date: 'Aug 12, 2026',
     isLatest: true,
-    summary: 'Trace's first release — task layer (candidates, guided editor, linked windows), AI observability, dual-row navigation with restore, 5 accent themes.',
+    summary: "Trace's first release — task layer (candidates, guided editor, linked windows), AI observability, dual-row navigation with restore, 5 accent themes.",
     highlights: [
       {
         title: 'Task Layer',

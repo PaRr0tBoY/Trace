@@ -1,38 +1,48 @@
 <p align="center">
-  <img src="public/Logo.gif" alt="Trace Logo" width="220" style="max-width: 100%; height: auto;" />
-</p>
-
-<h1 align="center">Trace</h1>
-
-<p align="center">
-  <strong>A zero-click, hover-activated clipboard shelf and desktop file-transfer hub with native OS integration.</strong><br/>
-  Lives invisibly on the screen edge. Approach it, and it opens. Drag anything out — into Photoshop, Word, Slack, Explorer, anywhere.
+  <img src="assets/readme/hero.svg" width="100%" alt="Trace — a work tracker built on the clipboard shelf: an activity stream of apps and copies is cut into task segments with confidence scores" />
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick Start</a> ·
+  <strong>Trace is not another clipboard manager — it is a work tracker that lives inside one.</strong>
+  On the edge of your screen, the shelf collects what you copy. Underneath it, Trace watches the
+  whole slice of work: the apps you switch between, the windows you work in, the clips you gather.
+  It cuts that slice into <strong>tasks</strong>, tracks their progress, and keeps every resource —
+  apps, windows, clips — attached to the task it belongs to.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-3b82f6?style=flat&logo=windows&logoColor=white" alt="Platform: Windows 10/11" />
+  <img src="https://img.shields.io/badge/electron-34-9ca3af?style=flat" alt="Electron 34" />
+  <img src="https://img.shields.io/badge/typescript-5-3b82f6?style=flat&logo=typescript&logoColor=white" alt="TypeScript 5" />
+  <img src="https://img.shields.io/badge/tests-509%20unit-14b8a6?style=flat" alt="509 unit tests" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-6b7280?style=flat" alt="Apache-2.0" /></a>
+</p>
+
+<p align="center">
+  <a href="#what-is-trace">What is Trace</a> ·
   <a href="#demos">Demos</a> ·
   <a href="#features">Features</a> ·
-  <a href="#codebase-architecture">Codebase & Architecture</a> ·
-  <a href="#security">Security</a> ·
-  <a href="#roadmap">Roadmap</a> ·
-  <a href="#contributing">Contributing</a>
-</p>
-
-<p align="center">
-  <sub>Built with Electron · React · TypeScript · Framer Motion · Zustand</sub><br/>
-  <sub>License: Apache-2.0 &nbsp;·&nbsp; Status: Public Beta</sub>
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#status">Status</a> ·
+  <a href="#security">Security</a>
 </p>
 
 ---
 
-## Why
+## What is Trace
 
-Every clipboard manager on the market breaks your flow. You copy something, switch apps, paste, then hunt through `Win+V` history with arrow keys or dig into a tray menu. Multi-step. Modal. Slow.
+Most clipboard managers treat what you copy as a list. Trace treats it as **evidence of what you are working on**.
 
-**Trace removes the friction.** It anchors to the screen edge of your monitor as a transparent, always-on-top, click-through surface. When your cursor approaches the edge, the shelf springs open. Drag images, file stacks, rich text, and HTML bundles *out* of it — directly into whatever desktop app you're already using. No shortcuts. No window switching. No modal dialogs.
+Trace looks at your work from a cross-section: at any moment it knows the foreground app, the window title, and the clips you copy. Over time that cross-section becomes a stream — and the stream is cut into **tasks** at cluster boundaries, the way you would segment a long session into "write the API docs", "fix the drag icon", "review the design". Each segment becomes a candidate task card with a confidence score, the apps and windows involved, and the clipboard material attached.
 
-It is built for the developer and creative workflow where you constantly juggle screenshots, code snippets, file paths, design assets, and reference links between many windows at once.
+The **task** is the hub, not the clipboard item. A task collects the windows you worked in (one click jumps back to them), the apps involved, and the clips you explicitly bind to it. Its state machine — one running task at a time, waiting, paused, completed — tracks progress honestly, with every transition annotated by who made it and why.
+
+None of this asks you to do anything extra. The observation is built directly on the clipboard mechanism you already use: the hover-to-open shelf on the screen edge is at once the **capture point**, the **resource repository**, and the **operation surface**. You copy, you drag, you work — Trace segments and suggests in the background, and the AI pass (titles, rationale, memory) is optional, off by default, and explainable.
+
+**This repository is a fork of [Edge-Drop](https://github.com/Deepender25/Edge-Drop).** The clipboard shelf is inherited and kept as the base; the task layer and the AI suggestion pipeline are rebuilt on top, with upstream's auto-update and sponsor plumbing removed.
+
+> **Platform:** Windows 10/11 only. The drag-out pipeline uses Win32 OLE and the edge trigger uses transparent-window cursor polling — there is no macOS or Linux port.
 
 ---
 
@@ -74,297 +84,171 @@ It is built for the developer and creative workflow where you constantly juggle 
 
 ---
 
-## Support & Sponsor
+## Features
+
+### Watching your work — segmentation
+
+- **A cross-section, not a log.** A 600 ms clipboard watcher and a foreground-window listener feed one event stream: app switches, window titles, copies. No separate capture ritual — the shelf already exists.
+- **Evidence timeline.** Events are deduplicated (FNV-1a signatures, sampled BGRA hashes for images), privacy-filtered, and persisted so any suggestion can be traced back to what was seen.
+- **Quiet-period clustering.** During silences, the clusterer segments the stream into activities. Each segment becomes a candidate task card: title, confidence, the apps and windows involved, and the clipboard items it carries.
+- **Accept, merge, or ignore.** Accept opens the guided editor; a candidate that matches an existing task merges into it instead. Ignoring writes the signature to a blocklist so the same suggestion does not return.
+
+### Tasks as the hub
+
+- **Guided editor.** Title, an app grid (most recently used first), and a clipboard material picker. When a provider is configured, the AI suggests a title and a one-line rationale; without one, the editor falls back to an algorithmic title — the flow never blocks on AI.
+- **Linked windows.** Each task remembers the foreground window it was created from. "Open app" jumps back to that window, or the app's latest window, or launches the app when it is gone.
+- **Explicit resource binding.** Drag a shelf item onto a task card or the binding panel to attach it as linked content. Clips never auto-attach — linkage is a decision, not a side effect.
+- **Honest states.** One task runs at a time (single `RUNNING`); `WAITING` means the system infers you paused, `PAUSED` means you explicitly did, `COMPLETED` and `ARCHIVED` end the lifecycle. Every transition is annotated with its source (user / system) and reason — the UI can tell "you paused it" apart from "the system thinks you are resting".
+- **Task detail.** Linked apps and windows, bound content, confidence, and the creation reason — why this task was suggested in the first place.
+
+### AI as an optional pass
+
+- **Works without AI.** The whole pipeline runs on deterministic clustering; LLM annotation (title + rationale) is a separate pass that only happens when you configure a provider chain (any OpenAI-compatible endpoint) in Settings → Tasks.
+- **Explainable.** Every suggestion cites what it saw and why. The task detail view shows the creation reason; `ai-log.jsonl` records each chat call and algorithm output for inspection.
+- **OCR context.** When a provider is set, an OCR pass on the foreground window may add screen text to the suggestion context. OCR output is never shown in the UI and never persisted.
+- **Long-term memory.** Accepted tasks feed a memory store (episode / entity / fact) that nudges the confidence of future segments; candidates sit in the memory panel in Settings until you confirm or dismiss them.
+
+### The zero-friction base — the clipboard shelf
+
+- **Hover to open.** A 3px hysteresis zone with a 120 ms dwell opens the panel; moving away closes it with a grace period. The collapsed window is 100% click-through, so the desktop stays fully usable. Hover can be disabled in Settings — `Alt+C` opens the panel instead.
+- **Pick your monitor and edge.** Left or right edge, any display; the choice survives reboots (session ID → geometry match → nearest → primary fallback). Fullscreen apps (games, video, presentations) suppress the trigger automatically via native `SHQueryUserNotificationState` detection.
+- **Multi-format clipboard.** Plain text, rich HTML, URLs, raw images, and multi-file selections. Duplicate copies are bumped to the top and counted.
+- **Stacks.** Multi-file drag-ins and multi-image copies group into stacks (max 10) with expand / split / merge, plus a preview flyout for single files and collections.
+- **Native OLE drag-out.** Real file handles, not simulated drags: text goes out as a temp UTF-8 file, images and file stacks as files with rendered drag ghosts. Drag files *in* to add them.
+- **30 languages, 5 themes.** Full UI dictionaries for 30 languages with RTL layout for Arabic and Hebrew; Graphite / Cobalt / Verdigris / Amber / Violet accent themes applied to the panel, drag ghost, and copy indicator.
+- **Battery-aware.** Cursor polling slows on battery power; sleep and unlock events pause the clipboard watcher so no false copy indicators fire when you open the laptop lid.
+
+### Privacy
+
+- **Three privacy planes.** Capture (foreground events), AI (anything leaving the machine), and Memory (what is retained) are enforced by a pure gate module — capture can be switched off entirely, AI only runs when you configure a provider, and denied data never reaches the model, not even as context. A denial always carries a reason for the trace log.
+- **Sensitive formats skipped.** Password managers and dictation tools (Bitwarden, KeePass, 1Password, `ExcludeClipboardContentFromMonitorProcessing`, …) are matched case-insensitively and never captured.
+- **Incognito and auto-delete.** One click suspends clipboard polling; auto-delete timers (1h / 6h / 24h / 7d) and clear-unpinned-on-restart keep history bounded.
+- **No telemetry, no auto-update.** There is no analytics or telemetry; the only network calls are the What's New release check and the AI providers you configure. Upstream's silent auto-updater was deliberately removed so a remote release can never overwrite a local build.
+
+---
+
+## How it works
+
+The core loop, from raw events to adopted tasks — the same stream that fills the shelf is what the tracker segments:
 
 <p align="center">
-  <strong>Trace is 100% free and open-source forever.</strong><br/>
-  If Trace speeds up your daily workflow, consider supporting ongoing development!
+  <img src="assets/readme/pipeline.svg" width="100%" alt="Activity pipeline: capture clipboard and foreground events, persist an evidence timeline, cluster into activities with confidence, decide proposals, then adopt tasks and feed memory — with privacy gates and traceability cutting across" />
 </p>
 
-<table align="center" border="0" style="border-collapse: collapse; border: none;">
-  <tr>
-    <td align="center" width="50%" style="border: none; padding: 15px; vertical-align: top;">
-      <h3>🌍 International (Ko-fi)</h3>
-      <a href="https://ko-fi.com/deepender" target="_blank">
-        <img src="public/kofi-qr.png" alt="Scan or Click for Ko-fi Support" width="170" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" />
-      </a>
-      <br/><br/>
-      <a href="https://ko-fi.com/deepender" target="_blank">
-        <img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Buy Me a Coffee on Ko-fi" height="36" />
-      </a>
-    </td>
-    <td align="center" width="50%" style="border: none; padding: 15px; vertical-align: top;">
-      <h3>🇮🇳 India (UPI)</h3>
-      <a href="https://edgedrop.vercel.app/supportedgedrop/upi" target="_blank">
-        <img src="public/upi-sponsor-qr.png" alt="Scan or Click for UPI Donation Page" width="170" style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);" />
-      </a>
-      <br/><br/>
-      <a href="https://edgedrop.vercel.app/supportedgedrop/upi" target="_blank">
-        <img src="https://img.shields.io/badge/Donate%20via-UPI-128856?style=for-the-badge&logo=googlepay&logoColor=white" alt="Donate via UPI" height="36" />
-      </a>
-      <br/><br/>
-      <sub><i>* Note: Scanning or clicking opens the <a href="https://edgedrop.vercel.app/supportedgedrop/upi" target="_blank">UPI Donation Page</a> where you can donate via GPay, PhonePe, Paytm, or any UPI app.</i></sub>
-    </td>
-  </tr>
-</table>
+Three isolated processes follow a strict contract:
+
+1. **Main** (`electron/main/`) — Node.js runtime. Owns the clipboard watcher, the OLE drag pipeline, window/edge handling, and the task & suggestion engines. It is the single source of truth: every change pushes a full state snapshot to the renderer.
+2. **Preload** (`electron/preload/`) — sandboxed bridge exposing `window.edge`, typed against `shared/ipc.ts` (`InvokeMap` / `EventMap` / `SendMap`) and `shared/bridge.ts` (`EdgeApi`). A new channel touches four files: contract, interface, preload implementation, and main handler.
+3. **Renderer** (`src/`) — React 18 UI. A Zustand store is a pure view cache of main's pushes; the renderer never persists anything itself.
+
+Windows-specific integration points: koffi (FFI) reads native clipboard formats and detects fullscreen apps; PowerShell handles HDROP file lists (bypassing Electron's single-file limit) and simulated paste; drag ghosts are rendered server-side with `@resvg/resvg-js`. The SuggestionEngine is a pure module — everything it needs is injected, so vitest drives it with a fake clock and a real task store.
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
-- **Node.js** v18 or higher
-- **OS**: Windows 10/11 (uses Win32 OLE drag pipelines and transparent-window cursor polling)
+
+- **Node.js** 18+ (npm 11+ blocks postinstall scripts by default)
+- **Windows 10/11**
 
 ### Run from source
+
 ```bash
-git clone https://github.com/Deepender25/Trace.git
+git clone https://github.com/PaRr0tBoY/Trace.git
 cd Trace
 npm install
-npm run dev          # launches Electron + Vite HMR
-```
-
-### Type-check
-```bash
-npm run typecheck    # runs tsc --noEmit against both node and web configs
-```
-
-### Build Windows installers
-```bash
-npm run build:github # outputs an NSIS .exe for GitHub releases
-npm run build:store  # outputs an MSIX .appx for Microsoft Store submission
+npm run dev    # Electron + Vite HMR
 ```
 
 > [!NOTE]
-> On Windows, if packaging fails with `EBUSY: resource busy or locked`, close any running Trace instances first: `taskkill /F /IM electron.exe /T`.
+> If `npm install` finishes but the first launch fails with missing binaries, approve the postinstall scripts and retry: `npm approve-scripts electron esbuild koffi better-sqlite3 node-llama-cpp`
+
+### Verify, test, package
+
+```bash
+npm run typecheck   # tsc --noEmit for both node and web configs
+npm test            # 509 unit tests (vitest)
+npm run package     # Windows NSIS installer into dist/
+npm run build:store # Windows MSIX for the Microsoft Store
+```
+
+> [!NOTE]
+> If packaging fails with `EBUSY: resource busy or locked`, close any running Trace instance first: `taskkill /F /IM electron.exe /T`
 
 ---
 
-## Features
+## Project structure
 
-**Zero-click edge hover**
-- Frameless, transparent, always-on-top `BrowserWindow` anchored at `x=0` or right screen edge
-- 100% click-through when collapsed — desktop stays fully usable
-- Configurable hot-zone height (25% / 40% / 60% of screen) and blade height (50% – 80%)
-- **Independent Edge Trigger Placement:** Choose exact trigger strip alignment (**Top**, **Center**, or **Bottom**) relative to the shelf, with dynamic CSS `clipPath` calculation matching the exact sensor region.
-- **Edge Location Hint (Proximity Beacon):** Subtle 1.5px hairline gradient pulse (300ms duration, 0.28 opacity) that flashes once on the screen edge when cursor touches the edge at a misaligned vertical position, guiding users to the shelf.
-- **Multi-monitor support:** Pick exactly which display the panel sticks to, with options for Left or Right screen edges. Features a single source of truth multi-display engine (`getDisplayListOptions()`) with real-time physical resolution calculation (3840×2160, 2560×1440, 1920×1080) across all High-DPI Windows display scaling factors.
-- **Cross-Reboot Display Persistence:** Trace remembers your chosen monitor across device restarts. A 4-tier resolution pipeline (exact session ID → fuzzy workArea geometry match within 8px tolerance → nearest by position → primary fallback) silently re-identifies the correct physical monitor after Windows re-assigns numeric display IDs on reboot. If the monitor is genuinely unplugged, the panel seamlessly falls back to the Primary Display without any user action.
-- **Fullscreen Protection (Game Mode):** Native Windows `SHQueryUserNotificationState` OS detection (`fullscreen.ts`) automatically suppresses edge hover when Direct3D games, fullscreen videos, or presentations are active.
-- **Ultra-lightweight:** Optimized memory footprint (~60% reduced RAM) using custom `tracelocal://` streaming protocols and compressed WebM assets.
-
-**Synthesized Web Audio Haptic Suite**
-- **Zero-Asset Audio Engine (`soundEffects.ts`):** Real-time synthesized Web Audio API sound suite providing tactile audio feedback for UI micro-interactions without audio file assets.
-- **Mechanical Dial Ticks:** High-frequency 1800Hz → 900Hz micro-ticks (`playDialTickSound`) when sliding position controls.
-- **Mechanical Delete Haptic:** Dual-stage downward pitch sweep (1400Hz → 250Hz in 14ms + 150Hz → 40Hz thud) when deleting items (`playDeleteSound`).
-- **Tactile Switches & Buttons:** Resonant pops for toggle switches (`playToggleSound`) and crisp clicks for buttons (`playButtonClickSound`).
-- **Global Audio Control:** Global `Sound effects` toggle switch in Settings (ON by default) with `isSoundEnabled()` guard across all synthesis routines. Eager `AudioContext` auto-unlock on initial interaction (`pointerdown`/`mouseenter`/`keydown`).
-
-**Segmented Settings Architecture**
-- **Stationary 3-Category Navigation Bar:** Organized into three clean, emoji-free tabs: **`Behaviour`** (1st), **`Position`** (2nd), and **`Appearance`** (3rd).
-- **Stationary Header & Independent Scroll Area:** Fixed top tab bar (`.settings-fixed-header`) stays 100% stationary while settings controls scroll independently underneath it.
-- **Independent Scroll Position Memory:** Each category section maintains its own separate `scrollTop` state across tab switches (`tabScrollPositions`).
-- **Pure CSS Selection Synchronization:** Native CSS active tab styling (`.settings-tab-btn.active`) eliminating layout projection glitches during panel position adjustments.
-- **5% Magnetic Tick Slider:** Smooth `0.002` real-time 1-to-1 continuous tracking during drag with 60fps/120fps precision, featuring 21 visual tick dashes, live percentage badge (`50%`), percentage quick-jump buttons (`0%`, `50%`, `100%`), and magnetic 5% snapping on pointer release.
-- **Position & Display Switch Preview:** 1.75s temporary interactive preview window when changing `Stick position` (`Left` / `Right`) or `Display` monitor in settings.
-- **CPU Performance Optimization & Zero Blur Jank:** Replaced heavy `backdrop-filter: blur()` calls across UI components with high-performance solid/semi-transparent dark fills, eliminating CPU rasterization overhead for 60fps/120fps butter-smooth panel opening and scrolling.
-- **Prominent Support Section & Matching Pill Buttons:** Re-ordered settings footer placing the Support & Sponsor card prominently above the Quit button. Features matching 40px height pill buttons (`border-radius: 999px`) for Support (soft solid pastel red `#ff7675` with heart badge) and GitHub Star.
-- **Low-Profile Bottom Quit Pill:** Compact, subtle Quit pill button (`.subtle-quit-btn`) centered at the very bottom of the settings view without noisy header text.
-
-**Silent Background Auto-Updates**
-- **Zero-Friction Updates (`electron-updater`):** GitHub releases feature background downloading and a single-click "Restart to Update" button.
-- **Monochrome Glassmorphic Banner:** Prominently positioned at the top of the scrollable content area across all category tabs. Styled with a dark-mode glassmorphic 4% white card fill (`rgba(255, 255, 255, 0.04)`), 12% white border, and high-contrast white button.
-- **Microsoft Store Isolation:** Isolated build pipelines ensure Microsoft Store (MSIX) builds remain 100% compliant with Store terms and conditions without integrated update mechanisms (`isStoreBuild()`).
-
-**Multi-format clipboard engine**
-- Captures plain text, URLs, rich HTML, raw images, and multi-file selections
-- Win32 `FileNameW` / HDROP parsing via PowerShell to bypass Electron's single-file limit
-- Respects password-manager and dictation-tool privacy flags (case-insensitive matching)
-- Smart deduplication — re-copies bump `hitCount` and move the item to the top
-- Incognito mode — one click suspends polling for sensitive data
-- Auto-delete timer options (Never / 1h / 6h / 24h / 7d) and clear unpinned on restart
-
-**Direct URL Detection & One-Click Launch**
-- **Quick Action Links:** Dedicated external link launcher (`ExternalLinkIcon`) on URL item cards and inside Preview Flyouts.
-- **Browser Launch:** Clicking the link button opens URLs directly in your default web browser without requiring manual copy/pasting.
-
-**Native OS drag & drop**
-- `webContents.startDrag()` hands real file handles to external apps
-- Custom drag icons: stacked card PNGs with count badges, styled text cards, real image thumbnails
-- Drag-in: drop files onto the shelf to add them; drag-out: drop anywhere — Photoshop, Word, Explorer, Slack
-
-**Fluid collections & stacks**
-- Auto-group multi-file drag-ins and multi-image copies into 3D card stacks (max 10)
-- **Preview Flyout Drag-to-Stack**: Drag any shelf item directly onto an open Preview Flyout to stack and merge them seamlessly
-- Expand stacks with a single click on the Expand action button or Preview Flyout; drag a sub-item to the screen edge to split it back out
-
-**Complete 30-Language Internationalization & Smart Selector**
-- **100% Native Localization**: Fully translated dictionaries for 30 global languages with 100% section & key coverage (`en`, `es`, `fr`, `de`, `it`, `pt`, `ru`, `ja`, `ko`, `zh-CN`, `zh-TW`, `hi`, `ar`, `bn`, `tr`, `vi`, `pl`, `nl`, `sv`, `id`, `uk`, `el`, `cs`, `ro`, `hu`, `da`, `fi`, `th`, `he`, `no`).
-- **Native Right-to-Left (RTL) Support**: Automatic text direction and layout mirror switching for Arabic (`ar`) and Hebrew (`he`).
-- **Auto-Scroll Language Viewport**: Language selector anchors `System Default (Auto)` at index 0 while auto-scrolling to bring the active selected language directly into view on open.
-- **Haptic Sound Feedback**: Integrated audio dial ticks (`playDialTickSound()`) during dropdown item hover and scroll.
-
-**Laptop Sleep/Wake Guard (`powerMonitor`)**
-- Native `powerMonitor` event handlers (`suspend`, `lock-screen`, `resume`, `unlock-screen`) pause clipboard polling on system sleep and re-seed the clipboard signature on wake.
-- Eliminates false Copy Indicator beacon flares when opening the laptop lid or unlocking the screen.
-
-**Customizable Text Size Scale Setting**
-- Select between **Small**, **Normal**, **Medium**, and **Large** typography scaling in Settings (`Appearance` tab), dynamically driving `--font-scale` across all components.
-
-**Multi-File Selection & Obsidian Glass Action Bar**
-- Tap-to-toggle multi-select mode in Preview Flyout with vector checkmarks (`✓`).
-- Integrated Obsidian Glass action bar for batch operations: Select All, Copy Selected, Paste Selected, Clear Selection.
-
-**Adaptive Battery Power Optimization**
-- Battery-aware cursor polling interval (`powerMonitor.isOnBatteryPower()`) reduces CPU draw and conserves laptop battery life.
-
-**UI / UX**
-- **macOS Segmented Control 5-Category Filter Suite**: Integrated 5-type filter bar (**`All`**, **`Text`**, **`Links`**, **`Images`**, **`Files`**) with a single persistent sliding spring indicator pill (`stiffness: 500`, `damping: 35`) and zero shape distortion.
-- **Independent Pinned Section State per Filter**: Each filter category tab maintains its own independent pinned section collapse/expand state (`collapsedMap`), persisted across sessions in `localStorage`.
-- **Unified Image Entity Classification**: Native screenshots (`Win + Shift + S`) and copied image files (`.png`, `.jpg`, `.webp`, `.svg`) are unified under the **`Images`** filter tab with visual thumbnail cards.
-- **HD Anti-Aliased Curved Edges**: GPU layer promotion (`transform: translateZ(0)`), `-webkit-background-clip: padding-box`, and smooth vector rasterization delivering 100% HD anti-aliased curved borders across all display scales.
-- **Tactile Micro-Interactions & Spring Motion**: Card hover 2px lift with ambient backlight glow, micro radial copy ripple effect, and smooth Framer Motion `layoutId` spring list reflow (`stiffness: 500`, `damping: 32`).
-- **Refined Obsidian Aesthetics & Multi-Layer Depth**: Dual-layer 3D glass hairline highlights (`inset 0 1px 0 rgba(255, 255, 255, 0.12)`) and dual typography hierarchy (monospaced *JetBrains Mono* metadata + *Inter/SF Pro* system title font stack).
-- **Ergonomic Card Action Bar & Safety Guard**: Re-ordered card actions (`Pin`, `Expand`, `Copy`, `Open Link`, `Divider`, `Delete`) with a physical safety hairline divider and 100% layout consistency across normal hover and preview mode.
-- **What's New Release History View**: Integrated in-app release notes timeline viewer (`ChangelogView.tsx`) connected to live GitHub Releases API with pure formatted text highlights and zero-lag offline fallbacks.
-- **Lucide-React Vector Icon Suite**: Powered by official `lucide-react` vector icons for crisp graphics across headers, item cards, and settings.
-- **Dynamic Preview Flyout**: Responsive layout for single files and multi-file collections with calibrated hover boundary tracking.
-- **Customizable Copy Indicator Styles**: Select from 4 vector copy indicators (**Trace Logo**, **Tick**, **Copy**, and **Sparkle**) in a 2x2 grid flyout selector.
-- **Universal Click-to-Paste**: Click any text snippet, image thumbnail, or file tile inside Preview Flyout to instantly paste into active desktop applications.
-- Minimalist macOS aesthetic — deep black obsidian surface, hairline borders, and adaptive spring physics (`useAdaptiveSpring`).
+```
+├─ shared/                 IPC contracts & domain types
+│  ├─ ipc.ts               InvokeMap / EventMap / SendMap channel definitions
+│  ├─ bridge.ts            EdgeApi interface implemented by preload
+│  └─ types.ts             ItemData, Task, TaskProposal, Settings, DTOs
+├─ electron/
+│  ├─ main/                window & edge trigger, drag (OLE), suggestionEngine,
+│  │                       clusterer, provider chain, MemoryStore wiring, ocr,
+│  │                       windowSwitch (linked windows), focus, imageProtocol,
+│  │                       aiLog, fullscreen (koffi), powershell, tray
+│  ├─ preload/             sandboxed contextBridge
+│  ├─ clipboard/           ClipboardWatcher (600ms poll), formats (FNV-1a, HDROP)
+│  └─ store/               ItemStore, TaskStore, MemoryStore, settings,
+│                          db.ts (SQLite migrations, canonical store in progress)
+├─ src/                    React renderer
+│  ├─ components/          Panel, Header, ItemList, PreviewFlyout, Settings,
+│  │  └─ tasks/            TaskView, TaskEditor, TaskDetail, TaskProposalCard,
+│  │                       TaskDropPanel, ContentPicker
+│  ├─ hooks/               useEdgeHover (hysteresis), useDragOut
+│  ├─ lib/                 fileTabs, theme, restore, taskEditor model
+│  ├─ i18n/                translations for 30 languages
+│  └─ store/               Zustand appStore (view cache of main state)
+├─ assets/readme/          hero and pipeline visuals
+└─ tests/                  26 vitest files, 509 cases
+```
 
 ---
 
-## Codebase & Architecture
+## Tech stack
 
-### Process Isolation & IPC Contract
-Trace is organized into three strictly isolated layers:
+| Layer             | Choice                      | Why                                                                       |
+| ----------------- | --------------------------- | ------------------------------------------------------------------------- |
+| Desktop runtime   | **Electron 34**             | Only way to reach Win32 OLE drag and native clipboard formats from JS     |
+| Build tooling     | **electron-vite**           | Separate Main / Preload / Renderer builds with Vite HMR                   |
+| UI                | **React 18 + TypeScript 5** | Typed component tree; sandboxed renderer                                  |
+| State / animation | **Zustand + Framer Motion** | Single-source-of-truth pushes, spring physics                             |
+| Native FFI        | **koffi**                   | Fullscreen detection, native clipboard formats, window activation control |
+| Scripting         | **PowerShell**              | HDROP file lists, simulated paste, WinRT OCR                              |
+| Drag ghosts       | **@resvg/resvg-js**         | Server-side SVG → PNG rendering                                           |
+| Storage           | **better-sqlite3**          | Canonical store (schema + migrations in place; business tables landing)   |
+| Local model       | **node-llama-cpp**          | Embedded Qwen3-0.6B for offline title drafts — planned, default off       |
+| Tests             | **vitest**                  | 509 unit tests, engine tested with fake clock + injected deps             |
 
-1. **Main Process (`electron/main/`)**: Node.js runtime handling OS integrations, Win32 OLE drag pipelines, Windows DPAPI encryption (`safeStorage`), native `ClipboardWatcher` polling, and background auto-updates (`updater.ts`).
-2. **Preload Sandbox (`electron/preload/`)**: Context-isolated bridge (`contextBridge.exposeInMainWorld('edge', api)`). Consumes single-source-of-truth contracts in `shared/ipc.ts` (`InvokeMap`, `EventMap`, `SendMap`) and `shared/bridge.ts` (`EdgeApi`).
-3. **Renderer Process (`src/`)**: React 18 UI powered by Zustand state management (`appStore.ts`), Web Audio synthesis (`soundEffects.ts`), and Framer Motion spring physics (`useAdaptiveSpring.ts`).
+---
 
-### Key Engine Components
-- **`ClipboardWatcher.ts`**: Polls system clipboard every 600ms. Computes cheap FNV-1a hashes over BGRA bitmap bytes for zero-overhead image deduplication.
-- **`ItemStore.ts`**: Atomic JSON persistence with `safeStorage` DPAPI encryption, automatic duplicate bumping, and stack merging/splitting.
-- **`soundEffects.ts`**: Synthesized Web Audio API sound suite (dial ticks, button clicks, toggle pops, delete thuds) with global toggle controls.
-- **`updater.ts`**: Singleton `autoUpdater` module handling background downloading and single-click restart installation for GitHub builds, gated behind `!isStoreBuild()`.
-- **`drag.ts`**: Server-side SVG → PNG icon rendering via `@resvg/resvg-js` for stacked drag ghosts.
+## Status
+
+**Current release (v2026.08.12)** — task layer (candidates, guided editor, linked windows, drop-to-bind), dual-row navigation with restore, five accent themes, AI observability (`ai-log.jsonl`), OCR context, thumbnail protocol.
+
+**In progress** — SQLite as the canonical store for the evidence timeline and memory, a two-stage decision path (deterministic change detection with LLM escalation on high-uncertainty cases), activity/session refactoring, and the embedded local model (ADR-0005).
+
+**Deliberately not planned** — silent auto-updates (removed; What's New reads GitHub releases instead), Linux/macOS ports, cloud sync. Windows-only by design.
 
 ---
 
 ## Security
 
-Trace touches the OS clipboard, the filesystem, and the Win32 OLE drag pipeline — so the security posture is intentional, not optional.
-
-| Control | Implementation |
-|---|---|
-| Modern Runtime | **Electron 34.2.0+** — Patches EOL Chromium memory corruption and RCE vectors |
-| Encrypted Storage | **Windows DPAPI `safeStorage`** — Plaintext history (`items.json`) encrypted at rest with user-session DPAPI keys & zero-data-loss auto-migration (`.bak` backups) |
-| Process Isolation | `contextIsolation: true` · `nodeIntegration: false` · `sandbox: true` on all browser windows |
-| PowerShell Hardening | Absolute executable path `${SystemRoot}\System32\WindowsPowerShell\v1.0\powershell.exe`, non-blocking `execFile`, strict path validation (`pathValidation.ts`), and queue deadlock protection |
-| Protocol Confinement | `tracelocal://` canonical path resolution (`path.resolve()`) strictly confined within `%APPDATA%/Trace/images/` and SHA-256 ETag revalidation |
-| Detector Teardown | Static `resources/detector.html` (zero `data:` URL inline scripts) with explicit `closed` lifecycle memory dereferencing |
-| Typed IPC | `shared/ipc.ts` defines `InvokeMap`, `EventMap`, `SendMap` — channel names and payload types are statically checked on both sides |
-| Privacy-Aware Clipboard | Honors `ExcludeClipboardContentFromMonitorProcessing`, `ClipboardViewerIgnore`, `CanIncludeInClipboardHistory`, `CanUploadToCloudClipboard`, plus 1Password / Bitwarden / KeePass concealed formats |
-| Atomic Persistence | JSON index written via temp-file + rename; image bytes stored as per-id PNG files |
-| Dev-Safe Startup | `app.setLoginItemSettings` is gated by `app.isPackaged` — dev builds never touch the Windows Registry |
-| External Links | `setWindowOpenHandler` forces all window-open requests to `shell.openExternal` — no in-app navigation |
-
----
-
-## Tech Stack
-
-| Layer | Choice | Why |
-|---|---|---|
-| Desktop runtime | **Electron 34+** | Only way to access Win32 OLE drag pipelines and native clipboard formats from JS |
-| Build tooling | **electron-vite** | Separate Main / Preload / Renderer builds with Vite HMR |
-| UI | **React 18 + TypeScript** | Strongly typed component hierarchy |
-| Audio | **Web Audio API** | Synthesized haptic audio feedback (ticks, clicks, pops, thuds) with 0 audio asset overhead |
-| Animation | **Framer Motion** | Adaptive spring physics (`useAdaptiveSpring`), layout transitions, gesture animations |
-| State | **Zustand** | Selector-optimized, zero cascading re-renders during drags |
-| Drag icons | **@resvg/resvg-js** | Server-side SVG → PNG rendering for custom drag ghosts |
-| Auto-Updates | **electron-updater** | Background downloading and single-click installation for GitHub builds |
-
----
-
-## Project Structure
-
-```
-Trace/
-├─ shared/                 Typed IPC contracts & domain models
-│  ├─ types.ts             ClipboardItem, Bundle, Settings, DragRequest DTOs
-│  ├─ bridge.ts            EdgeApi preload interface
-│  └─ ipc.ts               InvokeMap / EventMap / SendMap channel definitions
-├─ electron/               Node.js backend & OS integrations
-│  ├─ main/
-│  │  ├─ index.ts          Single-instance lock, IPC registration, startup
-│  │  ├─ window.ts         Frameless window, setIgnoreMouseEvents, cursor poll
-│  │  ├─ updater.ts        Background auto-update engine (electron-updater)
-│  │  ├─ tray.ts           System tray icon & context menus
-│  │  ├─ fullscreen.ts     Windows SHQueryUserNotificationState game detection
-│  │  └─ drag.ts           OLE startDrag, temp-file staging, icon generation
-│  ├─ preload/             Sandbox bridge exposing window.edge
-│  ├─ clipboard/
-│  │  ├─ ClipboardWatcher.ts   600ms poll loop, transient-copy rejection
-│  │  └─ formats.ts        FNV-1a signatures, Win32 HDROP, privacy-flag detection
-│  └─ store/
-│     ├─ ItemStore.ts      Atomic JSON persistence, DPAPI encryption, dedup
-│     ├─ settings.ts       User config & startup registration
-│     └─ paths.ts          AppData + temp directory resolution
-├─ src/                    React renderer
-│  ├─ components/          Panel, ItemList, ClipboardItem, SearchBar, Settings, ChangelogView, Icons
-│  ├─ hooks/               useEdgeHover (hysteresis), useDragOut, useFilteredItems
-│  ├─ lib/                 soundEffects (Web Audio API), theme tokens, format helpers
-│  ├─ store/               Zustand appStore
-│  └─ styles/              tokens.css, panel.css, settings.css, item.css, global.css
-```
-
----
-
-## Roadmap
-
-Trace is in **public beta**. The following are planned, in rough priority order:
-
-- [ ] **AI semantic self-organization** — embed text/URL/HTML items, auto-cluster into named groups, replace manual pinning
-- [ ] **AI summarization** — condense multi-file bundles and long HTML copies into one-line summaries + tags
-- [x] **Multi-monitor support** — anchor to any display edge, not just primary
-- [x] **Silent background auto-updates** — background download and 1-click update installation
-- [x] **Synthesized Web Audio Haptic Suite** — real-time sound effects for ticks, toggles, clicks, and deletes
-- [x] **Segmented Settings Architecture** — 3 stationary category tabs with independent scroll positions
-- [ ] **Linux port** — replace Win32-specific paths with cross-platform equivalents
-- [ ] **Plugin SDK** — let users write custom format readers and drag-out targets
-- [ ] **Cloud sync (opt-in, E2E encrypted)** — sync pinned items across machines
-- [ ] **Search across full history** — currently capped at `historyLimit` (default 500)
-
----
-
-## Contributing
-
-Trace is Apache-2.0 licensed and open to contributions. As a solo-maintained project in active beta, the best ways to help right now are:
-
-1. **File issues** for bugs, crashes, or privacy-edge-cases you hit (especially around clipboard format detection on different apps)
-2. **macOS porting** — Currently Trace only supports Windows; contributions for a macOS port are welcome
-3. **Suggest format readers** — if you copy from an app whose content Trace mis-categorizes, open an issue with the available formats list (`clipboard.availableFormats()` output)
-4. **Pick up a roadmap item** — open an issue first to discuss scope, then send a PR against a feature branch
-
-### Development workflow
-```bash
-npm install
-npm run dev          # Electron + Vite HMR
-npm run typecheck    # tsc --noEmit (node + web configs)
-npm run build:github # build Windows NSIS installer for GitHub
-npm run build:store  # build Windows AppX package for Microsoft Store
-```
+| Control              | Implementation                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Process isolation    | `contextIsolation: true` · `nodeIntegration: false` · `sandbox: true` on all windows                                  |
+| Typed IPC            | Channel names and payloads statically checked on both sides (`shared/ipc.ts`)                                         |
+| Clipboard privacy    | Password-manager / dictation formats matched case-insensitively and skipped; incognito suspends polling               |
+| AI disclosure        | Nothing leaves the machine unless a provider is configured; privacy gates for capture, AI, and memory are independent |
+| Protocol confinement | `tracelocal://` thumbnails resolve strictly inside the app data directory with SHA-256 revalidation                   |
+| PowerShell hardening | Absolute executable path, non-blocking exec, strict path validation                                                   |
+| Dev-safe startup     | Login-item registration is gated by `app.isPackaged` — dev builds never touch the registry                            |
 
 ---
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE). Commercial and non-commercial use, modification, and distribution all permitted with attribution.
-
----
-
-<p align="center">
-  <sub>Support Trace on <a href="https://ko-fi.com/deepender" target="_blank">Ko-fi ☕</a> &nbsp;·&nbsp; Star on <a href="https://github.com/Deepender25/Trace" target="_blank">GitHub ⭐</a></sub>
-</p>
+Apache-2.0 — see [LICENSE](LICENSE). This is a fork of [Edge-Drop](https://github.com/Deepender25/Edge-Drop); upstream's branding, sponsor links, and auto-update plumbing were removed in this fork.

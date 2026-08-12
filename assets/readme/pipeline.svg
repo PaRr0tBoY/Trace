@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="340" viewBox="0 0 1200 340" role="img" aria-labelledby="title desc">
+  <title id="title">Trace activity pipeline — capture, evidence, clustering, decisions, adoption</title>
+  <desc id="desc">Clipboard and foreground events flow through a persistent evidence timeline, clustering into activities with confidence scores, decisions that produce task proposals, and adoption that creates or merges tasks and feeds long-term memory. Privacy gates and traceability cut across the whole pipeline.</desc>
+
+  <rect width="1200" height="340" rx="24" fill="#050607"/>
+
+  <text x="56" y="52" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="12" letter-spacing="3" fill="#6B7280">ACTIVITY → DECISION → MEMORY PIPELINE</text>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#3B82F6"/>
+    </marker>
+  </defs>
+
+  <!-- stage nodes -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <g>
+      <rect x="56" y="80" width="180" height="112" rx="12" fill="#0A0C10" stroke="#26292E" stroke-width="1"/>
+      <text x="72" y="106" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="11" fill="#3B82F6">01</text>
+      <text x="72" y="134" font-size="17" font-weight="600" fill="#F3F4F6">Capture</text>
+      <text x="72" y="156" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="10.5" fill="#6B7280">clipboard + foreground</text>
+      <text x="72" y="172" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="10.5" fill="#6B7280">window events</text>
+    </g>
+    <g>
+      <rect x="283" y="80" width="180" height="112" rx="12" fill="#0A0C10" stroke="#26292E" stroke-width="1"/>
+      <text x="299" y="106" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="11" fill="#3B82F6">02</text>
+      <text x="299" y="134" font-size="17" font-weight="600" fill="#F3F4F6">Evidence</text>
+      <text x="299" y="156" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="10.5" fill="#6B7280">dedup, privacy-filtered</text>
+      <text x="299" y="172" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="10.5" fill="#6B7280">persistent timeline</text>
+    </g>
+    <g>
+      <rect x="510" y="80" width="180" height="112" rx="12" fill="#0A0C10" stroke="#26292E" stroke-width="1"/>
+      <text x="526" y="106" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="11" fill="#3B82F6">03</text>
+      <text x="526" y="134" font-size="17" font-weight="600" fill="#F3F4F6">Cluster</text>
+      <text x="526" y="156" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="10.5" fill="#6B7280">segments into activities</text>
+      <text x="526" y="172" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="10.5" fill="#6B7280">with a confidence score</text>
+    </g>
+    <g>
+      <rect x="737" y="80" width="180" height="112" rx="12" fill="#0A0C10" stroke="#26292E" stroke-width="1"/>
+      <text x="753" y="106" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="11" fill="#3B82F6">04</text>
+      <text x="753" y="134" font-size="17" font-weight="600" fill="#F3F4F6">Decide</text>
+      <text x="753" y="156" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="10.5" fill="#6B7280">proposal cards; LLM titles</text>
+      <text x="753" y="172" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="10.5" fill="#6B7280">only when a provider is set</text>
+    </g>
+    <g>
+      <rect x="964" y="80" width="180" height="112" rx="12" fill="#0A0C10" stroke="#26292E" stroke-width="1"/>
+      <text x="980" y="106" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="11" fill="#3B82F6">05</text>
+      <text x="980" y="134" font-size="17" font-weight="600" fill="#F3F4F6">Adopt</text>
+      <text x="980" y="156" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="10.5" fill="#6B7280">create or merge a task,</text>
+      <text x="980" y="172" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="10.5" fill="#6B7280">feed long-term memory</text>
+    </g>
+  </g>
+
+  <!-- connectors -->
+  <g stroke="#2A2D33" stroke-width="1">
+    <line x1="236" y1="136" x2="277" y2="136"/>
+    <line x1="463" y1="136" x2="504" y2="136"/>
+    <line x1="690" y1="136" x2="731" y2="136"/>
+    <line x1="917" y1="136" x2="958" y2="136"/>
+  </g>
+  <path d="M236 136 h41" fill="none" stroke="#3B82F6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M463 136 h41" fill="none" stroke="#3B82F6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M690 136 h41" fill="none" stroke="#3B82F6" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <path d="M917 136 h41" fill="none" stroke="#3B82F6" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- cross-cutting layers -->
+  <line x1="56" y1="228" x2="1144" y2="228" stroke="#1C2128" stroke-width="1"/>
+
+  <g>
+    <rect x="56" y="248" width="532" height="64" rx="12" fill="#0A0C10" stroke="#26292E" stroke-width="1"/>
+    <rect x="56" y="248" width="2.5" height="64" rx="1" fill="#3B82F6"/>
+    <text x="74" y="273" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="11" letter-spacing="2" fill="#F3F4F6">PRIVACY GATES</text>
+    <text x="74" y="294" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="12.5" fill="#9CA3AF">Capture, AI and memory switch independently.</text>
+  </g>
+  <g>
+    <rect x="612" y="248" width="532" height="64" rx="12" fill="#0A0C10" stroke="#26292E" stroke-width="1"/>
+    <rect x="612" y="248" width="2.5" height="64" rx="1" fill="#14B8A6"/>
+    <text x="630" y="273" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="11" letter-spacing="2" fill="#F3F4F6">TRACEABILITY</text>
+    <text x="630" y="294" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="12.5" fill="#9CA3AF">Every suggestion cites what it saw and why.</text>
+  </g>
+</svg>

@@ -7,7 +7,7 @@
  */
 import type { Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
 import type { DragRequest, ProviderConfig } from './types'
-import type { OllamaDetectionResult, ProviderTestResult, SuggestTitleContext, SuggestionAcceptOptions, DropResource } from './ipc'
+import type { ProviderTestResult, SuggestTitleContext, SuggestionAcceptOptions, DropResource } from './ipc'
 
 export interface EdgeApi {
   /* Renderer -> Main */
@@ -73,7 +73,6 @@ export interface EdgeApi {
 
   /* AI provider */
   testProvider: (config: ProviderConfig) => Promise<ProviderTestResult>
-  detectOllama: (baseUrl?: string) => Promise<OllamaDetectionResult>
 
   /* Suggestions */
   /** Accept a suggestion, optionally with the convert panel's edits (title/note/apps/items). */

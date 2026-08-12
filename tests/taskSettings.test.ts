@@ -59,7 +59,7 @@ describe('clampSettings — task domain fields', () => {
 
   it('forces the provider chain to be an array', () => {
     expect(clampSettings({ ...DEFAULT_SETTINGS, aiProviders: undefined as never }).aiProviders).toEqual([])
-    const providers = [{ id: 'p1', baseUrl: 'http://localhost:11434', model: 'qwen3', kind: 'local' as const }]
+    const providers = [{ id: 'p1', baseUrl: 'http://localhost:8080/v1', model: 'qwen3' }]
     expect(clampSettings({ ...DEFAULT_SETTINGS, aiProviders: providers }).aiProviders).toEqual(providers)
   })
 

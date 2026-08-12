@@ -2,9 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ProviderConfig } from '../shared/types'
 import {
   ProviderChain,
-  buildLocalProvider,
   buildChatBody,
-  detectOllama,
   normalizeChatUrl,
   testProvider,
   validateJsonSchema,
@@ -20,9 +18,8 @@ const SCHEMA: JsonSchemaObject = {
 
 const LOCAL: ProviderConfig = {
   id: 'local',
-  baseUrl: 'http://127.0.0.1:11434/v1',
+  baseUrl: 'http://localhost:8080/v1',
   model: 'qwen3:8b',
-  kind: 'local',
   supportsSchemaOutput: true
 }
 
@@ -31,7 +28,6 @@ const CLOUD: ProviderConfig = {
   baseUrl: 'https://api.deepseek.com/v1',
   apiKey: 'sk-test',
   model: 'deepseek-v4-flash',
-  kind: 'cloud',
   supportsSchemaOutput: false
 }
 
@@ -266,42 +262,6 @@ describe('testProvider', () => {
   })
 })
 
-describe('detectOllama', () => {
-  it('finds a running instance and lists its models', async () => {
-    const fetchImpl = vi.fn(async () => jsonResponse({ data: [{ id: 'qwen3:8b' }, { id: 'llama3.1:8b' }] }))
-    const res = await detectOllama('http://127.0.0.1:11434', fetchImpl)
-    expect(res.found).toBe(true)
-    expect(res.models).toEqual(['qwen3:8b', 'llama3.1:8b'])
-    const url = fetchImpl.mock.calls[0][0] as string
-    expect(url).toBe('http://127.0.0.1:11434/v1/models')
-  })
-
-  it('reports not-found on 404 and on unreachable', async () => {
-    const notFound = await detectOllama(undefined, vi.fn(async () => jsonResponse({}, 404)))
-    expect(notFound.found).toBe(false)
-    expect(notFound.error).toContain('404')
-
-    const unreachable = await detectOllama(undefined, vi.fn(async () => { throw new Error('ECONNREFUSED') }))
-    expect(unreachable.found).toBe(false)
-    expect(unreachable.error).toMatch(/ECONNREFUSED/)
-  })
-})
-
-describe('buildLocalProvider (onboarding prefill)', () => {
-  it('prefers an installed qwen3 model', () => {
-    const p = buildLocalProvider(['llama3.1:8b', 'qwen3:14b'])
-    expect(p.model).toBe('qwen3:14b')
-    expect(p.kind).toBe('local')
-    expect(p.baseUrl).toBe('http://127.0.0.1:11434/v1')
-    expect(p.supportsSchemaOutput).toBe(true)
-  })
-
-  it('falls back to qwen3:8b without a model list', () => {
-    expect(buildLocalProvider(undefined).model).toBe('qwen3:8b')
-    expect(buildLocalProvider([]).model).toBe('qwen3:8b')
-  })
-})
-
 describe('validateJsonSchema', () => {
   it('accepts conforming values', () => {
     expect(validateJsonSchema({ title: 'a', confidence: 0.5 }, SCHEMA)).toBeNull()
@@ -336,8 +296,8 @@ describe('validateJsonSchema', () => {
 
 describe('request plumbing', () => {
   it('normalizes base urls to /chat/completions', () => {
-    expect(normalizeChatUrl('http://x:11434/v1')).toBe('http://x:11434/v1/chat/completions')
-    expect(normalizeChatUrl('http://x:11434/v1/')).toBe('http://x:11434/v1/chat/completions')
+    expect(normalizeChatUrl('http://x:8080/v1')).toBe('http://x:8080/v1/chat/completions')
+    expect(normalizeChatUrl('http://x:8080/v1/')).toBe('http://x:8080/v1/chat/completions')
     expect(normalizeChatUrl('https://api.deepseek.com')).toBe('https://api.deepseek.com/chat/completions')
     expect(normalizeChatUrl('http://x/v1/chat/completions')).toBe('http://x/v1/chat/completions')
   })

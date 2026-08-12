@@ -2,7 +2,7 @@
  * AI provider layer — pure logic, zero Electron imports (vitest-friendly).
  *
  * Wire protocol: OpenAI-compatible POST /v1/chat/completions, shared by
- * Ollama / LM Studio / DeepSeek / Qwen endpoints alike. A provider is just a
+ * LM Studio / DeepSeek / Qwen endpoints alike. A provider is just a
  * `baseUrl + apiKey? + model` triple (see ProviderConfig in shared/types).
  *
  * Structured output degrades in two steps:
@@ -23,7 +23,7 @@
  * change (failover), no per-request noise.
  */
 import type { ProviderConfig } from '../../shared/types'
-import type { OllamaDetectionResult, ProviderTestResult } from '../../shared/ipc'
+import type { ProviderTestResult } from '../../shared/ipc'
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
@@ -81,10 +81,8 @@ export interface ProviderChainOptions {
   log?: (entry: Record<string, unknown>) => void
 }
 
-export const DEFAULT_OLLAMA_BASE = 'http://127.0.0.1:11434'
 const DEFAULT_CHAT_TIMEOUT_MS = 30_000
 const TEST_TIMEOUT_MS = 8_000
-const OLLAMA_DETECT_TIMEOUT_MS = 2_500
 /** Bounded client-side retries per provider when the reply fails validation. */
 const RETRY_LIMIT = 2
 
@@ -184,46 +182,6 @@ function validateProp(value: unknown, prop: JsonSchemaProp, path: string): strin
       }
       return null
     }
-  }
-}
-
-/** Probe a local Ollama instance via the OpenAI-compat model list. */
-export async function detectOllama(
-  baseUrl = DEFAULT_OLLAMA_BASE,
-  fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis),
-  timeoutMs = OLLAMA_DETECT_TIMEOUT_MS
-): Promise<OllamaDetectionResult> {
-  const url = `${baseUrl.replace(/\/+$/, '')}/v1/models`
-  try {
-    const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) })
-    if (!res.ok) return { found: false, baseUrl, error: `HTTP ${res.status}` }
-    const data = (await res.json()) as { data?: Array<{ id?: unknown }> }
-    const models = (data?.data ?? [])
-      .map((m) => m.id)
-      .filter((id): id is string => typeof id === 'string')
-    return { found: true, baseUrl, models }
-  } catch (err) {
-    return { found: false, baseUrl, error: err instanceof Error ? err.message : String(err) }
-  }
-}
-
-/**
- * Default local provider for onboarding prefill: prefer an installed Qwen3
- * (thinking off is the default for Qwen3 in Ollama's OpenAI-compat layer is
- * not controllable here, so we pick the plain Qwen3 tag the user pulled).
- */
-export function buildLocalProvider(models?: string[]): ProviderConfig {
-  const model =
-    models?.find((m) => /qwen3/i.test(m)) ??
-    models?.find((m) => /qwen/i.test(m)) ??
-    models?.[0] ??
-    'qwen3:8b'
-  return {
-    id: 'local-ollama',
-    baseUrl: `${DEFAULT_OLLAMA_BASE}/v1`,
-    model,
-    kind: 'local',
-    supportsSchemaOutput: true
   }
 }
 

@@ -153,7 +153,6 @@ const api = {
 
   /* AI provider */
   testProvider: (config: import('../../shared/types').ProviderConfig) => invoke('ai:test-provider', config),
-  detectOllama: (baseUrl?: string) => invoke('ai:detect-ollama', baseUrl),
 
   /* Suggestions */
   acceptSuggestion: (id: string, opts?: import('../../shared/ipc').SuggestionAcceptOptions) => invoke('suggestion:accept', id, opts),

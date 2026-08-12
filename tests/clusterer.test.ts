@@ -424,7 +424,7 @@ describe('clusterEvents — embedding 通道与降级', () => {
 
   it('falls back to the token path when the channel throws', async () => {
     const failing: EmbeddingChannel = {
-      embed: async () => { throw new Error('ollama down') }
+      embed: async () => { throw new Error('embedding channel down') }
     }
     const withEmbed = await clusterEvents(
       [ev('Code', 0, 'cad plugin window')],

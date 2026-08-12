@@ -23,7 +23,7 @@ import { mergeAppOptions } from './appOptions'
 import { resolveAppIcon } from './appIcons'
 import { recentEvents } from './eventBus'
 import { acceptWithResource } from './suggestionDrop'
-import { ProviderChain, buildLocalProvider, detectOllama, testProvider } from './provider'
+import { ProviderChain, testProvider } from './provider'
 import { logAi } from './aiLog'
 import type { ItemData, MergeResult, MemoryListPayload, ResourceRef, Task } from '../../shared/types'
 
@@ -190,8 +190,6 @@ export function registerIpc(): void {
   /* --------------------------- ai provider --------------------------- */
 
   handle('ai:test-provider', (config) => testProvider(config))
-  handle('ai:detect-ollama', (baseUrl) => detectOllama(baseUrl))
-  void detectOllamaAtStartup()
 
   /* --------------------------- task domain --------------------------- */
 
@@ -701,21 +699,6 @@ export function getProviderChain(): ProviderChain {
     console.log(`[AI] provider chain ready (${loadSettings().aiProviders.length} providers)`)
   }
   return providerChain
-}
-
-/**
- * Silent one-shot detection at startup: when no provider is configured yet
- * (fresh install -> onboarding) and Ollama is running, prefill the local
- * provider. Never overwrites a user-configured chain.
- */
-async function detectOllamaAtStartup(): Promise<void> {
-  if (loadSettings().aiProviders.length > 0) return
-  const result = await detectOllama()
-  if (!result.found) return
-  const provider = buildLocalProvider(result.models)
-  const next = saveSettings({ aiProviders: [provider] })
-  pushState.settings(next)
-  console.log(`[AI] ollama detected at startup, prefilled local provider (${provider.model})`)
 }
 
 /**

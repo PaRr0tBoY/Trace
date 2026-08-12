@@ -1394,9 +1394,9 @@ function LanguageDropdown() {
 
 /**
  * AI Provider chain editor: ordered list (first = primary, auto-failover),
- * inline editing, per-provider connection test with status, local Ollama
- * detection. State is local to the section; the chain itself lives in
- * settings.aiProviders (main is the single source of truth).
+ * inline editing, per-provider connection test with status. State is local
+ * to the section; the chain itself lives in settings.aiProviders (main is
+ * the single source of truth).
  */
 function AIProviderSection() {
   const { t } = useTranslation()
@@ -1405,7 +1405,6 @@ function AIProviderSection() {
   const providers = settings.aiProviders ?? []
 
   const [testStates, setTestStates] = useState<Record<string, { status: 'testing' | 'ok' | 'fail'; detail?: string; thinkingModel?: boolean }>>({})
-  const [detectState, setDetectState] = useState<{ status: 'idle' | 'detecting' | 'ok' | 'fail'; detail?: string }>({ status: 'idle' })
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<ProviderConfig | null>(null)
 
@@ -1429,46 +1428,12 @@ function AIProviderSection() {
       baseUrl: '',
       model: '',
       apiKey: '',
-      kind: 'cloud',
       supportsSchemaOutput: false
     }
     playButtonClickSound()
     setProviders([...providers, provider])
     setExpandedId(provider.id)
     setDraft({ ...provider })
-  }
-
-  /**
-   * Add local model = detect Ollama on the machine, then wire it up. When a
-   * local provider already exists the card is revealed instead of duplicated.
-   */
-  const addLocalModel = async () => {
-    playButtonClickSound()
-    setDetectState({ status: 'detecting' })
-    const res = await window.edge.detectOllama()
-    if (!res.found) {
-      setDetectState({ status: 'fail', detail: res.error ?? '' })
-      return
-    }
-    const existing = providers.find((p) => p.kind === 'local' && p.baseUrl.includes('127.0.0.1:11434'))
-    if (existing) {
-      setDetectState({ status: 'ok', detail: res.models?.join(', ') ?? '' })
-      setExpandedId(existing.id)
-      setDraft({ ...existing })
-      return
-    }
-    const model = res.models?.find((m) => /qwen3/i.test(m)) ?? res.models?.[0] ?? 'qwen3:8b'
-    const provider: ProviderConfig = {
-      id: `local-${Date.now().toString(36)}`,
-      baseUrl: 'http://127.0.0.1:11434/v1',
-      model,
-      kind: 'local',
-      supportsSchemaOutput: true
-    }
-    setProviders([...providers, provider])
-    setExpandedId(provider.id)
-    setDraft({ ...provider })
-    setDetectState({ status: 'ok', detail: model })
   }
 
   /** Click a card to open/close its editor; reopening syncs the draft. */
@@ -1567,16 +1532,6 @@ function AIProviderSection() {
               >
                 <ChevronRightIcon width={12} height={12} />
               </motion.span>
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  flexShrink: 0,
-                  background: p.kind === 'local' ? '#4ade80' : '#60a5fa'
-                }}
-                title={p.kind === 'local' ? t('ai.kindLocal') : t('ai.kindCloud')}
-              />
               <span
                 className="setting-title"
                 style={{
@@ -1709,14 +1664,6 @@ function AIProviderSection() {
         <button
           className="pill display-pill"
           style={{ flex: '1 1 auto', minWidth: 'max-content', flexDirection: 'row', gap: 6, padding: '8px 12px', cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}
-          onClick={() => void addLocalModel()}
-        >
-          <PlusIcon width={12} height={12} />
-          {t('ai.addLocalModel')}
-        </button>
-        <button
-          className="pill display-pill"
-          style={{ flex: '1 1 auto', minWidth: 'max-content', flexDirection: 'row', gap: 6, padding: '8px 12px', cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' }}
           onClick={addCloudProvider}
         >
           <PlusIcon width={12} height={12} />
@@ -1724,9 +1671,6 @@ function AIProviderSection() {
         </button>
       </div>
 
-      {detectState.status === 'detecting' && <div className="setting-desc" style={{ marginTop: 8, fontSize: 11.5 }}>{t('ai.detecting')}</div>}
-      {detectState.status === 'ok' && <div className="setting-desc" style={{ marginTop: 8, color: '#4caf50', fontSize: 11.5 }}>{t('ai.detectFound', { model: detectState.detail ?? '' })}</div>}
-      {detectState.status === 'fail' && <div className="setting-desc" style={{ marginTop: 8, color: '#ff6b6b', fontSize: 11.5 }}>{t('ai.detectNotFound')}{detectState.detail ? ` (${detectState.detail})` : ''}</div>}
       {hasChainFailure && <div className="setting-desc" style={{ marginTop: 8, opacity: 0.7 }}>{t('ai.chainHint')}</div>}
     </>
   )

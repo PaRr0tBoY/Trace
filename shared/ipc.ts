@@ -24,14 +24,6 @@ export interface ProviderTestResult {
   thinkingModel?: boolean
 }
 
-/** Result of probing a local Ollama instance (ai:detect-ollama). */
-export interface OllamaDetectionResult {
-  found: boolean
-  baseUrl: string
-  models?: string[]
-  error?: string
-}
-
 /**
  * Resource attached to a task created by dropping onto a suggestion card
  * (t25): a clipboard item (linked by id, snapshotted main-side) or raw
@@ -206,9 +198,6 @@ export interface InvokeMap {
 
   /** Test a provider connection (one 1-token chat completion). */
   'ai:test-provider': { args: [config: ProviderConfig]; result: ProviderTestResult }
-
-  /** Probe for a local Ollama instance via GET /v1/models. */
-  'ai:detect-ollama': { args: [baseUrl?: string]; result: OllamaDetectionResult }
 
   /* --------------------------- suggestions --------------------------- */
 

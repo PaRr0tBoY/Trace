@@ -541,6 +541,18 @@ export function suggestionSignature(appKeys: string[], segmentStartTs: number, b
   return hash.toString(16)
 }
 
+/**
+ * Semantic recommendation fingerprint (spec 决策 9: 语义簇 + 关键实体 + 时段).
+ * v1 以活动签名为基础：语义簇与关键实体 = 排序应用键集合，时段 = 小时桶。
+ * 版本前缀保证未来语义聚类指纹（semantic@2，本地模型开时）与 v1 不冲突；
+ * 同活动重复生成同指纹（确定性，冷却/去重键）。t46 推荐历史模块以此为键，
+ * 并在其模块中 re-export。
+ */
+export const FINGERPRINT_VERSION = 'semantic@1'
+export function recommendationFingerprint(appKeys: string[], segmentStartTs: number, bucketMs = 3_600_000): string {
+  return `${FINGERPRINT_VERSION}:${suggestionSignature(appKeys, segmentStartTs, bucketMs)}`
+}
+
 /** Version of the attribution classifier stamped on every activity (t40). */
 export const CLASSIFIER_VERSION = 'clusterer@1'
 
@@ -624,6 +636,13 @@ export interface ActivityLedgerOptions {
   getParams: () => ClusterParams
   /** Dismissal table; activities whose signature is present are skipped. */
   ignored: IgnoredTable
+  /**
+   * Cooldown gate (t46): given a recommendation fingerprint (semantic@1:
+   * app combination × hour bucket), true = suppress the activity this pass.
+   * Consulted after the ignored table — both must pass for an activity to
+   * become a suggestion. Absent = cooldown disabled (existing behavior).
+   */
+  cooling?: (fingerprint: string) => boolean
   /** Optional embedding channel (title similarity); absent = token path. */
   embed?: EmbeddingChannel
   /** Classifier version stamped on activities; defaults to CLASSIFIER_VERSION. */
@@ -831,6 +850,7 @@ export function createActivityLedger(options: ActivityLedgerOptions): ActivityLe
       for (let i = 0; i < result.attributions.length; i++) {
         const attr = result.attributions[i]
         if (ignored.has(suggestionSignature(attr.segment.appKeys, attr.segment.startTs))) continue
+        if (options.cooling && options.cooling(recommendationFingerprint(attr.segment.appKeys, attr.segment.startTs))) continue
         const { activity, detail } = buildActivity(attr, clipAssignments[i].itemIds, classifierVersion, promptVersion)
         // The app-switch rows inside [startAt, endAt] — segments partition the
         // batch, so the window is exact — plus the clipboard rows assigned

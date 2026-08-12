@@ -132,7 +132,7 @@ const MIGRATIONS: readonly Migration[] = [
           level        INTEGER NOT NULL CHECK (level IN (1, 2, 3)),
           shownAt      INTEGER NOT NULL,   -- epoch ms
           outcome      TEXT,               -- accepted | ignored | dismissed | noop
-          actionReason TEXT                -- user_confirmed | user_manually_dismissed | wrong_task | already_exists | not_now
+          actionReason TEXT                -- user_confirmed | user_manually_dismissed | wrong_task | already_exists | not_now | user_edited_title (t46)
         );
         CREATE INDEX idx_recommendation_history_fingerprint ON recommendation_history (fingerprint);
         CREATE INDEX idx_recommendation_history_shownAt     ON recommendation_history (shownAt);

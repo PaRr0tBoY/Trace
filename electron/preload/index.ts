@@ -154,11 +154,19 @@ const api = {
   /* AI provider */
   testProvider: (config: import('../../shared/types').ProviderConfig) => invoke('ai:test-provider', config),
 
+  /* Local model (t54) */
+  getLocalModelStatus: () => invoke('local-model:status'),
+  startLocalModelDownload: () => invoke('local-model:start-download'),
+  removeLocalModel: () => invoke('local-model:remove'),
+  setLocalModelSource: (source: import('../../shared/types').LocalModelSource) => invoke('local-model:set-source', source),
+  setLocalModelPath: (path: string | null) => invoke('local-model:set-path', path),
+  pickLocalModelPath: () => invoke('local-model:pick-path'),
+
   /* Suggestions */
   acceptSuggestion: (id: string, opts?: import('../../shared/ipc').SuggestionAcceptOptions) => invoke('suggestion:accept', id, opts),
   acceptSuggestionWithResource: (id: string, titleOverride: string | undefined, resource: import('../../shared/ipc').DropResource) =>
     invoke('suggestion:accept-with-resource', id, titleOverride, resource),
-  ignoreSuggestion: (id: string) => invoke('suggestion:ignore', id),
+  ignoreSuggestion: (id: string, reason?: import('../../shared/types').IgnoreReason) => invoke('suggestion:ignore', id, reason),
 
   /* Memory */
   loadMemories: () => invoke('memory:list'),
@@ -176,6 +184,7 @@ const api = {
   onTasks: (cb: (tasks: EventArgs<'state:tasks'>[0]) => void) => on('state:tasks', cb),
   onSuggestions: (cb: (suggestions: EventArgs<'state:suggestions'>[0]) => void) => on('state:suggestions', cb),
   onSettings: (cb: (settings: EventArgs<'state:settings'>[0]) => void) => on('state:settings', cb),
+  onLocalModelStatus: (cb: (status: EventArgs<'local-model:status'>[0]) => void) => on('local-model:status', cb),
   onToggle: (cb: (open?: boolean) => void) => on('window:toggle', cb),
   onOpenSettings: (cb: () => void) => on('window:open-settings', cb),
   onDragEnd: (cb: () => void) => on('item:drag-end', cb),

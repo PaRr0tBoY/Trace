@@ -5,7 +5,7 @@
  * contract lives in one place. The actual implementation lives in the preload;
  * the renderer only ever sees `window.edge` typed as this interface.
  */
-import type { Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
+import type { Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget, LocalModelSource, LocalModelStatus } from './types'
 import type { DragRequest, ProviderConfig } from './types'
 import type { ProviderTestResult, SuggestTitleContext, SuggestionAcceptOptions, DropResource } from './ipc'
 
@@ -74,12 +74,26 @@ export interface EdgeApi {
   /* AI provider */
   testProvider: (config: ProviderConfig) => Promise<ProviderTestResult>
 
+  /* Local model (t54) */
+  getLocalModelStatus: () => Promise<LocalModelStatus>
+  /** Download/resume the auto model file; progress arrives on onLocalModelStatus. */
+  startLocalModelDownload: () => Promise<void>
+  /** Delete the auto-downloaded model and release the runtime memory. */
+  removeLocalModel: () => Promise<LocalModelStatus>
+  /** Switch the model source ('auto' | 'manual'); persisted. */
+  setLocalModelSource: (source: LocalModelSource) => Promise<LocalModelStatus>
+  /** Record the user-picked .gguf path (null clears it); persisted. */
+  setLocalModelPath: (path: string | null) => Promise<LocalModelStatus>
+  /** Native file dialog for a .gguf file; null when canceled. */
+  pickLocalModelPath: () => Promise<string | null>
+  onLocalModelStatus: (cb: (status: LocalModelStatus) => void) => () => void
+
   /* Suggestions */
   /** Accept a suggestion, optionally with the convert panel's edits (title/note/apps/items). */
   acceptSuggestion: (id: string, opts?: SuggestionAcceptOptions) => Promise<TaskDto[]>
   /** Accept a suggestion and attach the dragged resource (t25 drop-to-bind). */
   acceptSuggestionWithResource: (id: string, titleOverride: string | undefined, resource: DropResource) => Promise<TaskDto[]>
-  ignoreSuggestion: (id: string) => Promise<void>
+  ignoreSuggestion: (id: string, reason?: import('./types').IgnoreReason) => Promise<void>
 
   /* Memory */
   loadMemories: () => Promise<import('./types').MemoryListPayload>

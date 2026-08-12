@@ -9,7 +9,7 @@
  *   - `Renderer -> Main` calls (invoke/handle) are listed in `InvokeMap`.
  *   - `Main -> Renderer` events (send/on) are listed in `EventMap`.
  */
-import type { AppRef, ClipboardItemDto, DragRequest, MergeResult, ProviderConfig, Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
+import type { AppRef, ClipboardItemDto, DragRequest, IgnoreReason, LocalModelSource, LocalModelStatus, MergeResult, ProviderConfig, Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
 
 /** Result of a connection test against one provider (ai:test-provider). */
 export interface ProviderTestResult {
@@ -199,6 +199,29 @@ export interface InvokeMap {
   /** Test a provider connection (one 1-token chat completion). */
   'ai:test-provider': { args: [config: ProviderConfig]; result: ProviderTestResult }
 
+  /* --------------------------- local model (t54) --------------------------- */
+
+  /** Snapshot of the local model manager (state / download progress / error / path). */
+  'local-model:status': { args: []; result: LocalModelStatus }
+
+  /**
+   * Download (or resume) the auto model file. Idempotent; progress is pushed
+   * on the 'local-model:status' event. Resolves when the download settles.
+   */
+  'local-model:start-download': { args: []; result: void }
+
+  /** Delete the auto-downloaded model (manual paths untouched); runtime memory is released. */
+  'local-model:remove': { args: []; result: LocalModelStatus }
+
+  /** Switch the model source ('auto' | 'manual'); persisted. */
+  'local-model:set-source': { args: [source: LocalModelSource]; result: LocalModelStatus }
+
+  /** Record the user-picked .gguf path (null clears it); persisted. */
+  'local-model:set-path': { args: [path: string | null]; result: LocalModelStatus }
+
+  /** Native file dialog for a .gguf file; null when canceled. */
+  'local-model:pick-path': { args: []; result: string | null }
+
   /* --------------------------- suggestions --------------------------- */
 
   /**
@@ -214,8 +237,12 @@ export interface InvokeMap {
    */
   'suggestion:accept-with-resource': { args: [id: string, titleOverride: string | undefined, resource: DropResource]; result: TaskDto[] }
 
-  /** Dismiss a suggestion; its signature suppresses the same kind later. */
-  'suggestion:ignore': { args: [id: string]; result: void }
+  /**
+   * Dismiss a suggestion; its signature suppresses the same kind later
+   * (existing LRU), and the outcome + reason land in the recommendation
+   * history (t46). `reason` is optional — absent = 不感兴趣.
+   */
+  'suggestion:ignore': { args: [id: string, reason?: IgnoreReason]; result: void }
 
   /* --------------------------- memory --------------------------- */
 
@@ -267,6 +294,8 @@ export interface EventMap {
   'state:suggestions': [suggestions: TaskProposal[]]
   /** Settings changed (e.g. from the tray menu). */
   'state:settings': [settings: Settings]
+  /** Local model manager status changed (state / download progress / error). */
+  'local-model:status': [status: LocalModelStatus]
   /** Toggle the panel open/closed from the main process (e.g. tray). */
   'window:toggle': [open?: boolean]
   /** Open the panel directly to settings from the main process (e.g. tray). */

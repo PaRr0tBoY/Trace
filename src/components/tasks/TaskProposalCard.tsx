@@ -9,12 +9,12 @@
  * delegates to main — the card is a view of the pushed `state:suggestions`
  * payload.
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import { basename } from '../../lib/format'
-import type { ResourceRef, TaskProposal } from '../../../shared/types'
-import { CheckIcon, EditIcon, CloseIcon, FileIcon, ImageIcon, SparklesIcon, InfoIcon } from '../icons'
+import type { IgnoreReason, ResourceRef, TaskProposal } from '../../../shared/types'
+import { CheckIcon, EditIcon, CloseIcon, ChevronDownIcon, FileIcon, ImageIcon, SparklesIcon, InfoIcon } from '../icons'
 import { acceptSuggestionDrop } from './dropActions'
 
 interface Props {
@@ -27,6 +27,18 @@ interface Props {
 
 const MAX_APPS = 5
 const MAX_CHIPS = 3
+
+/**
+ * Ignore-with-reason menu (t46): the X button stays a one-click quick ignore
+ * (not interested); the chevron opens these four explicit reasons so the
+ * engine can record reason-specific decay (wrong_task 0.2 etc.).
+ */
+const IGNORE_MENU_REASONS: ReadonlyArray<{ reason: IgnoreReason; label: string }> = [
+  { reason: 'not_interested', label: 'tasks.suggestionIgnoreNotInterested' },
+  { reason: 'duplicate', label: 'tasks.suggestionIgnoreDuplicate' },
+  { reason: 'wrong_task', label: 'tasks.suggestionIgnoreWrongTask' },
+  { reason: 'not_now', label: 'tasks.suggestionIgnoreNotNow' }
+]
 
 /** Short chip label for one clipboard ref (the task-detail preview shape). */
 function chipLabel(ref: ResourceRef): string {
@@ -42,6 +54,18 @@ export function TaskProposalCard({ suggestion, onOpen, onTrace }: Props) {
   const [brokenIcons, setBrokenIcons] = useState<ReadonlySet<string>>(new Set())
   /** Drop-hover highlight (t25): the whole card is a drop target. */
   const [over, setOver] = useState(false)
+  /** Ignore-with-reason menu (t46). */
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e: MouseEvent): void => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [menuOpen])
 
   const confirm = (): void => {
     void acceptSuggestion(suggestion.id)
@@ -141,16 +165,45 @@ export function TaskProposalCard({ suggestion, onOpen, onTrace }: Props) {
           >
             <InfoIcon width={13} height={13} />
           </button>
-          <button
-            type="button"
-            className="task-suggestion-action danger"
-            title={t('tasks.suggestionIgnore')}
-            onClick={() => {
-              void ignoreSuggestion(suggestion.id)
-            }}
-          >
-            <CloseIcon width={13} height={13} />
-          </button>
+          <div className="task-suggestion-ignore" ref={menuRef}>
+            <button
+              type="button"
+              className="task-suggestion-action danger"
+              title={t('tasks.suggestionIgnore')}
+              onClick={() => {
+                void ignoreSuggestion(suggestion.id)
+              }}
+            >
+              <CloseIcon width={13} height={13} />
+            </button>
+            <button
+              type="button"
+              className="task-suggestion-action task-suggestion-ignore-toggle"
+              title={t('tasks.suggestionIgnoreMenu')}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <ChevronDownIcon width={11} height={11} />
+            </button>
+            {menuOpen && (
+              <div className="task-suggestion-ignore-menu" role="menu">
+                {IGNORE_MENU_REASONS.map(({ reason, label }) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    role="menuitem"
+                    className="task-suggestion-ignore-menu-item"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      void ignoreSuggestion(suggestion.id, reason)
+                    }}
+                  >
+                    {t(label)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

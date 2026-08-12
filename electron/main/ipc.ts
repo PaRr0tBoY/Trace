@@ -5,14 +5,14 @@
  * renderer calls them through the typed preload bridge, so a signature mismatch
  * is a compile-time error rather than a runtime one.
  */
-import { app, ipcMain, clipboard, nativeImage, shell, dialog } from 'electron'
+import { app, ipcMain, clipboard, nativeImage, shell, dialog, BrowserWindow } from 'electron'
 import { existsSync, writeFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { psHost } from './powershell'
 import { requestPanelFocus, releasePanelFocus, releasePanelFocusNow } from './focus'
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
 import { rehomeTraceAfterMerge } from '../store/traceStore'
-import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore, getMemoryGraph, getTraceStore } from './state'
+import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getMemoryStore, getMemoryGraph, getTraceStore, getLocalModelManager, getLocalModelRuntime, resetLocalModelRuntime, ensureLocalModelLoaded } from './state'
 import { isTraceRecordDto, renderTraceReportHtml } from './traceReport'
 import { getMainWindow } from './window'
 import { setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
@@ -57,6 +57,16 @@ function toast(message: string, tone: 'info' | 'error' = 'info'): void {
   const win = getMainWindow()
   if (win && !win.isDestroyed()) {
     win.webContents.send('ui:toast', { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, message, tone })
+  }
+}
+
+/** Broadcast the local model manager status to every window (t54: progress / state / error). */
+function pushLocalModelStatus(): void {
+  const status = getLocalModelManager().status()
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+      win.webContents.send('local-model:status', status)
+    }
   }
 }
 
@@ -192,6 +202,57 @@ export function registerIpc(): void {
   /* --------------------------- ai provider --------------------------- */
 
   handle('ai:test-provider', (config) => testProvider(config))
+
+  /* --------------------------- local model (t54) --------------------------- */
+
+  handle('local-model:status', () => getLocalModelManager().status())
+
+  handle('local-model:start-download', async () => {
+    const manager = getLocalModelManager()
+    const status = manager.status()
+    if (status.state === 'downloading' || status.state === 'ready') return
+    try {
+      await manager.startDownload(() => pushLocalModelStatus())
+    } finally {
+      pushLocalModelStatus()
+      ensureLocalModelLoaded()
+    }
+  })
+
+  handle('local-model:remove', async () => {
+    await getLocalModelManager().removeModel()
+    getLocalModelRuntime().dispose().catch(() => {})
+    resetLocalModelRuntime()
+    pushLocalModelStatus()
+    return getLocalModelManager().status()
+  })
+
+  handle('local-model:set-source', (source) => {
+    const manager = getLocalModelManager()
+    manager.selectSource(source)
+    saveSettings({ localModelSource: source })
+    pushLocalModelStatus()
+    ensureLocalModelLoaded()
+    return manager.status()
+  })
+
+  handle('local-model:set-path', (path) => {
+    const manager = getLocalModelManager()
+    manager.setManualPath(path)
+    saveSettings({ localModelManualPath: path ?? undefined })
+    pushLocalModelStatus()
+    ensureLocalModelLoaded()
+    return manager.status()
+  })
+
+  handle('local-model:pick-path', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Select local model (.gguf)',
+      properties: ['openFile'],
+      filters: [{ name: 'GGUF model', extensions: ['gguf'] }]
+    })
+    return canceled || filePaths.length === 0 ? null : filePaths[0]
+  })
 
   /* --------------------------- task domain --------------------------- */
 
@@ -340,8 +401,8 @@ export function registerIpc(): void {
     return getTaskStore().toDto()
   })
 
-  handle('suggestion:ignore', (id) => {
-    getSuggestionEngine().ignore(id)
+  handle('suggestion:ignore', (id, reason) => {
+    getSuggestionEngine().ignore(id, reason)
   })
 
   /* --------------------------- memory --------------------------- */
@@ -699,6 +760,12 @@ export function registerIpc(): void {
     })
     // Keep the memory graph's decay in lockstep too (it snapshots λ at startup).
     getMemoryGraph()?.setLambda(next.memoryLambda)
+    // Enabling the local model enhancement must eagerly load the runtime —
+    // otherwise the first suggestion degrades silently until a restart
+    // (t54: the lazy optimizer gates on manager state, not on this hook).
+    if (patch.localModelEnabled === true) {
+      ensureLocalModelLoaded()
+    }
     pushState.settings(next)
     return next
   })

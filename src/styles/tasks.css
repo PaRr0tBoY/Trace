@@ -173,6 +173,50 @@
   pointer-events: none;
 }
 
+/* Ignore-with-reason menu (t46): X = quick ignore, chevron opens reasons. */
+.task-suggestion-ignore {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.task-suggestion-ignore-toggle {
+  width: 18px;
+  height: 24px;
+  opacity: 0.55;
+}
+.task-suggestion-card:hover .task-suggestion-ignore-toggle {
+  opacity: 1;
+}
+.task-suggestion-ignore-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  min-width: 148px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: var(--panel-bg, #1c1d21);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.task-suggestion-ignore-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: calc(12px * var(--font-scale, 1));
+  text-align: left;
+  cursor: pointer;
+}
+.task-suggestion-ignore-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.98);
+}
+
 /* Clipboard material copied during the segment (compact chips, t23 layout). */
 .task-suggestion-chips {
   display: flex;

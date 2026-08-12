@@ -442,6 +442,46 @@ export interface TraceRecordDto {
 /** 隐私：可进入 AI 的内容类型（与 privacyGate.ContentType 同构，spec 决策 7）。 */
 export type ContentType = 'text' | 'image' | 'files'
 
+/* ------------------------------------------------------------------ */
+/* Recommendation history (t46, spec 决策 9)                            */
+/* ------------------------------------------------------------------ */
+
+/** 展示分级：L1 主动建议 / L2 候选区 / L3 不展示（t47 评级产出，46 只持久化）。 */
+export type RecommendationLevel = 1 | 2 | 3
+
+/** 用户对一条推荐的动作结果。 */
+export type RecommendationOutcome = 'accepted' | 'ignored' | 'dismissed' | 'noop'
+
+/**
+ * 动作原因（spec 决策 9 基线五值；t46 扩展 user_edited_title 承载"用户编辑
+ * 标题"这一最强信号，映射意图档 user-edit）。
+ */
+export type RecommendationActionReason =
+  | 'user_confirmed'
+  | 'user_manually_dismissed'
+  | 'wrong_task'
+  | 'already_exists'
+  | 'not_now'
+  | 'user_edited_title'
+
+/** 忽略原因（t46）：不感兴趣 / 重复 / 错任务 / 暂不想处理。 */
+export const IGNORE_REASONS = ['not_interested', 'duplicate', 'wrong_task', 'not_now'] as const
+export type IgnoreReason = (typeof IGNORE_REASONS)[number]
+
+/**
+ * 一条推荐历史记录（spec 决策 9 契约 + 主键 id）。指纹 = 语义簇 + 关键实体 +
+ * 时段（v1 以活动签名为基础，见 activityLedger.recommendationFingerprint）。
+ */
+export interface RecommendationRecord {
+  id: string
+  fingerprint: string
+  level: RecommendationLevel
+  /** Unix epoch ms：展示时刻（store 以注入时钟落）。 */
+  shownAt: number
+  outcome?: RecommendationOutcome
+  actionReason?: RecommendationActionReason
+}
+
 export interface Settings {
   /** Fraction of the screen height the hot zone occupies (0.2 - 0.6). */
   hotZoneHeight: number
@@ -557,6 +597,15 @@ export interface Settings {
   /** 记忆写入主开关（时段整理落库）。 */
   memoryEnabled: boolean
   /**
+   * 本地模型增强开关（t54, spec 决策 11）：默认关 — 可选增强，关闭时其余
+   * 功能完全等价（不变量 H）。开启后候选后处理走本地模型过滤/标题/排序。
+   */
+  localModelEnabled: boolean
+  /** 本地模型来源（'auto' = 自动下载，'manual' = 用户手选 .gguf）。默认 auto。 */
+  localModelSource: LocalModelSource
+  /** 手动 .gguf 路径（source='manual' 时生效）；由 manager 做存在性校验。 */
+  localModelManualPath?: string
+  /**
    * Landing page applied on first launch and after the restore time expires
    * (ADR-0004). The files view has no second level.
    */
@@ -616,6 +665,9 @@ export const DEFAULT_SETTINGS: Settings = {
   clipboardAccess: true,
   memoryAccess: true,
   memoryEnabled: true,
+  localModelEnabled: false,
+  localModelSource: 'auto',
+  localModelManualPath: undefined,
   landing: { view: 'tasks', filter: 'existing' },
   restoreTime: 'relaxed'
 }
@@ -654,4 +706,29 @@ export interface LocalModelStatus {
   /** Last failure message when state is 'error'. */
   error: string | null
   modelFilePath: string | null
+}
+
+/* ------------------------------------------------------------------ */
+/* CandidateActivity (t54, spec 实现决策 6/11)                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 本地模型中间结构（决策者的公共输入，spec 决策 6）：聚类产出候选后、决策前，
+ * 候选被统一成 CandidateActivity 交给本地模型做过滤（≤3）/ 标题草稿 / 排序
+ * （spec 决策 11 接入点）。关闭或失败 → 算法候选原样传递（不变量 H：功能等价，
+ * 绝不污染决策数据）。
+ *
+ * - `activityId` 对应 activityLedger Activity.id，是候选与活动之间的稳定键。
+ * - `candidateTaskId` 为归属的候选任务（merge 目标）；缺失 = new 候选。
+ * - `semanticLabel` 为本地模型产出的标题草稿；缺失 = 沿用算法 / LLM 标题。
+ * - `score` 为算法置信度（0-1），排序基准；本地模型的 rerank 只改变候选
+ *   顺序与数量，不改动归因数据。
+ * - `evidenceRefs` 为证据引用（v1：窗口标题 + 应用组合串），供本地模型上下文。
+ */
+export interface CandidateActivity {
+  activityId: string
+  candidateTaskId?: string
+  semanticLabel?: string
+  score: number
+  evidenceRefs: string[]
 }

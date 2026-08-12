@@ -400,13 +400,17 @@ describe('createSqliteRecommendationHistory — recommendation_history 表持久
 
     let now = T0
     const store = createSqliteRecommendationHistory(db, { now: () => now, createId: counterId() })
-    const open = store.record({ fingerprint: FP, level: 1 })
+    const open = store.record({ fingerprint: FP, patternKey: 'semantic@1:pk-a', level: 1 })
     expect(open.outcome).toBe('noop') // 无 outcome 统一落 noop（与 memory 同形状）
     now = T0 + 1000
-    const resolved = store.record({ fingerprint: FP, level: 1, outcome: 'ignored', actionReason: 'not_now' })
+    const resolved = store.record({ fingerprint: FP, patternKey: 'semantic@1:pk-b', level: 1, outcome: 'ignored', actionReason: 'not_now' })
     expect(resolved.id).toBe(open.id)
     expect(resolved.shownAt).toBe(T0)
+    expect(resolved.patternKey).toBe('semantic@1:pk-b') // 回填同步更新 patternKey（与 memory 同形状）
     expect(store.size()).toBe(1)
+    // 跨实例回读：回填后的 patternKey 落库可见。
+    const rereadResolved = createSqliteRecommendationHistory(db).list().find((r) => r.id === resolved.id)
+    expect(rereadResolved?.patternKey).toBe('semantic@1:pk-b')
     // 形状一致：无 outcome 的记录统一落 noop（memory 与 SQLite 同形状），
     // 跨实例 list 回读仍是 noop 而非 undefined。
     const bare = store.record({ fingerprint: 'semantic@1:other-fp', level: 1 })
@@ -474,6 +478,7 @@ interface EngineHarness {
   history: RecommendationHistory
   ignored: ReturnType<typeof createIgnoredTable>
   pushed: TaskProposal[][]
+  /** 测试注入的分级，按确定性指纹查（t47 LevelInput）。 */
   levels: Record<string, RecommendationLevel>
 }
 
@@ -505,7 +510,8 @@ function makeEngineHarness(): EngineHarness {
     }),
     onSuggestions: (sugs) => h.pushed.push(sugs),
     history: h.history,
-    getLevel: (s) => h.levels[s.id] ?? 1
+    // t47 LevelInput：按确定性指纹查测试注入的分级（展示时经 getLevel 落库）。
+    getLevel: (input) => h.levels[input.fingerprint] ?? 1
   })
   return h
 }
@@ -580,14 +586,22 @@ describe('engine record points (t46)', () => {
     expect(h.history.list()[0].actionReason).toBe('user_manually_dismissed')
   })
 
-  it('getLevel 注入的分级随记录落库', async () => {
+  it('getLevel 注入的分级随记录落库（t47：展示时分级，noop 先行、动作回填保持）', async () => {
     const h = makeEngineHarness()
+    // t47 语义：分级在展示时（runAnalysis 尾部）经 getLevel 产出，随 noop
+    // 记录落 RecommendationRecord.level；accept/ignore 回填保持展示分级。
+    h.levels[FP_SIG] = 2
     h.engine.start()
     await trigger(h, batch())
     const [s] = h.pushed[0]
-    h.levels[s.id] = 2
+    expect(s.level).toBe(2)
+    const shown = h.history.list()[0]
+    expect(shown.level).toBe(2)
+    expect(shown.outcome).toBe('noop')
     h.engine.ignore(s.id, 'not_now')
-    expect(h.history.list()[0].level).toBe(2)
+    const resolved = h.history.list()[0]
+    expect(resolved.level).toBe(2)
+    expect(resolved.outcome).toBe('ignored')
   })
 
   it('冷却门：忽略后同指纹（同小时桶）的下一趟分析被抑制', async () => {

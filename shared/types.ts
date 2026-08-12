@@ -151,8 +151,39 @@ export interface MergeResult {
 /* Task domain (t11)                                                    */
 /* ------------------------------------------------------------------ */
 
-/** Lifecycle of a task. Only 'active' ↔ 'paused' is rule-driven; the rest is manual. */
-export type TaskStatus = 'active' | 'paused' | 'waiting' | 'completed'
+/**
+ * Lifecycle of a task (five-state machine, spec 实现决策 4). RUNNING is the
+ * single current task (domain invariant: runningTaskCount <= 1); WAITING is
+ * the system-inferred rest state (auto-resumable); PAUSED is a user-manual
+ * state that is immune to auto-resume; COMPLETED / ARCHIVED are terminal
+ * user actions — the system never revives them.
+ */
+export type TaskStatus = 'running' | 'waiting' | 'paused' | 'completed' | 'archived'
+
+/** Who drove the last status transition: the user or the system. */
+export type StatusSource = 'user' | 'system'
+
+/**
+ * Why a task entered its current status (written on every transition;
+ * absent only for legacy data that predates status annotation).
+ */
+export type StatusReason =
+  /** system: RUNNING -> WAITING via the idle timeout */
+  | 'activity_lost'
+  /** user: RUNNING -> PAUSED */
+  | 'user_paused'
+  /** user: PAUSED/WAITING -> RUNNING */
+  | 'user_resumed'
+  /** system: task switch — displaced old RUNNING task or a WAITING task taking RUNNING (attribution/new task) */
+  | 'auto_switch'
+  /** user: -> COMPLETED */
+  | 'user_completed'
+  /** user: -> ARCHIVED (also COMPLETED -> ARCHIVED) */
+  | 'user_archived'
+  /** user: COMPLETED/ARCHIVED -> RUNNING */
+  | 'user_restored'
+  /** system: legacy data migration (old 'active' -> RUNNING/WAITING) */
+  | 'migration'
 
 /**
  * An application a task is associated with.
@@ -200,6 +231,10 @@ export interface Task {
   id: string // 't_' prefix
   title: string
   status: TaskStatus
+  /** Who drove the last status transition — lets the UI tell "you paused it" apart from "the system judged it waiting". */
+  statusSource: StatusSource
+  /** Why the task entered its current status (set on every transition). */
+  statusReason?: StatusReason
   note?: string
   apps: AppRef[]
   resources: ResourceRef[]
@@ -213,9 +248,10 @@ export interface Task {
   updatedAt: number
   lastActiveAt: number
   /**
-   * Cumulative time the task has spent in 'active' (ms, ADR-0006). Settled
-   * whenever the task leaves active (manual pause/complete + idle timeout);
-   * never reset on resume. Displayed as "Running {duration}".
+   * Cumulative time the task has spent in RUNNING (ms, ADR-0006). Settled
+   * whenever the task leaves RUNNING (pause/complete/archive + idle timeout
+   * + auto-switch displacement); never reset on resume. Displayed as
+   * "Running {duration}".
    */
   activeMs: number
 }

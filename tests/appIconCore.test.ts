@@ -23,12 +23,15 @@ function makeTask(partial: Partial<TaskDto> = {}): TaskDto {
   return {
     id: 't_1',
     title: 'task',
-    status: 'active',
+    status: 'running',
+    statusSource: 'system',
     apps: [],
     resources: [],
+    windowTitles: [],
     createdAt: 1,
     updatedAt: 1,
     lastActiveAt: 1,
+    activeMs: 0,
     ...partial
   }
 }

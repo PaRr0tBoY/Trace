@@ -1,5 +1,5 @@
 /**
- * TaskList — status-grouped task list (Active > Waiting > Paused > Completed).
+ * TaskList — status-grouped task list (Running > Waiting > Paused > Completed > Archived).
  * Group order and in-group ordering come from main's sorted TaskDto push;
  * this component only slices the list into sections.
  */
@@ -17,10 +17,11 @@ interface Props {
 }
 
 const GROUP_LABEL: Record<TaskStatus, string> = {
-  active: 'groupActive',
+  running: 'groupRunning',
   waiting: 'groupWaiting',
   paused: 'groupPaused',
-  completed: 'groupCompleted'
+  completed: 'groupCompleted',
+  archived: 'groupArchived'
 }
 
 export function TaskList({ tasks, onOpen, onCreate, onDeleteRequest }: Props) {

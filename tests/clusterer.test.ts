@@ -35,12 +35,15 @@ function task(id: string, title: string, apps: string[], lastActiveAt = 0): Task
   return {
     id,
     title,
-    status: 'active',
+    status: 'running',
+    statusSource: 'system',
     apps: apps.map((a) => ({ id: a, name: a })),
     resources: [],
+    windowTitles: [],
     createdAt: 0,
     updatedAt: 0,
-    lastActiveAt
+    lastActiveAt,
+    activeMs: 0
   }
 }
 
@@ -210,12 +213,15 @@ describe('prefilterTasks — 规则预筛', () => {
     const tasks: Task[] = [{
       id: 't1',
       title: 'x',
-      status: 'active',
+      status: 'running',
+      statusSource: 'system',
       apps: [{ id: 'c:/apps/code.exe', name: '' }],
       resources: [],
+      windowTitles: [],
       createdAt: 0,
       updatedAt: 0,
-      lastActiveAt: 0
+      lastActiveAt: 0,
+      activeMs: 0
     }]
     const pool = prefilterTasks([ev('Code', 0)], tasks)
     expect(pool.map((t) => t.id)).toEqual(['t1'])

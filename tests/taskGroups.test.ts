@@ -7,21 +7,25 @@ function task(id: string, status: TaskDto['status']): TaskDto {
     id,
     title: id,
     status,
+    statusSource: 'system',
     apps: [],
     resources: [],
+    windowTitles: [],
     createdAt: 0,
     updatedAt: 0,
-    lastActiveAt: 0
+    lastActiveAt: 0,
+    activeMs: 0
   }
 }
 
 describe('groupTasksByStatus', () => {
-  it('groups into Active > Waiting > Paused > Completed order', () => {
+  it('groups into Running > Waiting > Paused > Completed > Archived order', () => {
     const tasks = [
       task('c', 'completed'),
       task('p', 'paused'),
-      task('a', 'active'),
-      task('w', 'waiting')
+      task('a', 'running'),
+      task('w', 'waiting'),
+      task('r', 'archived')
     ]
     const groups = groupTasksByStatus(tasks)
     expect(groups.map((g) => g.status)).toEqual(TASK_GROUP_ORDER)
@@ -29,30 +33,32 @@ describe('groupTasksByStatus', () => {
       ['a'],
       ['w'],
       ['p'],
-      ['c']
+      ['c'],
+      ['r']
     ])
   })
 
   it('preserves the incoming (main-sorted) order inside a group', () => {
-    const groups = groupTasksByStatus([task('a2', 'active'), task('a1', 'active')])
+    const groups = groupTasksByStatus([task('a2', 'running'), task('a1', 'running')])
     expect(groups[0].tasks.map((t) => t.id)).toEqual(['a2', 'a1'])
   })
 
   it('renders empty groups for missing statuses', () => {
-    const groups = groupTasksByStatus([task('a', 'active')])
-    expect(groups).toHaveLength(4)
-    expect(groups.map((g) => g.tasks.length)).toEqual([1, 0, 0, 0])
+    const groups = groupTasksByStatus([task('a', 'running')])
+    expect(groups).toHaveLength(5)
+    expect(groups.map((g) => g.tasks.length)).toEqual([1, 0, 0, 0, 0])
   })
 })
 
 describe('taskBadgeCount', () => {
   it('counts paused + waiting only', () => {
     const tasks = [
-      task('a', 'active'),
+      task('a', 'running'),
       task('w1', 'waiting'),
       task('w2', 'waiting'),
       task('p', 'paused'),
-      task('c', 'completed')
+      task('c', 'completed'),
+      task('r', 'archived')
     ]
     expect(taskBadgeCount(tasks)).toBe(3)
   })

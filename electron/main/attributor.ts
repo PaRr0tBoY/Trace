@@ -8,9 +8,10 @@
  * Matching contract (spec decision 2): an event's app identity is the
  * lowercase, slash-normalized exePath — or the process name when no exePath
  * is known. That key must equal the AppRef.id of the task (t11 convention).
- * Attribution itself (most-recently-active disambiguation, Paused auto-resume,
- * lastContext refresh) lives in TaskStore.applyAttribution; this module only
- * maps events to keys, calls it and nudges the renderer when a task changed.
+ * Attribution itself (most-recently-active disambiguation, WAITING auto-resume,
+ * PAUSED immunity, lastContext refresh) lives in TaskStore.applyAttribution;
+ * this module only maps events to keys, calls it and nudges the renderer
+ * when a task changed.
  *
  * Privacy gates (task-capture / L0 switches, incognito) are enforced at the
  * collector (foreground.ts): no events leave it while disabled, so there is

@@ -31,12 +31,14 @@ function makeHarness(deps?: Partial<Pick<TaskStoreDeps, 'isItemAlive'>>) {
 const app = (id: string, name = id): AppRef => ({ id, name })
 
 describe('TaskStore — create/update/delete', () => {
-  it('creates a task with t_ prefix, active status and injected clock timestamps', () => {
+  it('creates a task with t_ prefix, RUNNING status and injected clock timestamps', () => {
     const { store, now } = makeHarness()
     const task = store.create('写周报')
     expect(task).not.toBeNull()
     expect(task!.id).toMatch(/^t_/)
-    expect(task!.status).toBe('active')
+    expect(task!.status).toBe('running')
+    expect(task!.statusSource).toBe('system')
+    expect(task!.statusReason).toBe('auto_switch')
     expect(task!.createdAt).toBe(now())
     expect(task!.updatedAt).toBe(now())
     expect(task!.lastActiveAt).toBe(now())
@@ -167,62 +169,240 @@ describe('TaskStore — create/update/delete', () => {
   })
 })
 
-describe('TaskStore — manual status transitions (full transition table)', () => {
-  it('allows every manual transition and records resume as fresh activity', () => {
+describe('TaskStore — status machine: full transition table', () => {
+  it('allows every legal user transition and records source + reason', () => {
     const { store, tick } = makeHarness()
     const task = store.create('任务')!
     tick(60_000)
 
+    // running -> paused (user_paused), settling the RUNNING segment
     expect(store.update(task.id, { status: 'paused' })).toBe(true)
-    expect(store.get(task.id)!.status).toBe('paused')
+    let t = store.get(task.id)!
+    expect(t.status).toBe('paused')
+    expect(t.statusSource).toBe('user')
+    expect(t.statusReason).toBe('user_paused')
 
+    // paused -> running (user_resumed) — a manual resume is fresh activity
     tick(60_000)
-    expect(store.update(task.id, { status: 'waiting' })).toBe(true)
-    expect(store.get(task.id)!.status).toBe('waiting')
+    expect(store.update(task.id, { status: 'running' })).toBe(true)
+    t = store.get(task.id)!
+    expect(t.status).toBe('running')
+    expect(t.statusSource).toBe('user')
+    expect(t.statusReason).toBe('user_resumed')
+    expect(t.lastActiveAt).toBe(t.updatedAt)
 
+    // running -> completed (user_completed)
+    tick(60_000)
     expect(store.update(task.id, { status: 'completed' })).toBe(true)
+    t = store.get(task.id)!
+    expect(t.status).toBe('completed')
+    expect(t.statusSource).toBe('user')
+    expect(t.statusReason).toBe('user_completed')
+
+    // completed -> running (user_restored)
+    tick(60_000)
+    expect(store.update(task.id, { status: 'running' })).toBe(true)
+    t = store.get(task.id)!
+    expect(t.status).toBe('running')
+    expect(t.statusSource).toBe('user')
+    expect(t.statusReason).toBe('user_restored')
+
+    // running -> archived (user_archived)
+    expect(store.update(task.id, { status: 'archived' })).toBe(true)
+    t = store.get(task.id)!
+    expect(t.status).toBe('archived')
+    expect(t.statusSource).toBe('user')
+    expect(t.statusReason).toBe('user_archived')
+
+    // completed -> archived is also a user action
+    expect(store.update(task.id, { status: 'completed' })).toBe(false) // terminal: only restore
+    expect(store.update(task.id, { status: 'running' })).toBe(true)
+    expect(store.update(task.id, { status: 'completed' })).toBe(true)
+    expect(store.update(task.id, { status: 'archived' })).toBe(true)
+    expect(store.get(task.id)!.status).toBe('archived')
+  })
+
+  it('archives and restores round-trip: history survives, both lifecycle paths work', () => {
+    const { store, tick } = makeHarness()
+    const task = store.create('任务')!
+
+    // RUNNING -> ARCHIVED (user_archived): leaving RUNNING settles the segment.
+    tick(60_000)
+    expect(store.update(task.id, { status: 'archived' })).toBe(true)
+    let t = store.get(task.id)!
+    expect(t.status).toBe('archived')
+    expect(t.statusSource).toBe('user')
+    expect(t.statusReason).toBe('user_archived')
+    expect(t.activeMs).toBe(60_000)
+
+    // ARCHIVED -> RUNNING (user_restored): only a user may revive it.
+    tick(60_000)
+    expect(store.update(task.id, { status: 'running' })).toBe(true)
+    t = store.get(task.id)!
+    expect(t.status).toBe('running')
+    expect(t.statusSource).toBe('user')
+    expect(t.statusReason).toBe('user_restored')
+    expect(t.activeMs).toBe(60_000) // history kept across archive
+    expect(t.lastActiveAt).toBe(1_120_000) // resume refreshed it
+
+    // COMPLETED -> ARCHIVED is the other lifecycle path the UI exposes.
+    expect(store.update(task.id, { status: 'completed' })).toBe(true)
+    expect(store.update(task.id, { status: 'archived' })).toBe(true)
+    expect(store.get(task.id)!.status).toBe('archived')
+    expect(store.get(task.id)!.statusReason).toBe('user_archived')
+  })
+
+  it('rejects illegal user transitions', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务')!
+
+    // Users cannot fabricate WAITING (it is the system's rest state).
+    expect(store.update(task.id, { status: 'waiting' })).toBe(false)
+    expect(store.get(task.id)!.status).toBe('running')
+
+    // Pausing only makes sense while RUNNING.
+    store.update(task.id, { status: 'paused' })
+    expect(store.update(task.id, { status: 'paused' })).toBe(false) // same state
+    expect(store.update(task.id, { status: 'waiting' })).toBe(false)
+
+    // COMPLETED is terminal: only restore (or archive) is legal.
+    store.update(task.id, { status: 'running' })
+    store.update(task.id, { status: 'completed' })
+    expect(store.update(task.id, { status: 'paused' })).toBe(false)
+    expect(store.update(task.id, { status: 'waiting' })).toBe(false)
     expect(store.get(task.id)!.status).toBe('completed')
 
-    tick(60_000)
-    expect(store.update(task.id, { status: 'active' })).toBe(true)
-    expect(store.get(task.id)!.status).toBe('active')
-    expect(store.get(task.id)!.lastActiveAt).toBe(store.get(task.id)!.updatedAt)
+    // ARCHIVED is terminal: only a user restore may revive it.
+    store.update(task.id, { status: 'archived' })
+    expect(store.update(task.id, { status: 'completed' })).toBe(false)
+    expect(store.update(task.id, { status: 'paused' })).toBe(false)
+    expect(store.update(task.id, { status: 'waiting' })).toBe(false)
+    expect(store.get(task.id)!.status).toBe('archived')
   })
 
   it('rejects an invalid status value', () => {
     const { store } = makeHarness()
     const task = store.create('任务')!
     expect(store.update(task.id, { status: 'zombie' as never })).toBe(false)
-    expect(store.get(task.id)!.status).toBe('active')
+    expect(store.get(task.id)!.status).toBe('running')
+  })
+
+  it('rejects an illegal transition without touching other patch fields', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务')!
+    expect(store.update(task.id, { status: 'waiting', title: '新标题' })).toBe(false)
+    expect(store.get(task.id)!.title).toBe('任务')
+    expect(store.get(task.id)!.status).toBe('running')
+  })
+})
+
+describe('TaskStore — runningTaskCount <= 1 (domain invariant)', () => {
+  it('creating a task displaces the current RUNNING task to WAITING', () => {
+    const { store, tick } = makeHarness()
+    const first = store.create('第一个')!
+    tick(60_000)
+    const second = store.create('第二个')!
+
+    expect(store.get(first.id)!.status).toBe('waiting')
+    expect(store.get(first.id)!.statusSource).toBe('system')
+    expect(store.get(first.id)!.statusReason).toBe('auto_switch')
+    expect(store.get(first.id)!.activeMs).toBe(60_000) // left RUNNING: segment settled
+    expect(store.get(second.id)!.status).toBe('running')
+    expect(store.get(second.id)!.statusReason).toBe('auto_switch')
+    expect(store.list().filter((t) => t.status === 'running')).toHaveLength(1)
+  })
+
+  it('a user resume of a WAITING task displaces the current RUNNING task', () => {
+    const { store, tick } = makeHarness()
+    const first = store.create('第一个')!
+    expect(store.transition(first.id, 'waiting', 'system')).toBe(true) // system rests it
+    const second = store.create('第二个')! // takes RUNNING
+    tick(30_000)
+    expect(store.update(first.id, { status: 'running' })).toBe(true) // user resumes first
+
+    expect(store.get(second.id)!.status).toBe('waiting')
+    expect(store.get(second.id)!.statusSource).toBe('system')
+    expect(store.get(second.id)!.statusReason).toBe('auto_switch')
+    expect(store.get(second.id)!.activeMs).toBe(30_000) // left RUNNING: segment settled
+    expect(store.get(first.id)!.status).toBe('running')
+    expect(store.get(first.id)!.statusReason).toBe('user_resumed')
+    expect(store.list().filter((t) => t.status === 'running')).toHaveLength(1)
+  })
+
+  it('the public transition() seam enforces the invariant for system switches', () => {
+    const { store, tick } = makeHarness()
+    const a = store.create('A')!
+    const b = store.create('B')! // displaces A -> WAITING
+    expect(store.list().filter((t) => t.status === 'running')).toHaveLength(1)
+
+    // System auto-switch: a -> running while b is running.
+    tick(10_000)
+    expect(store.transition(a.id, 'running', 'system')).toBe(true)
+    expect(store.get(a.id)!.status).toBe('running')
+    expect(store.get(b.id)!.status).toBe('waiting')
+    expect(store.get(b.id)!.statusReason).toBe('auto_switch')
+    expect(store.get(b.id)!.activeMs).toBe(10_000)
+    expect(store.list().filter((t) => t.status === 'running')).toHaveLength(1)
+  })
+
+  it('system transitions may only rest RUNNING or resume WAITING', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务')!
+    // System may not pause, complete or archive.
+    expect(store.transition(task.id, 'paused', 'system')).toBe(false)
+    expect(store.transition(task.id, 'completed', 'system')).toBe(false)
+    expect(store.transition(task.id, 'archived', 'system')).toBe(false)
+    // System may rest an idle RUNNING task -> WAITING.
+    expect(store.transition(task.id, 'waiting', 'system')).toBe(true)
+    expect(store.get(task.id)!.statusReason).toBe('activity_lost')
+    // ...and bring it back.
+    expect(store.transition(task.id, 'running', 'system')).toBe(true)
+    expect(store.get(task.id)!.statusReason).toBe('auto_switch')
+  })
+
+  it('never revives COMPLETED or ARCHIVED via the system seam', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务')!
+    store.update(task.id, { status: 'completed' })
+    expect(store.transition(task.id, 'running', 'system')).toBe(false)
+    expect(store.transition(task.id, 'waiting', 'system')).toBe(false)
+    expect(store.get(task.id)!.status).toBe('completed')
+
+    store.update(task.id, { status: 'archived' })
+    expect(store.transition(task.id, 'running', 'system')).toBe(false)
+    expect(store.get(task.id)!.status).toBe('archived')
   })
 })
 
 describe('TaskStore — idle timeout state machine', () => {
-  it('keeps an active task active below the threshold', () => {
+  it('keeps a running task running below the threshold', () => {
     const { store, tick } = makeHarness()
     store.setPauseThreshold(15)
     const task = store.create('任务')!
     tick(14 * 60_000)
     expect(store.sweep()).toBe(0)
-    expect(store.get(task.id)!.status).toBe('active')
+    expect(store.get(task.id)!.status).toBe('running')
   })
 
-  it('auto-pauses at the threshold boundary (>= threshold)', () => {
+  it('auto-rests at the threshold boundary (>= threshold) into WAITING', () => {
     const { store, tick } = makeHarness()
     store.setPauseThreshold(15)
     const task = store.create('任务')!
     tick(15 * 60_000)
     expect(store.sweep()).toBe(1)
-    expect(store.get(task.id)!.status).toBe('paused')
+    const t = store.get(task.id)!
+    expect(t.status).toBe('waiting')
+    expect(t.statusSource).toBe('system')
+    expect(t.statusReason).toBe('activity_lost')
   })
 
-  it('persists the paused state when swept', () => {
+  it('persists the waiting state when swept', () => {
     const { store, tick, storage } = makeHarness()
     store.setPauseThreshold(15)
     const task = store.create('任务')!
     tick(20 * 60_000)
     store.sweep()
-    expect(storage.load()!.tasks.find((t) => t.id === task.id)!.status).toBe('paused')
+    expect(storage.load()!.tasks.find((t) => t.id === task.id)!.status).toBe('waiting')
   })
 
   it('re-evaluates the state machine at the end of every mutation', () => {
@@ -231,8 +411,8 @@ describe('TaskStore — idle timeout state machine', () => {
     const idle = store.create('闲置')!
     tick(16 * 60_000)
     const other = store.create('新任务')!
-    expect(store.get(idle.id)!.status).toBe('paused')
-    expect(store.get(other.id)!.status).toBe('active')
+    expect(store.get(idle.id)!.status).toBe('waiting')
+    expect(store.get(other.id)!.status).toBe('running')
   })
 
   it('clamps the threshold into 1-120 minutes', () => {
@@ -243,37 +423,65 @@ describe('TaskStore — idle timeout state machine', () => {
     expect(store.sweep()).toBe(0)
   })
 
-  it('paused tasks are not re-paused by the sweep', () => {
+  it('waiting tasks are not re-rested by the sweep', () => {
     const { store, tick } = makeHarness()
     store.setPauseThreshold(15)
     const task = store.create('任务')!
     tick(20 * 60_000)
     store.sweep()
     expect(store.sweep()).toBe(0)
-    expect(store.get(task.id)!.status).toBe('paused')
+    expect(store.get(task.id)!.status).toBe('waiting')
+  })
+
+  it('the sweep never touches PAUSED, COMPLETED or ARCHIVED tasks', () => {
+    const { store, tick } = makeHarness()
+    store.setPauseThreshold(15)
+    const paused = store.create('暂停')!
+    store.update(paused.id, { status: 'paused' })
+    const done = store.create('完成')!
+    store.update(done.id, { status: 'completed' })
+    const gone = store.create('归档')!
+    store.update(gone.id, { status: 'archived' })
+    tick(30 * 60_000)
+    expect(store.sweep()).toBe(0)
+    expect(store.get(paused.id)!.status).toBe('paused')
+    expect(store.get(done.id)!.status).toBe('completed')
+    expect(store.get(gone.id)!.status).toBe('archived')
   })
 })
 
 describe('TaskStore — attribution', () => {
-  it('attribution keeps an active task active and refreshes lastActiveAt', () => {
+  it('attribution keeps a running task running and refreshes lastActiveAt', () => {
     const { store, tick } = makeHarness()
     store.setPauseThreshold(15)
     const task = store.create('任务', { apps: [app('code.exe', 'Code')] })!
     tick(10 * 60_000)
     expect(store.applyAttribution('code.exe')).toBe(task.id)
-    expect(store.get(task.id)!.status).toBe('active')
+    expect(store.get(task.id)!.status).toBe('running')
     expect(store.get(task.id)!.lastActiveAt).toBeGreaterThan(1_000_000)
   })
 
-  it('auto-resumes a paused task on attribution', () => {
+  it('auto-resumes a WAITING task on attribution (system, auto_switch)', () => {
     const { store, tick } = makeHarness()
     store.setPauseThreshold(15)
     const task = store.create('任务', { apps: [app('code.exe')] })!
     tick(20 * 60_000)
     store.sweep()
-    expect(store.get(task.id)!.status).toBe('paused')
+    expect(store.get(task.id)!.status).toBe('waiting')
     expect(store.applyAttribution('code.exe')).toBe(task.id)
-    expect(store.get(task.id)!.status).toBe('active')
+    const t = store.get(task.id)!
+    expect(t.status).toBe('running')
+    expect(t.statusSource).toBe('system')
+    expect(t.statusReason).toBe('auto_switch')
+  })
+
+  it('never auto-resumes a user-paused task (PAUSED immunity)', () => {
+    const { store } = makeHarness()
+    const task = store.create('任务', { apps: [app('code.exe')] })!
+    store.update(task.id, { status: 'paused' })
+    expect(store.applyAttribution('code.exe')).toBeNull()
+    expect(store.get(task.id)!.status).toBe('paused')
+    expect(store.get(task.id)!.statusSource).toBe('user')
   })
 
   it('attributes to the most recently active task when several share an app', () => {
@@ -287,12 +495,14 @@ describe('TaskStore — attribution', () => {
     expect(store.get(newer.id)!.lastActiveAt).toBeGreaterThan(1_000_000)
   })
 
-  it('never attributes to waiting or completed tasks', () => {
+  it('never attributes to paused, completed or archived tasks', () => {
     const { store } = makeHarness()
-    const waiting = store.create('等待', { apps: [app('code.exe')] })!
-    store.update(waiting.id, { status: 'waiting' })
+    const paused = store.create('暂停', { apps: [app('code.exe')] })!
+    store.update(paused.id, { status: 'paused' })
     const done = store.create('完成', { apps: [app('code.exe')] })!
     store.update(done.id, { status: 'completed' })
+    const gone = store.create('归档', { apps: [app('code.exe')] })!
+    store.update(gone.id, { status: 'archived' })
     expect(store.applyAttribution('code.exe')).toBeNull()
   })
 
@@ -314,21 +524,29 @@ describe('TaskStore — attribution', () => {
 })
 
 describe('TaskStore — sorting', () => {
-  it('groups Active > Waiting > Paused > Completed, lastActiveAt desc within a group', () => {
+  it('groups Running > Waiting > Paused > Completed > Archived, lastActiveAt desc within a group', () => {
     const { store, tick } = makeHarness()
     store.setPauseThreshold(120)
-    store.create('A旧') // lastActiveAt = 1_000_000
+    store.create('A旧') // running, lastActiveAt = 1_000_000
     tick(10_000)
-    store.create('A新')
+    store.create('A新') // running, displaces A旧 -> waiting
+    tick(10_000)
     const waiting = store.create('W')!
-    store.update(waiting.id, { status: 'waiting' })
+    store.transition(waiting.id, 'waiting', 'system') // rest it
+    tick(10_000)
     const paused = store.create('P')!
     store.update(paused.id, { status: 'paused' })
+    tick(10_000)
     const done = store.create('C')!
     store.update(done.id, { status: 'completed' })
+    tick(10_000)
+    const gone = store.create('R')!
+    store.update(gone.id, { status: 'archived' })
+    tick(10_000)
+    store.create('RUN') // takes RUNNING
 
     const order = store.toDto().map((t) => t.title)
-    expect(order).toEqual(['A新', 'A旧', 'W', 'P', 'C'])
+    expect(order).toEqual(['RUN', 'W', 'A新', 'A旧', 'P', 'C', 'R'])
   })
 
   it('list() returns an array detached from the store', () => {
@@ -578,6 +796,8 @@ describe('TaskStore — persistence round-trip', () => {
     reloaded.load()
     const task2 = reloaded.get(task.id)!
     expect(task2).toEqual(store.get(task.id))
+    expect(task2.statusSource).toBe('user')
+    expect(task2.statusReason).toBe('user_paused')
   })
 
   it('round-trips the full task list', () => {
@@ -592,7 +812,7 @@ describe('TaskStore — persistence round-trip', () => {
     const reloaded = new TaskStore({ load: harness.storage.load, save: harness.storage.save, now: harness.now })
     reloaded.load()
     expect(reloaded.toDto().map((t) => [t.title, t.status])).toEqual([
-      ['A', 'active'],
+      ['A', 'waiting'],
       ['B', 'completed']
     ])
   })
@@ -622,11 +842,55 @@ describe('TaskStore — persistence round-trip', () => {
 
     const byId = new Map(store.list().map((t) => [t.id, t]))
     expect(byId.size).toBe(4)
-    expect(byId.get('t_ok')!.status).toBe('active')
-    expect(byId.get('t_badStatus')!.status).toBe('paused') // unknown status coerced, never resurrected as active
+    // Legacy 'active' migrates to RUNNING/WAITING: only the most recently
+    // active task (t_ok, lastActiveAt 3) stays RUNNING.
+    expect(byId.get('t_ok')!.status).toBe('running')
+    expect(byId.get('t_ok')!.statusSource).toBe('system')
+    expect(byId.get('t_ok')!.statusReason).toBe('migration')
+    expect(byId.get('t_badStatus')!.status).toBe('paused') // unknown status coerced, never resurrected as running
     expect(byId.get('t_badNums')!.createdAt).toBe(0)
+    expect(byId.get('t_badNums')!.status).toBe('waiting')
     expect(byId.get('t_badRes')!.apps).toEqual([])
     expect(byId.get('t_badRes')!.resources).toEqual([])
+    expect(store.list().filter((t) => t.status === 'running')).toHaveLength(1)
+  })
+
+  it('migrates a legacy multi-active index: most recent RUNNING, the rest WAITING', () => {
+    const legacy = [
+      { id: 't_old', title: '旧', status: 'active', createdAt: 1, updatedAt: 2, lastActiveAt: 100, apps: [], resources: [] },
+      { id: 't_new', title: '新', status: 'active', createdAt: 3, updatedAt: 4, lastActiveAt: 300, apps: [], resources: [] },
+      { id: 't_mid', title: '中', status: 'active', createdAt: 2, updatedAt: 3, lastActiveAt: 200, apps: [], resources: [] },
+      { id: 't_p', title: '暂停', status: 'paused', createdAt: 1, updatedAt: 2, lastActiveAt: 50, apps: [], resources: [] },
+      { id: 't_done', title: '完成', status: 'completed', createdAt: 1, updatedAt: 2, lastActiveAt: 60, apps: [], resources: [] }
+    ]
+    const store = new TaskStore({ load: () => ({ version: 1, tasks: legacy as never }), save: () => {} })
+    store.load()
+
+    const byId = new Map(store.list().map((t) => [t.id, t]))
+    expect(byId.get('t_new')!.status).toBe('running')
+    expect(byId.get('t_new')!.statusSource).toBe('system')
+    expect(byId.get('t_new')!.statusReason).toBe('migration')
+    expect(byId.get('t_old')!.status).toBe('waiting')
+    expect(byId.get('t_old')!.statusSource).toBe('system')
+    expect(byId.get('t_mid')!.status).toBe('waiting')
+    // Non-active legacy statuses are untouched by the migration.
+    expect(byId.get('t_p')!.status).toBe('paused')
+    expect(byId.get('t_done')!.status).toBe('completed')
+    expect(store.list().filter((t) => t.status === 'running')).toHaveLength(1)
+  })
+
+  it('repairs a corrupt index with multiple RUNNING tasks at load', () => {
+    const corrupt = [
+      { id: 't_a', title: 'A', status: 'running', statusSource: 'system', statusReason: 'auto_switch', createdAt: 1, updatedAt: 2, lastActiveAt: 100, apps: [], resources: [] },
+      { id: 't_b', title: 'B', status: 'running', statusSource: 'system', statusReason: 'auto_switch', createdAt: 1, updatedAt: 2, lastActiveAt: 200, apps: [], resources: [] }
+    ]
+    const store = new TaskStore({ load: () => ({ version: 2, tasks: corrupt as never }), save: () => {} })
+    store.load()
+
+    expect(store.get('t_b')!.status).toBe('running')
+    expect(store.get('t_a')!.status).toBe('waiting')
+    expect(store.get('t_a')!.statusReason).toBe('auto_switch')
+    expect(store.list().filter((t) => t.status === 'running')).toHaveLength(1)
   })
 })
 
@@ -717,7 +981,7 @@ describe('TaskStore — t27 evidence fields (windowTitles/confidence/reason)', (
 })
 
 describe('TaskStore — activeMs cumulative active duration (ADR-0006)', () => {
-  it('starts at zero and settles the active segment on manual pause', () => {
+  it('starts at zero and settles the RUNNING segment on manual pause', () => {
     const { store, tick } = makeHarness()
     const task = store.create('任务')!
     expect(task!.activeMs).toBe(0)
@@ -728,7 +992,7 @@ describe('TaskStore — activeMs cumulative active duration (ADR-0006)', () => {
     expect(store.get(task.id)!.status).toBe('paused')
   })
 
-  it('settles on complete and waiting too, not only pause', () => {
+  it('settles on complete and auto-wait too, not only pause', () => {
     const { store, tick } = makeHarness()
     const task = store.create('任务')!
     tick(45_000)
@@ -736,17 +1000,18 @@ describe('TaskStore — activeMs cumulative active duration (ADR-0006)', () => {
     expect(store.get(task.id)!.activeMs).toBe(45_000)
 
     const other = store.create('另一个')!
-    tick(10_000)
-    store.update(other.id, { status: 'waiting' })
-    expect(store.get(other.id)!.activeMs).toBe(10_000)
+    tick(16 * 60_000) // past the default 15-minute idle threshold
+    expect(store.sweep()).toBe(1) // idle timeout rests it as WAITING
+    expect(store.get(other.id)!.activeMs).toBe(16 * 60_000)
+    expect(store.get(other.id)!.status).toBe('waiting')
   })
 
-  it('settles on the idle-timeout auto-pause', () => {
+  it('settles on the idle-timeout auto-rest into WAITING', () => {
     const { store, tick } = makeHarness()
     const task = store.create('任务')!
     tick(15 * 60_000) // exactly at the default threshold
     expect(store.sweep()).toBe(1)
-    expect(store.get(task.id)!.status).toBe('paused')
+    expect(store.get(task.id)!.status).toBe('waiting')
     expect(store.get(task.id)!.activeMs).toBe(15 * 60_000)
   })
 
@@ -758,19 +1023,28 @@ describe('TaskStore — activeMs cumulative active duration (ADR-0006)', () => {
     expect(store.get(task.id)!.activeMs).toBe(60_000)
 
     tick(60_000) // paused time is NOT counted
-    store.update(task.id, { status: 'active' })
+    store.update(task.id, { status: 'running' })
     tick(30_000)
     store.update(task.id, { status: 'paused' })
     expect(store.get(task.id)!.activeMs).toBe(90_000)
 
-    // active -> completed settles too, and a restored task keeps its history.
+    // running -> completed settles too, and a restored task keeps its history.
     tick(60_000) // still paused: nothing settles
-    store.update(task.id, { status: 'active' })
+    store.update(task.id, { status: 'running' })
     tick(60_000)
     store.update(task.id, { status: 'completed' })
     expect(store.get(task.id)!.activeMs).toBe(150_000)
-    store.update(task.id, { status: 'active' })
+    store.update(task.id, { status: 'running' })
     expect(store.get(task.id)!.activeMs).toBe(150_000)
+  })
+
+  it('settles the displaced task when a new task takes RUNNING', () => {
+    const { store, tick } = makeHarness()
+    const first = store.create('第一个')!
+    tick(90_000)
+    store.create('第二个')! // displaces first -> WAITING
+    expect(store.get(first.id)!.status).toBe('waiting')
+    expect(store.get(first.id)!.activeMs).toBe(90_000)
   })
 
   it('merge keeps the larger settled value instead of summing', () => {
@@ -786,6 +1060,21 @@ describe('TaskStore — activeMs cumulative active duration (ADR-0006)', () => {
     expect(store.merge(target.id, source.id)).toBe(true)
     expect(store.get(target.id)!.activeMs).toBe(60_000)
     expect(store.get(source.id)).toBeUndefined()
+  })
+
+  it('merging a RUNNING source settles its segment before deletion', () => {
+    const { store, tick } = makeHarness()
+    const target = store.create('目标')!
+    tick(60_000)
+    const source = store.create('来源')! // displaces target -> WAITING
+    tick(30_000)
+
+    expect(store.merge(target.id, source.id)).toBe(true)
+    expect(store.get(source.id)).toBeUndefined()
+    // The absorbed RUNNING source's in-flight segment (30s) was settled
+    // before the merge deleted it; the target keeps the larger value.
+    expect(store.get(target.id)!.activeMs).toBe(60_000)
+    expect(store.get(target.id)!.status).toBe('waiting')
   })
 
   it('sanitize defaults missing activeMs to 0 and clamps negatives', () => {

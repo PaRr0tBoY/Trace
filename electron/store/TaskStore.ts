@@ -6,12 +6,23 @@
  * fake clock. The main process assembles the real file adapter (PATHS +
  * safeStorage encryption) around this class.
  *
- * Rules only — no AI anywhere in this module. The state machine:
- *   - Active -> Paused: no attribution event for taskPauseThresholdMinutes.
- *   - Paused -> Active: attribution event (auto-resume).
- *   - Waiting / Completed: manual transitions only.
- *   - Multiple tasks may be Active at once; attribution picks the most
- *     recently active task when several share an app.
+ * Rules only — no AI anywhere in this module. The state machine (spec
+ * 实现决策 4, CONTEXT.md 任务词条):
+ *   - RUNNING is globally unique: `transition` (and every path that changes
+ *     status) enforces runningTaskCount <= 1. Switching = the old task
+ *     leaves RUNNING (-> WAITING, auto_switch) + the new task enters
+ *     RUNNING, atomically.
+ *   - WAITING is the system-inferred rest state: the idle timeout moves an
+ *     idle RUNNING task there (activity_lost) and attribution auto-resumes
+ *     it. Users cannot fabricate WAITING.
+ *   - PAUSED is a user-manual state, immune to auto-resume: the system
+ *     never touches a paused task.
+ *   - COMPLETED / ARCHIVED are user actions only; the system never revives
+ *     them, and a user restore is the only way back to RUNNING.
+ *   - Every transition records statusSource (user/system) + statusReason.
+ *   - Legacy data: old multi-'active' indexes keep only the most recently
+ *     active task RUNNING; the rest downgrade to WAITING (statusSource
+ *     system, reason migration).
  */
 import { createId } from './ids'
 import type {
@@ -19,6 +30,8 @@ import type {
   ClipboardItem,
   ResourceRef,
   ResourceSnapshot,
+  StatusReason,
+  StatusSource,
   Task,
   TaskDto,
   TaskPatch,
@@ -39,17 +52,31 @@ export interface TaskStoreDeps {
   isItemAlive?: (itemId: string) => boolean
 }
 
-export const STORAGE_VERSION = 1
+export const STORAGE_VERSION = 2
 const TASK_ID_PREFIX = 't_'
 const TEXT_PREVIEW_LENGTH = 200
 const DEFAULT_PAUSE_THRESHOLD_MINUTES = 15
 const MIN_PAUSE_THRESHOLD_MINUTES = 1
 const MAX_PAUSE_THRESHOLD_MINUTES = 120
-const VALID_STATUSES: readonly TaskStatus[] = ['active', 'paused', 'waiting', 'completed']
-const STATUS_ORDER: Record<TaskStatus, number> = { active: 0, waiting: 1, paused: 2, completed: 3 }
+const VALID_STATUSES: readonly TaskStatus[] = ['running', 'waiting', 'paused', 'completed', 'archived']
+const STATUS_ORDER: Record<TaskStatus, number> = { running: 0, waiting: 1, paused: 2, completed: 3, archived: 4 }
+const VALID_REASONS: readonly StatusReason[] = [
+  'activity_lost',
+  'user_paused',
+  'user_resumed',
+  'auto_switch',
+  'user_completed',
+  'user_archived',
+  'user_restored',
+  'migration'
+]
 
 function isTaskStatus(v: unknown): v is TaskStatus {
   return typeof v === 'string' && (VALID_STATUSES as readonly string[]).includes(v)
+}
+
+function isStatusReason(v: unknown): v is StatusReason {
+  return typeof v === 'string' && (VALID_REASONS as readonly string[]).includes(v)
 }
 
 function isFiniteNumber(v: unknown): v is number {
@@ -168,8 +195,20 @@ function sanitizeTask(raw: unknown): Task | null {
   const t = raw as Record<string, unknown>
   if (!nonEmptyString(t.id) || !nonEmptyString(t.title)) return null
 
-  let status: TaskStatus = 'paused' // unknown status must never resurrect as active
-  if (isTaskStatus(t.status)) status = t.status
+  // Legacy 'active' maps to RUNNING with a migration marker (sanitizeIndex
+  // resolves the multi-active case); an unknown status must never resurrect
+  // as running, so it defaults to the inert PAUSED.
+  let status: TaskStatus = 'paused'
+  let statusSource: StatusSource = t.statusSource === 'user' ? 'user' : 'system'
+  let statusReason: StatusReason | undefined
+  if (t.status === 'active') {
+    status = 'running'
+    statusSource = 'system'
+    statusReason = 'migration'
+  } else if (isTaskStatus(t.status)) {
+    status = t.status
+  }
+  if (isStatusReason(t.statusReason)) statusReason = t.statusReason
 
   const apps: AppRef[] = []
   const seenAppIds = new Set<string>()
@@ -246,6 +285,8 @@ function sanitizeTask(raw: unknown): Task | null {
     id: t.id,
     title: t.title.trim(),
     status,
+    statusSource,
+    statusReason,
     note: typeof t.note === 'string' && t.note.trim() ? t.note.trim() : undefined,
     apps,
     resources,
@@ -273,7 +314,7 @@ export class TaskStore {
     this.tasks = sanitizeIndex(this.deps.load())
   }
 
-  /** Active -> Paused for tasks idle past the threshold. Returns transitions. */
+  /** RUNNING -> WAITING for tasks idle past the threshold. Returns transitions. */
   sweep(): number {
     const changed = this.applyIdleTimeout()
     if (changed > 0) this.persist()
@@ -289,14 +330,15 @@ export class TaskStore {
 
   /**
    * Attribute a foreground-app event to the most recently active matching
-   * task (Active or Paused; Waiting/Completed are manual-only). Auto-resumes
-   * Paused tasks and refreshes the matched AppRef's context. Returns the
-   * attributed task id, or null when nothing matches.
+   * task (RUNNING or WAITING). A WAITING task auto-resumes to RUNNING
+   * (system, auto_switch); PAUSED is immune to auto-resume and
+   * COMPLETED/ARCHIVED are never revived. Refreshes the matched AppRef's
+   * context. Returns the attributed task id, or null when nothing matches.
    */
   applyAttribution(appKey: string, context?: AppRef['lastContext']): string | null {
     let best: Task | null = null
     for (const t of this.tasks) {
-      if (t.status !== 'active' && t.status !== 'paused') continue
+      if (t.status !== 'running' && t.status !== 'waiting') continue
       if (t.apps.some((a) => a.id === appKey) && (!best || t.lastActiveAt > best.lastActiveAt)) {
         best = t
       }
@@ -314,9 +356,14 @@ export class TaskStore {
     }
     // Most-recently-used order: touched app first.
     best.apps = [app, ...best.apps.filter((a) => a !== app)]
-    best.status = 'active'
-    best.lastActiveAt = this.now()
-    best.updatedAt = this.now()
+    if (best.status === 'waiting') {
+      // System auto-resume: WAITING is the only state the system may bring
+      // back to RUNNING (displaces any current RUNNING task, atomically).
+      this.applyTransition(best, 'running', 'system')
+    } else {
+      best.lastActiveAt = this.now()
+      best.updatedAt = this.now()
+    }
     this.finish()
     return best.id
   }
@@ -331,7 +378,9 @@ export class TaskStore {
     const task: Task = {
       id: `${TASK_ID_PREFIX}${createId()}`,
       title: clean,
-      status: 'active',
+      status: 'running',
+      statusSource: 'system',
+      statusReason: 'auto_switch',
       note: opts?.note?.trim() || undefined,
       apps: dedupeApps(opts?.apps ?? []),
       resources: dedupeResources(opts?.resources ?? []),
@@ -344,6 +393,9 @@ export class TaskStore {
       activeMs: 0
     }
     this.tasks.push(task)
+    // A new task takes RUNNING; the previous RUNNING task (if any) leaves
+    // RUNNING for WAITING atomically — runningTaskCount stays <= 1.
+    this.makeRunning(task, now)
     this.finish()
     return task
   }
@@ -366,6 +418,11 @@ export class TaskStore {
     if (patch.apps !== undefined && !Array.isArray(patch.apps)) return false
     if (patch.clipboardRefs !== undefined && !Array.isArray(patch.clipboardRefs)) return false
 
+    // Status changes go through the state machine as user-driven transitions
+    // (illegal ones reject the whole update). Other patches apply below.
+    if (patch.status !== undefined && !this.applyTransition(task, patch.status, 'user')) {
+      return false
+    }
     if (patch.title !== undefined) task.title = patch.title.trim()
     if (patch.note !== undefined) task.note = patch.note.trim() || undefined
     if (patch.windowTitles !== undefined) task.windowTitles = dedupeStrings(patch.windowTitles)
@@ -383,17 +440,6 @@ export class TaskStore {
         task.resources.filter((r) => r.kind === 'files')
       )
       task.resources = [...clipboard, ...files]
-    }
-    if (patch.status !== undefined) {
-      const now = this.now()
-      // Leaving active settles the in-flight segment (ADR-0006); a resume
-      // keeps the accumulated time and starts a fresh segment.
-      if (task.status === 'active' && patch.status !== 'active') {
-        this.settleActiveSegment(task, now)
-      }
-      task.status = patch.status
-      // A manual resume is fresh activity; other transitions keep idle history.
-      if (patch.status === 'active') task.lastActiveAt = now
     }
     task.updatedAt = this.now()
     this.finish()
@@ -426,6 +472,10 @@ export class TaskStore {
     // Summing would double-count (a temp candidate task is ~0 anyway);
     // the larger settled value wins (ADR-0006).
     target.activeMs = Math.max(target.activeMs, source.activeMs)
+    // A RUNNING source leaves RUNNING when it is absorbed — settle its
+    // in-flight segment first (runningTaskCount only ever decreases here;
+    // the target status is untouched by a merge).
+    if (source.status === 'running') this.settleActiveSegment(source, this.now())
     target.updatedAt = this.now()
     this.tasks = this.tasks.filter((t) => t.id !== sourceId)
     this.finish()
@@ -514,6 +564,22 @@ export class TaskStore {
     }))
   }
 
+  /**
+   * Domain-level transition seam (spec 实现决策 4): the only public way to
+   * move a task between states with a source annotation, and the only path
+   * that can change which task is RUNNING. The current-task controller
+   * drives system transitions (auto-switch, activity loss) through this
+   * method; user actions go through update({ status }) which delegates here
+   * with source 'user'. Illegal transitions return false and change nothing.
+   */
+  transition(id: string, to: TaskStatus, source: StatusSource): boolean {
+    const task = this.tasks.find((t) => t.id === id)
+    if (!task) return false
+    if (!this.applyTransition(task, to, source)) return false
+    this.finish()
+    return true
+  }
+
   /* ------------------------------ internals ------------------------------ */
 
   private now(): number {
@@ -530,17 +596,101 @@ export class TaskStore {
     )
   }
 
+  /**
+   * The single transition core — every status change in the store funnels
+   * through here, so the runningTaskCount <= 1 invariant, PAUSED immunity,
+   * the COMPLETED/ARCHIVED terminal rule and the source/reason bookkeeping
+   * cannot be bypassed by any path.
+   *
+   * Legal table:
+   *   user:   running -> paused | completed | archived
+   *           waiting -> running | completed | archived
+   *           paused  -> running | completed | archived
+   *           completed -> running (restore) | archived
+   *           archived  -> running (restore)
+   *   system: running -> waiting (activity_lost), waiting -> running
+   *           (auto_switch) — nothing else: PAUSED is immune, COMPLETED and
+   *           ARCHIVED are never auto-revived.
+   * Users cannot fabricate WAITING (it is the system's rest state) and a
+   * manual pause only makes sense while RUNNING.
+   */
+  private applyTransition(task: Task, to: TaskStatus, source: StatusSource): boolean {
+    if (task.status === to) return false
+    const from = task.status
+    const now = this.now()
+
+    if (source === 'system') {
+      // The system only rests an idle RUNNING task or brings a WAITING task
+      // back. It never touches PAUSED (immune), COMPLETED or ARCHIVED.
+      const systemLegal = (from === 'running' && to === 'waiting') || (from === 'waiting' && to === 'running')
+      if (!systemLegal) return false
+    } else {
+      // WAITING is the system's rest state — users pause/resume/complete,
+      // they don't fabricate waiting; pausing a non-RUNNING task is a no-op.
+      if (to === 'waiting') return false
+      if (to === 'paused' && from !== 'running') return false
+      // COMPLETED/ARCHIVED are terminal: a user may restore them to RUNNING,
+      // or move a COMPLETED task to ARCHIVED, but nothing else.
+      if ((from === 'completed' || from === 'archived') && to !== 'running' && !(from === 'completed' && to === 'archived')) {
+        return false
+      }
+    }
+
+    // Leaving RUNNING settles the in-flight active segment (ADR-0006).
+    if (from === 'running') this.settleActiveSegment(task, now)
+
+    if (to === 'running') {
+      // Switching = the old RUNNING task leaves (-> WAITING, auto_switch) +
+      // this task enters RUNNING, atomically.
+      this.makeRunning(task, now)
+    } else {
+      task.status = to
+    }
+    task.statusSource = source
+    task.statusReason = this.reasonFor(from, to, source)
+    task.updatedAt = now
+    return true
+  }
+
+  /**
+   * Make `task` RUNNING. The previous RUNNING task (if any) leaves RUNNING
+   * for WAITING (system, auto_switch), settling its active segment — the
+   * runningTaskCount <= 1 invariant holds on every path that enters RUNNING.
+   */
+  private makeRunning(task: Task, now: number): void {
+    for (const other of this.tasks) {
+      if (other.status !== 'running' || other.id === task.id) continue
+      this.settleActiveSegment(other, now)
+      other.status = 'waiting'
+      other.statusSource = 'system'
+      other.statusReason = 'auto_switch'
+      other.updatedAt = now
+    }
+    task.status = 'running'
+    task.lastActiveAt = now
+  }
+
+  /** The transition table's reason vocabulary (statusSource/statusReason contract). */
+  private reasonFor(from: TaskStatus, to: TaskStatus, source: StatusSource): StatusReason {
+    if (to === 'running') {
+      if (source === 'user') return from === 'completed' || from === 'archived' ? 'user_restored' : 'user_resumed'
+      return 'auto_switch'
+    }
+    if (to === 'waiting') return 'activity_lost'
+    if (to === 'paused') return 'user_paused'
+    if (to === 'completed') return 'user_completed'
+    return 'user_archived'
+  }
+
   private applyIdleTimeout(): number {
     const now = this.now()
     const cutoff = now - this.pauseThresholdMinutes * 60_000
     let changed = 0
     for (const t of this.tasks) {
-      // Elapsed >= threshold: idle exactly AT the threshold counts as overdue.
-      if (t.status === 'active' && t.lastActiveAt <= cutoff) {
-        this.settleActiveSegment(t, now)
-        t.status = 'paused'
-        t.updatedAt = now
-        changed++
+      // Elapsed >= threshold: idle exactly AT the threshold counts as
+      // overdue. Idle RUNNING tasks rest as WAITING (system, activity_lost).
+      if (t.status === 'running' && t.lastActiveAt <= cutoff) {
+        if (this.applyTransition(t, 'waiting', 'system')) changed++
       }
     }
     return changed
@@ -553,11 +703,11 @@ export class TaskStore {
   }
 
   /**
-   * Fold the current active segment into activeMs (ADR-0006). Idempotent —
-   * a task that already left active has nothing left to settle.
+   * Fold the current RUNNING segment into activeMs (ADR-0006). Idempotent —
+   * a task that already left RUNNING has nothing left to settle.
    */
   private settleActiveSegment(task: Task, now: number): void {
-    if (task.status !== 'active' || task.lastActiveAt <= 0) return
+    if (task.status !== 'running' || task.lastActiveAt <= 0) return
     task.activeMs = Math.max(0, task.activeMs + (now - task.lastActiveAt))
   }
 
@@ -575,6 +725,20 @@ function sanitizeIndex(index: TaskIndex | null): Task[] {
     if (!task || seenIds.has(task.id)) continue
     seenIds.add(task.id)
     tasks.push(task)
+  }
+  // Migration + invariant repair (spec 实现决策 4): at most one RUNNING task
+  // may survive a load. Legacy multi-'active' indexes (sanitizeTask marks
+  // them with statusReason 'migration') and any corrupt index keep only the
+  // most recently active task RUNNING; the rest rest as WAITING (system).
+  const running = tasks.filter((t) => t.status === 'running')
+  if (running.length > 1) {
+    running.sort((a, b) => b.lastActiveAt - a.lastActiveAt)
+    for (const t of running.slice(1)) {
+      t.status = 'waiting'
+      t.statusSource = 'system'
+      // Keep the migration provenance; other repairs read as an auto-switch.
+      if (t.statusReason !== 'migration') t.statusReason = 'auto_switch'
+    }
   }
   return tasks
 }

@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import { relativeTime, previewText, formatDuration } from '../../lib/format'
+import { taskStatusHintKey } from '../../lib/taskGroups'
 import type { TaskDto, TaskStatus } from '../../../shared/types'
 import {
   PauseIcon,
@@ -52,19 +53,21 @@ export function TaskCard({ task, onOpen, onDeleteRequest }: Props) {
 
   const statusAction = (status: TaskStatus): { key: string; label: string; icon: JSX.Element; next: TaskStatus } | null => {
     switch (status) {
-      case 'active':
+      case 'running':
         return { key: 'pause', label: t('tasks.pause'), icon: <PauseIcon width={13} height={13} />, next: 'paused' }
       case 'paused':
       case 'waiting':
-        return { key: 'resume', label: t('tasks.resume'), icon: <ResumeIcon width={13} height={13} />, next: 'active' }
+        return { key: 'resume', label: t('tasks.resume'), icon: <ResumeIcon width={13} height={13} />, next: 'running' }
       case 'completed':
-        return { key: 'restore', label: t('tasks.restore'), icon: <RestoreIcon width={13} height={13} />, next: 'active' }
+      case 'archived':
+        return { key: 'restore', label: t('tasks.restore'), icon: <RestoreIcon width={13} height={13} />, next: 'running' }
     }
   }
 
   const action = statusAction(task.status)
-  const canComplete = task.status !== 'completed'
-  const now = useNowTick(30_000, task.status === 'active')
+  const canComplete = task.status !== 'completed' && task.status !== 'archived'
+  const statusHintKey = taskStatusHintKey(task)
+  const now = useNowTick(30_000, task.status === 'running')
 
   return (
     <div
@@ -77,7 +80,7 @@ export function TaskCard({ task, onOpen, onDeleteRequest }: Props) {
         <div className="task-card-body">
           <div className="task-title">{task.title}</div>
           {task.note && <div className="task-note">{previewText(task.note, 80)}</div>}
-          {task.status === 'active' && (
+          {task.status === 'running' && (
             <div className="task-time">
               {t('tasks.activeAt', { time: relativeTime(task.lastActiveAt) })} ·{' '}
               {t('tasks.runningTime', { duration: formatDuration(task.activeMs + (now - task.lastActiveAt)) })}
@@ -86,6 +89,11 @@ export function TaskCard({ task, onOpen, onDeleteRequest }: Props) {
           {task.status === 'paused' && task.activeMs > 0 && (
             <div className="task-time paused">
               {t('tasks.runningTime', { duration: formatDuration(task.activeMs) })}
+            </div>
+          )}
+          {statusHintKey && (
+            <div className="task-status-hint">
+              {t(`tasks.${statusHintKey}`)}
             </div>
           )}
           <div className="task-card-footer">

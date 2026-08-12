@@ -184,8 +184,8 @@ export function initState(): void {
     staleDays: settings.memoryStaleDays,
     cleanupScore: settings.memoryCleanupScore
   })
-  const swept = taskStore.sweep() // stale Active tasks from a previous session must not masquerade as live
-  console.log(`[Task] store ready: ${taskStore.list().length} tasks${swept > 0 ? `, ${swept} idle-paused` : ''}`)
+  const swept = taskStore.sweep() // stale RUNNING tasks from a previous session must not masquerade as live
+  console.log(`[Task] store ready: ${taskStore.list().length} tasks${swept > 0 ? `, ${swept} idle-rested` : ''}`)
   if (loadSettings().clearUnpinnedOnRestart) {
     store.clearUnpinned()
   }

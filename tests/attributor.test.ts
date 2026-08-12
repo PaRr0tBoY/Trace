@@ -77,7 +77,7 @@ describe('Attributor', () => {
 
     bus.fire(ev())
     expect(onAttributed).toHaveBeenCalledWith(task.id)
-    expect(store.get(task.id)!.status).toBe('active')
+    expect(store.get(task.id)!.status).toBe('running')
     expect(store.get(task.id)!.lastActiveAt).toBe(1_060_000)
   })
 
@@ -98,25 +98,38 @@ const CHROME_KEY = 'c:/program files/google/chrome/application/chrome.exe'
     expect(onAttributed).toHaveBeenCalledOnce()
     expect(onAttributed).toHaveBeenCalledWith(newer.id)
     expect(store.get(newer.id)!.lastActiveAt).toBe(1_120_000)
-    // Losers are untouched: no bump, no status change, no interruption.
+    // The two earlier tasks were displaced to WAITING when each newer task
+    // took RUNNING; the attribution itself bumps only the newest.
     expect(store.get(older.id)!.lastActiveAt).toBe(1_000_000)
     expect(store.get(middle.id)!.lastActiveAt).toBe(1_060_000)
-    expect(store.get(older.id)!.status).toBe('active')
-    expect(store.get(middle.id)!.status).toBe('active')
+    expect(store.get(older.id)!.status).toBe('waiting')
+    expect(store.get(middle.id)!.status).toBe('waiting')
   })
 
-  it('auto-resumes a paused task on an attribution event', () => {
+  it('auto-resumes a waiting task on an attribution event', () => {
     const { store, tick } = makeHarness()
     store.setPauseThreshold(15)
     const task = store.create('写周报', { apps: [app('code.exe')] })!
     tick(20 * 60_000)
     store.sweep()
-    expect(store.get(task.id)!.status).toBe('paused')
+    expect(store.get(task.id)!.status).toBe('waiting')
     const { bus, onAttributed } = makeAttributor(store)
 
     bus.fire(ev({ exePath: 'code.exe' }))
     expect(onAttributed).toHaveBeenCalledWith(task.id)
-    expect(store.get(task.id)!.status).toBe('active')
+    expect(store.get(task.id)!.status).toBe('running')
+  })
+
+  it('does not auto-resume a user-paused task (PAUSED immunity)', () => {
+    const { store } = makeHarness()
+    const task = store.create('写周报', { apps: [app('code.exe')] })!
+    store.update(task.id, { status: 'paused' })
+    expect(store.get(task.id)!.status).toBe('paused')
+    const { bus, onAttributed } = makeAttributor(store)
+
+    bus.fire(ev({ exePath: 'code.exe' }))
+    expect(onAttributed).not.toHaveBeenCalled()
+    expect(store.get(task.id)!.status).toBe('paused')
   })
 
   it('does nothing when no task matches the event app', () => {
@@ -130,12 +143,14 @@ const CHROME_KEY = 'c:/program files/google/chrome/application/chrome.exe'
     expect(store.get(task.id)!.lastActiveAt).toBe(1_000_000)
   })
 
-  it('never attributes to waiting or completed tasks', () => {
+  it('never attributes to paused, completed or archived tasks', () => {
     const { store } = makeHarness()
-    const waiting = store.create('等待', { apps: [app('code.exe')] })!
-    store.update(waiting.id, { status: 'waiting' })
+    const paused = store.create('暂停', { apps: [app('code.exe')] })!
+    store.update(paused.id, { status: 'paused' })
     const done = store.create('完成', { apps: [app('code.exe')] })!
     store.update(done.id, { status: 'completed' })
+    const gone = store.create('归档', { apps: [app('code.exe')] })!
+    store.update(gone.id, { status: 'archived' })
     const { bus, onAttributed } = makeAttributor(store)
 
     bus.fire(ev({ exePath: 'code.exe' }))

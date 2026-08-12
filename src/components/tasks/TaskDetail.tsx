@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import { basename } from '../../lib/format'
+import { taskStatusHintKey } from '../../lib/taskGroups'
 import { useDragOut } from '../../hooks/useDragOut'
 import { AppIcon } from './AppIcon'
 import type { AppRef, ResourceRef, TaskDto, TaskStatus } from '../../../shared/types'
@@ -22,6 +23,7 @@ import {
   ResumeIcon,
   CompleteIcon,
   RestoreIcon,
+  ArchiveIcon,
   PlusIcon
 } from '../icons'
 
@@ -34,10 +36,11 @@ interface Props {
 }
 
 const STATUS_LABEL: Record<TaskStatus, string> = {
-  active: 'groupActive',
+  running: 'groupRunning',
   waiting: 'groupWaiting',
   paused: 'groupPaused',
-  completed: 'groupCompleted'
+  completed: 'groupCompleted',
+  archived: 'groupArchived'
 }
 
 /** Confidence floor below which the bar turns amber (settings θ_low, t27). */
@@ -180,15 +183,24 @@ export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent
   const confidenceLow = useStore((s) => s.settings.confidenceLow ?? DEFAULT_CONFIDENCE_LOW)
 
   const actions: { key: string; label: string; icon: JSX.Element; next: TaskStatus }[] = []
-  if (task.status === 'active') {
+  if (task.status === 'running') {
     actions.push({ key: 'pause', label: t('tasks.pause'), icon: <PauseIcon width={13} height={13} />, next: 'paused' })
     actions.push({ key: 'complete', label: t('tasks.complete'), icon: <CompleteIcon width={13} height={13} />, next: 'completed' })
+    actions.push({ key: 'archive', label: t('tasks.archive'), icon: <ArchiveIcon width={13} height={13} />, next: 'archived' })
   } else if (task.status === 'paused' || task.status === 'waiting') {
-    actions.push({ key: 'resume', label: t('tasks.resume'), icon: <ResumeIcon width={13} height={13} />, next: 'active' })
+    actions.push({ key: 'resume', label: t('tasks.resume'), icon: <ResumeIcon width={13} height={13} />, next: 'running' })
     actions.push({ key: 'complete', label: t('tasks.complete'), icon: <CompleteIcon width={13} height={13} />, next: 'completed' })
+    actions.push({ key: 'archive', label: t('tasks.archive'), icon: <ArchiveIcon width={13} height={13} />, next: 'archived' })
+  } else if (task.status === 'completed') {
+    actions.push({ key: 'restore', label: t('tasks.restore'), icon: <RestoreIcon width={13} height={13} />, next: 'running' })
+    actions.push({ key: 'archive', label: t('tasks.archive'), icon: <ArchiveIcon width={13} height={13} />, next: 'archived' })
   } else {
-    actions.push({ key: 'restore', label: t('tasks.restore'), icon: <RestoreIcon width={13} height={13} />, next: 'active' })
+    actions.push({ key: 'restore', label: t('tasks.restore'), icon: <RestoreIcon width={13} height={13} />, next: 'running' })
   }
+
+  // Source-aware pill: "you paused this" (user PAUSED) vs "the system judged
+  // it waiting" (WAITING) — plain group label otherwise.
+  const pillKey = taskStatusHintKey(task) ?? STATUS_LABEL[task.status]
 
   const confidencePct =
     task.confidence === undefined ? undefined : Math.round(Math.min(1, Math.max(0, task.confidence)) * 100)
@@ -203,7 +215,7 @@ export function TaskDetail({ task, onBack, onEdit, onDeleteRequest, onAddContent
           <ChevronLeftIcon width={14} height={14} />
           {t('tasks.back')}
         </button>
-        <span className={`task-status-pill ${task.status}`}>{t(`tasks.${STATUS_LABEL[task.status]}`)}</span>
+        <span className={`task-status-pill ${task.status}`}>{t(`tasks.${pillKey}`)}</span>
         <button
           type="button"
           className="task-btn ghost danger task-detail-header-del"

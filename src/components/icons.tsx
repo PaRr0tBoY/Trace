@@ -23,6 +23,7 @@ import {
   X,
   Minus,
   ArrowDownToLine,
+  Archive,
   Layers,
   Maximize2,
   Minimize2,
@@ -101,6 +102,7 @@ export const PauseIcon = (p: P) => <Pause size={p.width ?? 14} strokeWidth={2.2}
 export const ResumeIcon = (p: P) => <Play size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
 export const CompleteIcon = (p: P) => <CircleCheck size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
 export const RestoreIcon = (p: P) => <RotateCcw size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
+export const ArchiveIcon = (p: P) => <Archive size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
 export const PlusIcon = (p: P) => <Plus size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
 export const EditIcon = (p: P) => <SquarePen size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
 

@@ -47,6 +47,7 @@
 import { createId } from './ids'
 import { DEFAULT_LAMBDA, MAX_LAMBDA, MIN_LAMBDA, STORAGE_VERSION, expDecay, saturation, type MemoryIndex } from './MemoryStore'
 import type { TraceDatabase } from './db'
+import type { TraceRecord, TraceStore } from './traceStore'
 import type { Memory, MemoryType, MemoryUserState } from '../../shared/types'
 
 /** 面板 legacy 四型——保留给 MemoryStore 适配器。 */
@@ -148,6 +149,234 @@ export interface FactQuery {
   limit?: number
 }
 
+/* ------------------------------------------------------------------ */
+/* 检索 API（t50，spec 决策 10 / 用户故事 27、28）                      */
+/* 确定性预筛四要素（活动 / 时间窗 / 实体 / 相关性命中），非 Top-K、    */
+/* 无 embedding（本地模型 ≠ 嵌入模型）：matchedMemories = 预筛结果。    */
+/* 活动匹配用归一化子串（CJK 安全，unicode61 FTS 不切中文，v1 不用      */
+/* FTS 做预筛）；扩散沿实体边 / 同 episode 边，默认 1-hop、上限 2-hop。 */
+/* ------------------------------------------------------------------ */
+
+/** 确定性预筛四要素（规范顺序）。 */
+export const HIT_REASONS = ['activity', 'time-window', 'entity', 'related'] as const
+export type HitReason = (typeof HIT_REASONS)[number]
+
+/** 扩散 hop 上限（用户故事 28）：默认 1、强制上限 2。 */
+export const DEFAULT_MAX_HOPS = 1
+export const MAX_HOPS_CAP = 2
+
+/** 预筛默认用户状态：confirmed + suggested；banned/ignored 不进预填（调用方可显式覆盖）。 */
+export const DEFAULT_RETRIEVAL_USER_STATES: readonly FactUserState[] = ['confirmed', 'suggested']
+
+/** 检索入参：当前活动上下文（预填组装方 t55/56 从 activityLedger / 会话状态取）。 */
+export interface MemoryRetrievalQuery {
+  /** 活动匹配：app 名 / 窗口标题 / 内容键（归一化后子串命中 fact content 或所挂实体名）。 */
+  activityKeys?: string[]
+  /**
+   * 时间窗匹配：当前时段 [windowStart, windowEnd] 与事实窗口 [valid_at, expired_at] 重叠。
+   * 只匹配带时间窗口（valid_at / expired_at 非空）的事实——恒有效事实由其他路由覆盖。
+   * null = 该侧无界；缺省（undefined）= 路由关闭。
+   */
+  windowStart?: number | null
+  windowEnd?: number | null
+  /** 实体命中：预解析的实体 id（主语/宾语）。 */
+  entityIds?: string[]
+  /** 实体命中：按名解析（entities.name 归一化全等，任 type）。 */
+  entityNames?: string[]
+  /** 来源相关：当前会话 episode 的姊妹事实。 */
+  episodeId?: string | null
+  /** 扩散 hop 上限：默认 1，超过 2 强制截断到 2。 */
+  maxHops?: number
+  /** 事实类型过滤（缺省全部）。 */
+  types?: readonly string[]
+  /** 用户状态过滤（缺省 confirmed + suggested；空数组视为缺省）。 */
+  userStates?: readonly FactUserState[]
+}
+
+/** 单条命中：事实 + 四要素原因 + 扩散路径 + 排序分。 */
+export interface MemoryHit {
+  fact: FactRecord
+  /** 种子 = 四要素直接命中原因（规范顺序）；扩散命中为空数组。 */
+  reasons: HitReason[]
+  /** 命中路径：种子 → … → 本事实的 fact id 链（种子 = [自身 id]）。 */
+  path: string[]
+  /** 扩散 hop 数：种子 0；沿一条关系边扩散 +1。 */
+  hops: number
+  /** 排序分 = 权重 × 时间有效性（48 公式，检索时按当前时钟重算）。 */
+  score: number
+}
+
+export interface MemoryRetrievalResult {
+  /** 排序后命中（权重降序，同分按 createdAt 新优先）。 */
+  hits: MemoryHit[]
+  /** 实际生效的 hop 上限（入参被钳制后的值）。 */
+  maxHops: number
+  /** 种子（四要素直接命中）数量。 */
+  seedCount: number
+}
+
+/** hop 上限钳制：默认 1、超过 2 截断到 2（非有限值 / 小于 1 回默认）。 */
+export function clampMaxHops(maxHops: number | undefined): number {
+  if (maxHops === undefined || !Number.isFinite(maxHops)) return DEFAULT_MAX_HOPS
+  return Math.min(MAX_HOPS_CAP, Math.max(DEFAULT_MAX_HOPS, Math.floor(maxHops)))
+}
+
+/** 区间重叠判定：事实窗口 [validAt, expiredAt] 与查询时段 [windowStart, windowEnd]（null = 无界）。 */
+export function windowsOverlap(
+  factValidAt: number | null,
+  factExpiredAt: number | null,
+  windowStart: number | null,
+  windowEnd: number | null
+): boolean {
+  const factLeft = factValidAt ?? -Infinity
+  const factRight = factExpiredAt ?? Infinity
+  const queryLeft = windowStart ?? -Infinity
+  const queryRight = windowEnd ?? Infinity
+  return factLeft <= queryRight && queryLeft <= factRight
+}
+
+/** 种子匹配上下文：由 retrieveMemories 组装（纯函数不触 DB）。 */
+export interface SeedMatchContext {
+  /** 活动键（**已归一化**；组装方归一化一次，长度 < 2 的键不参与匹配）。 */
+  activityKeys: readonly string[]
+  /** 已解析的实体 id 集合。 */
+  entityIds: ReadonlySet<string>
+  /** 实体 id → 名称（活动键对实体名做双向包含匹配）。 */
+  entityNameById: ReadonlyMap<string, string>
+  windowStart: number | null
+  windowEnd: number | null
+  episodeId: string | null
+}
+
+/** 确定性预筛：四要素逐一判定，返回命中原因（规范顺序；无命中 = 空数组）。 */
+export function seedReasonsFor(fact: FactRecord, ctx: SeedMatchContext): HitReason[] {
+  const reasons: HitReason[] = []
+  const keys = ctx.activityKeys.filter((k) => k.length >= 2)
+  if (keys.length > 0) {
+    const content = normalizeContent(fact.content)
+    const names = (fact.entityIds ?? [])
+      .map((id) => ctx.entityNameById.get(id))
+      .filter((n): n is string => n !== undefined)
+      .map(normalizeContent)
+    // 键命中 content（子串）或所挂实体名（双向包含；单字符名只做正向包含，
+    // 避免 "excel" ⊇ "x" 这类 ASCII 假阳性）。
+    const hit = keys.some((k) => content.includes(k) || names.some((n) => n.includes(k) || (n.length >= 2 && k.includes(n))))
+    if (hit) reasons.push('activity')
+  }
+  // 时间窗路由只匹配带窗口的事实：恒有效事实的"窗口"是整个时间轴，重叠无区分度。
+  if (
+    (ctx.windowStart !== null || ctx.windowEnd !== null) &&
+    (fact.validAt !== null || fact.expiredAt !== null) &&
+    windowsOverlap(fact.validAt, fact.expiredAt, ctx.windowStart, ctx.windowEnd)
+  ) {
+    reasons.push('time-window')
+  }
+  if (ctx.entityIds.size > 0 && (fact.entityIds ?? []).some((id) => ctx.entityIds.has(id))) {
+    reasons.push('entity')
+  }
+  if (ctx.episodeId !== null && fact.episodeId === ctx.episodeId) {
+    reasons.push('related')
+  }
+  return reasons
+}
+
+/** 关系扩散：从种子沿实体边 / 同 episode 边 BFS，≤ maxHops；命中路径与 hop 数随命中返回。 */
+export function diffuseHits(
+  facts: readonly FactRecord[],
+  seeds: ReadonlyArray<{ fact: FactRecord; reasons: HitReason[] }>,
+  maxHops: number
+): MemoryHit[] {
+  // 上限 2 强制（用户故事 28）：直调本函数也不绕过钳制。
+  const hopsCap = clampMaxHops(maxHops)
+  const byEntity = new Map<string, FactRecord[]>()
+  const byEpisode = new Map<string, FactRecord[]>()
+  for (const f of facts) {
+    for (const eid of f.entityIds ?? []) {
+      const list = byEntity.get(eid)
+      if (list) list.push(f)
+      else byEntity.set(eid, [f])
+    }
+    if (f.episodeId !== null) {
+      const list = byEpisode.get(f.episodeId)
+      if (list) list.push(f)
+      else byEpisode.set(f.episodeId, [f])
+    }
+  }
+  const visited = new Map<string, MemoryHit>()
+  let frontier: FactRecord[] = []
+  for (const seed of seeds) {
+    if (visited.has(seed.fact.id)) continue
+    visited.set(seed.fact.id, { fact: seed.fact, reasons: seed.reasons, path: [seed.fact.id], hops: 0, score: 0 })
+    frontier.push(seed.fact)
+  }
+  for (let hop = 1; hop <= hopsCap; hop++) {
+    const next: FactRecord[] = []
+    for (const f of frontier) {
+      const neighbors = new Set<FactRecord>()
+      for (const eid of f.entityIds ?? []) {
+        for (const n of byEntity.get(eid) ?? []) neighbors.add(n)
+      }
+      if (f.episodeId !== null) {
+        for (const n of byEpisode.get(f.episodeId) ?? []) neighbors.add(n)
+      }
+      for (const n of neighbors) {
+        if (visited.has(n.id)) continue
+        const parent = visited.get(f.id)!
+        visited.set(n.id, { fact: n, reasons: [], path: [...parent.path, n.id], hops: hop, score: 0 })
+        next.push(n)
+      }
+    }
+    frontier = next
+  }
+  return [...visited.values()]
+}
+
+/** 排序分 = 权重 × 时间有效性（48 公式：意图五档 × exp(-λ·周) × 时段字段），检索时重算。不修改入参命中对象（浅拷贝后写 score）。 */
+export function rankHits(hits: readonly MemoryHit[], now: number, lambda: number): MemoryHit[] {
+  return [...hits]
+    .map((h) => ({
+      ...h,
+      score: computeWeight({
+        intent: h.fact.intent,
+        lambda,
+        lastSeenAt: h.fact.lastSeenAt,
+        now,
+        validAt: h.fact.validAt,
+        invalidAt: h.fact.invalidAt,
+        expiredAt: h.fact.expiredAt
+      })
+    }))
+    .sort(
+      (a, b) => b.score - a.score || b.fact.createdAt - a.fact.createdAt || (a.fact.id < b.fact.id ? -1 : a.fact.id > b.fact.id ? 1 : 0)
+    )
+}
+
+/**
+ * trace 记录（kind='recall'，spec 决策 8）：工具 search_memories + 查询 + 条数 +
+ * 路径 + hop + 原因 + 预览 ≤200。
+ * 审计语义：传入完整检索结果（retrieveMemories 不内置截断），reasons / hops 取自
+ * 全量命中——消费端 slice 取用 top-N 不影响 trace 召回原因的完整性。
+ */
+export function recordMemoryRecall(
+  trace: TraceStore,
+  decisionId: string,
+  input: { query: string; result: MemoryRetrievalResult; preview?: string }
+): TraceRecord {
+  // TraceRecallPayload 契约字段 + 额外 reasons / maxHops（spec 决策 8："额外字段亦允许"）。
+  // 字面量类型自带隐式索引签名，可直接作 Record<string, unknown> payload 落库。
+  const payload = {
+    tool: 'search_memories',
+    query: input.query,
+    count: input.result.hits.length,
+    preview: (input.preview ?? input.result.hits[0]?.fact.content ?? '').slice(0, 200),
+    hitPath: [...new Set(input.result.hits.flatMap((h) => h.path))],
+    hops: input.result.hits.reduce((m, h) => Math.max(m, h.hops), 0),
+    reasons: HIT_REASONS.filter((r) => input.result.hits.some((h) => h.reasons.includes(r))),
+    maxHops: input.result.maxHops
+  }
+  return trace.append({ decisionId, kind: 'recall', payload })
+}
+
 export interface MemoryGraphStore {
   /* episodes */
   addEpisode(input: { sessionId?: string | null; startedAt?: number; endedAt?: number | null; summary?: string | null; content: string }): EpisodeRecord
@@ -174,6 +403,12 @@ export interface MemoryGraphStore {
   /** FTS5 全文检索（content），可按 type/userState 过滤。 */
   searchFacts(query: string, opts?: FactQuery): FactRecord[]
   countFacts(query?: FactQuery): number
+  /**
+   * t50 确定性检索（spec 决策 10）：候选 = validNow 未失效事实（默认
+   * confirmed+suggested）→ 四要素预筛种子（活动 / 时间窗 / 实体 / 相关）→
+   * 关系扩散（默认 1-hop、上限 2）→ 权重 × 时间有效性排序。
+   */
+  retrieveMemories(query?: MemoryRetrievalQuery): MemoryRetrievalResult
   /** memories.json 一次性迁移：每记忆一条事实（id/source/userState/计数保留），返回写入条数。 */
   ingestLegacyMemories(memories: readonly Memory[]): number
   /** 运行时同步衰减 λ（memoryLambda 设置变更时调用；钳制与 MemoryStore 同界）。 */
@@ -402,6 +637,7 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
     `INSERT OR IGNORE INTO entities (id, name, type, createdAt) VALUES (@id, @name, @type, @createdAt)`
   )
   const selectEntityByNameType = db.prepare(`SELECT id, name, type, createdAt FROM entities WHERE name = ? AND type = ?`)
+  const selectAllEntities = db.prepare(`SELECT id, name, type, createdAt FROM entities`)
   const selectFactById = db.prepare(`SELECT ${FACT_COLUMNS} FROM facts WHERE id = ?`)
   const selectActiveByType = db.prepare(
     `SELECT ${FACT_COLUMNS} FROM facts WHERE type = ? AND invalid_at IS NULL ORDER BY createdAt, id`
@@ -756,6 +992,44 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
     return Number(row.n)
   }
 
+  /** t50 确定性检索：候选（validNow）→ 四要素种子 → 扩散（钳制 hop）→ 权重 × 时间排序。 */
+  function retrieveMemories(query: MemoryRetrievalQuery = {}): MemoryRetrievalResult {
+    const candidates = listFacts({
+      types: query.types,
+      userStates: query.userStates && query.userStates.length > 0 ? query.userStates : DEFAULT_RETRIEVAL_USER_STATES,
+      validNow: true
+    })
+    const maxHops = clampMaxHops(query.maxHops)
+    const entityRows = selectAllEntities.all() as EntityRow[]
+    const entityNameById = new Map(entityRows.map((e) => [e.id, e.name]))
+    const entityIds = new Set<string>(query.entityIds ?? [])
+    for (const raw of query.entityNames ?? []) {
+      const normalized = normalizeContent(raw)
+      if (!normalized) continue
+      for (const row of entityRows) {
+        if (normalizeContent(row.name) === normalized) entityIds.add(row.id)
+      }
+    }
+    const ctx: SeedMatchContext = {
+      // 组装处归一化一次（seedReasonsFor 信任已归一化键）。
+      activityKeys: (query.activityKeys ?? []).map(normalizeContent),
+      entityIds,
+      entityNameById,
+      windowStart: query.windowStart ?? null,
+      windowEnd: query.windowEnd ?? null,
+      episodeId: query.episodeId ?? null
+    }
+    const seeds: Array<{ fact: FactRecord; reasons: HitReason[] }> = []
+    for (const fact of candidates) {
+      const reasons = seedReasonsFor(fact, ctx)
+      if (reasons.length > 0) seeds.push({ fact, reasons })
+    }
+    // 不内置截断：审计链需要全量命中（recordMemoryRecall 记完整召回原因），
+    // 消费端（预填组装 t55/56）自行 slice 取用。
+    const hits = rankHits(diffuseHits(candidates, seeds, maxHops), now(), lambdaValue)
+    return { hits, maxHops, seedCount: seeds.length }
+  }
+
   // 原子性：整体单事务。中途失败整体回滚（不会留下部分写入），
   // 迁移续跑以 countFacts(legacy) > 0 判定"已完成"才成立（见 state.ts）。
   const ingestTx = db.transaction((memories: readonly Memory[]): number => {
@@ -836,6 +1110,7 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
     listFacts,
     searchFacts,
     countFacts,
+    retrieveMemories,
     ingestLegacyMemories,
     setLambda: (value) => {
       lambdaValue = clampLambda(value)

@@ -150,8 +150,14 @@ export interface FactQuery {
 
 export interface MemoryGraphStore {
   /* episodes */
-  addEpisode(input: { sessionId?: string | null; startedAt?: number; summary?: string | null; content: string }): EpisodeRecord
+  addEpisode(input: { sessionId?: string | null; startedAt?: number; endedAt?: number | null; summary?: string | null; content: string }): EpisodeRecord
   closeEpisode(id: string, endedAt?: number): boolean
+  /** 全部 episode（可过滤 sessionId / 仅待整理 summary IS NULL），startedAt 升序。t49 时段整理用。 */
+  listEpisodes(query?: { sessionId?: string; pendingOnly?: boolean }): EpisodeRecord[]
+  /** 整理完成标记：写入提取摘要（非空）→ 不再 pending。返回是否命中（重复标记返回 false）。 */
+  markEpisodeConsolidated(id: string, summary: string): boolean
+  /** 事务内执行 fn：整体提交或整体回滚。t49 整理批次用它保证无部分写入。 */
+  withTransaction<T>(fn: () => T): T
   /* entities */
   ensureEntity(name: string, type: string): string
   /* facts */
@@ -382,6 +388,16 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
      VALUES (@id, @sessionId, @startedAt, @endedAt, @summary, @content, @createdAt)`
   )
   const updateEpisodeEnded = db.prepare(`UPDATE episodes SET endedAt = ? WHERE id = ?`)
+  const selectEpisodes = db.prepare(
+    `SELECT id, sessionId, startedAt, endedAt, summary, content, createdAt FROM episodes`
+  )
+  const selectEpisodesBySession = db.prepare(
+    `SELECT id, sessionId, startedAt, endedAt, summary, content, createdAt FROM episodes WHERE sessionId = ?`
+  )
+  const selectPendingEpisodes = db.prepare(
+    `SELECT id, sessionId, startedAt, endedAt, summary, content, createdAt FROM episodes WHERE summary IS NULL ORDER BY startedAt, createdAt`
+  )
+  const updateEpisodeSummary = db.prepare(`UPDATE episodes SET summary = ? WHERE id = ? AND summary IS NULL`)
   const insertEntity = db.prepare(
     `INSERT OR IGNORE INTO entities (id, name, type, createdAt) VALUES (@id, @name, @type, @createdAt)`
   )
@@ -766,6 +782,28 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
     return ingestTx(memories)
   }
 
+  /** t49 整理批次：全部 episode 查询（按需过滤），startedAt 升序、同刻按 createdAt。 */
+  function listEpisodes(query: { sessionId?: string; pendingOnly?: boolean } = {}): EpisodeRecord[] {
+    const rows = query.sessionId !== undefined
+      ? (selectEpisodesBySession.all(query.sessionId) as EpisodeRow[])
+      : query.pendingOnly
+        ? (selectPendingEpisodes.all() as EpisodeRow[])
+        : (selectEpisodes.all() as EpisodeRow[])
+    return [...rows].sort((a, b) => a.startedAt - b.startedAt || a.createdAt - b.createdAt)
+  }
+
+  /** 整理完成标记：写入非空摘要即退出 pending（提取失败不会走到这里）。 */
+  function markEpisodeConsolidated(id: string, summary: string): boolean {
+    const s = summary.trim()
+    if (!s) return false
+    return updateEpisodeSummary.run(s, id).changes > 0
+  }
+
+  /** 事务内执行 fn（better-sqlite3 事务包装）：整体提交或整体回滚。 */
+  function withTransaction<T>(fn: () => T): T {
+    return db.transaction(fn)()
+  }
+
   return {
     addEpisode: (input) => {
       const t = now()
@@ -773,7 +811,7 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
         id: `ep_${nextId()}`,
         sessionId: input.sessionId ?? null,
         startedAt: input.startedAt ?? t,
-        endedAt: null,
+        endedAt: input.endedAt ?? null,
         summary: input.summary ?? null,
         content: input.content,
         createdAt: t
@@ -782,6 +820,9 @@ export function createSqliteMemoryGraph(db: TraceDatabase, options: MemoryGraphO
       return row
     },
     closeEpisode: (id, endedAt) => updateEpisodeEnded.run(endedAt ?? now(), id).changes > 0,
+    listEpisodes,
+    markEpisodeConsolidated,
+    withTransaction,
     ensureEntity,
     addFact,
     putFact,

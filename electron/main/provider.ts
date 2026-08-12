@@ -35,7 +35,7 @@ export interface ChatMessage {
  * client-side validation. Single source of truth for the wire contract.
  */
 export type JsonSchemaProp =
-  | { type: 'string' }
+  | { type: 'string'; enum?: string[] }
   | { type: 'number' }
   | { type: 'integer' }
   | { type: 'boolean' }
@@ -153,7 +153,9 @@ export function validateJsonSchema(value: unknown, schema: JsonSchemaObject): st
 function validateProp(value: unknown, prop: JsonSchemaProp, path: string): string | null {
   switch (prop.type) {
     case 'string':
-      return typeof value === 'string' ? null : `${path}: expected string`
+      if (typeof value !== 'string') return `${path}: expected string`
+      if (prop.enum && !prop.enum.includes(value)) return `${path}: must be one of ${prop.enum.join(', ')}`
+      return null
     case 'number':
       return typeof value === 'number' && Number.isFinite(value) ? null : `${path}: expected number`
     case 'integer':

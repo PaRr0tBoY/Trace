@@ -7,7 +7,7 @@ import {
   type TaskIndex,
   type TaskStoreDeps
 } from '../electron/store/TaskStore'
-import type { AppRef, ResourceRef, Task } from '../shared/types'
+import type { AppRef, ResourceRef, Task, TaskProposal } from '../shared/types'
 
 /** In-memory storage + fake clock harness. */
 function makeHarness(deps?: Partial<Pick<TaskStoreDeps, 'isItemAlive'>>) {
@@ -627,6 +627,176 @@ describe('TaskStore — merge (type-safe, same-kind only)', () => {
     const source = store.create('来源')!
     store.merge(target.id, source.id)
     expect(store.get(target.id)!.status).toBe('paused')
+  })
+})
+
+describe('TaskStore — commit (proposal acceptance seam, t38)', () => {
+  function proposal(over: Partial<TaskProposal> = {}): TaskProposal {
+    return {
+      id: 's_test',
+      title: 'Proposal task',
+      appNames: ['Code', 'Chrome'],
+      confidence: 0.8,
+      lowConfidence: false,
+      algorithmReason: 'Similar to "Proposal task" — code.exe, 10 min',
+      evidence: { appCombination: 'code.exe, chrome.exe', durationMs: 600_000, overlappingTasks: [] },
+      ...over
+    }
+  }
+
+  it('new: creates a task carrying apps, resources and evidence', () => {
+    const { store } = makeHarness()
+    const id = store.commit(
+      proposal({
+        clipboardRefs: [{ kind: 'clipboard', itemId: 'i1', snapshot: { type: 'text', preview: 'a', capturedAt: 1 } }]
+      }),
+      { apps: [app('code.exe', 'Code')], note: 'from convert panel' }
+    )
+    expect(id).toBeTruthy()
+    const task = store.get(id!)!
+    expect(task.title).toBe('Proposal task')
+    expect(task.status).toBe('running') // create()'s existing RUNNING semantics
+    expect(task.apps.map((a) => a.id)).toEqual(['code.exe'])
+    expect(task.resources).toHaveLength(1)
+    expect(task.windowTitles).toEqual([])
+    expect(task.confidence).toBe(0.8)
+    expect(task.reason).toBe('Similar to "Proposal task" — code.exe, 10 min')
+    expect(task.note).toBe('from convert panel')
+  })
+
+  it('new: title override and windowTitles land on the created task', () => {
+    const { store } = makeHarness()
+    const id = store.commit(proposal(), { title: '  Renamed  ', windowTitles: ['report.md — Code'] })
+    const task = store.get(id!)!
+    expect(task.title).toBe('Renamed')
+    expect(task.windowTitles).toEqual(['report.md — Code'])
+  })
+
+  it('new: returns null for an empty effective title', () => {
+    const { store } = makeHarness()
+    expect(store.commit(proposal({ title: '   ' }))).toBeNull()
+    expect(store.commit(proposal({ title: '   ' }), { title: '  ' })).toBeNull()
+    expect(store.list()).toHaveLength(0)
+  })
+
+  it('merge: hits by taskId — updates evidence and absorbs apps/resources', () => {
+    const { store } = makeHarness()
+    const target = store.create('Proposal task', { apps: [app('code.exe', 'Code')] })!
+    store.update(target.id, { status: 'paused' })
+    const id = store.commit(
+      proposal({
+        taskId: target.id,
+        clipboardRefs: [{ kind: 'clipboard', itemId: 'i1', snapshot: { type: 'text', preview: 'a', capturedAt: 1 } }]
+      }),
+      { apps: [app('code.exe', 'Code'), app('chrome.exe', 'Chrome')], windowTitles: ['report.md — Code'] }
+    )
+    expect(id).toBe(target.id)
+    const task = store.get(target.id)!
+    expect(task.title).toBe('Proposal task') // unchanged without an override
+    expect(task.windowTitles).toEqual(['report.md — Code'])
+    expect(task.confidence).toBe(0.8)
+    expect(task.reason).toBe('Similar to "Proposal task" — code.exe, 10 min')
+    expect(task.apps.map((a) => a.id).sort()).toEqual(['chrome.exe', 'code.exe'])
+    expect(task.resources).toHaveLength(1)
+    expect(store.list()).toHaveLength(1) // carrier absorbed, no duplicate
+  })
+
+  it('merge: title override renames the target', () => {
+    const { store } = makeHarness()
+    const target = store.create('Proposal task')!
+    const id = store.commit(proposal({ taskId: target.id }), { title: '  Research + write  ' })
+    expect(id).toBe(target.id)
+    expect(store.get(target.id)!.title).toBe('Research + write')
+  })
+
+  it('merge: type-safe kind-wise resources (clipboard with clipboard, files with files)', () => {
+    const { store } = makeHarness()
+    const target = store.create('Proposal task', {
+      resources: [
+        { kind: 'clipboard', itemId: 'i1', snapshot: { type: 'text', preview: 'dup', capturedAt: 2 } },
+        { kind: 'files', paths: ['x.txt'] }
+      ]
+    })!
+    store.commit(
+      proposal({
+        taskId: target.id,
+        clipboardRefs: [
+          { kind: 'clipboard', itemId: 'i1', snapshot: { type: 'text', preview: 'old', capturedAt: 1 } },
+          { kind: 'clipboard', itemId: 'i2', snapshot: { type: 'text', preview: 'b', capturedAt: 3 } },
+          { kind: 'files', paths: ['x.txt', 'y.txt'] }
+        ]
+      })
+    )
+    const task = store.get(target.id)!
+    const clip = task.resources.filter((r) => r.kind === 'clipboard')
+    expect(clip).toHaveLength(2) // i1 deduped against the target's entry
+    const files = task.resources.filter((r) => r.kind === 'files')
+    expect(files.flatMap((f) => (f.kind === 'files' ? f.paths : []))).toEqual(['x.txt', 'y.txt'])
+  })
+
+  it('merge: exact case-insensitive title fallback without a taskId', () => {
+    const { store } = makeHarness()
+    const target = store.create('Writing Report')!
+    const id = store.commit(proposal({ title: 'writing report', taskId: undefined }))
+    expect(id).toBe(target.id)
+    expect(store.list()).toHaveLength(1)
+  })
+
+  it('merge: stale taskId falls back to the title match', () => {
+    const { store } = makeHarness()
+    const target = store.create('Proposal task')!
+    const stale = store.create('Other')!
+    store.delete(stale.id)
+    const id = store.commit(proposal({ taskId: stale.id }))
+    expect(id).toBe(target.id)
+  })
+
+  it('new: never merges into terminal tasks via the title fallback', () => {
+    const { store } = makeHarness()
+    const done = store.create('Proposal task')!
+    store.update(done.id, { status: 'completed' })
+    const id = store.commit(proposal({ taskId: undefined }))
+    expect(id).not.toBe(done.id)
+    expect(store.list()).toHaveLength(2)
+  })
+
+  it('new: a taskId pointing at a terminal task is not a merge target', () => {
+    const { store } = makeHarness()
+    const done = store.create('Proposal task')!
+    store.update(done.id, { status: 'completed' })
+    const id = store.commit(proposal({ taskId: done.id }))
+    expect(id).not.toBe(done.id)
+    expect(store.list()).toHaveLength(2) // fresh task created instead
+  })
+
+  it('committing onto a RUNNING target inherits the carrier displacement (t38 parity, no new switching)', () => {
+    const { store } = makeHarness()
+    const target = store.create('Proposal task')!
+    expect(store.get(target.id)!.status).toBe('running')
+    store.commit(proposal({ taskId: target.id }), { apps: [app('chrome.exe', 'Chrome')] })
+    const task = store.get(target.id)!
+    // The carrier temp task enters RUNNING via create() and displaces the
+    // RUNNING target to WAITING (auto_switch, settling its segment+session)
+    // before merge() absorbs it — the pre-t38 accept path behaved
+    // identically; switching timing stays with the future controller (55).
+    expect(task.status).toBe('waiting')
+    expect(store.list().filter((t) => t.status === 'running')).toHaveLength(0)
+    expect(store.list()).toHaveLength(1)
+  })
+
+  it('does not switch states itself: the target status survives a commit', () => {
+    const { store } = makeHarness()
+    const target = store.create('Proposal task')!
+    store.update(target.id, { status: 'paused' })
+    store.commit(proposal({ taskId: target.id }), { apps: [app('chrome.exe', 'Chrome')] })
+    expect(store.get(target.id)!.status).toBe('paused')
+  })
+
+  it('merge: convert-panel note lands on the target', () => {
+    const { store } = makeHarness()
+    const target = store.create('Proposal task')!
+    store.commit(proposal({ taskId: target.id }), { note: 'edited note' })
+    expect(store.get(target.id)!.note).toBe('edited note')
   })
 })
 

@@ -59,7 +59,6 @@ import type {
   ResourceRef,
   TaskProposal,
   Task,
-  TaskPatch,
   UsageEvent
 } from '../../shared/types'
 
@@ -575,40 +574,32 @@ export function createSuggestionEngine(options: SuggestionEngineOptions): Sugges
       const title = opts?.title?.trim() || suggestion.title
       const apps = opts?.apps ?? m?.appRefs ?? []
       const resources = opts?.clipboardRefs ?? suggestion.clipboardRefs ?? []
-      // Evidence captured at accept time (t27): the segment's recent window
-      // titles, the confidence shown on the card, and a human-readable reason
-      // — LLM rationale when present, else the algorithm evidence summary.
-      const evidence: TaskPatch = {
-        windowTitles: m?.windowTitles ?? [],
-        confidence: suggestion.confidence,
-        reason: suggestion.reason?.trim() || suggestion.algorithmReason,
-        ...(opts?.note !== undefined ? { note: opts.note } : {})
-      }
       const emitMemoryCandidate = (): void => {
         // Feedback distillation (spec decision 7): a confirmed work pattern
         // becomes a suggested memory candidate — never live without the user.
         const candidate = buildMemoryCandidate(title)
         if (candidate) options.onMemorySuggestion?.(candidate)
       }
-      if (suggestion.taskId && store.get(suggestion.taskId)) {
-        if (opts?.title?.trim()) evidence.title = opts.title.trim()
-        store.update(suggestion.taskId, evidence)
-        // Absorb the segment's apps + clipboard material through the type-safe
-        // merge path: create a temp task carrying them, then merge it into the
-        // candidate (source is deleted; apps/resources/timestamps are combined
-        // by TaskStore.merge).
-        const temp = store.create(title, { apps, resources })
-        if (temp) store.merge(suggestion.taskId, temp.id)
-        console.log(`[Suggestion] accepted ${id} -> merged into ${suggestion.taskId}`)
-        emitMemoryCandidate()
-        log({ kind: 'accept', suggestionId: id, title, taskId: suggestion.taskId, merged: true, apps: apps.length, clipboardRefs: resources.length })
-        return suggestion.taskId
-      }
-      const created = store.create(title, { apps, resources, ...evidence })
-      console.log(`[Suggestion] accepted ${id} -> new task ${created?.id ?? '(none)'}`)
+      // All landing decisions — new / update / merge — funnel through the
+      // store's commit seam (t38); the engine only resolves the payload
+      // and records the outcome.
+      const existing = new Set(store.list().map((t) => t.id))
+      const taskId = store.commit(suggestion, {
+        title: opts?.title,
+        note: opts?.note,
+        apps,
+        windowTitles: m?.windowTitles,
+        clipboardRefs: resources
+      })
+      const merged = taskId !== null && existing.has(taskId)
+      console.log(
+        merged
+          ? `[Suggestion] accepted ${id} -> merged into ${taskId}`
+          : `[Suggestion] accepted ${id} -> new task ${taskId ?? '(none)'}`
+      )
       emitMemoryCandidate()
-      log({ kind: 'accept', suggestionId: id, title, taskId: created?.id ?? null, merged: false, apps: apps.length, clipboardRefs: resources.length })
-      return created?.id ?? null
+      log({ kind: 'accept', suggestionId: id, title, taskId: taskId ?? null, merged, apps: apps.length, clipboardRefs: resources.length })
+      return taskId
     },
     ignore(id: string): boolean {
       const m = meta.get(id)

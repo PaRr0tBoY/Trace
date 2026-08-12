@@ -36,6 +36,7 @@ import type {
   Task,
   TaskDto,
   TaskPatch,
+  TaskProposal,
   TaskSession,
   TaskStatus,
   UnlinkTarget
@@ -44,6 +45,25 @@ import type {
 export interface TaskIndex {
   version: number
   tasks: Task[]
+}
+
+/**
+ * The accept payload for a task proposal (t38): user edits from the
+ * convert panel override what the proposal itself carries. Absent fields
+ * fall back to the proposal's own values (or to empty, for engine-side
+ * material like app refs / window titles).
+ */
+export interface CommitOptions {
+  /** User-edited title; falls back to the proposal's. */
+  title?: string
+  /** User-edited note (convert panel). */
+  note?: string
+  /** Resolved app refs (engine-side, incl. linked-window snapshots). */
+  apps?: AppRef[]
+  /** Segment window titles (t27 evidence). */
+  windowTitles?: string[]
+  /** Clipboard material: the user's final selection, else the proposal's. */
+  clipboardRefs?: ResourceRef[]
 }
 
 export interface TaskStoreDeps {
@@ -539,6 +559,87 @@ export class TaskStore {
     this.tasks = this.tasks.filter((t) => t.id !== sourceId)
     this.finish()
     return true
+  }
+
+  /**
+   * Proposal-acceptance seam (spec 实现决策 4, t38): the single entry point
+   * that lands accepted suggestion content in the store. It ONLY handles
+   * the new / update / merge three-way split — deciding WHEN a switch
+   * happens belongs to the future current-task controller, never here.
+   *
+   *   merge  — the proposal matched an existing task (its taskId — the
+   *            clusterer's evidence match — when the task still exists and
+   *            is not terminal, else an exact case-insensitive title match;
+   *            terminal tasks are never merge targets): the evidence
+   *            fields update on the target and its apps/resources are
+   *            absorbed through the type-safe merge path (clipboard with
+   *            clipboard, files with files, dedup by identity).
+   *   update — the same matched-target path when the proposal carries
+   *            field updates (title override / note / evidence) only.
+   *   new    — no match: create() builds a RUNNING task with the proposal
+   *            content.
+   *
+   * Switching note: commit adds no switching decision of its own, but it
+   * inherits one side effect from the pre-t38 accept path — the temp
+   * carrier task used to absorb apps/resources enters RUNNING via
+   * create(), which displaces a RUNNING target to WAITING (auto_switch,
+   * settling its segment + session); the carrier's own run is settled
+   * when merge() absorbs it. Committing onto a RUNNING target can
+   * therefore leave it WAITING with nothing RUNNING — the existing
+   * triple-jump's artifact, not a new switching rule.
+   *
+   * Returns the id of the task the proposal landed in, or null when the
+   * effective title is empty.
+   */
+  commit(proposal: TaskProposal, opts?: CommitOptions): string | null {
+    const title = opts?.title?.trim() || proposal.title.trim()
+    if (!title) return null
+    const apps = opts?.apps ?? []
+    const resources = opts?.clipboardRefs ?? proposal.clipboardRefs ?? []
+    // Evidence captured at accept time (t27): the segment's recent window
+    // titles, the confidence shown on the card, and a human-readable reason
+    // — LLM rationale when present, else the algorithm evidence summary.
+    const evidence: TaskPatch = {
+      windowTitles: opts?.windowTitles ?? [],
+      confidence: proposal.confidence,
+      reason: proposal.reason?.trim() || proposal.algorithmReason,
+      ...(opts?.note !== undefined ? { note: opts.note } : {})
+    }
+
+    const target = this.commitTarget(proposal, title)
+    if (!target) {
+      const created = this.create(title, { apps, resources, ...evidence })
+      return created?.id ?? null
+    }
+
+    // Matched task: field updates land on the target (a title override
+    // renames it)…
+    if (opts?.title?.trim()) evidence.title = opts.title.trim()
+    this.update(target.id, evidence)
+    // …and the proposal's apps + clipboard material are absorbed through
+    // the type-safe merge path: a temp carrier task carries them, then
+    // merge() combines kinds and dedups identities before deleting it.
+    const carrier = this.create(title, { apps, resources })
+    if (carrier) this.merge(target.id, carrier.id)
+    return target.id
+  }
+
+  /**
+   * Resolve the task a proposal lands in: the proposal's own taskId (the
+   * clusterer's evidence match) when that task still exists, else an exact
+   * case-insensitive title match. Terminal tasks are never merge targets —
+   * a terminal taskId hit falls through to the (also terminal-excluding)
+   * title fallback, then to a fresh create.
+   */
+  private commitTarget(proposal: TaskProposal, title: string): Task | undefined {
+    if (proposal.taskId) {
+      const byId = this.tasks.find((t) => t.id === proposal.taskId)
+      if (byId && byId.status !== 'completed' && byId.status !== 'archived') return byId
+    }
+    const lower = title.toLowerCase()
+    return this.tasks.find(
+      (t) => t.status !== 'completed' && t.status !== 'archived' && t.title.trim().toLowerCase() === lower
+    )
   }
 
   /** Attach a resource reference (snapshot already built). Dedup; returns whether anything changed. */

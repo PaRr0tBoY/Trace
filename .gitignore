@@ -16,3 +16,6 @@ dev-app-update.yml
 
 # local tracker artifacts
 .scratch/
+
+# local research dir
+ref/

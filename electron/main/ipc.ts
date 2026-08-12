@@ -938,9 +938,37 @@ function parseReleaseBodyToCleanText(body: string): { summary: string; highlight
 
 const STATIC_CHANGELOG_FALLBACK = [
   {
+    version: 'v2026.08.12',
+    date: 'Aug 12, 2026',
+    isLatest: true,
+    summary: 'Trace's first release — task layer (candidates, guided editor, linked windows), AI observability, dual-row navigation with restore, 5 accent themes.',
+    highlights: [
+      {
+        title: 'Task Layer',
+        description: 'Candidate task cards from foreground-activity clustering; guided create/edit editor with app grid, clipboard material picker and AI title fallback; task detail with linked windows (switch/launch); drop-to-bind from the panel.'
+      },
+      {
+        title: 'Dual-Row Navigation & Restore',
+        description: 'Clipboard / Files / Tasks views with second-level filters; the panel remembers the last page across opens (instant to forever) with edit protection.'
+      },
+      {
+        title: 'Accent Themes',
+        description: 'Five accent colors (Graphite / Cobalt / Verdigris / Amber / Violet) applied across panel, drag ghost and copy indicator.'
+      },
+      {
+        title: 'AI Observability & Provider Hardening',
+        description: 'ai-log.jsonl for chat calls and algorithm outputs; adaptive retry with thinking-model detection and output-budget scaling; OCR context for suggestions.'
+      },
+      {
+        title: 'Performance',
+        description: 'Thumbnail protocol keeps base64 out of IPC; movement-only cursor IPC; FLIP layout animation on short lists; drag-out text via temp file.'
+      }
+    ]
+  },
+  {
     version: 'v0.2.6',
     date: 'Aug 05, 2026',
-    isLatest: true,
+    isLatest: false,
     summary: 'Performance optimizations, redesigned settings footer, custom support portal integration, and enhanced 30-language typography.',
     highlights: [
       {

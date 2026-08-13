@@ -100,12 +100,13 @@ AI 管道通道（t42/t51/t54）：`trace:list-by-decision/list-by-task/get-by-i
 - `onboardingWindow.ts` — 首次启动引导窗口，独立 frameless 窗口，加载 `#/onboarding` 路由。
 - `config.ts` — `APP_CONFIG`（应用名、`tracelocal://` 图片协议）与 `runtime` 可变标志。
 - `focus.ts` — 输入框焦点桥（见注意事项"输入框焦点（t21）"）。
-- `windowSwitch.ts` — ADR-0005：`app:open-linked-window` 的实现（pid 命中 → 激活窗口；应用存活 → 最新窗口；否则启动 exe）。`suggestionEngine.ts` 的 `latestSwitchFor` 提供链接窗口快照（linkedWindow）。
+- `windowSwitch.ts` — ADR-0005：`app:open-linked-window` 的实现（pid 命中 → 激活窗口；应用存活 → 最新窗口；否则启动 exe）。`suggestionEngine.ts` 的 `latestSwitchFor` 提供链接窗口快照（linkedWindow）。`activateHwnd` 导出给切换器复用；**只有最小化窗口才 SW_RESTORE**（无脑 restore 会把最大化窗口切成普通窗口）。
 - `aiLog.ts` — JSONL 可观测日志（`ai-log.jsonl`）：聊天调用、引擎算法输出、记忆写入各留一条；`provider.ts` 的 `log` 钩子 + `MemoryStore`/`suggestionEngine` 的 `log` 均汇入。
 - `appIcons.ts` — APP 图标：`attachAppIcons`/`attachSuggestionIcons` 在 `pushState.tasks/suggestions` 推送前批量填充（`AppRef.iconUrl` / `TaskProposal.appIcons`），`app:icons` 通道按需补取（LRU 128 缓存）；`appIconCore.ts` 是纯逻辑（缓存/占位），可注入测试。
 - `imageProtocol.ts` — `tracelocal://thumb` 缩略图协议（ADR-0004 性能项，图片预览 base64 移出 IPC DTO）。
 - `ocr.ts` — Windows.Media.Ocr（WinRT，经 PowerShell 单行脚本）识别前台窗口文字，作为 LLM 建议的 `ocrContext` 输入。**只作 AI 资料不进 UI、不持久化**；隐私三开关（incognito/L0/总开关）任一关闭即跳过；分析触发时才跑，超时放弃。
 - `suggestionDrop.ts` — 拖到备选卡"自动建任务并绑定"的纯逻辑组合（`acceptWithResource`），IPC 层薄封装。
+- **Alt+Tab 切换器（ADR-0005，tabtab 合并 2026-08-13）**：`keyboardHook.ts`（WH_KEYBOARD_LL 钩子状态机：idle/altDown/pending/tap/armed，回调纯状态机、副作用全 defer——在 OS 钩子派发上下文里调 koffi/Electron API 会死锁，实测）；`hookHost.ts` 跑在 **utilityProcess**（纯 Node 事件循环，自带 PeekMessageW pump；宿主崩溃 → OS 自动摘钩，绝不吞键）；`hookManager.ts` 主进程侧 fork/桥接与生命周期；`switcher.ts` 会话控制器（show/advance/hover/click/execute，30s 超时自愈，退出还原交互性）；`windowSnapshot.ts` z-order 窗口枚举（复刻 explorer 的 Alt+Tab ring 成员规则：可见、非 toolwindow 除非 APPWINDOW、过滤宿主 exe）。渲染侧 `SwitcherView.tsx` 整页替换（`switcherActive` 时暂停边缘 hover 与点击穿透）。**注意**：`hookHost.ts` 必须作为独立入口构建（electron.vite.config.ts 的 rollup input），`hookManager` 用 `utilityProcess.fork(join(__dirname, 'hookHost.js'))` 拉起。
 
 ### 决策与记忆管道（ADR-0005，t31–t58 全量重构）
 - **数据层（`electron/store/`，全部纯逻辑零 Electron import，vitest 直测）**：

@@ -132,7 +132,6 @@ const api = {
   openLinkedWindow: (app: import('../../shared/types').AppRef) => invoke('app:open-linked-window', app),
   minimizeWindow: () => invoke('window:minimize'),
   setInternalDrag: (active: boolean) => { internalDrag = active },
-  broadcastTutorialStep: (step: number) => send('tutorial:set-step', step),
   requestInputFocus: () => send('ui:input-focus'),
   requestInputBlur: () => send('ui:input-blur'),
   expandPanel: () => send('panel:expand'),
@@ -197,7 +196,6 @@ const api = {
   onInternalDrop: (cb: (pos: { x: number; y: number }) => void) => on('item:internal-drop', cb),
   onCursorEdge: (cb: (data: EventArgs<'window:cursor-edge'>[0]) => void) => on('window:cursor-edge', cb),
   onToast: (cb: (toast: { id: string; message: string; tone: 'info' | 'error' }) => void) => on('ui:toast', cb),
-  onTutorialStep: (cb: (step: number) => void) => on('tutorial:step', cb),
 
   /* Drag helpers */
   // (Handled natively by capturing drop event above)

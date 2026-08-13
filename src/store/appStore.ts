@@ -416,7 +416,6 @@ export const useStore = create<AppState>((set, get) => ({
       // onboarding tutorial points at it, so flip the view when it starts.
       ...(step === 4 ? { view: 'files' } : {})
     })
-    edge.broadcastTutorialStep(step)
   },
 
   async createTask(title, opts) {

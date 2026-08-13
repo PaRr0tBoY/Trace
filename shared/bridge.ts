@@ -45,7 +45,6 @@ export interface EdgeApi {
     highlights: Array<{ title: string; description: string }>
   }>>
   setInternalDrag: (active: boolean) => void
-  broadcastTutorialStep: (step: number) => void
   /** Activate the panel window for keyboard input (only called while an input is focused). */
   requestInputFocus: () => void
   /** Restore the panel to non-activatable after the input lost focus. */
@@ -142,5 +141,4 @@ export interface EdgeApi {
     displayHeight: number
   }) => void) => () => void
   onToast: (cb: (toast: { id: string; message: string; tone: 'info' | 'error' }) => void) => () => void
-  onTutorialStep: (cb: (step: number) => void) => () => void
 }

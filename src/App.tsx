@@ -78,9 +78,6 @@ export default function App() {
       useStore.getState().setSettingsOpen(true)
       edge.setInteractive(true)
     })
-    const offTutorialStep = edge.onTutorialStep((step) => {
-      useStore.getState().setTutorialStep(step)
-    })
     return () => {
       offItems()
       offTasks()
@@ -89,7 +86,6 @@ export default function App() {
       offToast()
       offToggle()
       offOpenSettings()
-      offTutorialStep()
     }
   }, [hydrate, setItems, setSettings, pushToast])
 

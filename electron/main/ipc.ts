@@ -862,6 +862,10 @@ export function registerIpc(): void {
       win.minimize()
     }
   })
+
+  handle('app:quit', () => {
+    app.quit()
+  })
 }
 
 /** Singleton provider chain for the suggestion engine (t19); settings-driven. */

@@ -319,8 +319,6 @@ export interface EventMap {
   'window:open-settings': []
   /** Fired when an OS drag initiated by the app has completed. */
   'item:drag-end': []
-  /** Tutorial step sync */
-  'tutorial:step': [step: number]
   /** Internal drop triggered by the main process when startDrag ends inside the window */
   'item:internal-drop': [pos: { x: number; y: number }]
   /**
@@ -357,8 +355,6 @@ export interface EventMap {
 export interface SendMap {
   /** Begin a native OS drag of an item (or one file of a bundle) out of the app. */
   'item:start-drag': { args: [req: DragRequest] }
-  /** Synchronize tutorial step */
-  'tutorial:set-step': { args: [step: number] }
   /**
    * A panel input just gained focus; main activates the panel window so
    * Chromium forwards keyboard input (window is focusable:false, so it never

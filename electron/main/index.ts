@@ -19,6 +19,8 @@ import { prewarmDragIcons } from './drag'
 import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushState, stopStateTimers, setSuggestionChat, setSuggestionOcr } from './state'
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
+import { startKeyboardHook, stopKeyboardHook } from './hookManager'
+import { switcherShow, switcherAdvance, switcherExecute, switcherTapExecute } from './switcher'
 import { ForegroundWatcher } from './foreground'
 import { ocrFromForeground } from './ocr'
 import { createAttributor, type Attributor } from './attributor'
@@ -73,6 +75,7 @@ app.on('before-quit', () => {
   stopHeartbeat()
   stopStateTimers()
   stopFullscreenMonitor()
+  stopKeyboardHook()
   foregroundWatcher?.stop()
   attributor?.dispose()
   getWatcher().stop()
@@ -102,12 +105,20 @@ app.whenReady().then(() => {
   startFullscreenMonitor()
   createTray()
 
+  // Alt+Tab takeover (ADR-0005): the hook state machine feeds the switcher.
+  startKeyboardHook({
+    onShow: switcherShow,
+    onAdvance: switcherAdvance,
+    onExecute: switcherExecute,
+    onTapExecute: switcherTapExecute
+  })
+
   // Register Alt+C global shortcut to toggle panel
   try {
     const { globalShortcut } = require('electron')
     let lastToggleTime = 0
     globalShortcut.register('Alt+C', () => {
-      if (runtime.quitting) return
+      if (runtime.quitting || runtime.switcherActive) return // switcher session owns Alt
       const now = Date.now()
       if (now - lastToggleTime < 500) return // Throttle to once per 500ms
       lastToggleTime = now

@@ -284,6 +284,12 @@ export interface EventMap {
     displayWidth: number
     displayHeight: number
   }]
+  /** Alt+Tab switcher appeared (ADR-0005): renderer swaps the whole page. */
+  'switcher:show': [data: { entries: import('./types').SwitcherEntryDto[]; selectedIndex: number }]
+  /** Switcher highlight moved (Tab/Shift+Tab). */
+  'switcher:select': [selectedIndex: number]
+  /** Switcher is closing (Alt released or item clicked) — restore previous state. */
+  'switcher:hide': []
 }
 
 /* ------------------------------------------------------------------ */
@@ -316,6 +322,10 @@ export interface SendMap {
    * interactive, and forces the renderer open.
    */
   'panel:expand': { args: [] }
+  /** Switcher mouse hover moved the highlight (ADR-0005): sync main's selection. */
+  'switcher:hover': { args: [index: number] }
+  /** Switcher item clicked: execute the switch immediately (ADR-0005). */
+  'switcher:click': { args: [index: number] }
 }
 
 /* ------------------------------------------------------------------ */

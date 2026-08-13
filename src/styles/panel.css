@@ -105,6 +105,14 @@
      a very fast linear 0.1s sweep: constant speed, no curve, gone in a blink. */
   transition: clip-path 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* Alt+Tab switcher session (ADR-0005): snappier — a switcher must feel
+   instant, not like an edge-hover bloom. */
+.blade-container.switcher-session {
+  transition: clip-path 0.12s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.blade-container.switcher-session.closing {
+  transition: clip-path 0.08s linear;
+}
 .blade-container.closing {
   transition: clip-path 0.1s linear;
 }
@@ -478,3 +486,99 @@
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
+
+/* ── Alt+Tab switcher (ADR-0005) ─────────────────────────────────── */
+.switcher {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 8px 10px 12px;
+  min-height: 0;
+}
+
+.switcher-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative; /* offsetParent for rows — offsetTop must be list-relative */
+}
+
+.switcher-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.switcher-row.selected {
+  background: var(--bg-3);
+  box-shadow: 0 0 0 1px var(--edge-light) inset;
+}
+
+.switcher-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.switcher-icon img {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+
+.switcher-icon-placeholder {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--bg-3);
+}
+
+.switcher-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.switcher-app {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.switcher-title {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Switcher list: native-feeling scroll, no visible scrollbar. */
+.switcher-list {
+  scrollbar-width: none; /* Firefox */
+}
+.switcher-list::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}

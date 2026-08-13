@@ -22,6 +22,7 @@ type IsWindowVisibleFn = (hwnd: unknown) => number
 type GetWindowThreadProcessIdFn = (hwnd: unknown, pid: number[]) => number
 type GetWindowTextWFn = (hwnd: unknown, buf: string[], maxCount: number) => number
 type ShowWindowFn = (hwnd: unknown, nCmdShow: number) => number
+type IsIconicFn = (hwnd: unknown) => number
 type SetForegroundWindowFn = (hwnd: unknown) => number
 type SwitchToThisWindowFn = (hwnd: unknown, fAltTab: number) => void
 type AttachThreadInputFn = (idAttach: number, idAttachTo: number, fAttach: number) => number
@@ -36,6 +37,7 @@ let isWindowVisible: IsWindowVisibleFn | null = null
 let getWindowThreadProcessId: GetWindowThreadProcessIdFn | null = null
 let getWindowTextW: GetWindowTextWFn | null = null
 let showWindow: ShowWindowFn | null = null
+let isIconic: IsIconicFn | null = null
 let setForegroundWindow: SetForegroundWindowFn | null = null
 let switchToThisWindow: SwitchToThisWindowFn | null = null
 let attachThreadInput: AttachThreadInputFn | null = null
@@ -54,6 +56,7 @@ if (process.platform === 'win32') {
     getWindowThreadProcessId = user32.func('uint32_t __stdcall GetWindowThreadProcessId(void *hWnd, _Out_ uint32_t *lpdwProcessId)')
     getWindowTextW = user32.func('int __stdcall GetWindowTextW(void *hWnd, _Out_ char16_t *lpString, int nMaxCount)')
     showWindow = user32.func('int __stdcall ShowWindow(void *hWnd, int nCmdShow)')
+    isIconic = user32.func('int __stdcall IsIconic(void *hWnd)')
     setForegroundWindow = user32.func('int __stdcall SetForegroundWindow(void *hWnd)')
     switchToThisWindow = user32.func('void __stdcall SwitchToThisWindow(void *hWnd, int fAltTab)')
     attachThreadInput = user32.func('int __stdcall AttachThreadInput(uint32_t idAttach, uint32_t idAttachTo, int fAttach)')
@@ -143,7 +146,7 @@ function walkTopLevelWindows(): TopLevelWindow[] {
  * is the best-effort fallback when the lock still wins. Returns whether
  * SetForegroundWindow succeeded (the fallback's outcome is not observable).
  */
-function activateHwnd(hwnd: unknown): boolean {
+export function activateHwnd(hwnd: unknown): boolean {
   if (
     !hwnd || !showWindow || !getWindowThreadProcessId || !getForegroundWindow ||
     !getCurrentThreadId || !setForegroundWindow || !attachThreadInput ||
@@ -152,7 +155,9 @@ function activateHwnd(hwnd: unknown): boolean {
     return false
   }
   try {
-    showWindow(hwnd, SW_RESTORE)
+    // Only minimized windows need SW_RESTORE — an unconditional restore turns
+    // a maximized window into a normal one on switch (user-visible regression).
+    if (isIconic?.(hwnd)) showWindow(hwnd, SW_RESTORE)
     const fgTid = getWindowThreadProcessId(getForegroundWindow(), [0])
     const targetTid = getWindowThreadProcessId(hwnd, [0])
     const ourTid = getCurrentThreadId()

@@ -111,6 +111,15 @@ interface AppState {
   /* UI */
   setQuery: (q: string) => void
   setOpen: (open: boolean) => void
+  /** Alt+Tab switcher session (ADR-0005): page-swap state. */
+  switcherActive: boolean
+  switcherEntries: import('../../shared/types').SwitcherEntryDto[]
+  switcherSelected: number
+  /** Panel open state before the switcher took over — restored on hide. */
+  switcherPrevOpen: boolean
+  showSwitcher: (data: { entries: import('../../shared/types').SwitcherEntryDto[]; selectedIndex: number }) => void
+  setSwitcherSelected: (index: number) => void
+  hideSwitcher: () => void
   setSettingsOpen: (open: boolean) => void
   setDragActive: (active: boolean) => void
   setInternalDragReq: (req: import('../../shared/types').DragRequest | null) => void
@@ -179,6 +188,29 @@ export const useStore = create<AppState>((set, get) => ({
   tasksFilter: 'existing',
   setTasksFilter: (tasksFilter) => set({ tasksFilter }),
   open: false,
+  switcherActive: false,
+  switcherEntries: [],
+  switcherSelected: 0,
+  switcherPrevOpen: false,
+  showSwitcher: ({ entries, selectedIndex }) => {
+    set({ switcherActive: true, switcherEntries: entries, switcherSelected: selectedIndex, switcherPrevOpen: get().open, open: true })
+  },
+  setSwitcherSelected: (index) => set({ switcherSelected: index }),
+  hideSwitcher: () => {
+    const prevOpen = get().switcherPrevOpen
+    const finish = () => set({ switcherActive: false, switcherEntries: [] })
+    if (prevOpen) {
+      // Panel was already open before the session: no collapse animation,
+      // switch straight back to the previous page.
+      finish()
+      return
+    }
+    // Panel was collapsed: start the collapse animation first and keep the
+    // SwitcherView on screen for its duration — cutting to the clipboard page
+    // mid-retract would flash the clipboard UI on the way out.
+    get().setOpen(false)
+    setTimeout(finish, 150)
+  },
   debugHoldOpen: false,
   setDebugHoldOpen: (debugHoldOpen) => set({ debugHoldOpen }),
   settingsOpen: false,

@@ -17,6 +17,7 @@ import { setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPre
 import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData } from './drag'
 import { activateAppWindow } from './windowSwitch'
+import { switcherHover, switcherClick } from './switcher'
 import { clipboardSignature } from '../clipboard/formats'
 import { buildClipboardRef } from '../store/TaskStore'
 import { mergeAppOptions } from './appOptions'
@@ -746,6 +747,14 @@ export function registerSendListeners(): void {
     setVisible(true)
     setInteractive(true)
     pushState.togglePanel(true)
+  })
+
+  on('switcher:hover', (_sender, index) => {
+    switcherHover(index)
+  })
+
+  on('switcher:click', (_sender, index) => {
+    switcherClick(index)
   })
 
   on('item:start-drag', (sender, req) => {

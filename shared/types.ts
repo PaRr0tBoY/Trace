@@ -148,6 +148,17 @@ export interface MergeResult {
 }
 
 /* ------------------------------------------------------------------ */
+/* Alt+Tab switcher (ADR-0005)                                          */
+/* ------------------------------------------------------------------ */
+
+/** One entry in the switcher list, as sent to the renderer. */
+export interface SwitcherEntryDto {
+  title: string
+  exePath: string
+  isCurrent: boolean
+}
+
+/* ------------------------------------------------------------------ */
 /* Task domain (t11)                                                    */
 /* ------------------------------------------------------------------ */
 

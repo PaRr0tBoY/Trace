@@ -18,6 +18,7 @@ import { ItemList } from './ItemList'
 import { SearchBar } from './SearchBar'
 import { Settings } from './Settings'
 import { TaskView } from './tasks/TaskView'
+import { SwitcherView } from './SwitcherView'
 import { FileListView } from './FileListView'
 import { TaskDropPanel } from './tasks/TaskDropPanel'
 import { linkDraggedItem, acceptSuggestionDrop } from './tasks/dropActions'
@@ -27,6 +28,7 @@ import { t } from '../i18n'
 
 export function Panel() {
   const open = useStore((s) => s.open)
+const switcherActive = useStore((s) => s.switcherActive)
   const total = useStore((s) => s.items.length)
   const clear = useStore((s) => s.clear)
   const settings = useStore((s) => s.settings)
@@ -234,7 +236,7 @@ export function Panel() {
   return (
     <div className="root">
       <motion.div
-        className={`blade-container${open ? '' : ' closing'}${settings.stickPosition === 'right' ? ' blade-right' : ''}`}
+        className={`blade-container${open ? '' : ' closing'}${settings.stickPosition === 'right' ? ' blade-right' : ''}${switcherActive ? ' switcher-session' : ''}`}
         initial={false}
         onDragEnter={onDragEnter}
         onDragOver={onDragOver}
@@ -268,8 +270,9 @@ export function Panel() {
             // Scale keeps the original ratio to clip-path (~0.76x: it finished
             // ahead of the clip in the initial 0.46/0.35 pairing). Opening 0.2s
             // fast-then-slow, closing 0.08s linear, both ahead of the clip.
-            duration: open ? 0.2 : 0.08,
-            ease: open ? [0.22, 1, 0.36, 1] : [0, 0, 1, 1]
+            // Switcher sessions (ADR-0005) run ~2x faster — snappier feel.
+            duration: switcherActive ? (open ? 0.1 : 0.06) : open ? 0.2 : 0.08,
+            ease: switcherActive ? (open ? [0.22, 1, 0.36, 1] : [0, 0, 1, 1]) : open ? [0.22, 1, 0.36, 1] : [0, 0, 1, 1]
           }
         }}
       >
@@ -288,6 +291,10 @@ export function Panel() {
           className="blade"
           style={{ height: panelHeightStr }}
         >
+          {switcherActive ? (
+            <SwitcherView />
+          ) : (
+            <>
           <Header />
 
           {!settingsOpen && view !== 'tasks' && <SearchBar />}
@@ -367,6 +374,8 @@ export function Panel() {
           </AnimatePresence>
           <TaskDropPanel />
           <SplitDropZone />
+            </>
+          )}
         </div>
       </motion.div>
     </div>

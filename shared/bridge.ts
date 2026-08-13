@@ -106,4 +106,11 @@ export interface EdgeApi {
   }) => void) => () => void
   onToast: (cb: (toast: { id: string; message: string; tone: 'info' | 'error' }) => void) => () => void
   onTutorialStep: (cb: (step: number) => void) => () => void
+
+  /* Alt+Tab switcher (ADR-0005) */
+  switcherHover: (index: number) => void
+  switcherClick: (index: number) => void
+  onSwitcherShow: (cb: (data: { entries: import('./types').SwitcherEntryDto[]; selectedIndex: number }) => void) => () => void
+  onSwitcherSelect: (cb: (index: number) => void) => () => void
+  onSwitcherHide: (cb: () => void) => () => void
 }

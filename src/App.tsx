@@ -39,6 +39,9 @@ export default function App() {
     const offSettings = edge.onSettings((next) => setSettings(next))
     const offToast = edge.onToast((t) => pushToast(t))
     const offToggle = edge.onToggle((forceOpen) => {
+      // Switcher session (ADR-0005): the panel is pinned open — toggle must
+      // not collapse it under the switcher (e.g. fullscreen-suppression).
+      if (useStore.getState().switcherActive) return
       const next = forceOpen !== undefined ? forceOpen : !useStore.getState().open
       if (!next) {
         const state = useStore.getState()
@@ -81,6 +84,15 @@ export default function App() {
     const offTutorialStep = edge.onTutorialStep((step) => {
       useStore.getState().setTutorialStep(step)
     })
+    const offSwitcherShow = edge.onSwitcherShow((data) => {
+      useStore.getState().showSwitcher(data)
+    })
+    const offSwitcherSelect = edge.onSwitcherSelect((index) => {
+      useStore.getState().setSwitcherSelected(index)
+    })
+    const offSwitcherHide = edge.onSwitcherHide(() => {
+      useStore.getState().hideSwitcher()
+    })
     return () => {
       offItems()
       offTasks()
@@ -90,6 +102,9 @@ export default function App() {
       offToggle()
       offOpenSettings()
       offTutorialStep()
+      offSwitcherShow()
+      offSwitcherSelect()
+      offSwitcherHide()
     }
   }, [hydrate, setItems, setSettings, pushToast])
 

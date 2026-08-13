@@ -3,7 +3,9 @@
 /** Mutable runtime flags (kept separate from the frozen config object). */
 export const runtime = {
   /** Set true only while the app is genuinely quitting (tray -> Quit). */
-  quitting: false
+  quitting: false,
+  /** Alt+Tab switcher session active (ADR-0005): edge hover is suspended. */
+  switcherActive: false
 }
 
 export const APP_CONFIG = {

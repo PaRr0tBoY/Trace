@@ -1,0 +1,2174 @@
+[
+  {
+    "id": "a1786461421609-s_msot01a8-3z7iwwlh",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msoss7wo-fm8d33ee",
+      "candidateRanking": null,
+      "switch": null,
+      "merge": null,
+      "suggestionLevel": null,
+      "reason": null
+    }
+  },
+  {
+    "id": "a1786461421609-s_msot01a9-8cvno22y",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "窗口为微信且涉及图片和视频，可能正在查看或分享媒体文件。"
+    }
+  },
+  {
+    "id": "a1786461421609-s_msot01a9-c97ld4hq",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msol51iz-3ynmqe6a",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "窗口有 pwsh、readily 和文件资源管理器，且 OCR 显示与 Readily 相关，可能在进行调试或代码审查。"
+    }
+  },
+  {
+    "id": "a1786461421609-s_msot01a9-lbrx4vl0",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "窗口有 Claude 新聊天和 Clash Verge，可能在与 Claude 对话并调整网络代理设置。"
+    }
+  },
+  {
+    "id": "a1786461421609-s_msot01a9-x2bfoi51",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "包含 pwsh 终端、Chrome 新标签页和 Claude 标签，且类似任务为 Agentic Engineering，可能在进行该项目的编码和交互。"
+    }
+  },
+  {
+    "id": "a1786461824316-s_msot8nvm-79wrtmo7",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msoss7wo-fm8d33ee",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "scripted continue (llm mode)"
+    }
+  },
+  {
+    "id": "a1786461824316-s_msot8nvm-bxjmkrtm",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "User has Strawberry and cmd open, viewing an AI log file, likely for analysis."
+    }
+  },
+  {
+    "id": "a1786461824316-s_msot8nvm-cuyndxny",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "scripted new (llm mode)"
+    }
+  },
+  {
+    "id": "a1786461824316-s_msot8nvm-fo56u6lr",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "User is in a PowerShell terminal, likely involved in development tasks."
+    }
+  },
+  {
+    "id": "a1786461824316-s_msot8nvm-hxho905x",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msoss7wo-fm8d33ee",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "User is working in an Electron app named Trace, possibly a task tracker."
+    }
+  },
+  {
+    "id": "a1786461824316-s_msot8nvm-k4y03pib",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "scripted new (llm mode)"
+    }
+  },
+  {
+    "id": "a1786461824316-s_msot8nvm-k92ms9e9",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "User is previewing memory context files while in File Explorer and terminal, likely inspecting data."
+    }
+  },
+  {
+    "id": "a1786461824316-s_msot8nvm-m0o068mu",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msot7xum-wv8oykiw",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "User has File Explorer open with trace and download tabs, plus a PowerShell terminal, suggesting file management."
+    }
+  },
+  {
+    "id": "a1786461824316-s_msot8nvm-qa3fh60o",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "An OpenWith dialog is present, possibly choosing an application to open files."
+    }
+  },
+  {
+    "id": "a1786461824316-s_msot8nvm-wego23y7",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "User is accessing the jump list of Strawberry, a music player, possibly for recent files."
+    }
+  },
+  {
+    "id": "a1786461824316-s_msot8nvm-yb1gqtl4",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "llm",
+      "reason": "User is back in a PowerShell terminal, likely continuing development tasks."
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sj-kqcwgowz",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sk-08xwj2iw",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sk-4k7t55ld",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sk-7fg3qicr",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sk-bfdxnzwp",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sk-e651vjx9",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sk-e9xh8vze",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sk-hupkotiu",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sk-rx91bx74",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sl-frfrhnf5",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sl-ohph89v0",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sl-qgx8zigh",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sl-szkc2uxp",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sl-tvy4lmcp",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sl-w6ey74u3",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786537652139-s_msq2e2sm-jksnejd2",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-0l23kee7",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-2i6rzg4y",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-5o223vmb",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-8cpq71sp",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-9jkf4zcy",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-9k9bovuk",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-b0tqimml",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-dln1oe26",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-hdot8ulr",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-hlhpmgb2",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-i5d0sdlz",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_mspssdf5-t7brli6o",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-krvcsvau",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-r7ohvyrs",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-r8euopwy",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_mspssdf5-t7brli6o",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-t60sc3fg",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-zdad29su",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-ziqs6y7z",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538161280-s_msq2ozni-zsxtewoc",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538340334-s_msq2stt8-31s9sk52",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538340334-s_msq2stt8-74fz1aop",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538340334-s_msq2stt8-7v07v05r",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538340334-s_msq2stt8-89aaj0mv",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538340334-s_msq2stt8-brubs460",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538340334-s_msq2stt8-gs47rwfx",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538340334-s_msq2stt8-jy3lzzqv",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538340334-s_msq2stt8-xpwyoeq0",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538595615-s_msq2yasd-4tcawn4c",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_mspssdf5-t7brli6o",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786538595615-s_msq2yasd-58l369ws",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538595615-s_msq2yasd-93zyu1yn",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538595615-s_msq2yasd-h68jyqsy",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_mspwjn5d-ye27li68",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786538595615-s_msq2yasd-lc1wnais",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538595615-s_msq2yasd-vdatw8g4",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538595615-s_msq2yasd-zgmip6vc",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538821701-s_msq3358j-i53zl5wn",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538821701-s_msq3358j-iw4vyu7d",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538821701-s_msq3358j-kgl6bbnz",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786538821701-s_msq3358j-qmkzj74d",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786539306325-s_msq3dj6b-1qftzu2i",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786539306325-s_msq3dj6b-66bzemxw",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786539306325-s_msq3dj6b-781s7cp4",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786539306325-s_msq3dj6b-c65rfh63",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786539306325-s_msq3dj6b-eir47u8r",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786539306325-s_msq3dj6b-j3i3wz65",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786539306325-s_msq3dj6b-jk07z3fy",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786539306325-s_msq3dj6b-lfvofx1c",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786539306325-s_msq3dj6b-rbtvxlw6",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786539306325-s_msq3dj6b-rc89s9sl",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786539306325-s_msq3dj6b-z8whm05c",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786540142517-s_msq3vgds-svbxg89x",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786540142517-s_msq3vgdt-3ch2z5cb",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786540142517-s_msq3vgdt-92zfeeoy",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786540142517-s_msq3vgdt-ebvg88md",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786540142517-s_msq3vgdt-qlqs7dag",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786540142517-s_msq3vgdt-shdyozta",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786540499185-s_msq433la-9l4u0ny6",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786540499185-s_msq433la-aorgwzm2",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786540499185-s_msq433la-f2x6a4fb",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786540499185-s_msq433la-gen4uyay",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786540499185-s_msq433la-khhs6yym",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786540651408-s_msq46d1p-rlex0zfq",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786541205685-s_msq4i8qb-0j038l6q",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786541205685-s_msq4i8qb-aqcasasu",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786541205685-s_msq4i8qb-ce3idckj",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786541205685-s_msq4i8qb-erjveyh0",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786541205685-s_msq4i8qb-xdqvllu8",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786541723597-s_msq4tccr-6fpi79oa",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786541723597-s_msq4tccr-9vrggt8a",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786541723597-s_msq4tccr-l17k8pf2",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786541723597-s_msq4tccr-vuq3h64n",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786542235471-s_msq54bbg-8xlcg9bw",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786542235471-s_msq54bbg-jj7803xv",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786542235471-s_msq54bbg-yspx6rri",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786542235471-s_msq54bbh-0wadajyh",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786542580691-s_msq5bpow-2q40ogid",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786542580691-s_msq5bpow-86tdv65u",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786542580691-s_msq5bpow-lhmhxdh2",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786542580691-s_msq5bpow-mxzb828t",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786542580691-s_msq5bpow-v9489s8i",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786542769585-s_msq5frfz-6dirz6qw",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786542769585-s_msq5frfz-j7xqkvid",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786543592594-s_msq5xehc-8btnt7ne",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786543592594-s_msq5xehc-b55xqfgr",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786543592594-s_msq5xehc-pd6scilf",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786543592594-s_msq5xehc-u2mun767",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786543743229-s_msq60mpm-63f6otop",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786543743229-s_msq60mpm-9fsqua7b",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": null,
+      "switch": null,
+      "merge": null,
+      "suggestionLevel": null,
+      "reason": null
+    }
+  },
+  {
+    "id": "a1786543743229-s_msq60mpm-myqc7rlm",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786544110387-s_msq68i0g-7xoiz0nr",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786544110387-s_msq68i0g-86uw8uc8",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786544110387-s_msq68i0g-a3iavxnb",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786544110387-s_msq68i0g-cy2su30p",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786544110387-s_msq68i0g-hv1993zl",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786544110387-s_msq68i0g-j9muyejr",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786544110387-s_msq68i0g-p9c5t252",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786544110387-s_msq68i0g-pi9mmf08",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786544110387-s_msq68i0g-yek3lfvx",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786549660802-s_msq9jgpm-pt3ucxsn",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786549851110-s_msq9njl0-2fiishe6",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786549851110-s_msq9njl0-a3bfei4m",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786549851110-s_msq9njl0-ztumgldn",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7u-6b4pe9l8",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-2eaj80k8",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-2eyd78mg",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-b03x22gt",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-c8vobm2e",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-cymo5c73",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-ewxkg9a4",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-h5dx1eos",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-itrwocwp",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-lhdjujda",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-ov9os7ap",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-s634olll",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-t7ai5s9p",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7v-ykg6ipko",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7w-0wk81u54",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7w-8m2bxkoi",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7w-fbhmhbds",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7w-hsm6zqjf",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7w-ntjm9evr",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550731922-s_msqa6f7w-olr7jnzj",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550889972-s_msqa9t6a-8s3flurs",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550889972-s_msqa9t6a-igc8je8n",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786550889972-s_msqa9t6a-yw9lv4h5",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786551774195-s_msqasrfy-4k018fut",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786551774195-s_msqasrfy-co8vregr",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786551774195-s_msqasrfy-n7u9szy9",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786551774195-s_msqasrfy-omc5juvp",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786551774195-s_msqasrfy-v2600uvf",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786551774195-s_msqasrfz-0kzjkqn6",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786551774195-s_msqasrfz-v475mpld",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786551987111-s_msqaxbq4-4dhm4wdr",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786551987111-s_msqaxbq5-it3cw7ko",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786551987111-s_msqaxbqc-bswzd40i",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786551987111-s_msqaxbqc-hgzw5qyj",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786551987111-s_msqaxbqc-i51a0lac",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786551987111-s_msqaxbqc-kw7zyehl",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786552817982-s_msqbf4sn-3x7er7qk",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786552817982-s_msqbf4sn-5pj6ra63",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786552817982-s_msqbf4sn-b91iyzcn",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786552817982-s_msqbf4sn-edsjk05m",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786552817982-s_msqbf4sn-jfi0fczp",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786552817982-s_msqbf4sn-jhlj2q6r",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786552817982-s_msqbf4sn-plux62zn",
+    "labels": {
+      "activityBoundary": false,
+      "currentTask": "t_msq2zkbx-fyy91dww",
+      "candidateRanking": 1,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "attribution unchanged"
+    }
+  },
+  {
+    "id": "a1786552817982-s_msqbf4sn-q6o4p7fb",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786552817982-s_msqbf4sn-tatbjhvh",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786552817982-s_msqbf4so-lgis9ilf",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786552817982-s_msqbf4so-qzwa3287",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786553149354-s_msqbm8iv-5gbibgs9",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  },
+  {
+    "id": "a1786553149354-s_msqbm8iv-c1mu5j8e",
+    "labels": {
+      "activityBoundary": true,
+      "currentTask": null,
+      "candidateRanking": null,
+      "switch": false,
+      "merge": false,
+      "suggestionLevel": "algorithm",
+      "reason": "new semantic cluster with no attributed task"
+    }
+  }
+]

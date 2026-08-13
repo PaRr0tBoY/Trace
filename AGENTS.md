@@ -20,11 +20,12 @@
 | `npm run build` | 生产构建到 `out/` |
 | `npm run package` | 构建 + Windows NSIS 安装包到 `dist/` |
 | `npm run preview` | 预览构建产物 |
-| `npm test` | vitest 单元测试（22 文件 / 424 用例：任务层、restore、fileTabs、AI、几何等） |
+| `npm test` | vitest 单元测试（44 文件 / 896 用例：任务层、决策管道、记忆、AI、几何等） |
 
 - **有 vitest 测试，没有 lint 脚本。** 验收靠 `npm run typecheck` + `npm test` + `npm run dev` 手动验证。
 - npm ≥ 11 默认拦截 postinstall 脚本：装完依赖要 `npm approve-scripts electron esbuild koffi`，否则 esbuild/electron 二进制缺失，`npm run dev` 直接失败。
 - 打包失败报 `EBUSY` 时：`taskkill /F /IM electron.exe /T` 关掉运行中的实例再试。
+- `npm run package` = `build:github`，electron-builder 的 publish 配置指向 GitHub releases——**无 `GH_TOKEN` 环境变量时 NSIS 产物照常生成，但 upload 阶段报错退出**；本地打包验收用 `npm run package`（产物在 `dist/`），发布才需 token。
 - 注意：本环境（pi）裸 `git` 命令输出会被干扰（显示旧状态），用 `/cmd/git` 或 `/mingw64/bin/git` 执行 git 命令。
 
 ## 三进程架构
@@ -49,9 +50,11 @@
 
 - `InvokeMap` — renderer invoke → main 返回 Promise（`state:load`、`item:merge`、`app:get-releases`…）
 - `EventMap` — main → renderer 推送（`state:items`、`window:cursor-edge`、`ui:toast`…）
-- `SendMap` — 即发即弃（`item:start-drag`、`tutorial:set-step`、`panel:expand`…）
+- `SendMap` — 即发即弃（`item:start-drag`、`ui:input-focus`、`panel:expand`…）
 
-任务层通道：`task:load/merge/update/delete/link-*`、`suggestion:accept`（带 opts：title/note/apps/clipboardItemIds）、`suggestion:accept-with-resource`、`task:app-options`（ADR-0002 编辑器应用网格）、`app:icons`（on-demand 图标）、`app:open-linked-window`（ADR-0005 窗口切换）。
+任务层通道：`task:load/merge/update/delete/link-*`、`task:suggest-title`（t56 迁入决策模块）、`suggestion:accept`（带 opts：title/note/apps/clipboardItemIds）、`suggestion:accept-with-resource`、`suggestion:ignore`（带 reason）、`task:app-options`（ADR-0002 编辑器应用网格）、`app:icons`（on-demand 图标）、`app:open-linked-window`（ADR-0005 窗口切换）。
+
+AI 管道通道（t42/t51/t54）：`trace:list-by-decision/list-by-task/get-by-id/clear/export-report`（AI 依据）、`memory:list/act`、`memory-graph:list/set-state/adjudicate`（记忆面板）、`local-model:status/start-download/remove/set-source/set-path/pick-path`。
 
 领域模型在 `shared/types.ts`：`ItemData`（text/image/image-collection/files 判别联合）、`ClipboardItem`/`ClipboardItemDto`、`Settings`、`MAX_STACK = 10`、`DragRequest`。
 
@@ -104,6 +107,22 @@
 - `ocr.ts` — Windows.Media.Ocr（WinRT，经 PowerShell 单行脚本）识别前台窗口文字，作为 LLM 建议的 `ocrContext` 输入。**只作 AI 资料不进 UI、不持久化**；隐私三开关（incognito/L0/总开关）任一关闭即跳过；分析触发时才跑，超时放弃。
 - `suggestionDrop.ts` — 拖到备选卡"自动建任务并绑定"的纯逻辑组合（`acceptWithResource`），IPC 层薄封装。
 
+### 决策与记忆管道（ADR-0005，t31–t58 全量重构）
+- **数据层（`electron/store/`，全部纯逻辑零 Electron import，vitest 直测）**：
+  - `db.ts` — SQLite canonical（7 表 + FTS5 + WAL + 迁移框架，v4）；vitest 用 Node ABI 预编译回退（`node_modules/.cache/better-sqlite3-node/`）
+  - `activityLedger.ts` — 聚类管线（从 suggestionEngine 迁出）：事件 → 段 → 簇（分数/margin/zone）；`recommendationFingerprint`（冷却键）
+  - `evidenceStore.ts` — 证据时间线（event 级，30d 保留）；`traceStore.ts` — AI 依据五类（observed/recall/decision/result/privacy），`decisionId` 贯穿全链
+  - `recommendationHistory.ts` — 推荐记录 + 冷却（L1 24h / L2 48h / L3 7d，accepted 永久）+ 模式学习（意图五档 × 指数衰减 × 时段）
+  - `proposalGrading.ts` — L1/L2/L3 分级（L1 只能从 L2 升级、禁直升；批内语义/签名去重；与现有任务比对）
+  - `memoryGraph.ts` — 记忆三表（episodes/entities/facts + FTS5）：去重（norm-key + 余弦 ≥0.6）、矛盾 invalid_at（不覆盖）、权重 = 五档 × expDecay × 时段、确认/忽略/封禁/冲突裁决；`episodeConsolidator.ts` — 时段整理（会话结束/日界/6h 兜底，≤2 次 LLM）
+  - `privacyGate.ts` — 隐私三权政策（capture/AI/memory），`policyFromSettings` 纯投影；被拒数据记 trace kind='privacy'
+  - `localModelManager.ts` / `localModelRuntime.ts` / `localModelWorker.ts` — 本地模型（Qwen3-0.6B Q8_0）：下载/校验/worker 线程推理；`localModelOptimizer.ts` — 候选过滤 ≤3/标题草稿/rerank（关/失败 = 纯算法等价）
+- **决策层（`electron/main/`）**：
+  - `suggestionEngine.ts` — 收缩为生命周期控制器（定时/待定提案/采纳编排/commit 接缝），聚类/决策/suggestTitle 均迁出
+  - `currentTaskController.ts` — 主 seam：`observe(activity)`，六触发门控（分数跌破/候选超 margin/新簇/idle 恢复/多任务竞争/会话边界），两级调用策略（稳态 0 次 LLM、窗口 dwell 后恰好 1 次），滞回（30–60s dwell + margin 进设置），原子切换（域层 settle+open+迁移），PAUSED 免疫
+  - `decisionProvider.ts` — 决策者三实现同一协议（算法/agent/本地模型）：最小预填（隐私门过）、四工具面 ≤3 预算（search_tasks/memories/activities/clipboard，后者预览且受开关控制）、suggestTitle
+  - `provider.ts` — Agent 链（OpenAI 兼容，json_schema 400 → 降级 json_object；空 completion 重试 + thinking 关闭；DeepSeek 实测）
+
 ### 设置（`electron/store/settings.ts`）
 - 扁平 JSON，读取时深合并到 `DEFAULT_SETTINGS` 并**钳制数值**（hotZoneHeight 0.2–0.6、historyLimit 50–2000、autoDeleteHours ≥ 0、uiStyle 枚举、themeColor/restoreTime/tasksFilter 枚举钳制在 `settingsClamp.ts`）。新加设置字段要同时登记 `shared/types.ts` 的 `Settings`/`DEFAULT_SETTINGS` 和这里的 `merge()`。
 - Settings UI 是 4-tab（behaviour/position/appearance/tasks，ADR-0004）；`settingsTab` 在 store 里，restore 机制记住它。
@@ -126,5 +145,6 @@
 - **输入框焦点（t21，2026-08-11 最终版）**：键盘输入必须真正激活窗口——实测三条死路：①`focusable:false` 窗口 `element.focus()` 静默失败（无 focusin）；②user32 `SetFocus` 只设线程焦点，全局按键仍去前台窗口（keybd_event 实测 0 到达）；③`setFocusable(false)` 在 Windows 上**隐藏窗口**（禁用）。最终方案：窗口常驻 `focusable:true`（window.ts），OS 侧用 koffi 的 `WS_EX_NOACTIVATE`（`GetWindowLongPtrW`/`SetWindowLongPtrW`，`electron/main/focus.ts`）控制可激活性。输入框聚焦链：renderer 全局 `focusin`/`pointerdown`（App.tsx，捕获阶段，匹配 `input, textarea, [contenteditable]`）→ `ui:input-focus` → main：剥 NOACTIVATE + `win.focus()`（+ `setSkipTaskbar(true)` 防任务栏按钮）。**激活按会话保持**：输入框 blur 不释放（切换输入框不闪烁），面板关闭（`window:set-interactive(false)`）才贴回 NOACTIVATE；窗口失活（`onWindowBlur`）时主动 blur 输入框防 Chromium 焦点重放误激活；pointerdown 非输入元素 → `ui:input-blur` → `win.blur()` 立即失活（Chromium 对 focusable:true 窗口**任何点击都会激活**，NOACTIVATE 拦不住——实测，所以非输入点击后必须主动失活还焦点）。输入框聚焦时 Escape 只 blur 不关面板（useEdgeHover onKeyDown）。
 - **0.2.6 合并丢失了三个 IPC handler（2026-08-11 恢复）**：`file:reveal`、`displays:list`、`window:set-preview-mode` 在 `shared/ipc.ts`/preload 有声明但 main 从未注册（真机报 `No handler registered`）。已恢复并注释。**教训：四文件契约靠 typecheck 校验签名，但"声明了没注册"typecheck 查不出**——新增通道后跑一次真机或 grep 确认 `handle('channel'` 存在。
 - **搜索框 focus 样式（2026-08-12）**：不用主题色——accent 光晕在透明面板上边缘粗糙且被 `overflow:hidden` 容器截断；focus 时白色细线框（`rgba(255,255,255,0.85)`），无 box-shadow（panel.css `.search input:focus`）。
+- **tutorial IPC 死链已清（2026-08-13，t58）**：`tutorial:step`（EventMap）/`tutorial:set-step`（SendMap）两端 main 均无对端，已从四文件删除；renderer 内部 `tutorialStep` 状态流保留（onboarding 过滤逻辑）。**`app:quit` 曾是无 handler 的活坏通道**（Settings 退出按钮 reject 被 void 吞），已补注册 `app.quit()`。
 - `drag_debug.txt` 是 OLE 拖拽排障日志，已被 gitignore（upstream 加的），运行时生成不提交。
 - `features_and_architecture.md` 是旧架构文档（fork 前写的），可能滞后于代码；`scratch/` 用途不明，别动。

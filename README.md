@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-3b82f6?style=flat&logo=windows&logoColor=white" alt="Platform: Windows 10/11" />
   <img src="https://img.shields.io/badge/electron-34-9ca3af?style=flat" alt="Electron 34" />
   <img src="https://img.shields.io/badge/typescript-5-3b82f6?style=flat&logo=typescript&logoColor=white" alt="TypeScript 5" />
-  <img src="https://img.shields.io/badge/tests-509%20unit-14b8a6?style=flat" alt="509 unit tests" />
+  <img src="https://img.shields.io/badge/tests-896%20unit-14b8a6?style=flat" alt="896 unit tests" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-6b7280?style=flat" alt="Apache-2.0" /></a>
 </p>
 
@@ -168,7 +168,7 @@ npm run dev    # Electron + Vite HMR
 
 ```bash
 npm run typecheck   # tsc --noEmit for both node and web configs
-npm test            # 509 unit tests (vitest)
+npm test            # 896 unit tests (vitest)
 npm run package     # Windows NSIS installer into dist/
 npm run build:store # Windows MSIX for the Microsoft Store
 ```
@@ -186,14 +186,21 @@ npm run build:store # Windows MSIX for the Microsoft Store
 │  ├─ bridge.ts            EdgeApi interface implemented by preload
 │  └─ types.ts             ItemData, Task, TaskProposal, Settings, DTOs
 ├─ electron/
-│  ├─ main/                window & edge trigger, drag (OLE), suggestionEngine,
-│  │                       clusterer, provider chain, MemoryStore wiring, ocr,
-│  │                       windowSwitch (linked windows), focus, imageProtocol,
-│  │                       aiLog, fullscreen (koffi), powershell, tray
+│  ├─ main/                window & edge trigger, drag (OLE), suggestionEngine
+│  │                       (lifecycle controller), provider chain + decision
+│  │                       provider, currentTaskController, MemoryStore wiring,
+│  │                       ocr, windowSwitch (linked windows), focus,
+│  │                       imageProtocol, aiLog, fullscreen (koffi),
+│  │                       powershell, tray
 │  ├─ preload/             sandboxed contextBridge
 │  ├─ clipboard/           ClipboardWatcher (600ms poll), formats (FNV-1a, HDROP)
-│  └─ store/               ItemStore, TaskStore, MemoryStore, settings,
-│                          db.ts (SQLite migrations, canonical store in progress)
+│  └─ store/               db.ts (SQLite canonical: 7 tables + FTS5 + WAL),
+│                          ItemStore, TaskStore (state machine + commit seam),
+│                          sessionStore, activityLedger (clustering),
+│                          evidenceStore, traceStore, recommendationHistory,
+│                          proposalGrading, memoryGraph (episodes/entities/facts),
+│                          episodeConsolidator, privacyGate, localModelManager /
+│                          localModelRuntime, MemoryStore, settings, paths
 ├─ src/                    React renderer
 │  ├─ components/          Panel, Header, ItemList, PreviewFlyout, Settings,
 │  │  └─ tasks/            TaskView, TaskEditor, TaskDetail, TaskProposalCard,
@@ -203,7 +210,7 @@ npm run build:store # Windows MSIX for the Microsoft Store
 │  ├─ i18n/                translations for 30 languages
 │  └─ store/               Zustand appStore (view cache of main state)
 ├─ assets/readme/          hero and pipeline visuals
-└─ tests/                  26 vitest files, 509 cases
+└─ tests/                  44 vitest files, 896 cases
 ```
 
 ---
@@ -220,8 +227,8 @@ npm run build:store # Windows MSIX for the Microsoft Store
 | Scripting         | **PowerShell**              | HDROP file lists, simulated paste, WinRT OCR                              |
 | Drag ghosts       | **@resvg/resvg-js**         | Server-side SVG → PNG rendering                                           |
 | Storage           | **better-sqlite3**          | Canonical store (schema + migrations in place; business tables landing)   |
-| Local model       | **node-llama-cpp**          | Embedded Qwen3-0.6B for offline title drafts — planned, default off       |
-| Tests             | **vitest**                  | 509 unit tests, engine tested with fake clock + injected deps             |
+| Local model       | **node-llama-cpp**          | Embedded Qwen3-0.6B Q8_0 for offline title drafts / candidate rerank — default off, downloads from Settings |
+| Tests             | **vitest**                  | 896 unit tests, engine tested with fake clock + injected deps             |
 
 ---
 
@@ -229,7 +236,7 @@ npm run build:store # Windows MSIX for the Microsoft Store
 
 **Current release (v2026.08.12)** — task layer (candidates, guided editor, linked windows, drop-to-bind), dual-row navigation with restore, five accent themes, AI observability (`ai-log.jsonl`), OCR context, thumbnail protocol.
 
-**In progress** — SQLite as the canonical store for the evidence timeline and memory, a two-stage decision path (deterministic change detection with LLM escalation on high-uncertainty cases), activity/session refactoring, and the embedded local model (ADR-0005).
+**Pipeline refactor (ADR-0005, v2026.08.13)** — the suggestion pipeline is rebuilt end to end: an activity ledger clusters the event stream, a current-task controller gates decisions (six triggers, hysteresis in Settings, ~0 LLM calls in steady state), a decision provider escalates to the agent chain on low confidence (fixed four-tool surface, ≤3 calls), proposals are graded L1/L2/L3 with semantic dedup and recommendation-history cooldowns, memory is a reviewable fact graph (episodes → entities → facts, deterministic retrieval, conflict adjudication in Settings), everything is traceable to its evidence, and the embedded local model is wired but off by default. Golden Dataset baseline: precision 1.0 / recall 0.9935 / 0 false positives (181 seeds).
 
 **Deliberately not planned** — silent auto-updates (removed; What's New reads GitHub releases instead), Linux/macOS ports, cloud sync. Windows-only by design.
 

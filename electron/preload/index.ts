@@ -135,6 +135,8 @@ const api = {
   requestInputFocus: () => send('ui:input-focus'),
   requestInputBlur: () => send('ui:input-blur'),
   expandPanel: () => send('panel:expand'),
+  switcherHover: (index: number) => send('switcher:hover', index),
+  switcherClick: (index: number) => send('switcher:click', index),
 
   /* Task domain */
   loadTasks: () => invoke('task:load'),
@@ -196,6 +198,9 @@ const api = {
   onInternalDrop: (cb: (pos: { x: number; y: number }) => void) => on('item:internal-drop', cb),
   onCursorEdge: (cb: (data: EventArgs<'window:cursor-edge'>[0]) => void) => on('window:cursor-edge', cb),
   onToast: (cb: (toast: { id: string; message: string; tone: 'info' | 'error' }) => void) => on('ui:toast', cb),
+  onSwitcherShow: (cb: (data: EventArgs<'switcher:show'>[0]) => void) => on('switcher:show', cb),
+  onSwitcherSelect: (cb: (index: number) => void) => on('switcher:select', cb),
+  onSwitcherHide: (cb: () => void) => on('switcher:hide', cb),
 
   /* Drag helpers */
   // (Handled natively by capturing drop event above)

@@ -1,0 +1,49 @@
+/**
+ * Main-process side of the Alt+Tab hook (ADR-0005).
+ *
+ * Forks the keyboard hook into a utilityProcess (pure Node) — see hookHost.ts
+ * for why the hook must not run in the Electron main process. This module only
+ * bridges the host's messages to the switcher controller and owns the host's
+ * lifecycle. A host crash does NOT restart it automatically: the OS unhooks
+ * on process exit, so keyboard input is never at risk; the user just loses
+ * the takeover until Trace restarts (the hook re-installs on next launch).
+ */
+import { utilityProcess } from 'electron'
+import { join } from 'node:path'
+import type { KeyboardHookEvents } from './keyboardHook'
+
+let child: Electron.UtilityProcess | null = null
+
+/** Fork the hook host and bridge its events. Idempotent. */
+export function startKeyboardHook(events: KeyboardHookEvents): void {
+  if (child) return
+  try {
+    child = utilityProcess.fork(join(__dirname, 'hookHost.js'), [], {
+      serviceName: 'alt-tab-hook',
+      stdio: 'inherit'
+    })
+    child.on('message', (msg: unknown) => {
+      const m = msg as { type?: string; shiftDown?: boolean; delta?: 1 | -1 } | null
+      if (!m) return
+      if (m.type === 'show') events.onShow({ shiftDown: m.shiftDown ?? false })
+      else if (m.type === 'advance') events.onAdvance(m.delta === -1 ? -1 : 1)
+      else if (m.type === 'execute') events.onExecute()
+      else if (m.type === 'tap') events.onTapExecute({ shiftDown: m.shiftDown ?? false })
+    })
+    child.on('exit', () => {
+      child = null
+      console.log('[Hook] host exited — Alt+Tab takeover released (system restored)')
+    })
+  } catch (err) {
+    console.error('[Hook] failed to fork hook host — Alt+Tab takeover disabled:', err)
+    child = null
+  }
+}
+
+/** Kill the host (unhooks immediately). Idempotent. */
+export function stopKeyboardHook(): void {
+  if (child) {
+    child.kill()
+    child = null
+  }
+}

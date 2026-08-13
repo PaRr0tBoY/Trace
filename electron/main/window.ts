@@ -206,6 +206,9 @@ function _restartPollTimer(intervalMs: number): void {
 /** Single cursor poll tick — shared by both fast and slow modes. */
 function _pollTick(): void {
   if (runtime.quitting || !mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return
+  // Switcher session (ADR-0005): the panel is pinned open and fully
+  // interactive — edge dwell must not interfere with the switcher.
+  if (runtime.switcherActive) return
 
   const settings = loadSettings()
   if (settings.suppressInFullscreen && isFullscreenAppActive()) return
@@ -480,6 +483,9 @@ export function createWindow(): BrowserWindow {
   registerFullscreenActiveListener(() => {
     const settings = loadSettings()
     if (settings.suppressInFullscreen && (settings.hoverActivation ?? true)) {
+      // An active Alt+Tab switcher session owns the panel — never collapse it
+      // under the fullscreen-suppression logic (ADR-0005).
+      if (runtime.switcherActive) return
       if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
         mainWindow.webContents.send('window:toggle', false)
       }

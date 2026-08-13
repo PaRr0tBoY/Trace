@@ -141,6 +141,9 @@ export function useEdgeHover(): void {
 
     const closePanelNow = () => {
       const s = useStore.getState()
+      // Switcher session (ADR-0005): the panel is pinned open — the switcher
+      // owns the page until Alt is released or an entry is clicked.
+      if (s.switcherActive) return
       if (s.styleFlyoutOpen) s.setStyleFlyoutOpen(false)
       // NOTE: the settings sheet stays open — the restore mechanism
       // (ADR-0004) remembers it within the restore time and resets it when
@@ -156,6 +159,7 @@ export function useEdgeHover(): void {
     const closePanel = () => {
       const state = useStore.getState()
       if (!state.open) return
+      if (state.switcherActive) return // switcher owns the panel (ADR-0005)
       if (state.debugHoldOpen) return
       if (state.sliderActive) return
       if (state.dragActive && !state.internalDragReq) return
@@ -192,6 +196,7 @@ export function useEdgeHover(): void {
 
     const scheduleClose = (delay = GRACE_MS) => {
       const state = useStore.getState()
+      if (state.switcherActive) return // switcher owns the panel (ADR-0005)
       if (state.debugHoldOpen) return
       if (state.sliderActive) return
       if (state.dragActive && !state.internalDragReq) return
@@ -285,6 +290,7 @@ export function useEdgeHover(): void {
     }
 
     const onPanelLeave = () => {
+      if (useStore.getState().switcherActive) return // switcher owns the panel
       if (isInsideBlade()) {
         cancelClose()
         return

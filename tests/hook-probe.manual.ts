@@ -1,5 +1,6 @@
 // 临时验证：keyboardHook 状态机（SendInput 注入，无副作用——吞键模式）
-// 手动套件（不进默认 npm test，注入真实按键有副作用）：npx vitest run tests/hook-probe.manual.ts
+// 手动套件（不进默认 npm test，注入真实按键有副作用）：
+// npx vitest run --config vitest.manual.config.ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import koffi from 'koffi'
 import { startKeyboardHook, stopKeyboardHook } from '../electron/main/keyboardHook'
@@ -22,10 +23,10 @@ function chord(keys: [number, boolean][]) {
   sendInput(keys.length, keys.map(([vk, up]) => keyInput(vk, up)), koffi.sizeof(INPUT))
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-async function typeSequence(keys: [number, boolean][]) {
-  for (const [vk, up] of keys) {
+async function typeSequence(keys: Array<[number, boolean, number?]>) {
+  for (const [vk, up, delay = 25] of keys) {
     sendInput(1, [keyInput(vk, up)], koffi.sizeof(INPUT))
-    await sleep(25)
+    await sleep(delay)
   }
 }
 
@@ -49,7 +50,14 @@ describe('keyboardHook Alt+Tab takeover', () => {
 
   it('Alt+Tab: show, tab repeat advances, release executes', async () => {
     events.length = 0
-    await typeSequence([[VK_LMENU, false], [VK_TAB, false], [VK_TAB, true], [VK_TAB, false], [VK_TAB, true], [VK_LMENU, true]])
+    // Tab held > TAP_THRESHOLD_MS (50): a real finger holds Tab ~80-120ms,
+    // an injected 25ms tap would take the tap path and switch without UI.
+    await typeSequence([
+      [VK_LMENU, false],
+      [VK_TAB, false, 80], [VK_TAB, true],
+      [VK_TAB, false, 80], [VK_TAB, true],
+      [VK_LMENU, true]
+    ])
     await sleep(150)
     expect(events).toEqual(['show:plain', 'advance:1', 'execute'])
   })
@@ -58,8 +66,8 @@ describe('keyboardHook Alt+Tab takeover', () => {
     events.length = 0
     await typeSequence([
       [VK_LSHIFT, false], [VK_LMENU, false],
-      [VK_TAB, false], [VK_TAB, true],
-      [VK_TAB, false], [VK_TAB, true],
+      [VK_TAB, false, 80], [VK_TAB, true],
+      [VK_TAB, false, 80], [VK_TAB, true],
       [VK_LMENU, true], [VK_LSHIFT, true]
     ])
     await sleep(150)

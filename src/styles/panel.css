@@ -537,6 +537,7 @@
   width: 100%;
   padding: 8px 10px;
   border: none;
+  outline: none;
   background: transparent;
   border-radius: 10px;
   color: var(--text-primary);

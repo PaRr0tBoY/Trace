@@ -160,6 +160,12 @@ let hookPtr: unknown = null
 let pumpTimer: ReturnType<typeof setInterval> | null = null
 let activeEvents: KeyboardHookEvents | null = null
 let tapTimer: ReturnType<typeof setTimeout> | null = null
+// Session-level marker for pinned search mode. Deliberately separate from
+// `state`: Alt-up (the pin gesture's release) moves the state machine back
+// to idle — but the search session lives on until setPinned(false). Control
+// keys and Tab must keep belonging to the panel for the whole session, or
+// they fall through to the foreground window the moment Alt comes up.
+let pinnedSession = false
 
 // Persistent trampoline: an auto-registered JS callback only lives for the
 // duration of one FFI call, but SetWindowsHookExW fires the callback later —
@@ -183,6 +189,33 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
       const isTab = vk === VK_TAB
       const isReturn = vk === VK_RETURN
       if (DEBUG) console.log('[Hook]', 'wParam=' + wParam, 'vk=' + vk.toString(16), 'state=' + state)
+
+      // Pinned search session: the panel owns Tab and the control keys for
+      // the whole session, not just while `state === 'pinned'` (Alt-up has
+      // already moved the machine back to idle by the time the user types).
+      // Tab stays swallowed — repeats must never reach the OS as a live
+      // Alt+Tab combo. Enter/Esc/arrows are delivered via onControlKey and
+      // resolved by the switcher (Esc cancels in main, the rest in the
+      // renderer against its local selection state).
+      if (pinnedSession) {
+        if (isTab) return 1n
+        if (isReturn && isDown) {
+          defer(() => activeEvents?.onControlKey('enter'))
+          return 1n
+        }
+        if (vk === VK_ESCAPE && isDown) {
+          defer(() => activeEvents?.onControlKey('escape'))
+          return 1n
+        }
+        if (vk === VK_DOWN && isDown) {
+          defer(() => activeEvents?.onControlKey('down'))
+          return 1n
+        }
+        if (vk === VK_UP && isDown) {
+          defer(() => activeEvents?.onControlKey('up'))
+          return 1n
+        }
+      }
 
       if (state === 'idle') {
         if (isAlt && isDown) state = 'altDown'
@@ -274,38 +307,12 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
           return 1n // swallow the raw Alt up; the synthetic one is clean
         }
       } else if (state === 'pinned') {
-        // Pinned search mode: everything passes through to the focused panel
-        // input (search field handles Enter/Esc/arrows itself). Only Alt-up
-        // is special — it must not execute the switch (that's the point of
-        // pinning). Touch the session on keydown so long typing sessions
-        // don't hit the 30s self-heal timeout.
-        //
-        // Tab stays swallowed (up and down): the user pinned while still
-        // holding Alt+Tab, and passing Tab repeats through would let the OS
-        // see a live Alt+Tab combination and switch the foreground away —
-        // the panel input then never receives a key.
-        if (isTab) return 1n
-        // Control keys are swallowed and delivered via onControlKey: the
-        // panel is usually not the OS foreground here (activation is
-        // best-effort), so these keys would otherwise land in whatever
-        // window is in front. Keyups pass through — the OS delivers them
-        // to nothing important, and the panel gets no duplicate keydown.
-        if (isReturn && isDown) {
-          defer(() => activeEvents?.onControlKey('enter'))
-          return 1n
-        }
-        if (vk === VK_ESCAPE && isDown) {
-          defer(() => activeEvents?.onControlKey('escape'))
-          return 1n
-        }
-        if (vk === VK_DOWN && isDown) {
-          defer(() => activeEvents?.onControlKey('down'))
-          return 1n
-        }
-        if (vk === VK_UP && isDown) {
-          defer(() => activeEvents?.onControlKey('up'))
-          return 1n
-        }
+        // Pinned search mode: character keys pass through to the activated
+        // panel input (the search field). Only Alt-up is special — it must
+        // not execute the switch (that's the point of pinning). Touch the
+        // session on keydown so long typing sessions don't hit the 30s
+        // self-heal timeout. Control keys are handled above by the
+        // session-level block, not here — the session outlives this state.
         if (isAlt && !isDown) {
           state = 'idle'
           // The real Alt-up is swallowed so no switch executes — but without
@@ -408,6 +415,7 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
  * is still held (user can keep cycling), else idle.
  */
 export function setPinned(pinned: boolean): void {
+  pinnedSession = pinned
   if (pinned) {
     clearTapTimer()
     state = 'pinned'
@@ -428,5 +436,6 @@ export function stopKeyboardHook(): void {
   }
   activeEvents = null
   state = 'idle'
+  pinnedSession = false
   clearTapTimer()
 }

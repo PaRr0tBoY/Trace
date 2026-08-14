@@ -284,22 +284,43 @@ function activatePanel(): void {
     const hwnd = koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void'))
     activateHwnd(hwnd)
     if (win.isFocused()) return
-    try {
-      // Search field sits at the top of the switcher page (8px padding +
-      // 32px field): click its center in physical pixels.
-      const bounds = win.getContentBounds()
-      const pt = screen.dipToScreenPoint({ x: bounds.x + Math.round(bounds.width / 2), y: bounds.y + 26 })
-      const orig = Buffer.alloc(8) // POINT {x, y}
-      if (!getCursorPos(orig)) return
-      setCursorPos(pt.x, pt.y)
-      mouseEvent(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, null)
-      mouseEvent(MOUSEEVENTF_LEFTUP, 0, 0, 0, null)
-      setCursorPos(orig.readInt32LE(0), orig.readInt32LE(4))
-      console.log('[Switcher] panel activation: simulated click on search field')
-    } catch (err) {
-      console.error('[Switcher] panel activation fallback failed:', err)
+    clickSearchField()
+    // One retry: the first click can land before the window finished its
+    // current resize/layout pass (the click would hit the wrong element).
+    if (!win.isFocused()) {
+      setTimeout(() => {
+        if (!active || win.isDestroyed() || win.isFocused()) return
+        clickSearchField()
+      }, 150)
     }
   }, 0)
+}
+
+/**
+ * Inject a click on the search field — the one activation path that is
+ * proven to work: a real click grants the process input rights and the
+ * system activates the window (WM_MOUSEACTIVATE). The cursor jumps for
+ * <100ms and returns; the click lands on the field, which is exactly where
+ * the user is about to type anyway.
+ */
+function clickSearchField(): void {
+  const win = getMainWindow()
+  if (!win || win.isDestroyed()) return
+  try {
+    // Search field sits at the top of the switcher page (8px padding +
+    // 32px field): click its center in physical pixels.
+    const bounds = win.getContentBounds()
+    const pt = screen.dipToScreenPoint({ x: bounds.x + Math.round(bounds.width / 2), y: bounds.y + 26 })
+    const orig = Buffer.alloc(8) // POINT {x, y}
+    if (!getCursorPos(orig)) return
+    setCursorPos(pt.x, pt.y)
+    mouseEvent(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, null)
+    mouseEvent(MOUSEEVENTF_LEFTUP, 0, 0, 0, null)
+    setCursorPos(orig.readInt32LE(0), orig.readInt32LE(4))
+    console.log(`[Switcher] panel activation: simulated click on search field (focused=${win.isFocused()})`)
+  } catch (err) {
+    console.error('[Switcher] panel activation fallback failed:', err)
+  }
 }
 
 /**

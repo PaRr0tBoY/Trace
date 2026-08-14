@@ -201,7 +201,11 @@ const switcherActive = useStore((s) => s.switcherActive)
   const onDragLeave = (e: React.DragEvent) => {
     const related = e.relatedTarget as Node | null
     if (related && e.currentTarget.contains(related)) return
-    setDragActive(false)
+    // Deliberately no setDragActive(false) here: DOM drag events on an OLE
+    // drag are unreliable (enter without leave happens), and dragActive's
+    // authority is the main-process drag:active push — a premature clear
+    // releases the close-guards mid-drag and the panel collapses while the
+    // user is still dragging (user feedback 2026-08-14).
   }
 
   const onDrop = (e: React.DragEvent) => {
@@ -214,7 +218,9 @@ const switcherActive = useStore((s) => s.switcherActive)
     } else if (hasFiles(e)) {
       e.preventDefault()
     }
-    setDragActive(false)
+    // No setDragActive(false) here either — an OS drop is settled by the
+    // main drag:active push once DoDragDrop returns; internal drops are
+    // settled by setInternalDragReq(null) above.
   }
 
   return (

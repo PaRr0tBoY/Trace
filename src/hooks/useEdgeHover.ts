@@ -529,12 +529,14 @@ export function useEdgeHover(): void {
         cancelClose()
       }
     }
-    const onDocDragLeave = (e: DragEvent) => {
-      if (!e.relatedTarget) {
-        useStore.getState().setDragActive(false)
-        // No close here — a drag that left the window may still come back
-        // (user feedback 2026-08-14: keep the drop view until the drag ends).
-      }
+    const onDocDragLeave = (_e: DragEvent) => {
+      // No dragActive flip here: DOM drag events on an OLE drag are
+      // unreliable (dragleave often never fires), and dragActive's authority
+      // is the main-process drag:active push. Clearing it here released the
+      // close-guards while the drag was still in flight and collapsed the
+      // panel mid-drag — the exact bug this branch's comment describes.
+      // A drag that left the window may still come back (user feedback
+      // 2026-08-14: keep the drop view until the drag ends).
     }
     const onDocDrop = (e: DragEvent) => {
       e.preventDefault()

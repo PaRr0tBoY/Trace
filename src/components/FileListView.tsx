@@ -19,6 +19,7 @@ import { FileMemberRow } from './FileMemberRow'
 import { PinnedTile } from './PinnedTile'
 import { EmptyState } from './EmptyState'
 import { IncognitoBanner } from './IncognitoBanner'
+import { TrashIcon } from './icons'
 import { isImageItem } from '../lib/fileTabs'
 import { basename } from '../lib/format'
 import { filterStationByRoute, countStale } from '../lib/stationRoute'
@@ -138,42 +139,92 @@ export function FileListView() {
       ? <ClipboardItemCard key={row.entry.id} item={stationToItem(row.entry)} stationEntry={row.entry} instant={false} />
       : <ClipboardItemCard key={row.item.id} item={row.item} instant={false} />
 
+  /**
+   * One-click clear (mirrors the clipboard view's footer): remove every
+   * unpinned file — station entries and legacy file items alike. Pinned
+   * files stay (user feedback 2026-08-14).
+   */
+  const clearUnpinnedFiles = (): void => {
+    const unpinnedStation = useStore.getState().station.filter((e) => !e.pinned)
+    const unpinnedItems = useStore
+      .getState()
+      .items.filter((it) => it.data.kind === 'files' && !isImageItem(it) && !it.pinned)
+    void (async () => {
+      for (const e of unpinnedStation) {
+        await useStore.getState().stationDelete(e.id)
+      }
+      if (unpinnedItems.length > 0) {
+        await useStore.getState().clear(unpinnedItems.map((it) => it.id))
+      }
+    })()
+  }
+
+  const footer = (total: number) => (
+    <div className="footer">
+      <span className="count">
+        {total} item{total === 1 ? '' : 's'}
+      </span>
+      <div className="spacer" />
+      <button
+        className="text-btn danger"
+        onClick={() => {
+          playDeleteSound()
+          clearUnpinnedFiles()
+        }}
+        disabled={total === 0}
+        title={t('item.clearUnpinned')}
+        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+      >
+        <TrashIcon width={14} height={14} />
+        <span>{t('item.clear')}</span>
+      </button>
+    </div>
+  )
+
   if (files.tabMembers === null) {
     const total = groupedEntries.pinned.length + groupedEntries.recent.length
     if (total === 0) {
-      return <EmptyState filtered={query.trim().length > 0} />
+      return (
+        <>
+          <EmptyState filtered={query.trim().length > 0} />
+          {footer(0)}
+        </>
+      )
     }
     return (
-      <div className="list">
-        {staleBanner}
-        {/* The clipboard pseudo-tab shows clipboard-captured files — the
-            incognito notice belongs here, next to the content it affects. */}
-        {filesFilter === 'clipboard' && <IncognitoBanner />}
-        {groupedEntries.pinned.length > 0 && (
-          <section className="pinned-section">
-            <div className="section-label">{t('item.pinned')}</div>
-            {expandedEntry && (
-              <ClipboardItemCard key={expandedEntry.id} item={stationToItem(expandedEntry)} stationEntry={expandedEntry} instant={false} />
-            )}
-            {gridEntries.length > 0 && (
-              <div className="pinned-grid">
-                {gridEntries.map((e) => (
-                  <PinnedTile key={e.id} entry={e} onExpand={setExpandedGridId} />
-                ))}
-              </div>
-            )}
-            {itemPinned.map((r) => (
-              <ClipboardItemCard key={r.item.id} item={r.item} instant={false} />
-            ))}
-          </section>
-        )}
-        {groupedEntries.recent.length > 0 && (
-          <section>
-            {groupedEntries.pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
-            {groupedEntries.recent.map(renderRow)}
-          </section>
-        )}
-      </div>
+      <>
+        <div className="list">
+          {staleBanner}
+          {/* The clipboard pseudo-tab shows clipboard-captured files — the
+              incognito notice belongs here, next to the content it affects. */}
+          {filesFilter === 'clipboard' && <IncognitoBanner />}
+          {groupedEntries.pinned.length > 0 && (
+            <section className="pinned-section">
+              <div className="section-label">{t('item.pinned')}</div>
+              {expandedEntry && (
+                <ClipboardItemCard key={expandedEntry.id} item={stationToItem(expandedEntry)} stationEntry={expandedEntry} instant={false} />
+              )}
+              {gridEntries.length > 0 && (
+                <div className="pinned-grid">
+                  {gridEntries.map((e) => (
+                    <PinnedTile key={e.id} entry={e} onExpand={setExpandedGridId} />
+                  ))}
+                </div>
+              )}
+              {itemPinned.map((r) => (
+                <ClipboardItemCard key={r.item.id} item={r.item} instant={false} />
+              ))}
+            </section>
+          )}
+          {groupedEntries.recent.length > 0 && (
+            <section>
+              {groupedEntries.pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
+              {groupedEntries.recent.map(renderRow)}
+            </section>
+          )}
+        </div>
+        {footer(total)}
+      </>
     )
   }
 

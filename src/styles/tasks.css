@@ -66,6 +66,7 @@
 /* Whole card is a drop target (t25). */
 .task-suggestion-card.drop-over {
   border-color: var(--accent);
+  border-style: dashed;
   background: rgba(var(--accent-rgb), 0.12);
 }
 

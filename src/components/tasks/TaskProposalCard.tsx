@@ -106,130 +106,140 @@ export function TaskProposalCard({ suggestion, onOpen, onTrace }: Props) {
       }}
       onDrop={onDrop}
     >
-      <div className="task-suggestion-head">
-        <div className="task-suggestion-title">{suggestion.title}</div>
-        {suggestion.level === 1 && (
-          <span className="task-suggestion-l1" title={t('tasks.suggestionLevel1')}>
-            {t('tasks.suggestionLevel1')}
-          </span>
-        )}
-        {suggestion.lowConfidence && (
-          <span className="task-suggestion-low">{t('tasks.suggestionLowConfidence')}</span>
-        )}
-      </div>
-
-      <div className="task-suggestion-row">
-        <div className="task-suggestion-apps">
-          {apps.length > 0 ? (
-            <>
-              {apps.map((app, i) => (
-                <img
-                  key={`${app.name}:${app.iconUrl}:${i}`}
-                  className="task-suggestion-app"
-                  src={app.iconUrl}
-                  alt=""
-                  draggable={false}
-                  onError={() => setBrokenIcons((prev) => new Set(prev).add(app.iconUrl))}
-                />
-              ))}
-              {overflowApps.length > 0 && (
-                <span className="task-app-icons-more" title={overflowApps.map((a) => a.name).join(', ')}>
-                  +{overflowApps.length}
-                </span>
-              )}
-            </>
-          ) : (
-            <span className="task-suggestion-apps-empty" title={suggestion.appNames.join(', ')}>
-              <SparklesIcon width={12} height={12} />
-            </span>
-          )}
+      {over ? (
+        // Drop-hover operation hint (user feedback): the card announces what
+        // dropping will do instead of showing its usual content.
+        <div className="task-suggestion-head">
+          <span className="task-drop-row-hint">{t('tasks.suggestionDropHint')}</span>
         </div>
-
-        <div className="task-suggestion-actions" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            className="task-suggestion-action accept"
-            title={t('tasks.suggestionAccept')}
-            onClick={confirm}
-          >
-            <CheckIcon width={14} height={14} />
-          </button>
-          <button
-            type="button"
-            className="task-suggestion-action"
-            title={t('tasks.suggestionEdit')}
-            onClick={() => onOpen?.(suggestion.id)}
-          >
-            <EditIcon width={13} height={13} />
-          </button>
-          <button
-            type="button"
-            className="task-suggestion-action"
-            title={t('trace.entryLabel')}
-            onClick={() => onTrace?.(suggestion.decisionId ?? suggestion.id)}
-          >
-            <InfoIcon width={13} height={13} />
-          </button>
-          <div className="task-suggestion-ignore" ref={menuRef}>
-            <button
-              type="button"
-              className="task-suggestion-action danger"
-              title={t('tasks.suggestionIgnore')}
-              onClick={() => {
-                void ignoreSuggestion(suggestion.id)
-              }}
-            >
-              <CloseIcon width={13} height={13} />
-            </button>
-            <button
-              type="button"
-              className="task-suggestion-action task-suggestion-ignore-toggle"
-              title={t('tasks.suggestionIgnoreMenu')}
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              <ChevronDownIcon width={11} height={11} />
-            </button>
-            {menuOpen && (
-              <div className="task-suggestion-ignore-menu" role="menu">
-                {IGNORE_MENU_REASONS.map(({ reason, label }) => (
-                  <button
-                    key={reason}
-                    type="button"
-                    role="menuitem"
-                    className="task-suggestion-ignore-menu-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      void ignoreSuggestion(suggestion.id, reason)
-                    }}
-                  >
-                    {t(label)}
-                  </button>
-                ))}
-              </div>
+      ) : (
+        <>
+          <div className="task-suggestion-head">
+            <div className="task-suggestion-title">{suggestion.title}</div>
+            {suggestion.level === 1 && (
+              <span className="task-suggestion-l1" title={t('tasks.suggestionLevel1')}>
+                {t('tasks.suggestionLevel1')}
+              </span>
+            )}
+            {suggestion.lowConfidence && (
+              <span className="task-suggestion-low">{t('tasks.suggestionLowConfidence')}</span>
             )}
           </div>
-        </div>
-      </div>
 
-      {chips.length > 0 && (
-        <div className="task-suggestion-chips">
-          {chips.map((ref, i) => (
-            <span
-              key={ref.kind === 'files' ? `f${i}` : ref.itemId}
-              className="task-suggestion-chip"
-              title={chipLabel(ref)}
-            >
-              {ref.kind === 'files' ? (
-                <FileIcon width={10} height={10} />
-              ) : ref.snapshot.type !== 'text' ? (
-                <ImageIcon width={10} height={10} />
-              ) : null}
-              {chipLabel(ref)}
-            </span>
-          ))}
-          {chipOverflow > 0 && <span className="task-suggestion-chip-more">+{chipOverflow}</span>}
-        </div>
+          <div className="task-suggestion-row">
+            <div className="task-suggestion-apps">
+              {apps.length > 0 ? (
+                <>
+                  {apps.map((app, i) => (
+                    <img
+                      key={`${app.name}:${app.iconUrl}:${i}`}
+                      className="task-suggestion-app"
+                      src={app.iconUrl}
+                      alt=""
+                      draggable={false}
+                      onError={() => setBrokenIcons((prev) => new Set(prev).add(app.iconUrl))}
+                    />
+                  ))}
+                  {overflowApps.length > 0 && (
+                    <span className="task-app-icons-more" title={overflowApps.map((a) => a.name).join(', ')}>
+                      +{overflowApps.length}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="task-suggestion-apps-empty" title={suggestion.appNames.join(', ')}>
+                  <SparklesIcon width={12} height={12} />
+                </span>
+              )}
+            </div>
+
+            <div className="task-suggestion-actions" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="task-suggestion-action accept"
+                title={t('tasks.suggestionAccept')}
+                onClick={confirm}
+              >
+                <CheckIcon width={14} height={14} />
+              </button>
+              <button
+                type="button"
+                className="task-suggestion-action"
+                title={t('tasks.suggestionEdit')}
+                onClick={() => onOpen?.(suggestion.id)}
+              >
+                <EditIcon width={13} height={13} />
+              </button>
+              <button
+                type="button"
+                className="task-suggestion-action"
+                title={t('trace.entryLabel')}
+                onClick={() => onTrace?.(suggestion.decisionId ?? suggestion.id)}
+              >
+                <InfoIcon width={13} height={13} />
+              </button>
+              <div className="task-suggestion-ignore" ref={menuRef}>
+                <button
+                  type="button"
+                  className="task-suggestion-action danger"
+                  title={t('tasks.suggestionIgnore')}
+                  onClick={() => {
+                    void ignoreSuggestion(suggestion.id)
+                  }}
+                >
+                  <CloseIcon width={13} height={13} />
+                </button>
+                <button
+                  type="button"
+                  className="task-suggestion-action task-suggestion-ignore-toggle"
+                  title={t('tasks.suggestionIgnoreMenu')}
+                  aria-expanded={menuOpen}
+                  onClick={() => setMenuOpen((v) => !v)}
+                >
+                  <ChevronDownIcon width={11} height={11} />
+                </button>
+                {menuOpen && (
+                  <div className="task-suggestion-ignore-menu" role="menu">
+                    {IGNORE_MENU_REASONS.map(({ reason, label }) => (
+                      <button
+                        key={reason}
+                        type="button"
+                        role="menuitem"
+                        className="task-suggestion-ignore-menu-item"
+                        onClick={() => {
+                          setMenuOpen(false)
+                          void ignoreSuggestion(suggestion.id, reason)
+                        }}
+                      >
+                        {t(label)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {chips.length > 0 && (
+            <div className="task-suggestion-chips">
+              {chips.map((ref, i) => (
+                <span
+                  key={ref.kind === 'files' ? `f${i}` : ref.itemId}
+                  className="task-suggestion-chip"
+                  title={chipLabel(ref)}
+                >
+                  {ref.kind === 'files' ? (
+                    <FileIcon width={10} height={10} />
+                  ) : ref.snapshot.type !== 'text' ? (
+                    <ImageIcon width={10} height={10} />
+                  ) : null}
+                  {chipLabel(ref)}
+                </span>
+              ))}
+              {chipOverflow > 0 && <span className="task-suggestion-chip-more">+{chipOverflow}</span>}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

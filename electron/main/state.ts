@@ -84,6 +84,7 @@ const stationStore = new StationStore({
 })
 const watcher = new ClipboardWatcher(600)
 let pruneTimer: ReturnType<typeof setInterval> | null = null
+let stationRefreshTimer: ReturnType<typeof setInterval> | null = null
 let wakeTimer: ReturnType<typeof setTimeout> | null = null
 let taskSweepTimer: ReturnType<typeof setInterval> | null = null
 let suggestionTimer: ReturnType<typeof setInterval> | null = null
@@ -481,6 +482,20 @@ export function initState(): void {
     }
   }, 60_000)
 
+  // Station staleness (T6): re-stat every entry so the "文件已消失" badge and
+  // its auto-revive stay honest when files change on disk outside the app.
+  // refreshAll() side-effect-updates all cached stats; push only when the
+  // staleness set actually changed, so idle ticks never re-render the panel.
+  // 30s: the shelf is a hover glance, so a badge is at worst one glance stale.
+  if (stationRefreshTimer !== null) clearInterval(stationRefreshTimer)
+  stationRefreshTimer = setInterval(() => {
+    if (runtime.quitting) return
+    const before = stationStore.toDto().map((e) => `${e.id}:${e.stale}`).join(',')
+    stationStore.refreshAll()
+    const after = stationStore.toDto().map((e) => `${e.id}:${e.stale}`).join(',')
+    if (before !== after) pushState.station()
+  }, 30_000)
+
   if (taskSweepTimer !== null) clearInterval(taskSweepTimer)
   taskSweepTimer = setInterval(() => {
     if (runtime.quitting) return
@@ -591,6 +606,10 @@ export function stopStateTimers(): void {
   if (pruneTimer !== null) {
     clearInterval(pruneTimer)
     pruneTimer = null
+  }
+  if (stationRefreshTimer !== null) {
+    clearInterval(stationRefreshTimer)
+    stationRefreshTimer = null
   }
   if (taskSweepTimer !== null) {
     clearInterval(taskSweepTimer)

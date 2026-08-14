@@ -72,10 +72,12 @@ class HiddenMarkerWidget extends WidgetType {
   }
 }
 
-/** Renders a list marker: `•` for bullets, the original number for ordered
- * items — the source `-`/`1.` is replaced by what the preview shows.
- * Backspace at line start still deletes the whole marker (the widget is
- * one replacement range), turning the line into plain text. */
+/** Renders a list marker: nothing for bullets (an invisible fixed-width
+ * placeholder keeps the indentation, no dot — product preference), the
+ * original number for ordered items. The source `-`/`1.` is replaced by
+ * what the preview shows. Backspace at line start still deletes the whole
+ * marker (the widget is one replacement range), turning the line into
+ * plain text. */
 class ListMarkerWidget extends WidgetType {
   constructor(private readonly text: string) {
     super()
@@ -86,7 +88,7 @@ class ListMarkerWidget extends WidgetType {
   toDOM(): HTMLElement {
     const span = document.createElement('span')
     span.className = 'cm-md-listmark'
-    span.textContent = /^[-*•]/.test(this.text) ? '•' : this.text
+    if (/^\d+\./.test(this.text)) span.textContent = this.text
     return span
   }
   ignoreEvent(): boolean {
@@ -148,13 +150,23 @@ export function buildDecorations(view: EditorView): DecorationSet {
       const { name, from, to } = node
       if (MARKER_NODES[name]) {
         if (name === 'HeaderMark' || name === 'QuoteMark') {
-          // Hide `#` / `>` — the heading size and quote background/edge
-          // already carry the visual.
-          decos.push(Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to))
-        } else if (name === 'ListMark') {
-          // Show the rendered bullet / number instead of the raw marker.
+          // A marker only takes effect with the space that follows it
+          // (`# `, `> `) — a bare `#`/`>` keeps its raw characters until
+          // then, because the syntax has not kicked in yet.
+          const active = view.state.doc.sliceString(to, to + 1) === ' '
           decos.push(
-            Decoration.replace({ widget: new ListMarkerWidget(view.state.doc.sliceString(from, to)) }).range(from, to)
+            active
+              ? Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to)
+              : mark(from, to, 'cm-md-marker')
+          )
+        } else if (name === 'ListMark') {
+          // Same rule: `- ` renders (bullet placeholder / number), a bare
+          // `-` stays visible as the raw marker.
+          const active = view.state.doc.sliceString(to, to + 1) === ' '
+          decos.push(
+            active
+              ? Decoration.replace({ widget: new ListMarkerWidget(view.state.doc.sliceString(from, to)) }).range(from, to)
+              : mark(from, to, 'cm-md-marker')
           )
         } else {
           decos.push(mark(from, to, 'cm-md-marker'))
@@ -189,6 +201,10 @@ export function buildDecorations(view: EditorView): DecorationSet {
           }
           break
         case 'Blockquote':
+          // Only apply the quote visual when the `>` is followed by a
+          // space — `>text` has not taken effect yet (matches the marker
+          // rule above).
+          if (!view.state.doc.lineAt(from).text.startsWith('> ')) break
           for (let l = line.number; l <= view.state.doc.lineAt(to).number; l++) {
             decos.push(lineCls(view.state.doc.line(l).from, 'cm-md-quote-line'))
           }
@@ -203,10 +219,14 @@ export function buildDecorations(view: EditorView): DecorationSet {
           break
         }
         default: {
-          // ATXHeading1..6 — sized headings; the HeaderMark was already
-          // dimmed above.
+          // ATXHeading1..6 — sized headings. Only when the `#` marker is
+          // followed by a space (`#title` has not taken effect).
           const m = /^ATXHeading(\d)$/.exec(name)
-          if (m) decos.push(mark(from, to, `cm-md-h${m[1]}`))
+          if (m) {
+            const headerMark = node.node.getChild('HeaderMark')
+            const active = headerMark !== null && view.state.doc.sliceString(headerMark.to, headerMark.to + 1) === ' '
+            if (active) decos.push(mark(from, to, `cm-md-h${m[1]}`))
+          }
         }
       }
     }
@@ -247,7 +267,7 @@ const enterContinuation = keymap.of([
       const edit = continueOnEnter(state.doc.toString(), sel.from)
       if (!edit) return false
       view.dispatch({
-        changes: { from: sel.from, insert: edit.next.slice(sel.from) },
+        changes: { from: edit.from, to: edit.to, insert: edit.insert },
         selection: { anchor: edit.caret }
       })
       return true

@@ -13,17 +13,16 @@
  * component only renders what the store holds.
  */
 import { AnimatePresence, motion } from 'framer-motion'
-import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import { Bold, Italic, Strikethrough, Code, Link, Quote, List, ListOrdered, ListChecks } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import type { NoteDto } from '../../../shared/types'
-import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ChevronUpIcon, ChevronDownIcon, ExpandIcon, ContractIcon, BundleIcon, CloseIcon, PenLineIcon, EyeIcon } from '../icons'
+import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ChevronUpIcon, ChevronDownIcon, ExpandIcon, ContractIcon, BundleIcon, CloseIcon } from '../icons'
 import { playButtonClickSound } from '../../lib/soundEffects'
 import { edge } from '../../lib/edge'
 import { MarkdownPreview } from './markdown'
-import { flipTaskLine } from './editorInput'
 import { MarkdownEditor, applyCommandToView } from './markdownEditor'
 import type { MdCommand } from './markdownEditor'
 import type { EditorView } from '@codemirror/view'
@@ -75,10 +74,9 @@ function NoteEditor({
   const pendingValue = useRef(note.content)
   const initialContent = useRef(note.content)
   const saveTimer = useRef<number | null>(null)
-  // edit = live-rendering CodeMirror editor, preview = rendered Markdown
-  // (see MarkdownPreview). Switching remounts MarkdownEditor, which re-reads
-  // the current content — no manual refresh needed.
-  const [mode, setMode] = useState<'edit' | 'preview'>('edit')
+  // The editor is always in live-rendering mode — there is no separate
+  // preview toggle anymore (removed per product request; the WYSIWYG
+  // decorations make the editor show the rendered result directly).
 
   const schedulePush = (value: string) => {
     pendingValue.current = value
@@ -89,7 +87,7 @@ function NoteEditor({
     }, SAVE_DEBOUNCE_MS)
   }
 
-  /** Push any pending edit now (mode switches, unmount). */
+  /** Push any pending edit now (leaving the editor, unmount). */
   const flush = () => {
     if (saveTimer.current !== null) {
       clearTimeout(saveTimer.current)
@@ -116,52 +114,12 @@ function NoteEditor({
     onBack?.()
   }
 
-  const switchMode = (next: 'edit' | 'preview') => {
-    if (next === mode) return
-    playButtonClickSound()
-    flush()
-    setMode(next)
-  }
-
-  // Preview checkbox toggle: flip `- [x]` ↔ `- [ ]` on the clicked source
-  // line. Reads the note from the store so the callback stays referentially
-  // stable (no re-render churn) while always toggling the latest content.
-  const toggleTodo = useCallback(
-    (line: number) => {
-      const current = useStore.getState().notes.find((n) => n.id === note.id)
-      if (!current) return
-      const lines = current.content.split('\n')
-      if (line < 0 || line >= lines.length) return
-      const flipped = flipTaskLine(lines[line])
-      if (flipped === null) return
-      lines[line] = flipped
-      void updateNote(note.id, { content: lines.join('\n') })
-    },
-    [note.id, updateNote]
-  )
-
   return (
     <div className="notes-editor">
       <div className="notes-editor-bar">
         {variant === 'single' ? (
           <>
             <span className="notes-editor-title">{note.title || t('notes.untitled')}</span>
-            <button
-              type="button"
-              className={`notes-bar-btn${mode === 'edit' ? ' active' : ''}`}
-              title={t('notes.editMode')}
-              onClick={() => switchMode('edit')}
-            >
-              <PenLineIcon width={13} height={13} />
-            </button>
-            <button
-              type="button"
-              className={`notes-bar-btn${mode === 'preview' ? ' active' : ''}`}
-              title={t('notes.previewMode')}
-              onClick={() => switchMode('preview')}
-            >
-              <EyeIcon width={13} height={13} />
-            </button>
             <button
               type="button"
               className="notes-bar-btn"
@@ -249,22 +207,6 @@ function NoteEditor({
             <span className="notes-editor-title">{note.title || t('notes.untitled')}</span>
             <button
               type="button"
-              className={`notes-bar-btn${mode === 'edit' ? ' active' : ''}`}
-              title={t('notes.editMode')}
-              onClick={() => switchMode('edit')}
-            >
-              <PenLineIcon width={13} height={13} />
-            </button>
-            <button
-              type="button"
-              className={`notes-bar-btn${mode === 'preview' ? ' active' : ''}`}
-              title={t('notes.previewMode')}
-              onClick={() => switchMode('preview')}
-            >
-              <EyeIcon width={13} height={13} />
-            </button>
-            <button
-              type="button"
               className="notes-bar-btn"
               title={note.pinned ? t('notes.unpin') : t('notes.pin')}
               onClick={() => {
@@ -281,20 +223,14 @@ function NoteEditor({
         )}
       </div>
 
-      {mode === 'edit' ? (
-        <MarkdownEditor
-          value={note.content}
-          placeholder={t('notes.placeholder')}
-          editorRef={viewRef}
-          initialCaret={noteCaret[note.id]}
-          onDocChange={schedulePush}
-          onCaretChange={(pos) => setNoteCaret(note.id, pos)}
-        />
-      ) : (
-        <div className="notes-preview">
-          <MarkdownPreview text={note.content} onToggleTodo={toggleTodo} />
-        </div>
-      )}
+      <MarkdownEditor
+        value={note.content}
+        placeholder={t('notes.placeholder')}
+        editorRef={viewRef}
+        initialCaret={noteCaret[note.id]}
+        onDocChange={schedulePush}
+        onCaretChange={(pos) => setNoteCaret(note.id, pos)}
+      />
 
       <div className="notes-toolbar">
         {CMD_TOOLS.map(({ id, Icon, i18n }) => (

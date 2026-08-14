@@ -244,8 +244,11 @@
   text-decoration: none !important;
 }
 
-/* Rendered list bullet/number replacing the raw `-`/`1.` marker. */
+/* Rendered list marker widget: ordered shows the number, unordered is an
+ * invisible fixed-width placeholder (indentation without a bullet dot). */
 .cm-md-listmark {
+  display: inline-block;
+  min-width: 1.1em;
   color: rgba(255, 255, 255, 0.45);
   user-select: none;
 }
@@ -336,152 +339,6 @@
 
 .cm-task-box:hover {
   border-color: #7dd3fc;
-}
-
-/* Markdown preview pane (edit/preview toggle) — same typography as the
- * textarea so the switch does not reflow the page. */
-.notes-preview {
-  flex: 1;
-  min-height: 0;
-  margin: 0 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--edge-light);
-  border-radius: 12px;
-  background: var(--bg-2);
-  color: var(--text-primary);
-  font-size: 12px;
-  line-height: 1.6;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.notes-preview > * {
-  margin: 0;
-}
-
-.notes-preview .md-heading {
-  font-size: 12px;
-  font-weight: 700;
-  margin: 6px 0 2px;
-  color: var(--text-primary);
-}
-
-.notes-preview strong {
-  color: var(--text-primary);
-  font-weight: 700;
-}
-
-.notes-preview em {
-  color: var(--text-secondary);
-}
-
-.notes-preview code {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  padding: 1px 4px;
-  font-family: Consolas, Menlo, monospace;
-  font-size: 11px;
-  color: #7dd3fc;
-}
-
-.notes-preview .md-link {
-  color: #7dd3fc;
-  text-decoration: underline;
-  text-decoration-color: rgba(125, 211, 252, 0.45);
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
-.notes-preview .md-link:hover {
-  color: #a5e3fd;
-  text-decoration-color: #7dd3fc;
-}
-
-.notes-preview .md-hr {
-  border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  margin: 6px 0;
-}
-
-.notes-preview .md-bullets {
-  margin: 4px 0;
-  padding-left: 16px;
-}
-
-.notes-preview .md-todo {
-  margin: 4px 0;
-  padding-left: 0;
-  list-style: none;
-}
-
-.notes-preview .md-todo li {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.notes-preview .md-todo-box {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--text-secondary);
-  border-radius: 3px;
-  flex-shrink: 0;
-  align-self: center;
-  font-size: 8px;
-  line-height: 1;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.notes-preview .md-todo-box:hover {
-  border-color: var(--edge-strong);
-}
-
-.notes-preview .md-todo-done {
-  opacity: 0.55;
-  text-decoration: line-through;
-}
-
-.notes-preview .md-code {
-  margin: 4px 0;
-  padding: 6px 8px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  font-family: Consolas, Menlo, monospace;
-  font-size: 11px;
-  white-space: pre-wrap;
-  color: var(--text-secondary);
-}
-
-.notes-preview .md-quote {
-  margin: 4px 0;
-  padding: 2px 0 2px 10px;
-  border-left: 2px solid rgba(125, 211, 252, 0.55);
-  background: rgba(125, 211, 252, 0.06);
-  border-radius: 0 8px 8px 0;
-  color: var(--text-secondary);
-}
-
-.notes-preview .md-quote p {
-  margin: 0;
-}
-
-.notes-preview p {
-  margin: 3px 0;
-}
-
-.notes-preview .md-bullets p,
-.notes-preview .md-todo p {
-  margin: 0;
-}
-
-/* Active edit/preview mode indicator in the editor bar. */
-.notes-bar-btn.active {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--edge-strong);
 }
 
 /* Single-note empty state: hint + create button instead of a fabricated note. */
@@ -710,12 +567,10 @@
 /* Invisible scrollbars — same convention as the panel list, settings,
  * tasks: the notes UI scrolls without a visible scrollbar. */
 .notes-scroll,
-.notes-preview,
 .notes-modal-scroll {
   scrollbar-width: none; /* Firefox */
 }
 .notes-scroll::-webkit-scrollbar,
-.notes-preview::-webkit-scrollbar,
 .notes-modal-scroll::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
 }

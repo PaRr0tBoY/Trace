@@ -1,7 +1,8 @@
 /**
- * continueOnEnter — Enter-press continuation for the note editor. Returns the
- * edit to apply, or null when Enter keeps its default behavior (inside a code
- * block, or not on a list / quote / fence line).
+ * continueOnEnter — Enter-press continuation for the note editor. Returns a
+ * change to apply (from/to/insert + resulting caret), or null when Enter
+ * keeps its default behavior (inside a code block, or not on a list / quote
+ * / fence line).
  *
  * - `1. ` → `2. `, `- `/`• `/`> `/todo markers carry to the next line
  * - a bare marker (`-`, `1.`, `>` alone at end of line) also continues —
@@ -11,11 +12,6 @@
  *   for quotes and numbered lists, so `- ` and `> ` behave identically)
  * - an opening ``` fence at end of line auto-closes with a blank line + fence
  */
-
-/** Replace [start,end) with the given text, keeping the cursor after it. */
-function splice(value: string, start: number, end: number, next: string): string {
-  return value.slice(0, start) + next + value.slice(end)
-}
 
 /** Flip a task-line marker (`- [x] …` ↔ `- [ ] …`). Returns the flipped line,
  * or null when the line is not a task. Shared by the live editor's checkbox
@@ -38,7 +34,10 @@ function markerKind(marker: string): 'ul' | 'ol' | 'quote' {
 /** Marker line grammar shared by the continuation and exit checks. */
 const MARKER_LINE = /^(\s*)((?:\d+)\.|[-•]|>)(\s+\[[ xX]\])?(\s*)(.*)$/
 
-export function continueOnEnter(value: string, caret: number): { next: string; caret: number } | null {
+export function continueOnEnter(
+  value: string,
+  caret: number
+): { from: number; to: number; insert: string; caret: number } | null {
   const lineStart = value.lastIndexOf('\n', caret - 1) + 1
   const nlAt = value.indexOf('\n', caret)
   const lineEnd = nlAt === -1 ? value.length : nlAt
@@ -48,7 +47,7 @@ export function continueOnEnter(value: string, caret: number): { next: string; c
   if (fencesBefore % 2 === 1) return null // inside a code block
 
   if (atLineEnd && /^```\w*$/.test(line)) {
-    return { next: splice(value, caret, caret, '\n\n```'), caret: caret + 3 }
+    return { from: caret, to: caret, insert: '\n\n```', caret: caret + 3 }
   }
 
   const m = MARKER_LINE.exec(line)
@@ -70,9 +69,9 @@ export function continueOnEnter(value: string, caret: number): { next: string; c
     const prevLine = value.slice(prevStart, lineStart - 1)
     const prevM = MARKER_LINE.exec(prevLine)
     if (prevM && markerKind(prevM[2]) === kind && prevM[5].trim() === '') {
-      return { next: splice(value, lineStart, lineEnd, ''), caret: lineStart }
+      return { from: lineStart, to: lineEnd, insert: '', caret: lineStart }
     }
   }
 
-  return { next: splice(value, caret, caret, '\n' + continuation), caret: caret + continuation.length + 1 }
+  return { from: caret, to: caret, insert: '\n' + continuation, caret: caret + continuation.length + 1 }
 }

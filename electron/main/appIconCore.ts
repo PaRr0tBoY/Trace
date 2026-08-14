@@ -51,6 +51,9 @@ export function createAppIconService(fetcher: IconFetcher, max = APP_ICON_CACHE_
   // re-probed after APP_ICON_NEGATIVE_TTL_MS so a re-installed app's icon is
   // eventually picked up).
   const cache = new Map<string, { value: string | null; ts: number }>()
+  // Concurrent resolves of the same path share one fetch (window-enum
+  // prewarm and foreground events can race on a brand-new app).
+  const inflight = new Map<string, Promise<string | null>>()
 
   async function resolve(exePath: string): Promise<string | null> {
     const key = normalizeIconKey(exePath)
@@ -64,19 +67,29 @@ export function createAppIconService(fetcher: IconFetcher, max = APP_ICON_CACHE_
       }
       cache.delete(key) // expired negative entry: allow a re-probe
     }
-    let value: string | null
+    const pending = inflight.get(key)
+    if (pending) return pending
+    const fetching = (async (): Promise<string | null> => {
+      let value: string | null
+      try {
+        value = await fetcher.fetchIcon(exePath)
+      } catch {
+        value = null
+      }
+      cache.set(key, { value, ts: Date.now() })
+      if (cache.size > max) {
+        const oldest = cache.keys().next().value
+        if (oldest !== undefined) cache.delete(oldest)
+      }
+      if (value !== null) onChange?.()
+      return value
+    })()
+    inflight.set(key, fetching)
     try {
-      value = await fetcher.fetchIcon(exePath)
-    } catch {
-      value = null
+      return await fetching
+    } finally {
+      inflight.delete(key)
     }
-    cache.set(key, { value, ts: Date.now() })
-    if (cache.size > max) {
-      const oldest = cache.keys().next().value
-      if (oldest !== undefined) cache.delete(oldest)
-    }
-    if (value !== null) onChange?.()
-    return value
   }
 
   /** Restore persisted entries; a live-fetched slot wins over the disk copy. */

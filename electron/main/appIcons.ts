@@ -13,8 +13,8 @@
  */
 import { app } from 'electron'
 import { readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs'
-import type { TaskProposal, TaskDto, ClipboardItem, UsageEvent } from '../../shared/types'
-import { createAppIconService, normalizeIconKey, iconSourceOf } from './appIconCore'
+import type { TaskProposal, TaskDto } from '../../shared/types'
+import { createAppIconService, normalizeIconKey } from './appIconCore'
 import { PATHS } from '../store/paths'
 
 /** Disk entries older than this are re-extracted in the background on startup. */
@@ -78,28 +78,21 @@ export function loadAppIconCacheFromDisk(): void {
 }
 
 /**
- * Background prewarm: fetch every path the UI can render — persisted tasks'
- * apps, clipboard source apps, recent usage events — while the user is
- * elsewhere, so push-time attachment and the app:icons IPC hit the cache.
- * Never rejects; failures just stay out of the cache until re-probed.
+ * Background prewarm: extract icons for every app that currently has a
+ * window (the Alt+Tab ring — exactly the set the switcher, task editor and
+ * suggestion cards can show). Apps not running right now are covered by the
+ * disk cache from earlier sessions, and by the incremental extraction on
+ * foreground events (see the subscribeEvents wiring in index.ts). Never
+ * rejects; failures just stay out of the cache until re-probed.
  */
-export async function prewarmAppIcons(
-  tasks: TaskDto[],
-  items: readonly ClipboardItem[],
-  events: readonly UsageEvent[]
-): Promise<void> {
-  const paths = new Map<string, string>()
-  const add = (p: string | undefined | null): void => {
-    if (p && (/[\\/]/.test(p) || /\.exe$/i.test(p))) paths.set(normalizeIconKey(p), p)
+export async function prewarmAppIcons(windows: readonly { exePath: string }[]): Promise<void> {
+  const paths = new Set<string>()
+  for (const w of windows) {
+    if (w.exePath && (/[\\/]/.test(w.exePath) || /\.exe$/i.test(w.exePath))) {
+      paths.add(normalizeIconKey(w.exePath))
+    }
   }
-  for (const task of tasks) {
-    for (const appRef of task.apps) add(iconSourceOf(appRef))
-  }
-  for (const item of items) add(item.sourceApp?.exePath)
-  for (const event of events) {
-    if ('exePath' in event && typeof event.exePath === 'string') add(event.exePath)
-  }
-  await Promise.all([...paths.values()].map((p) => service.resolve(p)))
+  await Promise.all([...paths].map((p) => service.resolve(p)))
 }
 
 /** Fill TaskDto.apps[].iconUrl in place (fresh DTO objects only). */

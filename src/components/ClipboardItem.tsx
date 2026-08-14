@@ -195,8 +195,14 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
         >
           <motion.div
             initial={{ opacity: 0.9, scale: 0 }}
-            animate={{ opacity: 0, scale: 15 }}
-            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+            animate={{ opacity: 0, scale: 28 }}
+            transition={{
+              // Reach full coverage (28px -> 784px diameter, past any card's
+              // farthest corner) fast, then linger: opacity fades over the
+              // whole duration instead of riding the same ease-out curve.
+              scale: { duration: 0.7, ease: [0.16, 1, 0.3, 1] },
+              opacity: { duration: 1.3, ease: [0.16, 1, 0.3, 1] }
+            }}
             style={{
               position: 'absolute',
               left: rippleOrigin.x,
@@ -205,7 +211,7 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
               height: 28,
               borderRadius: '50%',
               background:
-                'radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.16) 55%, transparent 80%)',
+                'radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.14) 60%, transparent 100%)',
               transform: 'translate(-50%, -50%)'
             }}
           />

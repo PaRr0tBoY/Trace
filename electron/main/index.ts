@@ -16,8 +16,9 @@ import { createWindow, getMainWindow, setInteractive, setVisible, startCursorPol
 import { createTray, registerIncognitoApplier } from './tray'
 import { registerIpc, registerSendListeners, getProviderChain } from './ipc'
 import { prewarmDragIcons } from './drag'
-import { loadAppIconCacheFromDisk, prewarmAppIcons } from './appIcons'
-import { initState, getWatcher, getTaskStore, getStore, loadSettings, saveSettings, pushState, stopStateTimers, setSuggestionChat, setSuggestionOcr } from './state'
+import { loadAppIconCacheFromDisk, prewarmAppIcons, resolveAppIcon } from './appIcons'
+import { snapshotWindows } from './windowSnapshot'
+import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushState, stopStateTimers, setSuggestionChat, setSuggestionOcr } from './state'
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
 import { startKeyboardHook, stopKeyboardHook } from './hookManager'
@@ -25,7 +26,7 @@ import { switcherShow, switcherAdvance, switcherExecute, switcherTapExecute } fr
 import { ForegroundWatcher } from './foreground'
 import { ocrFromForeground } from './ocr'
 import { createAttributor, type Attributor } from './attributor'
-import { subscribe as subscribeEvents, recentEvents } from './eventBus'
+import { subscribe as subscribeEvents } from './eventBus'
 import { extname, normalize } from 'node:path'
 import { existsSync, createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -134,12 +135,25 @@ app.whenReady().then(() => {
   loadAppIconCacheFromDisk()
   initState()
   prewarmDragIcons()
-  // Background icon prewarm: every path the UI can render (persisted tasks'
-  // apps, clipboard source apps, recent usage events) is fetched while idle,
-  // so icons are ready before the user opens the panel — no letter fallback.
+  // Background icon prewarm: every app with a window right now gets its icon
+  // fetched while idle, so the switcher / task editor / suggestion cards show
+  // real icons from the first open. Apps that open later are covered by the
+  // incremental subscription below.
   setTimeout(() => {
-    prewarmAppIcons(getTaskStore().toDto(), getStore().list(), recentEvents()).catch(() => {})
+    try {
+      prewarmAppIcons(snapshotWindows()).catch(() => {})
+    } catch {
+      /* window enumeration unavailable (non-Win32): incremental events still feed the cache */
+    }
   }, 1500)
+  // Incremental extraction: whenever an app comes to the foreground (or is
+  // the copy source), its icon is fetched in the background — by the time the
+  // panel shows it the cache is warm. resolveAppIcon never rejects.
+  subscribeEvents((event) => {
+    if ('exePath' in event && typeof event.exePath === 'string' && event.exePath.length > 0) {
+      void resolveAppIcon(event.exePath)
+    }
+  })
 
   // Wire the provider chain into the suggestion engine (after initState so the
   // engine's singletons exist; the 30s+ silence floor guarantees the chain is

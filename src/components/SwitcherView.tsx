@@ -28,11 +28,12 @@ const ROW_MOTION = {
   transition: { duration: 0.16, ease: [0.16, 1, 0.3, 1] as const }
 }
 
-/** Search-mode impact (TabTab): the field lands ~0.18s in with a spring
- * overshoot; the light sweep and the row ripple cascade start from that
- * impact moment, so the three read as one causal chain. */
-const IMPACT_SECONDS = 0.18
-const RIPPLE_STAGGER_SECONDS = 0.045
+/** Search-mode impact (TabTab): the field slams down ~0.16s in with a hard
+ * spring overshoot; at that impact moment a light flash sweeps out from the
+ * field and the rows bounce in a wave, so the three read as one causal
+ * chain. */
+const IMPACT_SECONDS = 0.16
+const RIPPLE_STAGGER_SECONDS = 0.055
 
 function appNameOf(entry: SwitcherEntryDto): string {
   // UWP app hosts carry the real app title on the window ("Settings",
@@ -162,9 +163,9 @@ export function SwitcherView() {
       {(pinned || drill) && (
         <motion.div
           className="switcher-search"
-          initial={{ y: -52, opacity: 0 }}
+          initial={{ y: -72, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 620, damping: 16, mass: 0.9 }}
+          transition={{ type: 'spring', stiffness: 760, damping: 13.5, mass: 0.9 }}
         >
           {pinned && !drill && (
             <input
@@ -186,15 +187,14 @@ export function SwitcherView() {
         </motion.div>
       )}
       {pinned && (
-        <motion.div
-          className="switcher-sweep"
-          initial={{ scaleY: 0, opacity: 0 }}
-          animate={{ scaleY: 1, opacity: [0, 0.5, 0] }}
-          transition={{
-            scaleY: { duration: 0.55, delay: IMPACT_SECONDS, ease: [0.16, 1, 0.3, 1] },
-            opacity: { duration: 0.55, delay: IMPACT_SECONDS, ease: 'easeOut' }
-          }}
-        />
+        <div className="switcher-flash">
+          <motion.div
+            className="switcher-flash-beam"
+            initial={{ x: 50, opacity: 0 }}
+            animate={{ x: 320, opacity: [0, 0.85, 0] }}
+            transition={{ duration: 0.42, delay: IMPACT_SECONDS, ease: [0.16, 1, 0.3, 1] }}
+          />
+        </div>
       )}
       <div className="switcher-list" ref={listRef}>
         {drill ? (
@@ -228,14 +228,14 @@ export function SwitcherView() {
               key={entry.index}
               className={`switcher-row${i === displayIndex ? ' selected' : ''}`}
               initial={ROW_MOTION.initial}
-              animate={pinned ? { x: 0, y: [0, -6, 0], opacity: 1 } : ROW_MOTION.animate}
+              animate={pinned ? { x: 0, y: [0, -11, 0], opacity: 1 } : ROW_MOTION.animate}
               transition={{
                 x: { ...ROW_MOTION.transition, delay: i * 0.02 },
                 opacity: { ...ROW_MOTION.transition, delay: i * 0.02 },
                 y: {
                   type: 'spring',
-                  stiffness: 420,
-                  damping: 18,
+                  stiffness: 340,
+                  damping: 12.5,
                   delay: IMPACT_SECONDS + i * RIPPLE_STAGGER_SECONDS
                 }
               }}

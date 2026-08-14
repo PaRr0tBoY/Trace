@@ -520,20 +520,27 @@
   position: relative;
 }
 
-/* Impact light sweep (TabTab search mode): a beam originating at the search
-   field washes down over the list right as the field lands. scaleY from the
-   top reads as light pushing downward; compositor-only (transform+opacity). */
-.switcher-sweep {
+/* Impact flash (TabTab search mode): a bright beam sweeps out from the
+   search field right as it lands — a shimmer streak crossing the list,
+   not a static glow. Clipped inside the flash area; compositor-only. */
+.switcher-flash {
   position: absolute;
   left: 10px;
   right: 10px;
-  top: 46px;
-  height: 150px;
+  top: 44px;
+  bottom: 12px;
   pointer-events: none;
   z-index: 2;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.05) 70%, transparent);
-  transform-origin: top;
-  filter: blur(2px);
+  overflow: hidden;
+}
+
+.switcher-flash-beam {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 80px;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.6), transparent);
+  filter: blur(3px);
 }
 
 .switcher-list {

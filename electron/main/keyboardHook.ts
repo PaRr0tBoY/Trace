@@ -44,6 +44,9 @@ const VK_LMENU = 0xA4
 const VK_RMENU = 0xA5
 const VK_SHIFT = 0x10
 const VK_RETURN = 0x0D
+const VK_ESCAPE = 0x1B
+const VK_UP = 0x26
+const VK_DOWN = 0x28
 const KEYEVENTF_KEYUP = 0x0002
 const PM_REMOVE = 0x0001
 const INPUT_KEYBOARD = 0x0001
@@ -128,6 +131,14 @@ export interface KeyboardHookEvents {
   onPin: (initialQuery?: string) => void
   /** Any keydown while pinned — keeps the session's safety timeout alive during typing. */
   onTouch: () => void
+  /**
+   * Enter/Esc/arrow while pinned. The panel window often can't be
+   * programmatically activated (foreground lock), so these keys would never
+   * reach the search input — the hook swallows them and delivers the intent
+   * directly instead. 'escape' cancels the session outright; 'enter'/'up'/
+   * 'down' are forwarded to the renderer, which resolves drill vs execute.
+   */
+  onControlKey: (key: 'enter' | 'escape' | 'up' | 'down') => void
   /**
    * Real Alt-up while pinned: the OS Alt state is already released by the
    * synthetic up, and the foreground lock is gone — the panel can finally
@@ -274,6 +285,27 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
         // see a live Alt+Tab combination and switch the foreground away —
         // the panel input then never receives a key.
         if (isTab) return 1n
+        // Control keys are swallowed and delivered via onControlKey: the
+        // panel is usually not the OS foreground here (activation is
+        // best-effort), so these keys would otherwise land in whatever
+        // window is in front. Keyups pass through — the OS delivers them
+        // to nothing important, and the panel gets no duplicate keydown.
+        if (isReturn && isDown) {
+          defer(() => activeEvents?.onControlKey('enter'))
+          return 1n
+        }
+        if (vk === VK_ESCAPE && isDown) {
+          defer(() => activeEvents?.onControlKey('escape'))
+          return 1n
+        }
+        if (vk === VK_DOWN && isDown) {
+          defer(() => activeEvents?.onControlKey('down'))
+          return 1n
+        }
+        if (vk === VK_UP && isDown) {
+          defer(() => activeEvents?.onControlKey('up'))
+          return 1n
+        }
         if (isAlt && !isDown) {
           state = 'idle'
           // The real Alt-up is swallowed so no switch executes — but without

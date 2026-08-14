@@ -91,6 +91,9 @@ export default function App() {
     const offSwitcherPin = edge.onSwitcherPin((initialQuery) => {
       useStore.getState().setSwitcherPinned(true, initialQuery)
     })
+    const offSwitcherControlKey = edge.onSwitcherControlKey((key) => {
+      useStore.getState().setSwitcherControlKey(key)
+    })
     const offSwitcherHide = edge.onSwitcherHide(() => {
       useStore.getState().hideSwitcher()
     })
@@ -105,6 +108,7 @@ export default function App() {
       offSwitcherShow()
       offSwitcherSelect()
       offSwitcherPin()
+      offSwitcherControlKey()
       offSwitcherHide()
     }
   }, [hydrate, setItems, setSettings, pushToast])

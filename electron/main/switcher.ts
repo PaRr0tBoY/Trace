@@ -14,6 +14,7 @@
  */
 import { getMainWindow, setInteractive, isInteractive } from './window'
 import koffi from 'koffi'
+import { screen } from 'electron'
 import { runtime } from './config'
 import { snapshotWindows, type SwitcherWindow } from './windowSnapshot'
 import { activateHwnd } from './windowSwitch'
@@ -22,6 +23,14 @@ import { isFullscreenAppActive } from './fullscreen'
 import { setHookPinned } from './hookManager'
 import { loadSettings } from '../store/settings'
 import type { SwitcherEntryDto } from '../../shared/types'
+
+// user32 mouse glue for the search-field click fallback (see activatePanel).
+const MOUSEEVENTF_LEFTDOWN = 0x0002
+const MOUSEEVENTF_LEFTUP = 0x0004
+const user32 = koffi.load('user32.dll')
+const getCursorPos = user32.func('bool GetCursorPos(void* lpPoint)')
+const setCursorPos = user32.func('bool SetCursorPos(int x, int y)')
+const mouseEvent = user32.func('void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, void* dwExtraInfo)')
 
 /** A visible switcher row: one window, or all windows of one app when grouped. */
 interface Row {
@@ -126,7 +135,7 @@ function rowToDto(row: Row): SwitcherEntryDto {
   return dto
 }
 
-function broadcast(channel: 'switcher:show' | 'switcher:select' | 'switcher:pin' | 'switcher:unpin' | 'switcher:hide', payload?: unknown): void {
+function broadcast(channel: 'switcher:show' | 'switcher:select' | 'switcher:pin' | 'switcher:unpin' | 'switcher:hide' | 'switcher:control-key', payload?: unknown): void {
   const win = getMainWindow()
   if (!win || win.isDestroyed()) return
   if (payload !== undefined) win.webContents.send(channel, payload)
@@ -257,9 +266,15 @@ export function switcherPin(initialQuery?: string): void {
  * Force the panel window into the foreground. Deferred exactly like
  * switcherExecute's activation: Alt-up leaves the system cleaning up menu
  * mode for a few milliseconds, during which foreground changes are still
- * refused — the pin-time attempts failed for this reason. With the defer,
- * AttachThreadInput + SetForegroundWindow succeeds (the same path the
- * switcher's own execute uses on every switch).
+ * refused. Two escalation steps:
+ *  1. activateHwnd — the AttachThreadInput + SetForegroundWindow path the
+ *     switcher's own execute uses on every switch. Works for normal app
+ *     windows; the Electron layered panel has refused it in practice.
+ *  2. Simulated click on the search field — reproduces the one activation
+ *     path that is proven to work: a real click grants the process input
+ *     rights and the system activates the window (WM_MOUSEACTIVATE). The
+ *     cursor jumps for <100ms and returns; the click lands on the field,
+ *     which is exactly where the user is about to type anyway.
  */
 function activatePanel(): void {
   const win = getMainWindow()
@@ -267,11 +282,23 @@ function activatePanel(): void {
   setTimeout(() => {
     if (!active || win.isDestroyed()) return
     const hwnd = koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void'))
-    const ok = activateHwnd(hwnd)
-    // Nudge Chromium's webContents activation along the path a real click
-    // takes; harmless if the OS foreground is already ours.
-    win.focus()
-    if (!ok) console.log('[Switcher] panel activation FAILED (foreground lock held)')
+    activateHwnd(hwnd)
+    if (win.isFocused()) return
+    try {
+      // Search field sits at the top of the switcher page (8px padding +
+      // 32px field): click its center in physical pixels.
+      const bounds = win.getContentBounds()
+      const pt = screen.dipToScreenPoint({ x: bounds.x + Math.round(bounds.width / 2), y: bounds.y + 26 })
+      const orig = Buffer.alloc(8) // POINT {x, y}
+      if (!getCursorPos(orig)) return
+      setCursorPos(pt.x, pt.y)
+      mouseEvent(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, null)
+      mouseEvent(MOUSEEVENTF_LEFTUP, 0, 0, 0, null)
+      setCursorPos(orig.readInt32LE(0), orig.readInt32LE(4))
+      console.log('[Switcher] panel activation: simulated click on search field')
+    } catch (err) {
+      console.error('[Switcher] panel activation fallback failed:', err)
+    }
   }, 0)
 }
 
@@ -304,6 +331,21 @@ export function switcherCancel(): void {
   console.log('[Switcher] cancel (search Esc)')
   setHookPinned(false)
   resetSession()
+}
+
+/**
+ * Control key while pinned (keyboardHook onControlKey): the hook swallowed
+ * the key because the panel window often isn't the OS foreground (so the
+ * key would land in the window in front). Esc cancels outright; the rest
+ * are resolved in the renderer (drill vs execute depends on local state).
+ */
+export function switcherControlKey(key: 'enter' | 'escape' | 'up' | 'down'): void {
+  if (!active) return
+  if (key === 'escape') {
+    switcherCancel()
+    return
+  }
+  broadcast('switcher:control-key', key)
 }
 
 /**

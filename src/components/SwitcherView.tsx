@@ -94,35 +94,6 @@ export function SwitcherView() {
     setDrillSel(idx === -1 ? 0 : idx)
   }, [drill]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Drill groups have no search input, so keyboard navigation lives on the
-  // window: arrows move the highlight (synced to main for execution), Enter
-  // switches to the highlighted window, Esc cancels the session.
-  const drillWins = drill?.windows ?? []
-  useEffect(() => {
-    if (!drill) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault()
-        const dir = e.key === 'ArrowDown' ? 1 : -1
-        const cur = drillSel ?? 0
-        const next = Math.min(Math.max(cur + dir, 0), drillWins.length - 1)
-        if (next === cur) return
-        setDrillSel(next)
-        const w = drillWins[next]
-        if (w) edge.switcherHover(w.index)
-      } else if (e.key === 'Enter') {
-        e.preventDefault()
-        const w = drillWins[drillSel ?? 0]
-        if (w) edge.switcherClick(w.index)
-      } else if (e.key === 'Escape') {
-        e.preventDefault()
-        edge.switcherCancel()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [drill, drillSel, drillWins])
-
   // Resolve app icons in one batch (existing app:icons pipeline, cached main-side).
   // Grouped rows carry their sub-windows — those exePaths need icons too.
   useEffect(() => {
@@ -165,6 +136,53 @@ export function SwitcherView() {
 
   const displayIndex = hoverIndex ?? selInVisible
 
+  // Hook-delivered control keys (Enter/Esc/arrows). The hook swallows them
+  // while pinned because the panel window often isn't the OS foreground, so
+  // they would never reach the input — the intent comes over IPC instead.
+  // Esc is cancelled outright in main; here only enter/up/down arrive.
+  const controlKey = useStore((s) => s.switcherControlKey)
+  useEffect(() => {
+    if (!controlKey) return
+    useStore.getState().setSwitcherControlKey(null) // consume once
+    if (drill) {
+      const wins = drill.windows ?? []
+      if (controlKey === 'up' || controlKey === 'down') {
+        const dir = controlKey === 'down' ? 1 : -1
+        const cur = drillSel ?? 0
+        const next = Math.min(Math.max(cur + dir, 0), wins.length - 1)
+        if (next === cur) return
+        setDrillSel(next)
+        const w = wins[next]
+        if (w) edge.switcherHover(w.index)
+      } else if (controlKey === 'enter') {
+        const w = wins[drillSel ?? 0]
+        if (w) edge.switcherClick(w.index)
+      }
+      return
+    }
+    if (!pinned) return
+    if (controlKey === 'enter') {
+      if (displayIndex === null) return
+      const entry = visibleRows[displayIndex]
+      if (!entry) return
+      // Enter mirrors a mouse click: grouped rows drill into their window
+      // list (the user picks one specific window), single rows switch.
+      if (entry.groupCount) setDrill(entry)
+      else executeRow(displayIndex)
+    } else if (controlKey === 'up' || controlKey === 'down') {
+      if (visibleRows.length === 0) return
+      const next =
+        controlKey === 'down'
+          ? displayIndex === null
+            ? 0
+            : Math.min(displayIndex + 1, visibleRows.length - 1)
+          : displayIndex === null
+            ? visibleRows.length - 1
+            : Math.max(displayIndex - 1, 0)
+      syncHover(next)
+    }
+  }, [controlKey, drill, drillSel, pinned, displayIndex, visibleRows])
+
   // Keep the highlighted row in view when the selection moves.
   useEffect(() => {
     const list = listRef.current
@@ -194,32 +212,6 @@ export function SwitcherView() {
     edge.switcherClick(entry.index)
   }
 
-  const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      if (displayIndex === null) return
-      const entry = visibleRows[displayIndex]
-      if (!entry) return
-      // Enter mirrors a mouse click: grouped rows drill into their window
-      // list (the user picks one specific window), single rows switch.
-      if (entry.groupCount) setDrill(entry)
-      else executeRow(displayIndex)
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      edge.switcherCancel()
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      if (visibleRows.length === 0) return
-      const next = displayIndex === null ? 0 : Math.min(displayIndex + 1, visibleRows.length - 1)
-      syncHover(next)
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      if (visibleRows.length === 0) return
-      const next = displayIndex === null ? visibleRows.length - 1 : Math.max(displayIndex - 1, 0)
-      syncHover(next)
-    }
-  }
-
   return (
     <div className="switcher" onMouseLeave={handleMouseLeaveList}>
       {(pinned || drill) && (
@@ -237,7 +229,6 @@ export function SwitcherView() {
               placeholder="Search windows…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={onSearchKeyDown}
               spellCheck={false}
             />
           )}

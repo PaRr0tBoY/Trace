@@ -25,7 +25,8 @@ startKeyboardHook({
   onTapExecute: ({ shiftDown }) => process.parentPort?.postMessage({ type: 'tap', shiftDown }),
   onPin: (initialQuery) => process.parentPort?.postMessage({ type: 'pin', initialQuery }),
   onTouch: () => process.parentPort?.postMessage({ type: 'touch' }),
-  onPinReleased: () => process.parentPort?.postMessage({ type: 'pin-released' })
+  onPinReleased: () => process.parentPort?.postMessage({ type: 'pin-released' }),
+  onControlKey: (key) => process.parentPort?.postMessage({ type: 'control-key', key })
 })
 
 process.parentPort?.on('message', (e: { data?: { type?: string; pinned?: boolean } }) => {

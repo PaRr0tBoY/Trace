@@ -202,6 +202,7 @@ const api = {
   onSwitcherShow: (cb: (data: EventArgs<'switcher:show'>[0]) => void) => on('switcher:show', cb),
   onSwitcherSelect: (cb: (index: number) => void) => on('switcher:select', cb),
   onSwitcherPin: (cb: (initialQuery?: string) => void) => on('switcher:pin', cb),
+  onSwitcherControlKey: (cb: (key: 'enter' | 'up' | 'down') => void) => on('switcher:control-key', cb),
   onSwitcherHide: (cb: () => void) => on('switcher:hide', cb),
 
   /* Drag helpers */

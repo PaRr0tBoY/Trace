@@ -28,6 +28,7 @@ import { utilityProcess, screen } from 'electron'
 import { join } from 'node:path'
 import { getMainWindow, setInteractive, setVisible, setHeartbeatPaused, isInteractive } from './window'
 import { pushState } from './state'
+import { completeAllInFlightDrags, type DragEndSignal } from './drag'
 import {
   dragSessionTransition,
   initialDragSession,
@@ -133,6 +134,10 @@ function armTimeout(): void {
     session = state
     pushDragActive(false)
     applyCommands(commands)
+    // T3 seam: no end signal ever arrived — decideDragEnd's elapsedMs branch
+    // force-cancels records older than the timeout; younger records stay
+    // pending and their own watchdog settles them later.
+    completeAllInFlightDrags({ dragEndSeen: false, dragWindowGone: false })
     console.log('[DragDetect] drag force-ended after timeout')
   }, DRAG_SESSION_TIMEOUT_MS)
 }
@@ -153,6 +158,16 @@ function handleStart(msg: HostStartMsg): void {
   armTimeout()
 }
 
+/** T3 seam input: the signal facts of one drag end (decideDragEnd consumes it). */
+function dragEndSignal(msg: HostEndMsg): DragEndSignal {
+  // hook end = 0x10 seen → success iff the cursor sits on an Explorer target
+  // (decideDragEnd). dragwindow end = ghost vanished without 0x10 → cancel.
+  // timeout end is built by armTimeout (neither flag set → elapsedMs verdict).
+  return msg.reason === 'hook'
+    ? { dragEndSeen: true, cursorClass: msg.curClass, cursorExe: msg.curExe }
+    : { dragEndSeen: false, dragWindowGone: true, cursorClass: msg.curClass, cursorExe: msg.curExe }
+}
+
 function handleEnd(msg: HostEndMsg): void {
   lastEndFacts = msg
   const { state, commands } = dragSessionTransition(
@@ -164,6 +179,10 @@ function handleEnd(msg: HostEndMsg): void {
   clearTimeoutTimer()
   pushDragActive(false)
   applyCommands(commands)
+  // T3 seam: settle every in-flight staged drag with this end's facts
+  // (success → staged copy to Recycle Bin + entry removed; else stays
+  // in-transit). No-op when nothing is staged.
+  completeAllInFlightDrags(dragEndSignal(msg))
 }
 
 /** Fork the detector host and bridge its facts into the state machine. Idempotent. */

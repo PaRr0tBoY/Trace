@@ -192,13 +192,13 @@ describe('in-transit entries are immune to automatic cleanup (ADR-0007 §4)', ()
     expect(station.get('e2')).toBeUndefined()
   })
 
-  it('in-transit entries are immune to retarget and removal is explicit', () => {
+  it('in-transit entries survive prune and removal is the explicit manual path', () => {
     const { station, entries } = makeStation()
     station.hydrate(entries)
-    // retarget must refuse to retarget an in-transit entry via the wrapper…
+    // prune already covered immunity; verify the flag shape and that the
+    // entry can still be removed deliberately (re-drag/delete lifecycle).
     expect(station.setInTransit('missing', true)).toBe(false)
     expect(station.get('e1')?.inTransit).toBe(true)
-    // …and prune already covered it; removal is the explicit manual path.
     expect(station.remove('e1')?.inTransit).toBe(true)
   })
 })

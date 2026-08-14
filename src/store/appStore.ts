@@ -13,6 +13,7 @@ import type { SuggestTitleContext, SuggestionAcceptOptions, DropResource } from 
 import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View, TraceRecordDto, IgnoreReason } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 import type { StationEntryDto } from '../../shared/station'
+import type { StationRouteFilter } from '../lib/stationRoute'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -40,6 +41,8 @@ interface AppState {
   stationMerge: (sourceId: string, targetId: string) => Promise<import('../../shared/station').StationMergeResult>
   stationCopyMember: (req: DragRequest) => Promise<void>
   stationPasteMember: (req: DragRequest) => Promise<void>
+  /** Delete every stale entry (T6 cleanup banner). */
+  stationClearStale: () => Promise<void>
   suggestions: TaskProposal[]
   settings: Settings
   /** True until the first `state:load` resolves. */
@@ -52,6 +55,9 @@ interface AppState {
   /** Files view second level: 'all' | 'other' | a live extension tab (ADR-0004). */
   filesFilter: FilesFilter
   setFilesFilter: (filter: FilesFilter) => void
+  /** Station route filter (T6): 'all' shows every route, 'clipboard' only clipboard captures. */
+  stationRouteFilter: StationRouteFilter
+  setStationRouteFilter: (filter: StationRouteFilter) => void
   /** Tasks view second level (ADR-0004). */
   tasksFilter: TasksFilter
   setTasksFilter: (filter: TasksFilter) => void
@@ -211,6 +217,8 @@ export const useStore = create<AppState>((set, get) => ({
   setClipboardFilter: (clipboardFilter) => set({ clipboardFilter }),
   filesFilter: 'all',
   setFilesFilter: (filesFilter) => set({ filesFilter }),
+  stationRouteFilter: 'all',
+  setStationRouteFilter: (stationRouteFilter) => set({ stationRouteFilter }),
   tasksFilter: 'existing',
   setTasksFilter: (tasksFilter) => set({ tasksFilter }),
   open: false,
@@ -321,6 +329,13 @@ export const useStore = create<AppState>((set, get) => ({
   },
   async stationPasteMember(req) {
     await edge.stationPasteMember(req)
+  },
+  /** Delete every stale entry (T6 cleanup banner); in-transit entries are never stale by construction. */
+  async stationClearStale() {
+    const staleIds = get().station.filter((e) => e.stale).map((e) => e.id)
+    for (const id of staleIds) {
+      await get().stationDelete(id)
+    }
   },
 
   setItems: (items) => {

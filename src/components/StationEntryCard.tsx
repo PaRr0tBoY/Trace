@@ -27,11 +27,13 @@ import { t } from '../i18n'
 
 interface Props {
   entry: StationEntryDto
+  /** Start expanded (T6 pinned grid expand): renders the member rows immediately. */
+  defaultExpanded?: boolean
 }
 
-function StationEntryCardBase({ entry }: Props) {
+function StationEntryCardBase({ entry, defaultExpanded = false }: Props) {
   const open = useStore((s) => s.open)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(defaultExpanded)
   const startDrag = useDragOut()
   const setInternalDragReq = useStore((s) => s.setInternalDragReq)
 
@@ -250,6 +252,18 @@ function StationEntryCardBase({ entry }: Props) {
               {count > 1 ? `${count} ${t('filters.files').toLowerCase()}` : info.label.toLowerCase()}
             </span>
             <span>{relativeTime(entry.capturedAt)}</span>
+            {entry.inTransit && (
+              <span className="status-badge in-transit" title={t('item.inTransit')}>
+                <span className="status-dot" />
+                {t('item.inTransit')}
+              </span>
+            )}
+            {entry.stale && !entry.inTransit && (
+              <span className="status-badge missing" title={t('item.fileMissing')}>
+                <span className="status-dot" />
+                {t('item.fileMissing')}
+              </span>
+            )}
           </div>
         </div>
 

@@ -8,16 +8,19 @@
  * to paste it, copy button → copy-subitem (never creates a new entry), pin
  * button → pins the parent entry.
  */
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store/appStore'
 import { useTranslation } from '../i18n'
 import { useFileMembers } from '../hooks/useFilteredItems'
 import { ClipboardItemCard } from './ClipboardItem'
 import { StationEntryCard } from './StationEntryCard'
 import { FileMemberRow } from './FileMemberRow'
+import { PinnedTile } from './PinnedTile'
 import { EmptyState } from './EmptyState'
 import { isImageItem } from '../lib/fileTabs'
 import { basename } from '../lib/format'
+import { filterStationByRoute, countStale } from '../lib/stationRoute'
+import { playDeleteSound } from '../lib/soundEffects'
 import type { FileMember } from '../lib/fileTabs'
 import type { StationEntryDto } from '../../shared/station'
 import type { ClipboardItemDto } from '../../shared/types'
@@ -27,12 +30,15 @@ export function FileListView() {
   const query = useStore((s) => s.query)
   const tutorialStep = useStore((s) => s.tutorialStep)
   const files = useFileMembers()
+  // T6 pinned grid: the tile clicked expands into a full card above the grid.
+  const [expandedGridId, setExpandedGridId] = useState<string | null>(null)
 
   // Grouped mode: station entries + every non-image file entry, pinned
   // first in each domain. Independent of the clipboard view's second-level
   // filter. Station entries are hidden during the onboarding tour.
   const fileItems = useStore((s) => s.items)
   const station = useStore((s) => s.station)
+  const stationRouteFilter = useStore((s) => s.stationRouteFilter)
   const groupedEntries = useMemo(() => {
     type Row = { kind: 'station'; entry: StationEntryDto } | { kind: 'item'; item: ClipboardItemDto }
     const filtered = fileItems.filter((it) => {
@@ -45,16 +51,53 @@ export function FileListView() {
       ? filtered.filter((it) => it.data.kind === 'files' && it.data.paths.some((p) => basename(p).toLowerCase().includes(q)))
       : filtered
     const stationVisible = tutorialStep <= 0
+    // Route filter (T6): 'clipboard' keeps only clipboard-captured station
+    // entries; stack file items have no route and hide under it.
+    const routeStation = stationVisible ? filterStationByRoute(station, stationRouteFilter) : []
     const stationSearched = q
-      ? station.filter((e) => e.paths.some((p) => basename(p).toLowerCase().includes(q)))
-      : station
+      ? routeStation.filter((e) => e.paths.some((p) => basename(p).toLowerCase().includes(q)))
+      : routeStation
     const toStationRows = (entries: StationEntryDto[]): Row[] => entries.map((entry) => ({ kind: 'station' as const, entry }))
     const toItemRows = (items: ClipboardItemDto[]): Row[] => items.map((item) => ({ kind: 'item' as const, item }))
+    const visibleItems = stationRouteFilter === 'clipboard' ? [] : searched
     return {
-      pinned: [...toStationRows(stationVisible ? stationSearched.filter((e) => e.pinned) : []), ...toItemRows(searched.filter((it) => it.pinned))],
-      recent: [...toStationRows(stationVisible ? stationSearched.filter((e) => !e.pinned) : []), ...toItemRows(searched.filter((it) => !it.pinned))]
+      pinned: [...toStationRows(stationSearched.filter((e) => e.pinned)), ...toItemRows(visibleItems.filter((it) => it.pinned))],
+      recent: [...toStationRows(stationSearched.filter((e) => !e.pinned)), ...toItemRows(visibleItems.filter((it) => !it.pinned))]
     }
-  }, [fileItems, station, query, tutorialStep])
+  }, [fileItems, station, query, tutorialStep, stationRouteFilter])
+
+  const staleCount = useMemo(() => countStale(station), [station])
+  const stationPinned = useMemo(
+    () => groupedEntries.pinned.filter((r): r is { kind: 'station'; entry: StationEntryDto } => r.kind === 'station'),
+    [groupedEntries]
+  )
+  // The expanded card leaves the grid; a stale id (entry unpinned meanwhile)
+  // simply renders nothing.
+  const gridEntries = stationPinned.filter((r) => r.entry.id !== expandedGridId).map((r) => r.entry)
+  const expandedEntry = stationPinned.find((r) => r.entry.id === expandedGridId)?.entry ?? null
+  const itemPinned = groupedEntries.pinned.filter((r): r is { kind: 'item'; item: ClipboardItemDto } => r.kind === 'item')
+
+  // An unpinned (or deleted/filtered-out) expanded entry goes back to the
+  // grid — re-pinning must not resurrect the expanded card.
+  useEffect(() => {
+    if (expandedGridId !== null && !expandedEntry) setExpandedGridId(null)
+  }, [expandedGridId, expandedEntry])
+
+  const staleBanner = staleCount > 0 && tutorialStep <= 0 ? (
+    <div className="stale-banner">
+      <span className="stale-banner-text">{t('item.missingFilesBanner', { count: staleCount })}</span>
+      <button
+        className="stale-banner-btn"
+        onClick={(e) => {
+          e.currentTarget.blur()
+          playDeleteSound()
+          void useStore.getState().stationClearStale()
+        }}
+      >
+        {t('item.clearMissing')}
+      </button>
+    </div>
+  ) : null
 
   const renderRow = (row: { kind: 'station'; entry: StationEntryDto } | { kind: 'item'; item: ClipboardItemDto }) =>
     row.kind === 'station' ? <StationEntryCard key={row.entry.id} entry={row.entry} /> : <ClipboardItemCard key={row.item.id} item={row.item} instant={false} />
@@ -66,10 +109,21 @@ export function FileListView() {
     }
     return (
       <div className="list">
+        {staleBanner}
         {groupedEntries.pinned.length > 0 && (
           <section className="pinned-section">
             <div className="section-label">{t('item.pinned')}</div>
-            {groupedEntries.pinned.map(renderRow)}
+            {expandedEntry && <StationEntryCard key={expandedEntry.id} entry={expandedEntry} defaultExpanded />}
+            {gridEntries.length > 0 && (
+              <div className="pinned-grid">
+                {gridEntries.map((e) => (
+                  <PinnedTile key={e.id} entry={e} onExpand={setExpandedGridId} />
+                ))}
+              </div>
+            )}
+            {itemPinned.map((r) => (
+              <ClipboardItemCard key={r.item.id} item={r.item} instant={false} />
+            ))}
           </section>
         )}
         {groupedEntries.recent.length > 0 && (
@@ -102,6 +156,7 @@ export function FileListView() {
 
   return (
     <div className="list">
+      {staleBanner}
       {grouped.map((g) => (
         <section key={g.itemId} style={{ marginBottom: 8 }}>
           {g.members.map((m) => (

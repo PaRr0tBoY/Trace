@@ -152,6 +152,10 @@ export interface TranslationKeys {
     singleFile: string
     /** Station route badge (ADR-0006); only en is populated, others fall back to en. */
     routeClipboard?: string
+    inTransit: string
+    fileMissing: string
+    missingFilesBanner: string
+    clearMissing: string
     scrollToTop: string
   }
   fileKinds: {
@@ -853,6 +857,10 @@ export const en: TranslationKeys = {
     "moreImages": "+{count} more images",
     "moreFiles": "+{count} more files",
     "singleFile": "1 file",
+    "inTransit": "In transit",
+    "fileMissing": "File missing",
+    "missingFilesBanner": "{count} entries lost their files",
+    "clearMissing": "Clean up",
     "routeClipboard": "Clipboard",
     "scrollToTop": "Scroll to top"
   },
@@ -1386,6 +1394,10 @@ export const es: TranslationKeys = {
     "moreImages": "+{count} imágenes más",
     "moreFiles": "+{count} archivos más",
     "singleFile": "1 archivo",
+    "inTransit": "En tránsito",
+    "fileMissing": "Archivo desaparecido",
+    "missingFilesBanner": "{count} entradas perdieron sus archivos",
+    "clearMissing": "Limpiar",
     "scrollToTop": "Volver arriba"
   },
   "fileKinds": {
@@ -1918,6 +1930,10 @@ export const fr: TranslationKeys = {
     "moreImages": "+{count} images de plus",
     "moreFiles": "+{count} fichiers de plus",
     "singleFile": "1 fichier",
+    "inTransit": "En transit",
+    "fileMissing": "Fichier introuvable",
+    "missingFilesBanner": "{count} entrées ont perdu leurs fichiers",
+    "clearMissing": "Nettoyer",
     "scrollToTop": "Remonter en haut"
   },
   "fileKinds": {
@@ -2450,6 +2466,10 @@ export const de: TranslationKeys = {
     "moreImages": "+{count} weitere Bilder",
     "moreFiles": "+{count} weitere Dateien",
     "singleFile": "1 Datei",
+    "inTransit": "Unterwegs",
+    "fileMissing": "Datei fehlt",
+    "missingFilesBanner": "{count} Einträge haben ihre Dateien verloren",
+    "clearMissing": "Aufräumen",
     "scrollToTop": "Nach oben scrollen"
   },
   "fileKinds": {
@@ -2982,6 +3002,10 @@ export const it: TranslationKeys = {
     "moreImages": "+{count} altre immagini",
     "moreFiles": "+{count} altri file",
     "singleFile": "1 file",
+    "inTransit": "In transito",
+    "fileMissing": "File mancante",
+    "missingFilesBanner": "{count} voci hanno perso i file",
+    "clearMissing": "Pulisci",
     "scrollToTop": "Torna in cima"
   },
   "fileKinds": {
@@ -3514,6 +3538,10 @@ export const pt: TranslationKeys = {
     "moreImages": "+{count} imagens a mais",
     "moreFiles": "+{count} arquivos a mais",
     "singleFile": "1 arquivo",
+    "inTransit": "Em trânsito",
+    "fileMissing": "Arquivo sumiu",
+    "missingFilesBanner": "{count} entradas perderam seus arquivos",
+    "clearMissing": "Limpar",
     "scrollToTop": "Voltar ao topo"
   },
   "fileKinds": {
@@ -4046,6 +4074,10 @@ export const ru: TranslationKeys = {
     "moreImages": "+{count} ещё изображений",
     "moreFiles": "+{count} ещё файлов",
     "singleFile": "1 файл",
+    "inTransit": "В пути",
+    "fileMissing": "Файл пропал",
+    "missingFilesBanner": "{count} записей потеряли файлы",
+    "clearMissing": "Очистить",
     "scrollToTop": "Прокрутить наверх"
   },
   "fileKinds": {
@@ -4578,6 +4610,10 @@ export const ja: TranslationKeys = {
     "moreImages": "+{count} 枚の画像",
     "moreFiles": "+{count} 個のファイル",
     "singleFile": "1 個のファイル",
+    "inTransit": "移動中",
+    "fileMissing": "ファイルが見つかりません",
+    "missingFilesBanner": "{count} 件のファイルが見つかりません",
+    "clearMissing": "整理",
     "scrollToTop": "先頭へスクロール"
   },
   "fileKinds": {
@@ -5110,6 +5146,10 @@ export const ko: TranslationKeys = {
     "moreImages": "+{count}개 이미지 더",
     "moreFiles": "+{count}개 파일 더",
     "singleFile": "1개 파일",
+    "inTransit": "이동 중",
+    "fileMissing": "파일 없음",
+    "missingFilesBanner": "{count}개 항목의 파일이 사라졌습니다",
+    "clearMissing": "정리",
     "scrollToTop": "맨 위로 스크롤"
   },
   "fileKinds": {
@@ -5642,6 +5682,10 @@ export const zhCN: TranslationKeys = {
     "moreImages": "+{count} 张更多图片",
     "moreFiles": "+{count} 个更多文件",
     "singleFile": "1 个文件",
+    "inTransit": "在途",
+    "fileMissing": "文件已消失",
+    "missingFilesBanner": "{count} 个条目的文件已消失",
+    "clearMissing": "清理",
     "scrollToTop": "滚动到顶部"
   },
   "fileKinds": {
@@ -6174,6 +6218,10 @@ export const zhTW: TranslationKeys = {
     "moreImages": "+{count} 張更多圖片",
     "moreFiles": "+{count} 個更多檔案",
     "singleFile": "1 個檔案",
+    "inTransit": "在途",
+    "fileMissing": "檔案已消失",
+    "missingFilesBanner": "{count} 個條目的檔案已消失",
+    "clearMissing": "清理",
     "scrollToTop": "捲動到頂部"
   },
   "fileKinds": {
@@ -6706,6 +6754,10 @@ export const hi: TranslationKeys = {
     "moreImages": "+{count} और छवियाँ",
     "moreFiles": "+{count} और फ़ाइलें",
     "singleFile": "1 फ़ाइल",
+    "inTransit": "संक्रमण में",
+    "fileMissing": "फ़ाइल गायब है",
+    "missingFilesBanner": "{count} प्रविष्टियों की फ़ाइलें गायब हैं",
+    "clearMissing": "साफ़ करें",
     "scrollToTop": "शीर्ष पर स्क्रॉल करें"
   },
   "fileKinds": {
@@ -7238,6 +7290,10 @@ export const ar: TranslationKeys = {
     "moreImages": "+{count} صور أخرى",
     "moreFiles": "+{count} ملفات أخرى",
     "singleFile": "ملف واحد",
+    "inTransit": "قيد النقل",
+    "fileMissing": "الملف مفقود",
+    "missingFilesBanner": "{count} عناصر فقدت ملفاتها",
+    "clearMissing": "تنظيف",
     "scrollToTop": "التمرير للأعلى"
   },
   "fileKinds": {
@@ -7770,6 +7826,10 @@ export const bn: TranslationKeys = {
     "moreImages": "+{count} টি অতিরিক্ত ছবি",
     "moreFiles": "+{count} টি অতিরিক্ত ফাইল",
     "singleFile": "১টি ফাইল",
+    "inTransit": "পরিবহনে",
+    "fileMissing": "ফাইল হারিয়ে গেছে",
+    "missingFilesBanner": "{count}টি এন্ট্রির ফাইল হারিয়ে গেছে",
+    "clearMissing": "পরিষ্কার করুন",
     "scrollToTop": "শীর্ষে স্ক্রোল করুন"
   },
   "fileKinds": {
@@ -8302,6 +8362,10 @@ export const tr: TranslationKeys = {
     "moreImages": "+{count} görsel daha",
     "moreFiles": "+{count} dosya daha",
     "singleFile": "1 dosya",
+    "inTransit": "Taşımada",
+    "fileMissing": "Dosya kayboldu",
+    "missingFilesBanner": "{count} öğenin dosyası kayboldu",
+    "clearMissing": "Temizle",
     "scrollToTop": "Başa kaydır"
   },
   "fileKinds": {
@@ -8834,6 +8898,10 @@ export const vi: TranslationKeys = {
     "moreImages": "+{count} hình ảnh nữa",
     "moreFiles": "+{count} tệp nữa",
     "singleFile": "1 tệp",
+    "inTransit": "Đang chuyển",
+    "fileMissing": "Tệp đã biến mất",
+    "missingFilesBanner": "{count} mục đã mất tệp",
+    "clearMissing": "Dọn dẹp",
     "scrollToTop": "Cuộn lên đầu"
   },
   "fileKinds": {
@@ -9366,6 +9434,10 @@ export const pl: TranslationKeys = {
     "moreImages": "+{count} więcej obrazów",
     "moreFiles": "+{count} więcej plików",
     "singleFile": "1 plik",
+    "inTransit": "W tranzycie",
+    "fileMissing": "Plik zniknął",
+    "missingFilesBanner": "{count} wpisów straciło pliki",
+    "clearMissing": "Posprzątaj",
     "scrollToTop": "Przewiń na górę"
   },
   "fileKinds": {
@@ -9898,6 +9970,10 @@ export const nl: TranslationKeys = {
     "moreImages": "+{count} afbeeldingen meer",
     "moreFiles": "+{count} bestanden meer",
     "singleFile": "1 bestand",
+    "inTransit": "Onderweg",
+    "fileMissing": "Bestand verdwenen",
+    "missingFilesBanner": "{count} items verloren hun bestanden",
+    "clearMissing": "Opruimen",
     "scrollToTop": "Naar boven scrollen"
   },
   "fileKinds": {
@@ -10430,6 +10506,10 @@ export const sv: TranslationKeys = {
     "moreImages": "+{count} fler bilder",
     "moreFiles": "+{count} fler filer",
     "singleFile": "1 fil",
+    "inTransit": "Under överföring",
+    "fileMissing": "Fil saknas",
+    "missingFilesBanner": "{count} poster förlorade sina filer",
+    "clearMissing": "Rensa",
     "scrollToTop": "Scrolla till toppen"
   },
   "fileKinds": {
@@ -10962,6 +11042,10 @@ export const id: TranslationKeys = {
     "moreImages": "+{count} gambar lagi",
     "moreFiles": "+{count} berkas lagi",
     "singleFile": "1 berkas",
+    "inTransit": "Dalam perjalanan",
+    "fileMissing": "Berkas hilang",
+    "missingFilesBanner": "{count} entri kehilangan berkas",
+    "clearMissing": "Bersihkan",
     "scrollToTop": "Gulir ke atas"
   },
   "fileKinds": {
@@ -11494,6 +11578,10 @@ export const uk: TranslationKeys = {
     "moreImages": "+{count} більше зображень",
     "moreFiles": "+{count} більше файлів",
     "singleFile": "1 файл",
+    "inTransit": "У дорозі",
+    "fileMissing": "Файл зник",
+    "missingFilesBanner": "{count} записів втратили файли",
+    "clearMissing": "Прибрати",
     "scrollToTop": "Прокрутити вгору"
   },
   "fileKinds": {
@@ -12026,6 +12114,10 @@ export const el: TranslationKeys = {
     "moreImages": "+{count} περισσότερες εικόνες",
     "moreFiles": "+{count} περισσότερα αρχεία",
     "singleFile": "1 αρχείο",
+    "inTransit": "Σε μεταφορά",
+    "fileMissing": "Το αρχείο εξαφανίστηκε",
+    "missingFilesBanner": "{count} καταχωρήσεις έχασαν τα αρχεία τους",
+    "clearMissing": "Καθαρισμός",
     "scrollToTop": "Κύλιση στην κορυφή"
   },
   "fileKinds": {
@@ -12558,6 +12650,10 @@ export const cs: TranslationKeys = {
     "moreImages": "+{count} dalších obrázků",
     "moreFiles": "+{count} dalších souborů",
     "singleFile": "1 soubor",
+    "inTransit": "V přepravě",
+    "fileMissing": "Soubor zmizel",
+    "missingFilesBanner": "{count} položek ztratilo soubory",
+    "clearMissing": "Uklidit",
     "scrollToTop": "Přejít nahoru"
   },
   "fileKinds": {
@@ -13090,6 +13186,10 @@ export const ro: TranslationKeys = {
     "moreImages": "+{count} imagini mai mult",
     "moreFiles": "+{count} fișiere mai mult",
     "singleFile": "1 fișier",
+    "inTransit": "În tranzit",
+    "fileMissing": "Fișierul a dispărut",
+    "missingFilesBanner": "{count} intrări și-au pierdut fișierele",
+    "clearMissing": "Curăță",
     "scrollToTop": "Derulează sus"
   },
   "fileKinds": {
@@ -13622,6 +13722,10 @@ export const hu: TranslationKeys = {
     "moreImages": "+{count} további kép",
     "moreFiles": "+{count} további fájl",
     "singleFile": "1 fájl",
+    "inTransit": "Szállítás alatt",
+    "fileMissing": "Fájl eltűnt",
+    "missingFilesBanner": "{count} elem elvesztette a fájljait",
+    "clearMissing": "Takarítás",
     "scrollToTop": "Görgetés a tetejére"
   },
   "fileKinds": {
@@ -14154,6 +14258,10 @@ export const da: TranslationKeys = {
     "moreImages": "+{count} flere billeder",
     "moreFiles": "+{count} flere filer",
     "singleFile": "1 fil",
+    "inTransit": "Under transport",
+    "fileMissing": "Fil forsvundet",
+    "missingFilesBanner": "{count} poster mistede deres filer",
+    "clearMissing": "Ryd op",
     "scrollToTop": "Rul til toppen"
   },
   "fileKinds": {
@@ -14686,6 +14794,10 @@ export const fi: TranslationKeys = {
     "moreImages": "+{count} kuvaa lisää",
     "moreFiles": "+{count} tiedostoa lisää",
     "singleFile": "1 tiedosto",
+    "inTransit": "Siirrossa",
+    "fileMissing": "Tiedosto kadonnut",
+    "missingFilesBanner": "{count} kohdetta menetti tiedostonsa",
+    "clearMissing": "Siivoa",
     "scrollToTop": "Vieritä ylös"
   },
   "fileKinds": {
@@ -15218,6 +15330,10 @@ export const th: TranslationKeys = {
     "moreImages": "+{count} รูปภาพเพิ่มเติม",
     "moreFiles": "+{count} ไฟล์เพิ่มเติม",
     "singleFile": "1 ไฟล์",
+    "inTransit": "กำลังย้าย",
+    "fileMissing": "ไฟล์หายไป",
+    "missingFilesBanner": "{count} รายการสูญเสียไฟล์",
+    "clearMissing": "ทำความสะอาด",
     "scrollToTop": "เลื่อนไปที่ด้านบน"
   },
   "fileKinds": {
@@ -15750,6 +15866,10 @@ export const he: TranslationKeys = {
     "moreImages": "+{count} תמונות נוספות",
     "moreFiles": "+{count} קבצים נוספים",
     "singleFile": "קובץ 1",
+    "inTransit": "במעבר",
+    "fileMissing": "הקובץ נעלם",
+    "missingFilesBanner": "{count} פריטים איבדו את הקבצים שלהם",
+    "clearMissing": "נקה",
     "scrollToTop": "גלול לראש"
   },
   "fileKinds": {
@@ -16282,6 +16402,10 @@ export const no: TranslationKeys = {
     "moreImages": "+{count} flere bilder",
     "moreFiles": "+{count} flere filer",
     "singleFile": "1 fil",
+    "inTransit": "Under overføring",
+    "fileMissing": "Fil forsvunnet",
+    "missingFilesBanner": "{count} oppføringer mistet filene sine",
+    "clearMissing": "Rydd opp",
     "scrollToTop": "Rull til toppen"
   },
   "fileKinds": {

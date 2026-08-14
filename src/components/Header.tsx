@@ -92,6 +92,10 @@ export function Header() {
   const setClipboardFilter = useStore((s) => s.setClipboardFilter)
   const filesFilter = useStore((s) => s.filesFilter)
   const setFilesFilter = useStore((s) => s.setFilesFilter)
+  const stationRouteFilter = useStore((s) => s.stationRouteFilter)
+  const setStationRouteFilter = useStore((s) => s.setStationRouteFilter)
+  const stationCount = useStore((s) => s.station.length)
+  const tutorialStep = useStore((s) => s.tutorialStep)
   const tasksFilter = useStore((s) => s.tasksFilter)
   const setTasksFilter = useStore((s) => s.setTasksFilter)
   const tasks = useStore((s) => s.tasks)
@@ -504,6 +508,36 @@ export function Header() {
                       transition={{ type: 'spring', stiffness: 400, damping: 34 }}
                       style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, overflow: 'hidden' }}
                     >
+                      {/* Route filter (T6): station entries narrow to clipboard captures; hidden during the onboarding tour. */}
+                      {tutorialStep <= 0 && stationCount > 0 && (
+                        <>
+                          <button
+                            type="button"
+                            data-chip-active={stationRouteFilter === 'all'}
+                            className={`filter-chip${stationRouteFilter === 'all' ? ' active' : ''}`}
+                            onClick={() => {
+                              playButtonClickSound()
+                              setStationRouteFilter('all')
+                            }}
+                            style={secondaryChipStyle(stationRouteFilter === 'all')}
+                          >
+                            <span>{t('filters.all')}</span>
+                          </button>
+                          <button
+                            type="button"
+                            data-chip-active={stationRouteFilter === 'clipboard'}
+                            className={`filter-chip${stationRouteFilter === 'clipboard' ? ' active' : ''}`}
+                            onClick={() => {
+                              playButtonClickSound()
+                              setStationRouteFilter('clipboard')
+                            }}
+                            style={secondaryChipStyle(stationRouteFilter === 'clipboard')}
+                          >
+                            <span>{t('filters.clipboard')}</span>
+                          </button>
+                          <span className="filter-divider" />
+                        </>
+                      )}
                       <button
                         type="button"
                         data-chip-active={filesFilter === 'all'}

@@ -14,6 +14,7 @@ import { useStore } from '../store/appStore'
 import type { ClipboardItemDto, ClipboardFilter, FilesFilter } from '../../shared/types'
 import { basename } from '../lib/format'
 import { collectFileMembers, collectStationMembers, deriveFileTabs, filterMembersByTab, isFileTabAlive, isImageItem, MAX_EXT_TABS, type FileMember } from '../lib/fileTabs'
+import { filterStationByRoute } from '../lib/stationRoute'
 
 function matches(it: ClipboardItemDto, q: string): boolean {
   if (!q) return true
@@ -114,6 +115,7 @@ export function useFileMembers(): FileViewData {
   const query = useStore((s) => s.query)
   const filesFilter = useStore((s) => s.filesFilter)
   const setFilesFilter = useStore((s) => s.setFilesFilter)
+  const stationRouteFilter = useStore((s) => s.stationRouteFilter)
   const tutorialStep = useStore((s) => s.tutorialStep)
 
   const data = useMemo(() => {
@@ -128,8 +130,13 @@ export function useFileMembers(): FileViewData {
     })
     // Station members feed the same member list/tabs (ADR-0006); hidden
     // during the onboarding tour so the tutorial items stay uncluttered.
-    const stationMembers = tutorialStep <= 0 ? collectStationMembers(station) : []
-    const members = [...collectFileMembers(filteredByTutorial), ...stationMembers]
+    // The route filter (T6) narrows the station first; legacy stack file
+    // items only show under 'all' (they have no route).
+    const stationMembers = tutorialStep <= 0 ? collectStationMembers(filterStationByRoute(station, stationRouteFilter)) : []
+    const members = [
+      ...(stationRouteFilter === 'clipboard' ? [] : collectFileMembers(filteredByTutorial)),
+      ...stationMembers
+    ]
     const q = query.trim().toLowerCase()
     const searched = q ? members.filter((m) => m.name.toLowerCase().includes(q)) : members
     const tabs = deriveFileTabs(searched, MAX_EXT_TABS)
@@ -141,7 +148,7 @@ export function useFileMembers(): FileViewData {
       otherCount: tabs.otherCount,
       activeFilter
     }
-  }, [items, station, query, filesFilter, tutorialStep])
+  }, [items, station, query, filesFilter, stationRouteFilter, tutorialStep])
 
   // A vanished tab falls back to 'all' (ADR-0004); sync the store so the
   // header highlight matches what is rendered.

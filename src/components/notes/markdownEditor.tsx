@@ -326,13 +326,13 @@ const enterContinuation = keymap.of([
 const notesTheme = EditorView.theme({
   '&': {
     height: '100%',
-    fontSize: '12px',
+    fontSize: '13px',
     backgroundColor: 'transparent',
     color: 'var(--text-primary)'
   },
   '.cm-scroller': {
     fontFamily: 'inherit',
-    lineHeight: '1.6',
+    lineHeight: '1.65',
     overflow: 'auto',
     scrollbarWidth: 'none' /* Firefox */
   },
@@ -340,7 +340,7 @@ const notesTheme = EditorView.theme({
     display: 'none' /* Chrome/Safari — invisible scrollbar like the panel */
   },
   '.cm-content': {
-    padding: '8px 10px',
+    padding: '12px 14px',
     caretColor: 'var(--text-primary)'
   },
   '&.cm-focused': {

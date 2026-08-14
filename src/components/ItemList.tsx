@@ -14,6 +14,7 @@ import { useStore } from '../store/appStore'
 import { useFilteredItems } from '../hooks/useFilteredItems'
 import { ClipboardItemCard } from './ClipboardItem'
 import { EmptyState } from './EmptyState'
+import { IncognitoBanner } from './IncognitoBanner'
 import { ChevronDownIcon, PinFillIcon } from './icons'
 import { playExpandSound } from '../lib/soundEffects'
 
@@ -220,6 +221,7 @@ export function ItemList() {
       onDrop={handleDragLeaveOrDrop}
       onScroll={handleScroll}
     >
+      <IncognitoBanner />
       {total === 0 ? (
         <EmptyState filtered={query.trim().length > 0} />
       ) : (

@@ -19,6 +19,7 @@ import { StationEntryCard } from './StationEntryCard'
 import { FileMemberRow } from './FileMemberRow'
 import { PinnedTile } from './PinnedTile'
 import { EmptyState } from './EmptyState'
+import { IncognitoBanner } from './IncognitoBanner'
 import { isImageItem } from '../lib/fileTabs'
 import { basename } from '../lib/format'
 import { filterStationByRoute, countStale } from '../lib/stationRoute'
@@ -148,6 +149,9 @@ export function FileListView() {
     return (
       <div className="list">
         {staleBanner}
+        {/* The clipboard pseudo-tab shows clipboard-captured files — the
+            incognito notice belongs here, next to the content it affects. */}
+        {filesFilter === 'clipboard' && <IncognitoBanner />}
         {groupedEntries.pinned.length > 0 && (
           <section className="pinned-section">
             <div className="section-label">{t('item.pinned')}</div>

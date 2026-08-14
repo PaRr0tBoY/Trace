@@ -767,3 +767,23 @@
   border-color: rgba(255, 128, 128, 0.6);
   color: #fff;
 }
+
+/* Incognito notice (feedback): same anatomy as the stale banner, but the
+   "resume recording" action reads as a recovery, not a cleanup — accent
+   colored instead of red. */
+.stale-banner.incognito-banner {
+  background: rgba(26, 26, 20, 0.55);
+  border-color: rgba(var(--accent-rgb), 0.28);
+}
+
+.stale-banner.incognito-banner .stale-banner-btn {
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: rgba(var(--accent-rgb), 0.16);
+  color: var(--accent);
+}
+
+.stale-banner.incognito-banner .stale-banner-btn:hover {
+  background: rgba(var(--accent-rgb), 0.32);
+  border-color: rgba(var(--accent-rgb), 0.7);
+  color: #fff;
+}

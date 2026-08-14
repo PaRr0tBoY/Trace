@@ -223,6 +223,6 @@ let incognitoApply: ((v: boolean) => void) | null = null
 export function registerIncognitoApplier(fn: (v: boolean) => void): void {
   incognitoApply = fn
 }
-function applyIncognito(v: boolean): void {
+export function applyIncognito(v: boolean): void {
   incognitoApply?.(v)
 }

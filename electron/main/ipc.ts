@@ -31,6 +31,7 @@ import { recentEvents } from './eventBus'
 import { acceptWithResource } from './suggestionDrop'
 import { ProviderChain, testProvider } from './provider'
 import { logAi } from './aiLog'
+import { applyIncognito } from './tray'
 import type { ItemData, MergeResult, MemoryFactDto, MemoryFactPanelPayload, MemoryListPayload, ResourceRef, Task } from '../../shared/types'
 
 /**
@@ -854,6 +855,12 @@ export function registerIpc(): void {
 
   handle('settings:update', (patch) => {
     const next = saveSettings(patch)
+    if (patch.incognito !== undefined) {
+      // The tray toggle applies the watcher pause through this hook; the
+      // settings sheet must too — otherwise capture keeps polling until the
+      // next event gate (still correct, but the pause is the contract).
+      applyIncognito(next.incognito)
+    }
     if (patch.launchAtLogin !== undefined && app.isPackaged) {
       try {
         app.setLoginItemSettings({

@@ -3,8 +3,8 @@
  *
  * Row 1: three top-level chips (clipboard / files / tasks) + right buttons.
  * Row 2: the active view's second level — clipboard (all/text/links/images),
- * files (all + dynamic extension tabs + other; hidden entirely when no file
- * entries exist), tasks (existing / candidates).
+ * files (all + clipboard + dynamic extension tabs + other; hidden entirely
+ * when no file entries exist), tasks (existing / candidates).
  *
  * Badges: the tasks top-level chip shows a red paused+waiting count (no
  * amber dot); the existing-tasks tab shows the same count, candidate-tasks
@@ -92,8 +92,6 @@ export function Header() {
   const setClipboardFilter = useStore((s) => s.setClipboardFilter)
   const filesFilter = useStore((s) => s.filesFilter)
   const setFilesFilter = useStore((s) => s.setFilesFilter)
-  const stationRouteFilter = useStore((s) => s.stationRouteFilter)
-  const setStationRouteFilter = useStore((s) => s.setStationRouteFilter)
   const stationCount = useStore((s) => s.station.length)
   const tutorialStep = useStore((s) => s.tutorialStep)
   const tasksFilter = useStore((s) => s.tasksFilter)
@@ -508,36 +506,9 @@ export function Header() {
                       transition={{ type: 'spring', stiffness: 400, damping: 34 }}
                       style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, overflow: 'hidden' }}
                     >
-                      {/* Route filter (T6): station entries narrow to clipboard captures; hidden during the onboarding tour. */}
-                      {tutorialStep <= 0 && stationCount > 0 && (
-                        <>
-                          <button
-                            type="button"
-                            data-chip-active={stationRouteFilter === 'all'}
-                            className={`filter-chip${stationRouteFilter === 'all' ? ' active' : ''}`}
-                            onClick={() => {
-                              playButtonClickSound()
-                              setStationRouteFilter('all')
-                            }}
-                            style={secondaryChipStyle(stationRouteFilter === 'all')}
-                          >
-                            <span>{t('filters.all')}</span>
-                          </button>
-                          <button
-                            type="button"
-                            data-chip-active={stationRouteFilter === 'clipboard'}
-                            className={`filter-chip${stationRouteFilter === 'clipboard' ? ' active' : ''}`}
-                            onClick={() => {
-                              playButtonClickSound()
-                              setStationRouteFilter('clipboard')
-                            }}
-                            style={secondaryChipStyle(stationRouteFilter === 'clipboard')}
-                          >
-                            <span>{t('filters.clipboard')}</span>
-                          </button>
-                          <span className="filter-divider" />
-                        </>
-                      )}
+                      {/* One unified chip row (feedback): 全部 / 剪贴板 (route
+                          filter, only when the station exists) / ext tabs / 其他.
+                          No separate route group, no duplicate 全部. */}
                       <button
                         type="button"
                         data-chip-active={filesFilter === 'all'}
@@ -550,6 +521,20 @@ export function Header() {
                       >
                         <span>{t('filters.all')}</span>
                       </button>
+                      {tutorialStep <= 0 && stationCount > 0 && (
+                        <button
+                          type="button"
+                          data-chip-active={filesFilter === 'clipboard'}
+                          className={`filter-chip${filesFilter === 'clipboard' ? ' active' : ''}`}
+                          onClick={() => {
+                            playButtonClickSound()
+                            setFilesFilter('clipboard')
+                          }}
+                          style={secondaryChipStyle(filesFilter === 'clipboard')}
+                        >
+                          <span>{t('filters.clipboard')}</span>
+                        </button>
+                      )}
                       {files.tabs.map((tab) => (
                         <button
                           key={tab.ext}

@@ -261,8 +261,9 @@ function pollOnce(): void {
         active = true
         activeBy = 'poll'
         if (DEBUG) console.log('[DragDetect] start (DragWindow)')
-        // No source window on this path — isFileDrag=false; the manager's
-        // ADR fallback (cursor in panel ⇒ file) decides.
+        // No source window on this path — srcClass='' and isFileDrag=false;
+        // the manager treats unknown-source drags as file drags (real data:
+        // 0x0F never fires, so this poll path is the only start source).
         activeEvents?.onStart({ isFileDrag: false, srcClass: '', cursor: readCursor() })
       }
     } else if (!has && dragWindowSeen) {

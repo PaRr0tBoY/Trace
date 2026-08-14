@@ -39,9 +39,12 @@ export type ClipboardFilter = 'all' | 'text' | 'links' | 'images'
 /**
  * Second-level filter inside the files view (ADR-0004): the dynamic
  * extension tabs ('.pdf', …) are added by the renderer; 'other' holds
- * extension-less members. The value is the raw `path.extname` result.
+ * extension-less members; 'clipboard' narrows the station to
+ * clipboard-captured entries (the T6 route filter folded into this set —
+ * one chip row, no duplicate 全部). The value is the raw `path.extname`
+ * result for extension tabs.
  */
-export type FilesFilter = 'all' | 'other' | (string & {})
+export type FilesFilter = 'all' | 'clipboard' | 'other' | (string & {})
 
 /** Second-level filter inside the tasks view (ADR-0004). */
 export type TasksFilter = 'existing' | 'candidates'

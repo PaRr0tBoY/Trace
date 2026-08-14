@@ -4,8 +4,9 @@
  * Serves three views (ADR-0004):
  * - clipboard: pinned/recent split, filtered by clipboardFilter ('all'
  *   excludes file entries — files live in the files view).
- * - files:    'all' keeps the grouped file entries; an extension tab or
- *             'other' returns single file *members* for the member list.
+ * - files:    'all'/'clipboard' return flat file *members* (with the pinned
+ *             shelf rendered by the caller); an extension tab or 'other'
+ *             returns the tab's members.
  *
  * Kept as a selector so components stay presentational.
  */
@@ -90,24 +91,25 @@ export function useFilteredItems(): GroupedItems {
 }
 
 export interface FileViewData {
-  /** Every non-image file member (after search), in item order. */
+  /** Every non-image file member (after search + route filter), in item order. */
   members: FileMember[]
   /**
-   * Members under the active tab; null when the active filter is 'all'
-   * (the caller renders grouped entries instead).
+   * Members under the active tab; null when the active filter is 'all' or
+   * 'clipboard' (the caller renders the pinned shelf + flat member rows).
    */
   tabMembers: FileMember[] | null
   /** Extension tabs, count desc then alphabetical. */
   tabs: { ext: string; count: number }[]
   /** Number of extension-less members (the 'other' bucket). */
   otherCount: number
-  /** The active filter — falls back to 'all' when the tab vanished. */
+  /** The active filter — falls back to 'all' when the tab/route vanished. */
   activeFilter: FilesFilter
 }
 
 /**
  * Files-view data: extension tabs + the members under the active tab.
- * A vanished tab (its files were deleted) falls back to 'all'.
+ * 'all' and 'clipboard' render flat member rows (feedback: files show as
+ * members, not groups); a vanished tab or empty route falls back to 'all'.
  */
 export function useFileMembers(): FileViewData {
   const items = useStore((s) => s.items)
@@ -115,7 +117,6 @@ export function useFileMembers(): FileViewData {
   const query = useStore((s) => s.query)
   const filesFilter = useStore((s) => s.filesFilter)
   const setFilesFilter = useStore((s) => s.setFilesFilter)
-  const stationRouteFilter = useStore((s) => s.stationRouteFilter)
   const tutorialStep = useStore((s) => s.tutorialStep)
 
   const data = useMemo(() => {
@@ -130,28 +131,38 @@ export function useFileMembers(): FileViewData {
     })
     // Station members feed the same member list/tabs (ADR-0006); hidden
     // during the onboarding tour so the tutorial items stay uncluttered.
-    // The route filter (T6) narrows the station first; legacy stack file
-    // items only show under 'all' (they have no route).
-    const stationMembers = tutorialStep <= 0 ? collectStationMembers(filterStationByRoute(station, stationRouteFilter)) : []
+    // The route filter (T6, folded into FilesFilter) narrows the station
+    // first; legacy stack file items only show under 'all'/ext tabs (they
+    // have no route).
+    const routeFilter = filesFilter === 'clipboard' ? 'clipboard' : 'all'
+    const routeStation = filterStationByRoute(station, routeFilter)
+    const stationMembers = tutorialStep <= 0 ? collectStationMembers(routeStation) : []
     const members = [
-      ...(stationRouteFilter === 'clipboard' ? [] : collectFileMembers(filteredByTutorial)),
+      ...(filesFilter === 'clipboard' ? [] : collectFileMembers(filteredByTutorial)),
       ...stationMembers
     ]
     const q = query.trim().toLowerCase()
     const searched = q ? members.filter((m) => m.name.toLowerCase().includes(q)) : members
     const tabs = deriveFileTabs(searched, MAX_EXT_TABS)
-    const activeFilter = isFileTabAlive(searched, filesFilter, MAX_EXT_TABS) ? filesFilter : 'all'
+    const activeFilter =
+      filesFilter === 'clipboard'
+        ? routeStation.length > 0
+          ? 'clipboard'
+          : 'all'
+        : isFileTabAlive(searched, filesFilter, MAX_EXT_TABS)
+          ? filesFilter
+          : 'all'
     return {
       members: searched,
-      tabMembers: activeFilter === 'all' ? null : filterMembersByTab(searched, activeFilter),
+      tabMembers: activeFilter === 'all' || activeFilter === 'clipboard' ? null : filterMembersByTab(searched, activeFilter),
       tabs: tabs.tabs,
       otherCount: tabs.otherCount,
       activeFilter
     }
-  }, [items, station, query, filesFilter, stationRouteFilter, tutorialStep])
+  }, [items, station, query, filesFilter, tutorialStep])
 
-  // A vanished tab falls back to 'all' (ADR-0004); sync the store so the
-  // header highlight matches what is rendered.
+  // A vanished tab or empty route falls back to 'all' (ADR-0004); sync the
+  // store so the header highlight matches what is rendered.
   useEffect(() => {
     if (data.activeFilter !== filesFilter) setFilesFilter(data.activeFilter)
   }, [data.activeFilter, filesFilter, setFilesFilter])

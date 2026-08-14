@@ -144,9 +144,14 @@ function armTimeout(): void {
 
 function handleStart(msg: HostStartMsg): void {
   const cursorInPanel = cursorInPanelAt(msg.cursor)
-  // ADR-0007 fallback: a failed source-class read ('' — no source window on
-  // the poll path either) treats "cursor in panel area" as a file drag.
-  const isFileDrag = msg.isFileDrag || (msg.srcClass === '' && cursorInPanel)
+  // Real-drag data (ADR-0007 T4a): 0x0F never fires, so every start comes
+  // from the DragWindow poll, which cannot name a source window (srcClass
+  // ''). Classifying that as a non-file drag made the panel never expand —
+  // a drag from Explorer (cursor over Explorer, outside the panel) stayed
+  // dead. Unknown-source drags now count as file drags: the panel pops for
+  // any drag so the save zone can receive the drop (T5/T7 need it too);
+  // hook-path starts keep the precise class-based classification.
+  const isFileDrag = msg.isFileDrag || msg.srcClass === ''
   const { state, commands } = dragSessionTransition(
     session,
     { type: 'start', isFileDrag, cursorInPanel, panelOpen: isInteractive() },

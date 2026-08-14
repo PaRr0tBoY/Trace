@@ -6,13 +6,15 @@
  * Pure logic, zero Electron imports — vitest-tested directly (same pattern
  * as keyboardHook.ts's state machine).
  *
- * Behavior contract (ticket #7):
+ * Behavior contract (ticket #7, amended by real-drag data — ADR-0007 T4a):
  *   - A file drag starting ANYWHERE on screen expands the panel — no edge
  *     dwell needed. The source window class (Explorer/desktop classes =
  *     file drag, everything else = not) classifies the drag; a failed class
- *     read falls back to "cursor in panel area ⇒ file drag" (the common
- *     "grab a file and drag it onto Trace" gesture).
- *   - Non-file drags NEVER expand the panel.
+ *     read ('' — every poll-path start, since 0x0F never fires on Windows)
+ *     is treated as a file drag by the manager, so any OS drag pops the
+ *     panel for the drop to land (T5/T7 depend on it).
+ *   - Hook-classified non-file drags (a real source class outside the
+ *     Explorer/desktop sets) NEVER expand the panel.
  *   - A drag that ends without ever reaching the panel retracts it again.
  *     A drag that ends with the cursor inside the panel leaves it open (the
  *     user just dropped something on it / is looking at it).

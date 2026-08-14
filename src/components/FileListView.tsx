@@ -1,12 +1,13 @@
 /**
  * FileListView — the files view body (ADR-0004).
  *
- * 'all' renders the grouped entries — transfer station cards (ADR-0006)
- * first, then legacy stack file entries (reusing ClipboardItemCard); an
- * extension tab or 'other' renders single file *members* as rows with the
- * same interactions as the expanded stack: drag out the single path, click
- * to paste it, copy button → copy-subitem (never creates a new entry), pin
- * button → pins the parent entry.
+ * 'all'/'clipboard' render the pinned shelf (station grid + pinned stack
+ * cards) plus flat *member* rows below it (feedback: files show as members,
+ * not group cards); an extension tab or 'other' renders single file members
+ * as rows. Member rows carry the same interactions as the expanded stack:
+ * drag out the single path, click to paste it, copy button → copy-subitem
+ * (never creates a new entry), pin button → pins the parent entry, and
+ * station rows get an entry-level delete (the group card no longer shows).
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store/appStore'
@@ -33,12 +34,12 @@ export function FileListView() {
   // T6 pinned grid: the tile clicked expands into a full card above the grid.
   const [expandedGridId, setExpandedGridId] = useState<string | null>(null)
 
-  // Grouped mode: station entries + every non-image file entry, pinned
+  // Pinned shelf: station entries + every non-image file entry, pinned
   // first in each domain. Independent of the clipboard view's second-level
   // filter. Station entries are hidden during the onboarding tour.
   const fileItems = useStore((s) => s.items)
   const station = useStore((s) => s.station)
-  const stationRouteFilter = useStore((s) => s.stationRouteFilter)
+  const filesFilter = useStore((s) => s.filesFilter)
   const groupedEntries = useMemo(() => {
     type Row = { kind: 'station'; entry: StationEntryDto } | { kind: 'item'; item: ClipboardItemDto }
     const filtered = fileItems.filter((it) => {
@@ -51,20 +52,21 @@ export function FileListView() {
       ? filtered.filter((it) => it.data.kind === 'files' && it.data.paths.some((p) => basename(p).toLowerCase().includes(q)))
       : filtered
     const stationVisible = tutorialStep <= 0
-    // Route filter (T6): 'clipboard' keeps only clipboard-captured station
-    // entries; stack file items have no route and hide under it.
-    const routeStation = stationVisible ? filterStationByRoute(station, stationRouteFilter) : []
+    // Route filter (T6, folded into FilesFilter): 'clipboard' keeps only
+    // clipboard-captured station entries; stack file items have no route
+    // and hide under it.
+    const routeStation = stationVisible ? filterStationByRoute(station, filesFilter === 'clipboard' ? 'clipboard' : 'all') : []
     const stationSearched = q
       ? routeStation.filter((e) => e.paths.some((p) => basename(p).toLowerCase().includes(q)))
       : routeStation
     const toStationRows = (entries: StationEntryDto[]): Row[] => entries.map((entry) => ({ kind: 'station' as const, entry }))
     const toItemRows = (items: ClipboardItemDto[]): Row[] => items.map((item) => ({ kind: 'item' as const, item }))
-    const visibleItems = stationRouteFilter === 'clipboard' ? [] : searched
+    const visibleItems = filesFilter === 'clipboard' ? [] : searched
     return {
       pinned: [...toStationRows(stationSearched.filter((e) => e.pinned)), ...toItemRows(visibleItems.filter((it) => it.pinned))],
       recent: [...toStationRows(stationSearched.filter((e) => !e.pinned)), ...toItemRows(visibleItems.filter((it) => !it.pinned))]
     }
-  }, [fileItems, station, query, tutorialStep, stationRouteFilter])
+  }, [fileItems, station, query, tutorialStep, filesFilter])
 
   const staleCount = useMemo(() => countStale(station), [station])
   const stationPinned = useMemo(
@@ -99,8 +101,34 @@ export function FileListView() {
     </div>
   ) : null
 
-  const renderRow = (row: { kind: 'station'; entry: StationEntryDto } | { kind: 'item'; item: ClipboardItemDto }) =>
-    row.kind === 'station' ? <StationEntryCard key={row.entry.id} entry={row.entry} /> : <ClipboardItemCard key={row.item.id} item={row.item} instant={false} />
+  // Flat mode ('all'/'clipboard'): pinned shelf above, then every member
+  // of unpinned entries as rows (feedback: files show as members, not
+  // group cards). Members of pinned entries are excluded — the shelf
+  // already shows them at entry level.
+  const pinnedIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const r of groupedEntries.pinned) ids.add(r.kind === 'station' ? r.entry.id : r.item.id)
+    return ids
+  }, [groupedEntries])
+  const flatMembers = useMemo(
+    () => files.members.filter((m) => !pinnedIds.has(m.itemId)),
+    [files.members, pinnedIds]
+  )
+
+  // Keep members of the same parent entry contiguous (the parent's order in
+  // the list is preserved).
+  const groupByEntry = (members: FileMember[]): { itemId: string; members: FileMember[] }[] => {
+    const grouped: { itemId: string; members: FileMember[] }[] = []
+    for (const m of members) {
+      const last = grouped[grouped.length - 1]
+      if (last && last.itemId === m.itemId) {
+        last.members.push(m)
+      } else {
+        grouped.push({ itemId: m.itemId, members: [m] })
+      }
+    }
+    return grouped
+  }
 
   if (files.tabMembers === null) {
     const total = groupedEntries.pinned.length + groupedEntries.recent.length
@@ -126,10 +154,16 @@ export function FileListView() {
             ))}
           </section>
         )}
-        {groupedEntries.recent.length > 0 && (
+        {flatMembers.length > 0 && (
           <section>
             {groupedEntries.pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
-            {groupedEntries.recent.map(renderRow)}
+            {groupByEntry(flatMembers).map((g) => (
+              <section key={g.itemId} style={{ marginBottom: 8 }}>
+                {g.members.map((m) => (
+                  <FileMemberRow key={`${m.itemId}:${m.index}`} member={m} />
+                ))}
+              </section>
+            ))}
           </section>
         )}
       </div>
@@ -142,22 +176,10 @@ export function FileListView() {
     return <EmptyState filtered={query.trim().length > 0} />
   }
 
-  // Keep members of the same parent entry contiguous (the parent's order in
-  // the list is preserved).
-  const grouped: { itemId: string; members: FileMember[] }[] = []
-  for (const m of members) {
-    const last = grouped[grouped.length - 1]
-    if (last && last.itemId === m.itemId) {
-      last.members.push(m)
-    } else {
-      grouped.push({ itemId: m.itemId, members: [m] })
-    }
-  }
-
   return (
     <div className="list">
       {staleBanner}
-      {grouped.map((g) => (
+      {groupByEntry(members).map((g) => (
         <section key={g.itemId} style={{ marginBottom: 8 }}>
           {g.members.map((m) => (
             <FileMemberRow key={`${m.itemId}:${m.index}`} member={m} />

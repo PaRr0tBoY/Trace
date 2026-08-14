@@ -4,9 +4,11 @@
  * block, or not on a list / quote / fence line).
  *
  * - `1. ` → `2. `, `- `/`• `/`> `/todo markers carry to the next line
- * - an EMPTY marker still continues (`1. ` + Enter → `2. `) — the marker is
- *   never dropped by Enter, so "1. enter becomes 2" always holds; exiting a
- *   list is done with Backspace on the marker
+ * - a bare marker (`-`, `1.`, `>` alone at end of line) also continues —
+ *   the marker is never dropped by Enter, so starting a list is one keystroke
+ * - an EMPTY marker continues too (`- ` + Enter → `- `) — a list only ends
+ *   when a second consecutive empty marker line gets Enter (same behavior
+ *   for quotes and numbered lists, so `- ` and `> ` behave identically)
  * - an opening ``` fence at end of line auto-closes with a blank line + fence
  */
 
@@ -26,6 +28,16 @@ export function flipTaskLine(line: string): string | null {
   return `${prefix}[${mark.toLowerCase() === 'x' ? ' ' : 'x'}]${rest}`
 }
 
+/** `-`/`•`/`*` → 'ul', `1.` → 'ol', `>` → 'quote'. */
+function markerKind(marker: string): 'ul' | 'ol' | 'quote' {
+  if (/^\d+\.$/.test(marker)) return 'ol'
+  if (marker === '>') return 'quote'
+  return 'ul'
+}
+
+/** Marker line grammar shared by the continuation and exit checks. */
+const MARKER_LINE = /^(\s*)((?:\d+)\.|[-•]|>)(\s+\[[ xX]\])?(\s*)(.*)$/
+
 export function continueOnEnter(value: string, caret: number): { next: string; caret: number } | null {
   const lineStart = value.lastIndexOf('\n', caret - 1) + 1
   const nlAt = value.indexOf('\n', caret)
@@ -39,10 +51,28 @@ export function continueOnEnter(value: string, caret: number): { next: string; c
     return { next: splice(value, caret, caret, '\n\n```'), caret: caret + 3 }
   }
 
-  const m = /^(\s*)((?:\d+)\.|[-•]|>)(\s+\[[ xX]\])?(\s+)(.*)$/.exec(line)
+  const m = MARKER_LINE.exec(line)
   if (!m) return null
-  const [, indent, marker, checkbox] = m
-  const num = /^\d+\.$/.test(marker) ? Number(marker.slice(0, -1)) : null
-  const continuation = num !== null ? `${indent}${num + 1}. ` : checkbox ? `${indent}${marker}${checkbox} ` : `${indent}${marker} `
+  const [, indent, marker, checkbox, space, rest] = m
+  const kind = markerKind(marker)
+  // `-foo` / `1.foo`: content glued to the marker is not a list.
+  if (space === '' && rest !== '') return null
+  const num = kind === 'ol' ? Number(marker.slice(0, -1)) : null
+  const continuation =
+    num !== null ? `${indent}${num + 1}. ` : checkbox ? `${indent}${marker}${checkbox} ` : `${indent}${marker} `
+
+  // Empty marker line (bare or trailing space, nothing else):
+  //   - previous line is the same kind of empty marker → exit the
+  //     list/quote (drop the marker, cursor to line start)
+  //   - otherwise continue with a fresh marker
+  if (rest.trim() === '' && atLineEnd && lineStart > 0) {
+    const prevStart = value.lastIndexOf('\n', lineStart - 2) + 1
+    const prevLine = value.slice(prevStart, lineStart - 1)
+    const prevM = MARKER_LINE.exec(prevLine)
+    if (prevM && markerKind(prevM[2]) === kind && prevM[5].trim() === '') {
+      return { next: splice(value, lineStart, lineEnd, ''), caret: lineStart }
+    }
+  }
+
   return { next: splice(value, caret, caret, '\n' + continuation), caret: caret + continuation.length + 1 }
 }

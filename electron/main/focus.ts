@@ -42,6 +42,7 @@
 import { app } from 'electron'
 import koffi from 'koffi'
 import { getMainWindow } from './window'
+import { activateHwnd } from './windowSwitch'
 
 const WS_EX_NOACTIVATE = 0x08000000
 const GWL_EXSTYLE = -20
@@ -98,7 +99,25 @@ export function requestPanelFocus(): void {
     // activation alone reports focused — so compare against the real OS
     // foreground window and steal when it is still someone else's.
     const fg = getForegroundWindow ? getForegroundWindow() : null
-    if (fg === null || fg !== hwnd) app.focus({ steal: true })
+    if (fg === null || fg !== hwnd) {
+      try {
+        app.focus({ steal: true })
+      } catch {
+        // fail silent — escalation continues
+      }
+      win.focus()
+      // The lock can reject even app.focus() (re-hovering the edge is not
+      // a user-input event either). activateHwnd's AttachThreadInput +
+      // SetForegroundWindow chain works without input rights.
+      const fg2 = getForegroundWindow ? getForegroundWindow() : null
+      if (fg2 === null || fg2 !== hwnd) {
+        try {
+          activateHwnd(koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void')))
+        } catch {
+          // fail silent — best effort
+        }
+      }
+    }
   } catch {
     // fail silent
   }

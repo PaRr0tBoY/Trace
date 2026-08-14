@@ -535,18 +535,20 @@ export function NotesView() {
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [noteViewMode])
 
-  // Panel re-opening after a collapse lands straight back in the editor. The
-  // panel window is WS_EX_NOACTIVATE again after closing (focus.ts restores
-  // it), and Chromium silently drops element.focus() on such a window — so
-  // ask main to truly activate the window first, then focus next frame.
+  // Entering a note editor (either variant) keeps keyboard focus inside it.
+  // The panel window is WS_EX_NOACTIVATE again after closing (focus.ts
+  // restores it), and Chromium silently drops element.focus() on such a
+  // window — so ask main to truly activate the window first, then focus
+  // next frame. Re-runs when the open note changes (steppers / modal pick).
   useEffect(() => {
-    if (noteViewMode !== 'single' || !open || !effectiveCurrent) return
+    const target = noteViewMode === 'single' ? effectiveCurrent : editing
+    if (!open || !target) return
     edge.requestInputFocus()
     const raf = requestAnimationFrame(() => {
       document.querySelector<HTMLElement>('.notes-editor .cm-content')?.focus()
     })
     return () => cancelAnimationFrame(raf)
-  }, [open, noteViewMode])
+  }, [open, noteViewMode, effectiveCurrent?.id, editing?.id])
 
   const handleNew = () => {
     playButtonClickSound()

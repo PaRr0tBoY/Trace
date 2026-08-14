@@ -700,6 +700,19 @@
   padding: 0 10px 10px;
 }
 
+/* Invisible scrollbars — same convention as the panel list, settings,
+ * tasks: the notes UI scrolls without a visible scrollbar. */
+.notes-scroll,
+.notes-preview,
+.notes-modal-scroll {
+  scrollbar-width: none; /* Firefox */
+}
+.notes-scroll::-webkit-scrollbar,
+.notes-preview::-webkit-scrollbar,
+.notes-modal-scroll::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
 @keyframes notes-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }

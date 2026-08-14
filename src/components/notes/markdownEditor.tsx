@@ -218,7 +218,11 @@ const notesTheme = EditorView.theme({
   '.cm-scroller': {
     fontFamily: 'inherit',
     lineHeight: '1.6',
-    overflow: 'auto'
+    overflow: 'auto',
+    scrollbarWidth: 'none' /* Firefox */
+  },
+  '.cm-scroller::-webkit-scrollbar': {
+    display: 'none' /* Chrome/Safari — invisible scrollbar like the panel */
   },
   '.cm-content': {
     padding: '8px 10px',
@@ -247,9 +251,10 @@ const notesTheme = EditorView.theme({
 /* ── Toolbar commands (applied to the current selection / line) ──── */
 
 /** Apply a Markdown command to the editor's selection (or current line).
- * Selection behavior mirrors NotchNotes: wrap commands select the inner
- * content (placeholder when nothing was selected), link selects the URL
- * when wrapping a label, and line commands select the whole block. */
+ * The caret lands right after the inserted content and nothing is selected,
+ * so the next keystroke keeps typing. Line commands prefix every selected
+ * line (empty selection → the current line); wrap commands replace the
+ * selection with `**content**` (placeholder when nothing was selected). */
 export function applyCommandToView(view: EditorView, cmd: MdCommand): void {
   const { state } = view
   const sel = state.selection.main
@@ -276,7 +281,7 @@ export function applyCommandToView(view: EditorView, cmd: MdCommand): void {
       .join('\n')
     view.dispatch({
       changes: { from: lineStart, to: lineEnd, insert: prefixed },
-      selection: { anchor: lineStart, head: lineStart + prefixed.length }
+      selection: { anchor: lineStart + prefixed.length }
     })
   } else {
     const wrap: Record<'bold' | 'italic' | 'strike' | 'code' | 'link', [string, string, string]> = {
@@ -291,11 +296,7 @@ export function applyCommandToView(view: EditorView, cmd: MdCommand): void {
     const insert = `${pre}${inner}${post}`
     view.dispatch({
       changes: { from: start, to: end, insert },
-      selection:
-        cmd === 'link'
-          ? // Empty selection → select the label; wrapped label → select the URL.
-            { anchor: selected ? start + inner.length + 3 : start + 1, head: start + 1 + (selected ? 3 : inner.length) }
-          : { anchor: start + pre.length, head: start + pre.length + inner.length }
+      selection: { anchor: start + insert.length }
     })
   }
 }
@@ -329,7 +330,12 @@ export function MarkdownEditor({
           // markdownLanguage carries the GFM extensions (strikethrough,
           // task lists) — bare markdown() only parses CommonMark, which
           // would silently drop the ~~strike~~ and - [x] decorations.
-          markdown({ base: markdownLanguage }),
+          // addKeymap: false keeps the built-in Enter/Backspace bindings
+          // (insertNewlineContinueMarkup/deleteMarkupBackward, registered
+          // with Prec.high) from pre-empting enterContinuation below —
+          // they only continue non-empty items and drop empty list
+          // markers on Enter, which is not the behavior we want.
+          markdown({ base: markdownLanguage, addKeymap: false }),
           history(),
           notesTheme,
           markdownDeco,
@@ -346,10 +352,11 @@ export function MarkdownEditor({
       parent: host
     })
     if (editorRef) editorRef.current = view
-    // Restore the remembered caret and land straight in the editor.
-    if (initialCaret != null && initialCaret <= view.state.doc.length) {
-      view.dispatch({ selection: { anchor: initialCaret } })
-    }
+    // Restore the remembered caret and land straight in the editor. With
+    // no remembered position (first edit / fresh session) the caret goes
+    // to the end of the content so typing continues where it left off.
+    const target = initialCaret != null && initialCaret <= view.state.doc.length ? initialCaret : view.state.doc.length
+    view.dispatch({ selection: { anchor: target } })
     view.focus()
     return () => {
       view.destroy()

@@ -28,6 +28,12 @@ type InlinePart =
 const INLINE_RE =
   /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*|~~[^~\n]+~~|`[^`]+`|\[[^\]\n]+\]\([^)\s]+\)|\[\[[^\]\n]+\]\]|https?:\/\/[^\s<]+?(?=[\s<),;:!?。，；：！？]|$))/g
 
+/** Turn a protocol-less target (`acidev.cc`) into an https URL — window.open
+ * would otherwise resolve it against the app origin (dev: localhost:5173). */
+function externalUrl(target: string): string {
+  return /^[a-z][a-z0-9+.-]*:/i.test(target) ? target : `https://${target}`
+}
+
 function parseInline(text: string): InlinePart[] {
   const parts: InlinePart[] = []
   let last = 0
@@ -77,14 +83,16 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
           <a
             key={key}
             className="md-link"
-            href={part.kind === 'link' ? part.href : part.text}
+            href={externalUrl(part.kind === 'link' ? part.href : part.text)}
             title={part.kind === 'link' ? part.href : part.text}
-            // The main process routes window.open to the system browser
-            // (window.ts setWindowOpenHandler → shell.openExternal).
+            // window.open resolves a protocol-less target against the app
+            // origin (dev: http://localhost:5173), so normalize to https
+            // here; the main process routes window.open to the system
+            // browser (window.ts setWindowOpenHandler → shell.openExternal).
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              window.open(part.kind === 'link' ? part.href : part.text, '_blank')
+              window.open(externalUrl(part.kind === 'link' ? part.href : part.text), '_blank')
             }}
           >
             {part.text}

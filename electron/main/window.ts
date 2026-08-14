@@ -541,9 +541,12 @@ export function createWindow(): BrowserWindow {
     mainWindow?.setAlwaysOnTop(true, 'screen-saver')
   })
 
-  // Open external links in the default browser.
+  // Open external links in the default browser. window.open() resolves
+  // protocol-less targets against the app origin (dev: http://localhost:5173),
+  // so a bare `acidev.cc` would open the dev server — normalize to https.
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    const url = /^[a-z][a-z0-9+.-]*:/i.test(details.url) ? details.url : `https://${details.url}`
+    shell.openExternal(url)
     return { action: 'deny' }
   })
 

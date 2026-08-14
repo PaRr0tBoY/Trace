@@ -20,6 +20,7 @@ import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushSt
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
 import { startKeyboardHook, stopKeyboardHook } from './hookManager'
+import { releasePanelFocusNow } from './focus'
 import { switcherShow, switcherAdvance, switcherExecute, switcherTapExecute } from './switcher'
 import { ForegroundWatcher } from './foreground'
 import { ocrFromForeground } from './ocr'
@@ -309,6 +310,10 @@ function panelMouseDown(pt: { x: number; y: number }): void {
     if (pt.x >= sr.x && pt.x <= sr.x + sr.width && pt.y >= sr.y && pt.y <= sr.y + sr.height) return
     console.log('[Panel] click outside panel — collapse')
     setInteractive(false)
+    // Restore WS_EX_NOACTIVATE so the next hover-open starts from a clean
+    // non-activatable state (a window left activatable re-activates oddly
+    // and its next focus request can be refused).
+    releasePanelFocusNow()
     pushState.togglePanel(false)
   } catch (err) {
     console.error('[Panel] click-outside check failed:', err)

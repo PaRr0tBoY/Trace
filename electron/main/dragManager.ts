@@ -28,6 +28,7 @@ import { utilityProcess, screen } from 'electron'
 import { join } from 'node:path'
 import { getMainWindow, setInteractive, setVisible, setHeartbeatPaused, isInteractive } from './window'
 import { pushState } from './state'
+import { loadSettings } from '../store/settings'
 import { completeAllInFlightDrags, type DragEndSignal } from './drag'
 import {
   dragSessionTransition,
@@ -70,11 +71,33 @@ export function isDragActive(): boolean {
   return session.phase === 'drag'
 }
 
-function cursorInPanelAt(pt: { x: number; y: number }): boolean {
+/**
+ * The screen rect of the *visible* panel — the window is 384px wide but the
+ * blade is 270px (tokens.css --panel-width); the detection zone must match
+ * what the user sees, or a drag detected outside the visible panel would
+ * judge the cursor "outside the panel" at end and collapse it (user
+ * feedback 2026-08-14). The window's bounds already track every geometry
+ * setting (stickPosition, display, panelHeight, verticalOffset), so reading
+ * them keeps the zone in sync automatically.
+ */
+const PANEL_VISUAL_WIDTH = 270
+
+function panelVisualRect(): { x: number; y: number; width: number; height: number } {
   const win = getMainWindow()
-  if (!win || win.isDestroyed()) return false
+  if (!win || win.isDestroyed()) return { x: 0, y: 0, width: 0, height: 0 }
   const b = win.getBounds()
-  return pt.x >= b.x && pt.x <= b.x + b.width && pt.y >= b.y && pt.y <= b.y + b.height
+  const right = loadSettings().stickPosition === 'right'
+  return right
+    ? { x: b.x + b.width - PANEL_VISUAL_WIDTH, y: b.y, width: PANEL_VISUAL_WIDTH, height: b.height }
+    : { x: b.x, y: b.y, width: PANEL_VISUAL_WIDTH, height: b.height }
+}
+
+function pointInRect(pt: { x: number; y: number }, r: { x: number; y: number; width: number; height: number }): boolean {
+  return pt.x >= r.x && pt.x <= r.x + r.width && pt.y >= r.y && pt.y <= r.y + r.height
+}
+
+function cursorInPanelAt(pt: { x: number; y: number }): boolean {
+  return pointInRect(pt, panelVisualRect())
 }
 
 function currentCursorInPanel(): boolean {
@@ -117,7 +140,7 @@ function startZonePoll(): void {
       return
     }
     const pt = screen.getCursorScreenPoint()
-    const inZone = cursorInPanelAt(pt)
+    const inZone = pointInRect(pt, panelVisualRect())
     const { state, commands } = dragSessionTransition(
       session,
       { type: 'cursor', inDropZone: inZone, cursorInPanel: inZone },

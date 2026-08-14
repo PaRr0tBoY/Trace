@@ -23,7 +23,7 @@ import { FileListView } from './FileListView'
 import { TaskDropPanel } from './tasks/TaskDropPanel'
 import { linkDraggedItem, acceptSuggestionDrop, dropOnSaveZone } from './tasks/dropActions'
 import { ToastStack } from './Toast'
-import { TrashIcon, DropIcon } from './icons'
+import { TrashIcon } from './icons'
 import { t } from '../i18n'
 
 export function Panel() {
@@ -34,7 +34,6 @@ const switcherActive = useStore((s) => s.switcherActive)
   const settings = useStore((s) => s.settings)
   const settingsOpen = useStore((s) => s.settingsOpen)
   const view = useStore((s) => s.view)
-  const dragIndicator = useStore((s) => s.dragIndicator)
 
   // NOTE: closing the panel intentionally keeps the settings sheet, its sub
   // view, and the search query — the restore mechanism (ADR-0004) decides
@@ -220,16 +219,6 @@ const switcherActive = useStore((s) => s.switcherActive)
 
   return (
     <div className="root">
-      {/* Drag indicator (T4b feedback): shown while a file drag waits for
-          the detection zone — the panel itself stays collapsed. */}
-      {dragIndicator && !open && (
-        <div className={`drag-indicator${settings.stickPosition === 'right' ? ' drag-indicator-right' : ''}`}>
-          <span className="drag-indicator-icon">
-            <DropIcon width={18} height={18} />
-          </span>
-          <span className="drag-indicator-text">{t('tasks.dragIndicatorHint')}</span>
-        </div>
-      )}
       <motion.div
         className={`blade-container${open ? '' : ' closing'}${settings.stickPosition === 'right' ? ' blade-right' : ''}${switcherActive ? ' switcher-session' : ''}`}
         initial={false}

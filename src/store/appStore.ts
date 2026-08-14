@@ -420,7 +420,10 @@ export const useStore = create<AppState>((set, get) => ({
     if (internalDragReq === null) {
       set({ internalDragReq: null, dragActive: false })
     } else {
-      set({ internalDragReq })
+      // An in-panel drag counts as an active drag: the panel must stay up
+      // and the drag view locked while the item is dragged out across the
+      // edge (user feedback 2026-08-14).
+      set({ internalDragReq, dragActive: true })
     }
     edge.setInternalDrag(!!internalDragReq)
   },

@@ -229,6 +229,7 @@ export function SparkleIndicatorIcon({
 export function CopyIndicatorCurve() {
   const copyFlareActive = useStore((s) => s.copyFlareActive)
   const flareKey = useStore((s) => s.flareKey)
+  const dragIndicator = useStore((s) => s.dragIndicator)
   const open = useStore((s) => s.open)
   const settings = useStore((s) => s.settings)
   const isRight = settings.stickPosition === 'right'
@@ -254,7 +255,10 @@ export function CopyIndicatorCurve() {
   const activePath = isRight ? curvePathRight : curvePathLeft
   const flatPath = isRight ? flatPathRight : flatPathLeft
 
-  const showCurve = (settings.showCopyIndicator !== false) && copyFlareActive && !open
+  // The curve doubles as the drag indicator: while a file drag waits for
+  // the detection zone (panel closed), the same edge curve announces where
+  // the panel will expand (user feedback 2026-08-14).
+  const showCurve = !open && ((settings.showCopyIndicator !== false && copyFlareActive) || dragIndicator)
 
   const screenH = typeof window !== 'undefined' ? window.innerHeight : 800
   const pFrac = settings.panelHeight || 0.6
@@ -271,7 +275,7 @@ export function CopyIndicatorCurve() {
     <AnimatePresence mode="popLayout">
       {showCurve && (
         <motion.div
-          key={`copy-sine-curve-${flareKey}`}
+          key={dragIndicator ? `drag-sine-curve-${flareKey}` : `copy-sine-curve-${flareKey}`}
           className={`copy-curve-container ${isRight ? 'right' : 'left'}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

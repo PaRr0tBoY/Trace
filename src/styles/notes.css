@@ -213,29 +213,115 @@
   text-overflow: ellipsis;
 }
 
-.notes-textarea {
+.notes-cm-host {
   flex: 1;
   min-height: 0;
   margin: 0 8px;
-  padding: 8px 10px;
   border: 1px solid var(--edge-light);
   border-radius: 12px;
   background: var(--bg-2);
-  color: var(--text-primary);
-  font-size: 12px;
-  line-height: 1.6;
-  font-family: inherit;
-  resize: none;
-  outline: none;
+  overflow: hidden;
   transition: border-color 0.18s ease;
 }
 
-.notes-textarea:focus {
+.notes-cm-host:focus-within {
   border-color: var(--edge-strong);
 }
 
-.notes-textarea::placeholder {
-  color: var(--text-tertiary);
+/* Inline markdown decorations (live rendering, markers stay visible). */
+.cm-md-marker {
+  color: rgba(255, 255, 255, 0.28);
+  font-style: normal !important;
+  font-weight: normal !important;
+  text-decoration: none !important;
+}
+
+.cm-md-strong {
+  font-weight: 700;
+}
+
+.cm-md-italic {
+  font-style: italic;
+}
+
+.cm-md-strike {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+.cm-md-inline-code,
+.cm-md-code-text {
+  font-family: Consolas, 'Cascadia Mono', 'SF Mono', monospace;
+}
+
+.cm-md-inline-code {
+  padding: 1px 3px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cm-md-link {
+  color: #7dd3fc;
+  text-decoration: underline;
+  text-decoration-color: rgba(125, 211, 252, 0.45);
+}
+
+.cm-md-h1 {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.cm-md-h2 {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cm-md-h3 {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.cm-md-h4,
+.cm-md-h5,
+.cm-md-h6 {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* Fenced code blocks and blockquotes get a full-line backdrop. */
+.cm-md-code-block {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cm-md-code-block.cm-md-quote-line {
+  background: none;
+}
+
+.cm-md-quote-line {
+  background: rgba(125, 211, 252, 0.06);
+  border-left: 2px solid rgba(125, 211, 252, 0.35);
+}
+
+/* Task checkbox widget — same look as the rendered .md-todo-box. */
+.cm-task-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-right: 5px;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border-radius: 4px;
+  color: #7dd3fc;
+  font-size: 9px;
+  line-height: 1;
+  vertical-align: -1px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cm-task-box:hover {
+  border-color: #7dd3fc;
 }
 
 /* Markdown preview pane (edit/preview toggle) — same typography as the

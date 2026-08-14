@@ -4,9 +4,10 @@
  * Two states, switched by a local editing id:
  *   - list: note cards (pin / fold / delete + tap to edit), filtered by the
  *     shared search query against title + content
- *   - editor: full-height textarea with a compact Markdown toolbar. Edits are
- *     saved live main-side through a 180 ms debounce and flushed on exit, so
- *     the renderer never owns the source of truth.
+ *   - editor: full-height CodeMirror editor (live markdown rendering) with a
+ *     compact Markdown toolbar. Edits are saved live main-side through a
+ *     180 ms debounce and flushed on exit, so the renderer never owns the
+ *     source of truth.
  *
  * The list order is decided main-side (pinned first, newest first) — this
  * component only renders what the store holds.
@@ -22,14 +23,12 @@ import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ExpandIcon,
 import { playButtonClickSound } from '../../lib/soundEffects'
 import { edge } from '../../lib/edge'
 import { MarkdownPreview } from './markdown'
-import { continueOnEnter } from './editorInput'
+import { MarkdownEditor, applyCommandToView } from './markdownEditor'
+import type { MdCommand } from './markdownEditor'
+import type { EditorView } from '@codemirror/view'
 
 /** How long a keystroke sits locally before the main-process update. */
 const SAVE_DEBOUNCE_MS = 180
-
-/** Markdown toolbar commands — the full NotchNotes set (bold / italic /
- * strikethrough / inline code / link / quote / bulleted / numbered / todo). */
-type MdCommand = 'bold' | 'italic' | 'strike' | 'code' | 'link' | 'quote' | 'ul' | 'ol' | 'todo'
 
 const CMD_TOOLS: Array<{ id: MdCommand; Icon: LucideIcon; i18n: string }> = [
   { id: 'bold', Icon: Bold, i18n: 'notes.bold' },
@@ -42,62 +41,6 @@ const CMD_TOOLS: Array<{ id: MdCommand; Icon: LucideIcon; i18n: string }> = [
   { id: 'ol', Icon: ListOrdered, i18n: 'notes.orderedList' },
   { id: 'todo', Icon: ListChecks, i18n: 'notes.todo' }
 ]
-
-/** Replace [start,end) with the given text, keeping the cursor after it. */
-function splice(value: string, start: number, end: number, next: string): string {
-  return value.slice(0, start) + next + value.slice(end)
-}
-
-/** Apply a Markdown command to the textarea's selection (or current line).
- * Selection behavior mirrors NotchNotes: wrap commands select the inner
- * content (placeholder when nothing was selected), link selects the URL
- * when wrapping a label, and line commands select the whole block. */
-function applyCommand(ta: HTMLTextAreaElement, cmd: MdCommand): void {
-  const value = ta.value
-  const start = ta.selectionStart ?? 0
-  const end = ta.selectionEnd ?? 0
-  const selected = value.slice(start, end)
-  const lineStart = value.lastIndexOf('\n', start - 1) + 1
-  const lineEnd = value.indexOf('\n', end) === -1 ? value.length : value.indexOf('\n', end)
-
-  if (cmd === 'quote' || cmd === 'ul' || cmd === 'ol' || cmd === 'todo') {
-    // Prefix every selected line (empty selection → the current line).
-    const block = value.slice(lineStart, lineEnd)
-    const prefix = cmd === 'quote' ? '> ' : cmd === 'ul' ? '- ' : cmd === 'todo' ? '- [ ] ' : ''
-    const prefixed = block
-      .split('\n')
-      .map((line, i) => {
-        if (cmd === 'ol') {
-          // Renumber: strip any existing number prefix instead of stacking.
-          return `${i + 1}. ${line.replace(/^\d+\.\s+/, '')}`
-        }
-        return line.startsWith(prefix) ? line.slice(prefix.length) : `${prefix}${line}`
-      })
-      .join('\n')
-    ta.value = splice(value, lineStart, lineEnd, prefixed)
-    ta.setSelectionRange(lineStart, lineStart + prefixed.length)
-  } else {
-    const wrap: Record<'bold' | 'italic' | 'strike' | 'code' | 'link', [string, string, string]> = {
-      bold: ['**', '**', 'bold'],
-      italic: ['*', '*', 'italic'],
-      strike: ['~~', '~~', 'strikethrough'],
-      code: ['`', '`', 'code'],
-      link: ['[', '](url)', 'text']
-    }
-    const [pre, post, placeholder] = wrap[cmd]
-    const inner = selected || placeholder
-    ta.value = splice(value, start, end, `${pre}${inner}${post}`)
-    if (cmd === 'link') {
-      // Empty selection → select the label; wrapped label → select the URL.
-      const selStart = selected ? start + inner.length + 3 : start + 1
-      ta.setSelectionRange(selStart, selStart + (selected ? 3 : inner.length))
-    } else {
-      ta.setSelectionRange(start + pre.length, start + pre.length + inner.length)
-    }
-  }
-
-  ta.dispatchEvent(new Event('input', { bubbles: true }))
-}
 
 /** Full-height editor with a compact Markdown toolbar. Live-saved main-side.
  *
@@ -122,11 +65,13 @@ function NoteEditor({
   const deleteNote = useStore((s) => s.deleteNote)
   const noteCaret = useStore((s) => s.noteCaret)
   const setNoteCaret = useStore((s) => s.setNoteCaret)
-  const taRef = useRef<HTMLTextAreaElement>(null)
+  const viewRef = useRef<EditorView | null>(null)
   const pendingValue = useRef(note.content)
   const initialContent = useRef(note.content)
   const saveTimer = useRef<number | null>(null)
-  // edit = plain textarea, preview = rendered Markdown (see MarkdownPreview).
+  // edit = live-rendering CodeMirror editor, preview = rendered Markdown
+  // (see MarkdownPreview). Switching remounts MarkdownEditor, which re-reads
+  // the current content — no manual refresh needed.
   const [mode, setMode] = useState<'edit' | 'preview'>('edit')
 
   const schedulePush = (value: string) => {
@@ -157,24 +102,6 @@ function NoteEditor({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note.id])
-
-  // Switching notes / creating a note lands straight in the editor, ready to
-  // type; the panel re-opening after a collapse does the same (see NotesView).
-  // A remembered caret (last edit position) is restored along with the focus.
-  useEffect(() => {
-    if (mode !== 'edit') return
-    // Read the latest saved caret via a ref-less closure: re-running on every
-    // caret write would fight live selections by re-compressing them to a point.
-    const saved = noteCaret[note.id]
-    const raf = requestAnimationFrame(() => {
-      const ta = taRef.current
-      if (!ta) return
-      if (saved != null && saved <= ta.value.length) ta.setSelectionRange(saved, saved)
-      ta.focus()
-    })
-    return () => cancelAnimationFrame(raf)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, note.id])
 
   const handleDelete = async () => {
     // Await the deletion so the list is already consistent when we return to
@@ -207,55 +134,6 @@ function NoteEditor({
     },
     [note.id, updateNote]
   )
-
-  // A toggle performed in preview changes note.content; the uncontrolled
-  // textarea keeps its mount-time value and the pending/initial refs would
-  // flush stale content over it — sync them while in preview so a later
-  // flush (mode switch / unmount) never overwrites the toggle.
-  useEffect(() => {
-    if (mode !== 'preview') return
-    pendingValue.current = note.content
-    initialContent.current = note.content
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, note.content])
-
-  // Switching back to edit: refresh the textarea with the current content
-  // (defaultValue only applies on mount, so toggles made in preview would
-  // otherwise be invisible in the editor).
-  useEffect(() => {
-    if (mode !== 'edit') return
-    const ta = taRef.current
-    if (!ta || ta.value === note.content) return
-    ta.value = note.content
-    pendingValue.current = note.content
-    initialContent.current = note.content
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode])
-
-  /** Programmatic edit on the (uncontrolled) textarea + schedule the save. */
-  const applyEdit = (next: string, caret: number) => {
-    const ta = taRef.current
-    if (!ta) return
-    ta.value = next
-    ta.setSelectionRange(caret, caret)
-    schedulePush(next)
-  }
-
-  // Enter continuation, mirroring NotchNotes' input behavior (see
-  // continueOnEnter): list / quote markers carry to the next line, an empty
-  // item drops its marker, and an opening ``` fence auto-closes.
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
-    const ta = taRef.current
-    if (!ta) return
-    const { selectionStart, selectionEnd, value } = ta
-    if (selectionStart !== selectionEnd) return
-    const edit = continueOnEnter(value, selectionStart)
-    if (edit) {
-      e.preventDefault()
-      applyEdit(edit.next, edit.caret)
-    }
-  }
 
   return (
     <div className="notes-editor">
@@ -351,20 +229,13 @@ function NoteEditor({
       </div>
 
       {mode === 'edit' ? (
-        <textarea
-          ref={taRef}
-          className="notes-textarea"
-          defaultValue={note.content}
+        <MarkdownEditor
+          value={note.content}
           placeholder={t('notes.placeholder')}
-          spellCheck={false}
-          onChange={(e) => schedulePush(e.target.value)}
-          onKeyDown={handleKeyDown}
-          // Remember the caret on every move (typing, arrows, clicks) so a
-          // re-entry restores the exact last edit position (setNoteCaret).
-          onSelect={() => {
-            const ta = taRef.current
-            if (ta) setNoteCaret(note.id, ta.selectionStart)
-          }}
+          editorRef={viewRef}
+          initialCaret={noteCaret[note.id]}
+          onDocChange={schedulePush}
+          onCaretChange={(pos) => setNoteCaret(note.id, pos)}
         />
       ) : (
         <div className="notes-preview">
@@ -380,11 +251,12 @@ function NoteEditor({
             className="notes-toolbar-btn"
             title={t(i18n)}
             onClick={() => {
-              const ta = taRef.current
-              if (!ta) return
-              applyCommand(ta, id)
-              schedulePush(ta.value)
-              ta.focus()
+              const view = viewRef.current
+              if (!view) return
+              // The dispatch flows through the update listener, which
+              // schedules the save — no separate push needed here.
+              applyCommandToView(view, id)
+              view.focus()
             }}
           >
             <Icon size={14} strokeWidth={2} />
@@ -608,7 +480,7 @@ export function NotesView() {
     if (noteViewMode !== 'single' || !open || !effectiveCurrent) return
     edge.requestInputFocus()
     const raf = requestAnimationFrame(() => {
-      document.querySelector<HTMLTextAreaElement>('.notes-editor textarea')?.focus()
+      document.querySelector<HTMLElement>('.notes-editor .cm-content')?.focus()
     })
     return () => cancelAnimationFrame(raf)
   }, [open, noteViewMode])

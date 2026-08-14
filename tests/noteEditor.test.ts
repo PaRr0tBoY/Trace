@@ -111,9 +111,13 @@ describe('continueOnEnter', () => {
 })
 
 describe('markdown decoration builder', () => {
-  const decorate = (doc: string) =>
+  const decorate = (doc: string, anchor = 0, head?: number) =>
     buildDecorations({
-      state: EditorState.create({ doc, extensions: [markdown({ base: markdownLanguage })] })
+      state: EditorState.create({
+        doc,
+        selection: { anchor, head: head ?? anchor },
+        extensions: [markdown({ base: markdownLanguage })]
+      })
     } as unknown as EditorView)
 
   it('builds decorations for a multi-line blockquote without throwing', () => {
@@ -131,43 +135,60 @@ describe('markdown decoration builder', () => {
     expect(set.size).toBeGreaterThan(0)
   })
 
-  it('replaces a marker widget only once the syntax is active (space after marker)', () => {
-    const replaceCount = (doc: string) => {
+  it('renders block markers as widgets while the caret is away, reveals on the caret line', () => {
+    const replaceCount = (doc: string, anchor = 0) => {
       let n = 0
-      decorate(doc).between(0, doc.length, (_f, _t, value) => {
+      decorate(doc, anchor).between(0, doc.length, (_f, _t, value) => {
         if (value.spec.widget) n++
       })
       return n
     }
-    // `# ` / `> ` / `- ` are active constructs — the marker is replaced.
-    expect(replaceCount('# title')).toBe(1)
-    expect(replaceCount('> quote')).toBe(1)
-    expect(replaceCount('- item')).toBe(1)
-    // A task line (off the caret line) has both the list placeholder and
-    // the checkbox widget.
-    expect(replaceCount('first\n- [ ] task')).toBe(2)
-    // Bare markers (no space yet) stay as visible raw text.
-    expect(replaceCount('#title')).toBe(0)
-    expect(replaceCount('>quote')).toBe(0)
-    expect(replaceCount('-')).toBe(0)
+    // Caret on a different line → the marker renders as a widget.
+    expect(replaceCount('plain\n# title')).toBe(1)
+    expect(replaceCount('plain\n> quote')).toBe(1)
+    expect(replaceCount('plain\n- item')).toBe(1)
+    // Task lines render the checkbox but no bullet (2 widgets: hidden
+    // ListMark + checkbox).
+    expect(replaceCount('plain\n- [ ] task')).toBe(2)
+    // Caret on the marker line → raw marker revealed, no widgets.
+    expect(replaceCount('# title', 3)).toBe(0)
+    expect(replaceCount('> quote', 3)).toBe(0)
+    expect(replaceCount('- item', 3)).toBe(0)
+    expect(replaceCount('- [ ] task', 3)).toBe(0)
+    // Bare markers (no space yet) never render, wherever the caret is.
+    expect(replaceCount('plain\n#title')).toBe(0)
+    expect(replaceCount('plain\n>quote')).toBe(0)
+    expect(replaceCount('plain\n-')).toBe(0)
   })
 
-  it('hides inline markers entirely once parsed, keeps raw text while typing', () => {
-    const replaceCount = (doc: string) => {
+  it('hides inline markers when the caret is away, reveals them while editing the construct', () => {
+    const replaceCount = (doc: string, anchor = 0, head?: number) => {
       let n = 0
-      decorate(doc).between(0, doc.length, (_f, _t, value) => {
+      decorate(doc, anchor, head).between(0, doc.length, (_f, _t, value) => {
         if (value.spec.widget) n++
       })
       return n
     }
-    // `**bold**` = two hidden `**` markers; unmatched `*` is not parsed.
-    expect(replaceCount('**bold**')).toBe(2)
-    expect(replaceCount('*italic*')).toBe(2)
-    expect(replaceCount('~~strike~~')).toBe(2)
-    expect(replaceCount('`code`')).toBe(2)
-    // `[label](url)` parses to 4 LinkMarks + URL, all hidden → just "label".
-    expect(replaceCount('[label](url)')).toBe(5)
-    expect(replaceCount('*half-open')).toBe(0)
-    expect(replaceCount('plain')).toBe(0)
+    // Caret inside the marked content → both markers revealed.
+    expect(replaceCount('**bold**', 4)).toBe(0)
+    expect(replaceCount('*italic*', 4)).toBe(0)
+    expect(replaceCount('~~strike~~', 4)).toBe(0)
+    expect(replaceCount('`code`', 3)).toBe(0)
+    expect(replaceCount('[label](url)', 4)).toBe(0)
+    // Caret at a marker edge / inside the marker → revealed.
+    expect(replaceCount('**bold**', 0)).toBe(0)
+    expect(replaceCount('**bold**', 2)).toBe(0)
+    // A selection spanning the marker reveals it too.
+    expect(replaceCount('**bold**', 0, 4)).toBe(0)
+    // Caret outside the construct → rendered hidden again.
+    expect(replaceCount('**bold**\n\nplain', 11)).toBe(2)
+    expect(replaceCount('*italic*\n\nplain', 11)).toBe(2)
+    expect(replaceCount('~~strike~~\n\nplain', 13)).toBe(2)
+    expect(replaceCount('`code`\n\nplain', 9)).toBe(2)
+    // `[label](url)` parses to 4 LinkMarks + URL.
+    expect(replaceCount('[label](url)\n\nplain', 15)).toBe(5)
+    // Unparsed / plain text stays visible.
+    expect(replaceCount('*half-open', 4)).toBe(0)
+    expect(replaceCount('plain', 4)).toBe(0)
   })
 })

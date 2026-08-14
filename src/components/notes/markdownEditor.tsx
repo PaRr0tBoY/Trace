@@ -17,6 +17,7 @@
  */
 import { useEffect, useRef } from 'react'
 import type { MutableRefObject } from 'react'
+import type { SyntaxNode } from '@lezer/common'
 import { EditorState } from '@codemirror/state'
 import type { Range } from '@codemirror/state'
 import {
@@ -43,10 +44,11 @@ const lineCls = (from: number, cls: string): Range<Decoration> =>
   Decoration.line({ attributes: { class: cls } }).range(from)
 
 /** Node names whose whole range is a "marker". Block markers (headings,
- * quotes, lists) are replaced by rendered widgets once active (space after
- * the marker); inline markers (emphasis, strike, code, link) are hidden
- * entirely — the editor shows what the preview shows, and an unmatched
- * marker never parses, so raw characters stay visible while typing. */
+ * quotes, lists) and inline markers (emphasis, strike, code, link) are
+ * replaced by rendered widgets while the caret is away; the caret on the
+ * line / at the marker edge reveals the raw syntax so it stays editable
+ * (Obsidian-style live preview). An unmatched marker never parses, so raw
+ * characters stay visible while typing. */
 const MARKER_NODES: Record<string, true> = {
   HeaderMark: true,
   EmphasisMark: true,
@@ -141,37 +143,64 @@ function toggleTaskAt(view: EditorView, pos: number): void {
 export function buildDecorations(view: EditorView): DecorationSet {
   const decos: Range<Decoration>[] = []
   const tree = syntaxTree(view.state)
+  const { from: selFrom, to: selTo } = view.state.selection.main
+  const selSpan = selFrom !== selTo
 
   tree.iterate({
     enter: (node) => {
       const { name, from, to } = node
+      const line = view.state.doc.lineAt(from)
+      const caretOnLine = selFrom >= line.from && selFrom <= line.to
       if (MARKER_NODES[name]) {
-        // Block markers (`#`, `>`, list markers) only take effect with the
-        // space that follows them — a bare marker keeps its raw characters
-        // until then, because the syntax has not kicked in yet.
+        // Block markers (`#`, `>`, list markers): the caret on the line
+        // reveals the raw marker so it can be edited (Obsidian behavior);
+        // otherwise a bare marker (no space yet) stays visible as raw text
+        // and an active one renders as its widget.
         if (name === 'HeaderMark' || name === 'QuoteMark' || name === 'ListMark') {
+          if (caretOnLine) {
+            decos.push(mark(from, to, 'cm-md-marker'))
+            return
+          }
           const active = view.state.doc.sliceString(to, to + 1) === ' '
-          decos.push(
-            active
-              ? name === 'ListMark'
-                ? Decoration.replace({
+          if (active && name === 'ListMark') {
+            // Task lines show no bullet — the checkbox is the marker.
+            const isTask = node.node.parent?.getChild('TaskMarker') !== null
+            decos.push(
+              isTask
+                ? Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to)
+                : Decoration.replace({
                     widget: new ListMarkerWidget(view.state.doc.sliceString(from, to))
                   }).range(from, to)
-                : Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to)
-              : mark(from, to, 'cm-md-marker')
-          )
+            )
+          } else {
+            decos.push(
+              active
+                ? Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to)
+                : mark(from, to, 'cm-md-marker')
+            )
+          }
           return
         }
-        // Inline markers (`**`, `*`, `~~`, backticks, `[`/`](url)`) are
-        // always hidden once the syntax parsed — an unmatched marker is not
-        // a syntax node and stays visible while typing.
-        decos.push(Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to))
+        // Inline markers (`**`, `*`, `~~`, backticks, `[`/`](url)`):
+        // revealed (raw text) while the caret is anywhere inside the
+        // marked content (both opening and closing markers come back, so
+        // editing mid-content shows where the syntax is), at the marker
+        // edge, inside the marker itself, or when the selection spans it.
+        // Once the caret leaves the construct it renders hidden again.
+        const parent = node.node.parent
+        const inContent = parent !== null && selFrom >= parent.from && selFrom <= parent.to
+        const near =
+          inContent ||
+          (selFrom >= from - 1 && selFrom <= to + 1) ||
+          (selTo >= from - 1 && selTo <= to + 1) ||
+          (selSpan && selFrom <= to && selTo >= from)
+        decos.push(
+          near ? mark(from, to, 'cm-md-marker') : Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to)
+        )
         return
       }
-      const line = view.state.doc.lineAt(from)
 
-      switch (name) {
-        case 'StrongEmphasis':
+      switch (name) {        case 'StrongEmphasis':
           decos.push(mark(from, to, 'cm-md-strong'))
           break
         case 'Emphasis':
@@ -204,8 +233,9 @@ export function buildDecorations(view: EditorView): DecorationSet {
           }
           break
         case 'TaskMarker': {
-          // Always render the clickable checkbox — the raw `[ ]` never
-          // shows, even on the caret line (fully WYSIWYG).
+          // The caret on the line reveals the raw `[ ]` so it can be
+          // edited; elsewhere the clickable checkbox widget takes over.
+          if (caretOnLine) break
           const listItem = node.node.parent
           const listMark = listItem?.getChild('ListMark')
           const replaceFrom = listMark ? listMark.from : from
@@ -250,6 +280,24 @@ const markdownDeco = ViewPlugin.fromClass(
   },
   { decorations: (v) => v.decorations }
 )
+
+/** Click-to-open rendered links: a click on the link label opens the URL in
+ * the system browser (window.open → main's setWindowOpenHandler). Clicks on
+ * the URL itself (visible when the caret reveals the marker) stay in the
+ * editor so the link can be edited. */
+const linkClick = EditorView.domEventHandlers({
+  click: (event, view) => {
+    const pos = view.posAtCoords(event)
+    if (pos == null) return
+    let node: SyntaxNode | null = syntaxTree(view.state).resolveInner(pos).node
+    while (node && node.name !== 'Link') node = node.parent
+    if (!node) return
+    const urlNode = node.getChild('URL')
+    if (!urlNode || (pos >= urlNode.from && pos <= urlNode.to)) return
+    const href = view.state.doc.sliceString(urlNode.from, urlNode.to)
+    window.open(/^[a-z][a-z0-9+.-]*:/i.test(href) ? href : `https://${href}`, '_blank')
+  }
+})
 
 const enterContinuation = keymap.of([
   {
@@ -403,6 +451,7 @@ export function MarkdownEditor({
           history(),
           notesTheme,
           markdownDeco,
+          linkClick,
           enterContinuation,
           keymap.of([...defaultKeymap, ...historyKeymap]),
           cmPlaceholder(placeholder ?? ''),

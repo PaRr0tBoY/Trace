@@ -251,6 +251,12 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
         // is special — it must not execute the switch (that's the point of
         // pinning). Touch the session on keydown so long typing sessions
         // don't hit the 30s self-heal timeout.
+        //
+        // Tab stays swallowed (up and down): the user pinned while still
+        // holding Alt+Tab, and passing Tab repeats through would let the OS
+        // see a live Alt+Tab combination and switch the foreground away —
+        // the panel input then never receives a key.
+        if (isTab) return 1n
         if (isAlt && !isDown) {
           state = 'idle'
           // The real Alt-up is swallowed so no switch executes — but without

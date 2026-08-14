@@ -1,8 +1,8 @@
 /**
- * continueOnEnter — Enter-press continuation for the note editor, mirroring
- * NotchNotes' input behavior: `1. `→`2. `, `- `/`• `/`> `/todo markers carry
- * to the next line, an empty item drops its marker, and an opening ``` fence
- * at end of line auto-closes with a blank line + fence.
+ * continueOnEnter — Enter-press continuation for the note editor: `1. `→`2. `,
+ * `- `/`• `/`> `/todo markers carry to the next line — an empty marker still
+ * continues (never drops on Enter), and an opening ``` fence at end of line
+ * auto-closes with a blank line + fence.
  */
 import { describe, expect, it } from 'vitest'
 import { continueOnEnter } from '../src/components/notes/editorInput'
@@ -27,11 +27,12 @@ describe('continueOnEnter', () => {
     expect(atEnd('- [x] done')).toEqual({ next: '- [x] done\n- [x] ', caret: 17 })
   })
 
-  it('drops the marker on an empty item (exits the list)', () => {
-    expect(atEnd('- ')).toEqual({ next: '', caret: 0 })
-    expect(atEnd('1. ')).toEqual({ next: '', caret: 0 })
-    expect(atEnd('> ')).toEqual({ next: '', caret: 0 })
-    expect(atEnd('before\n- ')).toEqual({ next: 'before\n', caret: 7 })
+  it('continues an empty marker too (1. + Enter becomes 2., never vanishes)', () => {
+    expect(atEnd('- ')).toEqual({ next: '- \n- ', caret: 5 })
+    expect(atEnd('1. ')).toEqual({ next: '1. \n2. ', caret: 7 })
+    expect(atEnd('> ')).toEqual({ next: '> \n> ', caret: 5 })
+    expect(atEnd('before\n- ')).toEqual({ next: 'before\n- \n- ', caret: 12 })
+    expect(atEnd('- [ ] ')).toEqual({ next: '- [ ] \n- [ ] ', caret: 13 })
   })
 
   it('auto-closes an opening fence at end of line', () => {

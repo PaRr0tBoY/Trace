@@ -174,6 +174,9 @@ interface AppState {
   createNote: (content?: string) => Promise<string>
   updateNote: (id: string, patch: NotePatch) => Promise<void>
   deleteNote: (id: string) => Promise<void>
+  /** Last editing caret per note (renderer memory; restores on re-entry). */
+  noteCaret: Record<string, number>
+  setNoteCaret: (id: string, pos: number) => void
 
   /* memory panel (delegate to main; the refreshed buckets come back) */
   memories: MemoryListPayload | null
@@ -517,6 +520,9 @@ export const useStore = create<AppState>((set, get) => ({
   async deleteNote(id) {
     set({ notes: await edge.deleteNote(id) })
   },
+
+  noteCaret: {},
+  setNoteCaret: (id, pos) => set((s) => ({ noteCaret: { ...s.noteCaret, [id]: pos } })),
 
   memories: null,
   async loadMemories() {

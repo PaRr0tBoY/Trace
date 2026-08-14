@@ -20,6 +20,7 @@ import { useTranslation } from '../../i18n'
 import type { NoteDto } from '../../../shared/types'
 import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ExpandIcon, ContractIcon, BundleIcon, CloseIcon, PenLineIcon, EyeIcon } from '../icons'
 import { playButtonClickSound } from '../../lib/soundEffects'
+import { edge } from '../../lib/edge'
 import { MarkdownPreview } from './markdown'
 import { continueOnEnter } from './editorInput'
 
@@ -119,6 +120,8 @@ function NoteEditor({
   const { t } = useTranslation()
   const updateNote = useStore((s) => s.updateNote)
   const deleteNote = useStore((s) => s.deleteNote)
+  const noteCaret = useStore((s) => s.noteCaret)
+  const setNoteCaret = useStore((s) => s.setNoteCaret)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const pendingValue = useRef(note.content)
   const initialContent = useRef(note.content)
@@ -157,10 +160,20 @@ function NoteEditor({
 
   // Switching notes / creating a note lands straight in the editor, ready to
   // type; the panel re-opening after a collapse does the same (see NotesView).
+  // A remembered caret (last edit position) is restored along with the focus.
   useEffect(() => {
     if (mode !== 'edit') return
-    const raf = requestAnimationFrame(() => taRef.current?.focus())
+    // Read the latest saved caret via a ref-less closure: re-running on every
+    // caret write would fight live selections by re-compressing them to a point.
+    const saved = noteCaret[note.id]
+    const raf = requestAnimationFrame(() => {
+      const ta = taRef.current
+      if (!ta) return
+      if (saved != null && saved <= ta.value.length) ta.setSelectionRange(saved, saved)
+      ta.focus()
+    })
     return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, note.id])
 
   const handleDelete = async () => {
@@ -304,6 +317,12 @@ function NoteEditor({
           spellCheck={false}
           onChange={(e) => schedulePush(e.target.value)}
           onKeyDown={handleKeyDown}
+          // Remember the caret on every move (typing, arrows, clicks) so a
+          // re-entry restores the exact last edit position (setNoteCaret).
+          onSelect={() => {
+            const ta = taRef.current
+            if (ta) setNoteCaret(note.id, ta.selectionStart)
+          }}
         />
       ) : (
         <div className="notes-preview">
@@ -335,10 +354,8 @@ function NoteEditor({
 }
 
 /** One note card in the list: title row + (unless folded) a two-line preview. */
-const NoteCard = forwardRef<HTMLDivElement, { note: NoteDto; onEdit: () => void }>(function NoteCard(
-  { note, onEdit },
-  ref
-) {
+const NoteCard = forwardRef<HTMLDivElement, { note: NoteDto; onEdit: () => void; deleteDisabled?: boolean }>(
+  function NoteCard({ note, onEdit, deleteDisabled }, ref) {
   const { t } = useTranslation()
   const updateNote = useStore((s) => s.updateNote)
   const deleteNote = useStore((s) => s.deleteNote)
@@ -399,6 +416,7 @@ const NoteCard = forwardRef<HTMLDivElement, { note: NoteDto; onEdit: () => void 
           type="button"
           className="notes-card-btn danger"
           title={t('notes.delete')}
+          disabled={deleteDisabled}
           onClick={(e) => {
             e.stopPropagation()
             void deleteNote(note.id)
@@ -417,20 +435,33 @@ const NoteCard = forwardRef<HTMLDivElement, { note: NoteDto; onEdit: () => void 
 })
 
 /** All-notes modal for single-note mode: search + card list (pin / fold /
- * delete live on the cards). Picking a card switches the editor behind it. */
+ * delete live on the cards). Picking a card switches the editor behind it.
+ * `initialQuery` seeds the search box — a keystroke that called the modal up
+ * should already be filtering when it appears. */
 function NotesModal({
   open,
   notes,
+  initialQuery,
   onClose,
   onSelect
 }: {
   open: boolean
   notes: NoteDto[]
+  initialQuery: string
   onClose: () => void
   onSelect: (id: string) => void
 }) {
   const { t } = useTranslation()
-  const [q, setQ] = useState('')
+  const [q, setQ] = useState(initialQuery)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  // Modal opens on a typed keystroke — focus the box so the search continues
+  // with the next character (the window is already active: the key arrived).
+  useEffect(() => {
+    if (!open) return
+    const raf = requestAnimationFrame(() => searchRef.current?.focus())
+    return () => cancelAnimationFrame(raf)
+  }, [open])
 
   const filtered = useMemo(() => {
     if (!q.trim()) return notes
@@ -450,6 +481,7 @@ function NotesModal({
           </button>
         </div>
         <input
+          ref={searchRef}
           className="notes-modal-search"
           value={q}
           placeholder={t('notes.search')}
@@ -458,7 +490,7 @@ function NotesModal({
         <div className="notes-modal-scroll">
           <AnimatePresence initial={false} mode="popLayout">
             {filtered.map((note) => (
-              <NoteCard key={note.id} note={note} onEdit={() => onSelect(note.id)} />
+              <NoteCard key={note.id} note={note} onEdit={() => onSelect(note.id)} deleteDisabled={notes.length === 1} />
             ))}
           </AnimatePresence>
           {filtered.length === 0 && (
@@ -507,6 +539,9 @@ export function NotesView() {
 
   // Single-note mode: typing while the editor is open calls up the all-notes
   // modal (the management list lives there) instead of the clipboard search.
+  // The pressed character rides along and lands in the modal's search box,
+  // so the search starts immediately without a second click.
+  const [modalQuery, setModalQuery] = useState('')
   useEffect(() => {
     if (noteViewMode !== 'single') return
     const onKeyDown = (e: KeyboardEvent) => {
@@ -516,21 +551,24 @@ export function NotesView() {
       const el = document.activeElement
       if (el instanceof HTMLElement && el.matches('input, textarea, [contenteditable]')) return
       e.preventDefault()
+      setModalQuery(e.key)
       setModalOpen(true)
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [noteViewMode])
 
-  // Panel re-opening after a collapse lands straight back in the editor.
+  // Panel re-opening after a collapse lands straight back in the editor. The
+  // panel window is WS_EX_NOACTIVATE again after closing (focus.ts restores
+  // it), and Chromium silently drops element.focus() on such a window — so
+  // ask main to truly activate the window first, then focus next frame.
   useEffect(() => {
     if (noteViewMode !== 'single' || !open || !effectiveCurrent) return
-    const ta = document.querySelector<HTMLTextAreaElement>('.notes-editor textarea')
-    if (ta) {
-      const raf = requestAnimationFrame(() => ta.focus())
-      return () => cancelAnimationFrame(raf)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    edge.requestInputFocus()
+    const raf = requestAnimationFrame(() => {
+      document.querySelector<HTMLTextAreaElement>('.notes-editor textarea')?.focus()
+    })
+    return () => cancelAnimationFrame(raf)
   }, [open, noteViewMode])
 
   const handleNew = () => {
@@ -574,6 +612,7 @@ export function NotesView() {
         <NotesModal
           open={modalOpen}
           notes={notes}
+          initialQuery={modalQuery}
           onClose={() => setModalOpen(false)}
           onSelect={(id) => {
             setCurrentId(id)

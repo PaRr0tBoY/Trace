@@ -28,7 +28,7 @@ import {
 } from '@codemirror/view'
 import type { DecorationSet, ViewUpdate } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
-import { markdown } from '@codemirror/lang-markdown'
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { continueOnEnter } from './editorInput'
 
@@ -56,22 +56,34 @@ const MARKER_NODES = new Set([
   'QuoteMark'
 ])
 
-/** Task checkbox widget: replaces `- [x]` with a clickable box. */
+/** Task checkbox widget: replaces `- [x]` with a clickable box. The widget
+ * carries its source line's start position, so toggling never depends on
+ * guessing the position back from the DOM. */
 class TaskCheckboxWidget extends WidgetType {
-  constructor(private readonly checked: boolean) {
+  constructor(
+    private readonly checked: boolean,
+    private readonly lineFrom: number
+  ) {
     super()
   }
 
   eq(other: TaskCheckboxWidget): boolean {
-    return other.checked === this.checked
+    return other.checked === this.checked && other.lineFrom === this.lineFrom
   }
 
-  toDOM(): HTMLElement {
+  toDOM(view: EditorView): HTMLElement {
     const box = document.createElement('span')
     box.className = 'cm-task-box'
     box.setAttribute('role', 'checkbox')
     box.setAttribute('aria-checked', String(this.checked))
     box.textContent = this.checked ? '✓' : ''
+    // Keep the click from moving the editor caret onto the widget.
+    box.addEventListener('mousedown', (e) => e.preventDefault())
+    box.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      toggleTaskAt(view, this.lineFrom)
+    })
     return box
   }
 
@@ -140,7 +152,7 @@ function buildDecorations(view: EditorView): DecorationSet {
           const listMark = listItem?.getChild('ListMark')
           const replaceFrom = listMark ? listMark.from : from
           const checked = view.state.doc.sliceString(from, to).toLowerCase().includes('x')
-          decos.push(Decoration.replace({ widget: new TaskCheckboxWidget(checked) }).range(replaceFrom, to))
+          decos.push(Decoration.replace({ widget: new TaskCheckboxWidget(checked, line.from) }).range(replaceFrom, to))
           break
         }
         default: {
@@ -172,16 +184,6 @@ const markdownDeco = ViewPlugin.fromClass(
   },
   { decorations: (v) => v.decorations }
 )
-
-const taskClick = EditorView.domEventHandlers({
-  mousedown: (event, view) => {
-    const target = event.target as HTMLElement
-    if (!target.classList.contains('cm-task-box')) return false
-    event.preventDefault()
-    toggleTaskAt(view, view.posAtDOM(target))
-    return true
-  }
-})
 
 const enterContinuation = keymap.of([
   {
@@ -218,7 +220,7 @@ const notesTheme = EditorView.theme({
   },
   '.cm-content': {
     padding: '8px 10px',
-    caretColor: 'var(--edge-strong)'
+    caretColor: 'var(--text-primary)'
   },
   '&.cm-focused': {
     outline: 'none'
@@ -236,7 +238,7 @@ const notesTheme = EditorView.theme({
     color: 'var(--text-tertiary)'
   },
   '.cm-cursor': {
-    borderLeftColor: 'var(--edge-strong)'
+    borderLeftColor: 'var(--text-primary)'
   }
 })
 
@@ -322,11 +324,13 @@ export function MarkdownEditor({
       state: EditorState.create({
         doc: value,
         extensions: [
-          markdown(),
+          // markdownLanguage carries the GFM extensions (strikethrough,
+          // task lists) — bare markdown() only parses CommonMark, which
+          // would silently drop the ~~strike~~ and - [x] decorations.
+          markdown({ base: markdownLanguage }),
           history(),
           notesTheme,
           markdownDeco,
-          taskClick,
           enterContinuation,
           keymap.of([...defaultKeymap, ...historyKeymap]),
           cmPlaceholder(placeholder ?? ''),

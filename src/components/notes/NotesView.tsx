@@ -19,7 +19,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import type { NoteDto } from '../../../shared/types'
-import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ExpandIcon, ContractIcon, BundleIcon, CloseIcon, PenLineIcon, EyeIcon } from '../icons'
+import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ChevronUpIcon, ChevronDownIcon, ExpandIcon, ContractIcon, BundleIcon, CloseIcon, PenLineIcon, EyeIcon } from '../icons'
 import { playButtonClickSound } from '../../lib/soundEffects'
 import { edge } from '../../lib/edge'
 import { MarkdownPreview } from './markdown'
@@ -42,24 +42,29 @@ const CMD_TOOLS: Array<{ id: MdCommand; Icon: LucideIcon; i18n: string }> = [
   { id: 'ol', Icon: ListOrdered, i18n: 'notes.orderedList' },
   { id: 'todo', Icon: ListChecks, i18n: 'notes.todo' }
 ]
-
 /** Full-height editor with a compact Markdown toolbar. Live-saved main-side.
  *
- * variant 'list' (management mode): back / title / pin / delete.
- * variant 'single' (single-note mode): title / open-all-notes modal / new —
- * pin & delete live inside the modal list instead. */
+ * Both variants carry prev/next note steppers (shelf order: pinned first,
+ * newest first). variant 'list' (management mode): back / title / pin /
+ * delete. variant 'single' (single-note mode): title / open-all-notes modal /
+ * new — pin & delete live inside the modal list instead. */
 function NoteEditor({
   note,
   onBack,
   variant = 'list',
   onOpenModal,
-  onNew
+  onNew,
+  onPrevNote,
+  onNextNote
 }: {
   note: NoteDto
   onBack?: () => void
   variant?: 'list' | 'single'
   onOpenModal?: () => void
   onNew?: () => void
+  /** Step to the previous / next note in the shelf order; null disables. */
+  onPrevNote?: (() => void) | null
+  onNextNote?: (() => void) | null
 }) {
   const { t } = useTranslation()
   const updateNote = useStore((s) => s.updateNote)
@@ -160,6 +165,30 @@ function NoteEditor({
             <button
               type="button"
               className="notes-bar-btn"
+              title={t('notes.prevNote')}
+              disabled={onPrevNote === null}
+              onClick={() => {
+                playButtonClickSound()
+                onPrevNote?.()
+              }}
+            >
+              <ChevronUpIcon width={13} height={13} />
+            </button>
+            <button
+              type="button"
+              className="notes-bar-btn"
+              title={t('notes.nextNote')}
+              disabled={onNextNote === null}
+              onClick={() => {
+                playButtonClickSound()
+                onNextNote?.()
+              }}
+            >
+              <ChevronDownIcon width={13} height={13} />
+            </button>
+            <button
+              type="button"
+              className="notes-bar-btn"
               title={t('notes.allNotes')}
               onClick={() => {
                 playButtonClickSound()
@@ -192,6 +221,30 @@ function NoteEditor({
               }}
             >
               <ChevronLeftIcon width={14} height={14} />
+            </button>
+            <button
+              type="button"
+              className="notes-bar-btn"
+              title={t('notes.prevNote')}
+              disabled={onPrevNote === null}
+              onClick={() => {
+                playButtonClickSound()
+                onPrevNote?.()
+              }}
+            >
+              <ChevronUpIcon width={14} height={14} />
+            </button>
+            <button
+              type="button"
+              className="notes-bar-btn"
+              title={t('notes.nextNote')}
+              disabled={onNextNote === null}
+              onClick={() => {
+                playButtonClickSound()
+                onNextNote?.()
+              }}
+            >
+              <ChevronDownIcon width={14} height={14} />
             </button>
             <span className="notes-editor-title">{note.title || t('notes.untitled')}</span>
             <button
@@ -442,6 +495,16 @@ export function NotesView() {
   // render the next note immediately and let the effect below sync currentId.
   const effectiveCurrent = current ?? (notes.length > 0 ? notes[0] : undefined)
 
+  // Prev/next note steppers operate on the full shelf order (pinned first,
+  // newest first — main-side ordering), ignoring the search filter: stepping
+  // keeps the surrounding notes reachable even when the list is filtered.
+  const stepNote = (fromId: string, delta: number): string | null => {
+    const idx = notes.findIndex((n) => n.id === fromId)
+    if (idx === -1) return null
+    const next = notes[idx + delta]
+    return next ? next.id : null
+  }
+
   // Single-note mode: keep currentId pointing at a live note. An empty shelf
   // shows the empty state — deleting the last note never fabricates a new one.
   useEffect(() => {
@@ -503,6 +566,9 @@ export function NotesView() {
     })
   }
 
+  const prevNoteId = effectiveCurrent ? stepNote(effectiveCurrent.id, -1) : null
+  const nextNoteId = effectiveCurrent ? stepNote(effectiveCurrent.id, 1) : null
+
   if (noteViewMode === 'single') {
     return (
       <div className="notes-single">
@@ -513,6 +579,8 @@ export function NotesView() {
             variant="single"
             onOpenModal={() => setModalOpen(true)}
             onNew={handleNewSingle}
+            onPrevNote={prevNoteId !== null ? () => setCurrentId(prevNoteId) : null}
+            onNextNote={nextNoteId !== null ? () => setCurrentId(nextNoteId) : null}
           />
         ) : (
           <div className="notes-single-empty">
@@ -539,7 +607,17 @@ export function NotesView() {
 
   if (editing) {
     // key remounts the editor per note so draft state never leaks across notes
-    return <NoteEditor key={editing.id} note={editing} onBack={() => setEditingId(null)} />
+    const prevId = stepNote(editing.id, -1)
+    const nextId = stepNote(editing.id, 1)
+    return (
+      <NoteEditor
+        key={editing.id}
+        note={editing}
+        onBack={() => setEditingId(null)}
+        onPrevNote={prevId !== null ? () => setEditingId(prevId) : null}
+        onNextNote={nextId !== null ? () => setEditingId(nextId) : null}
+      />
+    )
   }
 
   return (

@@ -556,6 +556,8 @@ export interface TranslationKeys {
     created: string
     editMode: string
     previewMode: string
+    prevNote: string
+    nextNote: string
   }
 
 }
@@ -1283,6 +1285,8 @@ export const en: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -1842,6 +1846,8 @@ export const es: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -2401,6 +2407,8 @@ export const fr: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -2960,6 +2968,8 @@ export const de: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -3519,6 +3529,8 @@ export const it: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -4078,6 +4090,8 @@ export const pt: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -4637,6 +4651,8 @@ export const ru: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -5196,6 +5212,8 @@ export const ja: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -5755,6 +5773,8 @@ export const ko: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -6314,6 +6334,8 @@ export const zhCN: TranslationKeys = {
     created: '新建成功',
     editMode: '编辑模式',
     previewMode: '预览模式',
+    prevNote: '上一条笔记',
+    nextNote: '下一条笔记',
   },
 }
 
@@ -6873,6 +6895,8 @@ export const zhTW: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -7432,6 +7456,8 @@ export const hi: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -7991,6 +8017,8 @@ export const ar: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -8550,6 +8578,8 @@ export const bn: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -9109,6 +9139,8 @@ export const tr: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -9668,6 +9700,8 @@ export const vi: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -10227,6 +10261,8 @@ export const pl: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -10786,6 +10822,8 @@ export const nl: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -11345,6 +11383,8 @@ export const sv: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -11904,6 +11944,8 @@ export const id: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -12463,6 +12505,8 @@ export const uk: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -13022,6 +13066,8 @@ export const el: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -13581,6 +13627,8 @@ export const cs: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -14140,6 +14188,8 @@ export const ro: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -14699,6 +14749,8 @@ export const hu: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -15258,6 +15310,8 @@ export const da: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -15817,6 +15871,8 @@ export const fi: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -16376,6 +16432,8 @@ export const th: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -16935,6 +16993,8 @@ export const he: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 
@@ -17494,6 +17554,8 @@ export const no: TranslationKeys = {
     created: 'Note created',
     editMode: 'Edit mode',
     previewMode: 'Preview mode',
+    prevNote: 'Previous note',
+    nextNote: 'Next note',
   },
 }
 

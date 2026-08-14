@@ -191,10 +191,11 @@ function renderBlocks(text: string, onToggleTodo?: (line: number) => void): Reac
 
     // Bullet / todo list — a todo marker anywhere in the block makes it a
     // todo list (checked items render with a checkbox glyph). Empty items
-    // (`- [ ]` alone) still render their checkbox.
-    const bullet = /^[-*•]\s+(.+)$/.exec(line)
+    // (`- [ ]` alone, or a bare `- ` from Enter-continuation) still belong
+    // to the list — a trailing blank item must not split the block.
+    const bullet = /^[-*•]\s+(.*)$/.exec(line)
     if (bullet) {
-      const items = collectList(i, lines, /^[-*•]\s+(.+)$/)
+      const items = collectList(i, lines, /^[-*•]\s+(.*)$/)
       const todos = items.map((m) => /^\[([ xX])\]\s*(.*)$/.exec(m[1]))
       const isTodo = todos.some((t) => t !== null)
       blocks.push(
@@ -238,9 +239,10 @@ function renderBlocks(text: string, onToggleTodo?: (line: number) => void): Reac
       continue
     }
 
-    // Numbered list.
+    // Numbered list — empty items (`1. ` from Enter-continuation) keep the
+    // block together, same rule as bullets above.
     if (/^\d+\.\s+/.test(line)) {
-      const items = collectList(i, lines, /^\d+\.\s+(.+)$/)
+      const items = collectList(i, lines, /^\d+\.\s+(.*)$/)
       blocks.push(
         <ol key={blockIndex++} className="md-bullets">
           {items.map((m, j) => (

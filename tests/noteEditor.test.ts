@@ -143,12 +143,31 @@ describe('markdown decoration builder', () => {
     expect(replaceCount('# title')).toBe(1)
     expect(replaceCount('> quote')).toBe(1)
     expect(replaceCount('- item')).toBe(1)
-    // A task line (off the caret line — the caret line keeps its raw
-    // checkbox marker) has both the list placeholder and the checkbox widget.
+    // A task line (off the caret line) has both the list placeholder and
+    // the checkbox widget.
     expect(replaceCount('first\n- [ ] task')).toBe(2)
     // Bare markers (no space yet) stay as visible raw text.
     expect(replaceCount('#title')).toBe(0)
     expect(replaceCount('>quote')).toBe(0)
     expect(replaceCount('-')).toBe(0)
+  })
+
+  it('hides inline markers entirely once parsed, keeps raw text while typing', () => {
+    const replaceCount = (doc: string) => {
+      let n = 0
+      decorate(doc).between(0, doc.length, (_f, _t, value) => {
+        if (value.spec.widget) n++
+      })
+      return n
+    }
+    // `**bold**` = two hidden `**` markers; unmatched `*` is not parsed.
+    expect(replaceCount('**bold**')).toBe(2)
+    expect(replaceCount('*italic*')).toBe(2)
+    expect(replaceCount('~~strike~~')).toBe(2)
+    expect(replaceCount('`code`')).toBe(2)
+    // `[label](url)` parses to 4 LinkMarks + URL, all hidden → just "label".
+    expect(replaceCount('[label](url)')).toBe(5)
+    expect(replaceCount('*half-open')).toBe(0)
+    expect(replaceCount('plain')).toBe(0)
   })
 })

@@ -244,12 +244,10 @@
   text-decoration: none !important;
 }
 
-/* Rendered list marker widget: ordered shows the number, unordered is an
- * invisible fixed-width placeholder (indentation without a bullet dot). */
+/* Rendered list marker widget: `•` for bullets, the number for ordered
+ * items, replacing the raw `-`/`1.` marker. */
 .cm-md-listmark {
-  display: inline-block;
-  min-width: 1.1em;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-tertiary);
   user-select: none;
 }
 
@@ -278,9 +276,9 @@
 }
 
 .cm-md-link {
-  color: #7dd3fc;
+  color: var(--accent);
   text-decoration: underline;
-  text-decoration-color: rgba(125, 211, 252, 0.45);
+  text-decoration-color: rgba(var(--accent-rgb), 0.45);
 }
 
 .cm-md-h1 {
@@ -315,8 +313,8 @@
 }
 
 .cm-md-quote-line {
-  background: rgba(125, 211, 252, 0.1);
-  border-left: 2px solid rgba(125, 211, 252, 0.55);
+  background: rgba(var(--accent-rgb), 0.1);
+  border-left: 2px solid rgba(var(--accent-rgb), 0.55);
 }
 
 /* Task checkbox widget — same look as the rendered .md-todo-box. */
@@ -329,7 +327,7 @@
   margin-right: 5px;
   border: 1.5px solid rgba(255, 255, 255, 0.45);
   border-radius: 4px;
-  color: #7dd3fc;
+  color: var(--accent);
   font-size: 9px;
   line-height: 1;
   vertical-align: -1px;
@@ -338,7 +336,7 @@
 }
 
 .cm-task-box:hover {
-  border-color: #7dd3fc;
+  border-color: var(--accent);
 }
 
 /* Single-note empty state: hint + create button instead of a fabricated note. */
@@ -416,9 +414,9 @@
 }
 
 .notes-card-preview .md-link {
-  color: #7dd3fc;
+  color: var(--accent);
   text-decoration: underline;
-  text-decoration-color: rgba(125, 211, 252, 0.45);
+  text-decoration-color: rgba(var(--accent-rgb), 0.45);
   text-underline-offset: 2px;
   cursor: pointer;
 }

@@ -1,16 +1,17 @@
 /**
  * MarkdownEditor — the note editor backed by CodeMirror 6, reproducing the
  * NotchNotes editing experience: one live view where markdown renders
- * inline (markers stay visible but dimmed, content gets styled) instead of
- * a plain textarea + preview toggle.
+ * inline (markers hidden, content styled — WYSIWYG) instead of a plain
+ * textarea + preview toggle.
  *
  * - markdown + GFM parsing (@codemirror/lang-markdown)
  * - decorations style the syntax tree: bold/italic/strike/code/link/heading
- *   content, heading/quote/list markers replaced by rendered widgets,
- *   inline markers dimmed, fenced code and blockquote line backgrounds
+ *   content; block markers (`#`, `>`, `-`) and inline markers (`**`, `*`,
+ *   `~~`, backticks, `[`/`](url)`) are replaced by rendered widgets; fenced
+ *   code and blockquote line backgrounds
  * - task lists render as clickable checkboxes (Joplin's approach: replace
  *   the `- [x]` marker with a widget) — clicking flips the checkbox state
- *   in the source text; the current line reveals its raw marker
+ *   in the source text
  * - Enter continues list/quote markers and auto-closes fences (continueOnEnter)
  * - IME composition is handled natively by CodeMirror
  */
@@ -42,11 +43,10 @@ const lineCls = (from: number, cls: string): Range<Decoration> =>
   Decoration.line({ attributes: { class: cls } }).range(from)
 
 /** Node names whose whole range is a "marker". Block markers (headings,
- * quotes, lists) are replaced by rendered widgets — the editor shows what
- * the preview shows. Inline markers (emphasis, strike, code, link) stay
- * visible-but-dimmed: hiding them would make the caret's position inside
- * vs. outside the marked span invisible while editing (Obsidian reveals
- * inline markers on the caret line — not worth that machinery yet). */
+ * quotes, lists) are replaced by rendered widgets once active (space after
+ * the marker); inline markers (emphasis, strike, code, link) are hidden
+ * entirely — the editor shows what the preview shows, and an unmatched
+ * marker never parses, so raw characters stay visible while typing. */
 const MARKER_NODES: Record<string, true> = {
   HeaderMark: true,
   EmphasisMark: true,
@@ -72,12 +72,10 @@ class HiddenMarkerWidget extends WidgetType {
   }
 }
 
-/** Renders a list marker: nothing for bullets (an invisible fixed-width
- * placeholder keeps the indentation, no dot — product preference), the
- * original number for ordered items. The source `-`/`1.` is replaced by
- * what the preview shows. Backspace at line start still deletes the whole
- * marker (the widget is one replacement range), turning the line into
- * plain text. */
+/** Renders a list marker: `•` for bullets, the original number for ordered
+ * items — the source `-`/`1.` is replaced by what the preview shows.
+ * Backspace at line start still deletes the whole marker (the widget is
+ * one replacement range), turning the line into plain text. */
 class ListMarkerWidget extends WidgetType {
   constructor(private readonly text: string) {
     super()
@@ -88,7 +86,7 @@ class ListMarkerWidget extends WidgetType {
   toDOM(): HTMLElement {
     const span = document.createElement('span')
     span.className = 'cm-md-listmark'
-    if (/^\d+\./.test(this.text)) span.textContent = this.text
+    span.textContent = /^[-*•]/.test(this.text) ? '•' : this.text
     return span
   }
   ignoreEvent(): boolean {
@@ -143,38 +141,34 @@ function toggleTaskAt(view: EditorView, pos: number): void {
 export function buildDecorations(view: EditorView): DecorationSet {
   const decos: Range<Decoration>[] = []
   const tree = syntaxTree(view.state)
-  const { from: selFrom, to: selTo } = view.state.selection.main
 
   tree.iterate({
     enter: (node) => {
       const { name, from, to } = node
       if (MARKER_NODES[name]) {
-        if (name === 'HeaderMark' || name === 'QuoteMark') {
-          // A marker only takes effect with the space that follows it
-          // (`# `, `> `) — a bare `#`/`>` keeps its raw characters until
-          // then, because the syntax has not kicked in yet.
+        // Block markers (`#`, `>`, list markers) only take effect with the
+        // space that follows them — a bare marker keeps its raw characters
+        // until then, because the syntax has not kicked in yet.
+        if (name === 'HeaderMark' || name === 'QuoteMark' || name === 'ListMark') {
           const active = view.state.doc.sliceString(to, to + 1) === ' '
           decos.push(
             active
-              ? Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to)
+              ? name === 'ListMark'
+                ? Decoration.replace({
+                    widget: new ListMarkerWidget(view.state.doc.sliceString(from, to))
+                  }).range(from, to)
+                : Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to)
               : mark(from, to, 'cm-md-marker')
           )
-        } else if (name === 'ListMark') {
-          // Same rule: `- ` renders (bullet placeholder / number), a bare
-          // `-` stays visible as the raw marker.
-          const active = view.state.doc.sliceString(to, to + 1) === ' '
-          decos.push(
-            active
-              ? Decoration.replace({ widget: new ListMarkerWidget(view.state.doc.sliceString(from, to)) }).range(from, to)
-              : mark(from, to, 'cm-md-marker')
-          )
-        } else {
-          decos.push(mark(from, to, 'cm-md-marker'))
+          return
         }
+        // Inline markers (`**`, `*`, `~~`, backticks, `[`/`](url)`) are
+        // always hidden once the syntax parsed — an unmatched marker is not
+        // a syntax node and stays visible while typing.
+        decos.push(Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to))
         return
       }
       const line = view.state.doc.lineAt(from)
-      const onSelLine = (selFrom >= line.from && selFrom <= line.to) || (selTo >= line.from && selTo <= line.to)
 
       switch (name) {
         case 'StrongEmphasis':
@@ -210,7 +204,8 @@ export function buildDecorations(view: EditorView): DecorationSet {
           }
           break
         case 'TaskMarker': {
-          if (onSelLine) break
+          // Always render the clickable checkbox — the raw `[ ]` never
+          // shows, even on the caret line (fully WYSIWYG).
           const listItem = node.node.parent
           const listMark = listItem?.getChild('ListMark')
           const replaceFrom = listMark ? listMark.from : from

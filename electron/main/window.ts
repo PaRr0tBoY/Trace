@@ -33,6 +33,7 @@ import { TRANSLATIONS, en } from '../../src/i18n/translations'
 import { computeStickBounds } from './geometry'
 import { loadSettings, saveSettings } from '../store/settings'
 import { isFullscreenAppActive, registerFullscreenActiveListener } from './fullscreen'
+import { setPanelInteractive } from './hookManager'
 
 export const PANEL_WIDTH = 384
 /** Visual width of the blade when collapsed (only used by the renderer). */
@@ -109,6 +110,10 @@ export function isInteractive(): boolean {
 export function setInteractive(value: boolean): void {
   if (!mainWindow || value === interactive) return
   interactive = value
+  // Click-outside detection rides on the same gate: while the panel is
+  // interactive a left-click outside its bounds means "collapse" (focus
+  // events can't detect it — NOACTIVATE windows often never have focus).
+  setPanelInteractive(value)
   if (value) {
     // Panel is open: disable click-through so user can interact.
     mainWindow.setIgnoreMouseEvents(false)

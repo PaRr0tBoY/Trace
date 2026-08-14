@@ -16,15 +16,19 @@
  * Events flow out via process.parentPort; main drives it with
  * utilityProcess.fork('hookHost.js').
  */
-import { startKeyboardHook, stopKeyboardHook } from './keyboardHook'
+import { startKeyboardHook, stopKeyboardHook, setMouseTracking } from './keyboardHook'
 
 startKeyboardHook({
   onShow: ({ shiftDown }) => process.parentPort?.postMessage({ type: 'show', shiftDown }),
   onAdvance: (delta) => process.parentPort?.postMessage({ type: 'advance', delta }),
   onExecute: () => process.parentPort?.postMessage({ type: 'execute' }),
-  onTapExecute: ({ shiftDown }) => process.parentPort?.postMessage({ type: 'tap', shiftDown })
+  onTapExecute: ({ shiftDown }) => process.parentPort?.postMessage({ type: 'tap', shiftDown }),
+  onMouseDown: (pt) => process.parentPort?.postMessage({ type: 'mouse-down', x: pt.x, y: pt.y })
 })
 
 process.parentPort?.on('message', (e: { data?: { type?: string } }) => {
   if (e.data?.type === 'stop') stopKeyboardHook()
+  // Panel interactivity gate: only report clicks while the panel is open.
+  else if (e.data?.type === 'panel-open') setMouseTracking(true)
+  else if (e.data?.type === 'panel-close') setMouseTracking(false)
 })

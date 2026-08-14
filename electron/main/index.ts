@@ -8,11 +8,11 @@
  *   3. On 'window-all-closed' we DON'T quit (the panel is hidden, not closed).
  *   4. Quit from the tray menu tears everything down cleanly.
  */
-import { app, BrowserWindow, protocol, session } from 'electron'
+import { app, BrowserWindow, protocol, session, screen } from 'electron'
 import { APP_CONFIG, runtime } from './config'
 import { ensureDirs, cleanTemp, PATHS } from '../store/paths'
 import { configureAiLog } from './aiLog'
-import { createWindow, getMainWindow, setInteractive, setVisible, startCursorPoll, stopCursorPoll, stopHeartbeat, setHotZoneWidth } from './window'
+import { createWindow, getMainWindow, isInteractive, setInteractive, setVisible, startCursorPoll, stopCursorPoll, stopHeartbeat, setHotZoneWidth } from './window'
 import { createTray, registerIncognitoApplier } from './tray'
 import { registerIpc, registerSendListeners, getProviderChain } from './ipc'
 import { prewarmDragIcons } from './drag'
@@ -110,11 +110,13 @@ app.whenReady().then(async () => {
   createTray()
 
   // Alt+Tab takeover (ADR-0005): the hook state machine feeds the switcher.
+  // onMouseDown feeds click-outside collapse (see panelMouseDown).
   startKeyboardHook({
     onShow: switcherShow,
     onAdvance: switcherAdvance,
     onExecute: switcherExecute,
-    onTapExecute: switcherTapExecute
+    onTapExecute: switcherTapExecute,
+    onMouseDown: panelMouseDown
   })
 
   // Register Alt+C global shortcut to toggle panel
@@ -288,6 +290,27 @@ function registerImageProtocol(): void {
   })
 }
 
-// Silence unused import in environments where setVisible isn't referenced
-// after the refactor (kept for second-instance wiring above).
-void setInteractive
+/**
+ * Left-button down while the panel is interactive (mouse hook). The panel
+ * is WS_EX_NOACTIVATE and often never reaches the OS foreground, so focus
+ * events can't detect click-outside (blur never fires for a window that
+ * never had focus) — the hook reports the physical screen point and we
+ * collapse when it lands outside the panel's bounds. Clicks inside the
+ * panel pass through untouched (the hook never swallows).
+ */
+function panelMouseDown(pt: { x: number; y: number }): void {
+  if (runtime.switcherActive) return // the switcher owns click-outside
+  const win = getMainWindow()
+  if (!win || win.isDestroyed() || !win.isVisible() || !isInteractive()) return
+  try {
+    // Physical screen point vs the panel's screen rect (DIP → physical).
+    const b = win.getBounds()
+    const sr = screen.dipToScreenRect(win, b)
+    if (pt.x >= sr.x && pt.x <= sr.x + sr.width && pt.y >= sr.y && pt.y <= sr.y + sr.height) return
+    console.log('[Panel] click outside panel — collapse')
+    setInteractive(false)
+    pushState.togglePanel(false)
+  } catch (err) {
+    console.error('[Panel] click-outside check failed:', err)
+  }
+}

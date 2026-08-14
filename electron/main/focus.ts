@@ -48,14 +48,17 @@ const GWL_EXSTYLE = -20
 
 type GetWindowLongPtrFn = (hwnd: unknown, index: number) => bigint
 type SetWindowLongPtrFn = (hwnd: unknown, index: number, value: bigint) => bigint
+type GetForegroundWindowFn = () => bigint
 
 let getWindowLongPtrW: GetWindowLongPtrFn | null = null
 let setWindowLongPtrW: SetWindowLongPtrFn | null = null
+let getForegroundWindow: GetForegroundWindowFn | null = null
 
 if (process.platform === 'win32') {
   try {
     const user32 = koffi.load('user32.dll')
     getWindowLongPtrW = user32.func('int64_t __stdcall GetWindowLongPtrW(void *hWnd, int nIndex)') as GetWindowLongPtrFn
+    getForegroundWindow = user32.func('int64_t __stdcall GetForegroundWindow()') as GetForegroundWindowFn
     setWindowLongPtrW = user32.func('int64_t __stdcall SetWindowLongPtrW(void *hWnd, int nIndex, int64_t dwNewLong)') as SetWindowLongPtrFn
   } catch (err) {
     console.error('[Focus] koffi user32 load failed — activation bridge disabled:', err)
@@ -76,8 +79,9 @@ export function requestPanelFocus(): void {
   } catch {
     // fail silent
   }
+  let hwnd: bigint | null = null
   try {
-    const hwnd = koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void'))
+    hwnd = BigInt(koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void')))
     const ex = getWindowLongPtrW ? Number(getWindowLongPtrW(hwnd, GWL_EXSTYLE)) : 0
     if (ex !== 0 && (ex & WS_EX_NOACTIVATE) !== 0 && setWindowLongPtrW) {
       setWindowLongPtrW(hwnd, GWL_EXSTYLE, BigInt(ex & ~WS_EX_NOACTIVATE))
@@ -90,14 +94,15 @@ export function requestPanelFocus(): void {
     // Windows foreground lock: a hover-opened panel is not a "user input"
     // event, so win.focus() can be silently ignored and keystrokes keep
     // going to the external app while the caret merely appears inside.
-    // app.focus({ steal: true }) bypasses the lock — exactly what the
-    // auto-focus-into-editor feature asked for.
-    if (!win.isFocused()) app.focus({ steal: true })
+    // win.isFocused() is no reliable oracle here — webContents-internal
+    // activation alone reports focused — so compare against the real OS
+    // foreground window and steal when it is still someone else's.
+    const fg = getForegroundWindow ? getForegroundWindow() : null
+    if (fg === null || fg !== hwnd) app.focus({ steal: true })
   } catch {
     // fail silent
   }
 }
-
 /**
  * Input blur (`ui:input-blur`): intentionally a no-op. Early versions blurred
  * the window on every non-input click to hand the keyboard focus back, but

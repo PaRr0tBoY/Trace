@@ -23,12 +23,13 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
       stdio: 'inherit'
     })
     child.on('message', (msg: unknown) => {
-      const m = msg as { type?: string; shiftDown?: boolean; delta?: 1 | -1 } | null
+      const m = msg as { type?: string; shiftDown?: boolean; delta?: 1 | -1; x?: number; y?: number } | null
       if (!m) return
       if (m.type === 'show') events.onShow({ shiftDown: m.shiftDown ?? false })
       else if (m.type === 'advance') events.onAdvance(m.delta === -1 ? -1 : 1)
       else if (m.type === 'execute') events.onExecute()
       else if (m.type === 'tap') events.onTapExecute({ shiftDown: m.shiftDown ?? false })
+      else if (m.type === 'mouse-down' && typeof m.x === 'number' && typeof m.y === 'number') events.onMouseDown({ x: m.x, y: m.y })
     })
     child.on('exit', () => {
       child = null
@@ -45,5 +46,18 @@ export function stopKeyboardHook(): void {
   if (child) {
     child.kill()
     child = null
+  }
+}
+
+/**
+ * Gate the mouse hook's click reporting on panel interactivity (see
+ * keyboardHook.setMouseTracking). Idempotent; no-op before the host forks.
+ */
+export function setPanelInteractive(interactive: boolean): void {
+  if (!child) return
+  try {
+    child.postMessage({ type: interactive ? 'panel-open' : 'panel-close' })
+  } catch {
+    // fail silent — click-outside detection degrades, panel behavior unchanged
   }
 }

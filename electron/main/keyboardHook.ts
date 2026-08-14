@@ -32,12 +32,14 @@
 import koffi from 'koffi'
 
 const WH_KEYBOARD_LL = 13
+const WH_MOUSE_LL = 14
 // Debug noise goes behind this switch (AGENTS.md logging rules).
 const DEBUG = false
 const WM_KEYDOWN = 0x100
 const WM_KEYUP = 0x101
 const WM_SYSKEYDOWN = 0x104
 const WM_SYSKEYUP = 0x105
+const WM_LBUTTONDOWN = 0x201
 const VK_TAB = 0x09
 const VK_MENU = 0x12
 const VK_LMENU = 0xA4
@@ -51,6 +53,16 @@ const INPUT_KEYBOARD = 0x0001
 const KBDLLHOOKSTRUCT = koffi.struct('KBDLLHOOKSTRUCT', {
   vkCode: 'uint32_t',
   scanCode: 'uint32_t',
+  flags: 'uint32_t',
+  time: 'uint32_t',
+  dwExtraInfo: 'uintptr_t'
+})
+
+/** MSLLHOOKSTRUCT — screen point at offset 0; used for click-outside detection. */
+const MSLLHOOKSTRUCT = koffi.struct('MSLLHOOKSTRUCT', {
+  pt_x: 'int32_t',
+  pt_y: 'int32_t',
+  mouseData: 'uint32_t',
   flags: 'uint32_t',
   time: 'uint32_t',
   dwExtraInfo: 'uintptr_t'
@@ -123,6 +135,14 @@ export interface KeyboardHookEvents {
   onExecute: () => void
   /** Quick Alt+Tab tap (Tab released inside the threshold): switch directly, no UI. */
   onTapExecute: (opts: { shiftDown: boolean }) => void
+  /**
+   * Left-button mouse-down while the panel is interactive, in physical
+   * screen pixels. The panel is WS_EX_NOACTIVATE and often never reaches
+   * the OS foreground, so click-outside can't be detected via the window's
+   * focus events — the mouse hook reports the click position and main
+   * decides whether it landed outside the panel.
+   */
+  onMouseDown: (pt: { x: number; y: number }) => void
 }
 
 type HookState = 'idle' | 'altDown' | 'pending' | 'tap' | 'armed'
@@ -134,9 +154,19 @@ const TAP_THRESHOLD_MS = 50
 
 let state: HookState = 'idle'
 let hookPtr: unknown = null
+let mouseHookPtr: unknown = null
 let pumpTimer: ReturnType<typeof setInterval> | null = null
 let activeEvents: KeyboardHookEvents | null = null
 let tapTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Click-outside tracking gate. The mouse hook only reports left-button
+ * downs while the panel is interactive (main toggles this via
+ * setMouseTracking) — outside the panel a click means "collapse", inside
+ * it is normal panel interaction. When the panel is closed there is
+ * nothing to collapse, so the hook stays silent (and cheap).
+ */
+let mouseTracking = false
 
 // Persistent trampoline: an auto-registered JS callback only lives for the
 // duration of one FFI call, but SetWindowsHookExW fires the callback later —
@@ -238,6 +268,33 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
   return callNextHookEx ? callNextHookEx(hookPtr, nCode, wParam, lParam) : 1n
 }, koffi.pointer(koffi.proto('intptr_t (int nCode, uintptr_t wParam, intptr_t lParam)')))
 
+/**
+ * Mouse hook: reports left-button clicks while the panel is interactive,
+ * so main can collapse on click-outside even when the window never reached
+ * the OS foreground (Electron focus events are unreliable for a
+ * WS_EX_NOACTIVATE window — see window.ts). Same purity discipline as the
+ * keyboard callback: no FFI/Electron calls inside the dispatch; the screen
+ * point is decoded here (plain reads) and the event deferred.
+ */
+const mousePtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bigint => {
+  if (nCode >= 0 && hookPtr && callNextHookEx) {
+    if (mouseTracking && wParam === WM_LBUTTONDOWN) {
+      try {
+        const m = koffi.decode(lParam, MSLLHOOKSTRUCT)
+        defer(() => activeEvents?.onMouseDown({ x: m.pt_x, y: m.pt_y }))
+      } catch {
+        // ignore malformed structs — click-outside detection degrades
+      }
+    }
+  }
+  return callNextHookEx ? callNextHookEx(hookPtr, nCode, wParam, lParam) : 1n
+}, koffi.pointer(koffi.proto('intptr_t (int nCode, uintptr_t wParam, intptr_t lParam)')))
+
+/** Enable/disable click-outside tracking while the panel is interactive. */
+export function setMouseTracking(enabled: boolean): void {
+  mouseTracking = enabled
+}
+
 function sendSyntheticAltUp(): void {
   if (!sendInput) return
   try {
@@ -275,6 +332,12 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
     console.error('[Hook] SetWindowsHookExW failed — Alt+Tab takeover disabled')
     return
   }
+  // Same pump drives the mouse hook; failure only disables click-outside
+  // detection (keyboard takeover is unaffected).
+  mouseHookPtr = setWindowsHookExW(WH_MOUSE_LL, mousePtr, null, 0)
+  if (!mouseHookPtr) {
+    console.error('[Hook] WH_MOUSE_LL failed — click-outside detection disabled')
+  }
   pumpTimer = setInterval(() => {
     if (peekMessageW) {
       // Bounded drain: an unbounded while loop starves libuv timers while
@@ -300,7 +363,12 @@ export function stopKeyboardHook(): void {
     unhookWindowsHookEx(hookPtr)
     hookPtr = null
   }
+  if (mouseHookPtr && unhookWindowsHookEx) {
+    unhookWindowsHookEx(mouseHookPtr)
+    mouseHookPtr = null
+  }
   activeEvents = null
   state = 'idle'
+  mouseTracking = false
   clearTapTimer()
 }

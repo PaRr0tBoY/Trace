@@ -1,29 +1,30 @@
 /**
- * MarkdownPreview — Markdown → React renderer for note previews, scoped to
- * the NotchNotes MarkdownEngine feature set.
+ * MarkdownPreview — Markdown → React renderer for note previews.
  *
- * Inline: **bold**, *italic*, ***bold italic***, `code`, [label](url),
- * [[wiki link]], bare http(s) URLs. Block: #..###### headings, fenced code,
- * bullet (-/•) / numbered / todo lists, `---` horizontal rules, paragraphs.
+ * Inline: **bold**, *italic*, ***bold italic***, ~~strike~~, `code`,
+ * [label](url), [[wiki link]], bare http(s) URLs. Block: #..###### headings,
+ * fenced code, bullet (-/•) / numbered / todo lists, `> ` blockquotes,
+ * `---` horizontal rules, paragraphs.
  *
- * Matches NotchNotes exactly where it draws the line: blockquotes and
- * strike-through (`~~`) are NOT rendered (they are plain text), and there
- * are no tables, images, or LaTeX. Output is plain React elements — note
- * content is never injected as HTML. Links render without href so a click
- * inside a preview opens the editor instead of navigating the panel.
+ * Beyond NotchNotes' MarkdownEngine scope on purpose: NotchNotes itself does
+ * not render blockquotes or strike-through (they stay plain text there), but
+ * the Trace preview renders them per explicit product request. Still absent:
+ * tables, images, LaTeX. Output is plain React elements — note content is
+ * never injected as HTML. Links render without href so a click inside a
+ * preview opens the editor instead of navigating the panel.
  */
 import { useMemo } from 'react'
 import type { JSX, ReactNode } from 'react'
 
 type InlinePart =
-  | { kind: 'text' | 'bold' | 'italic' | 'boldItalic' | 'code'; text: string }
+  | { kind: 'text' | 'bold' | 'italic' | 'boldItalic' | 'strike' | 'code'; text: string }
   | { kind: 'link'; text: string; href: string }
   | { kind: 'wiki' | 'auto'; text: string }
 
-// Longest markers first (`***` before `**` before `*`); `~~strike~~` is
-// deliberately absent — NotchNotes does not render it either.
+// Longest markers first (`***` before `**` before `*`); `~~strike~~` renders
+// as a deletion line (product request — NotchNotes keeps it plain text).
 const INLINE_RE =
-  /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`|\[[^\]\n]+\]\([^)\s]+\)|\[\[[^\]\n]+\]\]|https?:\/\/[^\s<]+?(?=[\s<),;:!?。，；：！？]|$))/g
+  /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*|~~[^~\n]+~~|`[^`\n]+`|\[[^\]\n]+\]\([^)\s]+\)|\[\[[^\]\n]+\]\]|https?:\/\/[^\s<]+?(?=[\s<),;:!?。，；：！？]|$))/g
 
 function parseInline(text: string): InlinePart[] {
   const parts: InlinePart[] = []
@@ -35,6 +36,7 @@ function parseInline(text: string): InlinePart[] {
     if (token.startsWith('***')) parts.push({ kind: 'boldItalic', text: token.slice(3, -3) })
     else if (token.startsWith('**')) parts.push({ kind: 'bold', text: token.slice(2, -2) })
     else if (token.startsWith('*')) parts.push({ kind: 'italic', text: token.slice(1, -1) })
+    else if (token.startsWith('~~')) parts.push({ kind: 'strike', text: token.slice(2, -2) })
     else if (token.startsWith('`')) parts.push({ kind: 'code', text: token.slice(1, -1) })
     else if (token.startsWith('[[')) parts.push({ kind: 'wiki', text: token.slice(2, -2) })
     else if (token.startsWith('[')) {
@@ -63,6 +65,8 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
             <em>{part.text}</em>
           </strong>
         )
+      case 'strike':
+        return <s key={key}>{part.text}</s>
       case 'code':
         return <code key={key}>{part.text}</code>
       case 'link':
@@ -91,7 +95,7 @@ function collectList(start: number, lines: string[], re: RegExp): RegExpExecArra
 }
 
 /** Block-starting prefixes — a paragraph ends where a new block begins. */
-const BLOCK_START = /^(```|#{1,6}\s|[-*•]\s|\d+\.\s)/
+const BLOCK_START = /^(```|#{1,6}\s|>|[-*•]\s|\d+\.\s)/
 
 function renderBlocks(text: string): ReactNode[] {
   const lines = text.split('\n')
@@ -139,12 +143,29 @@ function renderBlocks(text: string): ReactNode[] {
       continue
     }
 
+    // Blockquote — consecutive `> ` lines merge into one quote block; each
+    // line keeps its own paragraph so multi-line quotes stay readable.
+    const quote = /^>\s?(.*)$/.exec(line)
+    if (quote) {
+      const items = collectList(i, lines, /^>\s?(.*)$/)
+      blocks.push(
+        <blockquote key={blockIndex++} className="md-quote">
+          {items.map((m, j) => (
+            <p key={j}>{renderInline(m[1], `q${blockIndex}-${j}`)}</p>
+          ))}
+        </blockquote>
+      )
+      i += items.length
+      continue
+    }
+
     // Bullet / todo list — a todo marker anywhere in the block makes it a
-    // todo list (checked items render with a checkbox glyph).
+    // todo list (checked items render with a checkbox glyph). Empty items
+    // (`- [ ]` alone) still render their checkbox.
     const bullet = /^[-*•]\s+(.+)$/.exec(line)
     if (bullet) {
       const items = collectList(i, lines, /^[-*•]\s+(.+)$/)
-      const todos = items.map((m) => /^\[([ xX])\]\s+(.+)$/.exec(m[1]))
+      const todos = items.map((m) => /^\[([ xX])\]\s*(.*)$/.exec(m[1]))
       const isTodo = todos.some((t) => t !== null)
       blocks.push(
         <ul key={blockIndex++} className={isTodo ? 'md-todo' : 'md-bullets'}>

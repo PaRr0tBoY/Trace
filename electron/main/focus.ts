@@ -16,10 +16,13 @@
  *
  * Design (activation on demand, session-held while typing):
  *   - requestPanelFocus (renderer `ui:input-focus` from pointerdown/focusin
- *     on an editable element): strip WS_EX_NOACTIVATE, then win.focus() — the
- *     window truly activates and Chromium routes keys. skipTaskbar is
- *     re-asserted so no taskbar button appears. Stealing the foreground is
- *     exactly what the user asked for by clicking an input.
+ *     on an editable element, or from the notes view auto-focus on panel
+ *     open): strip WS_EX_NOACTIVATE, then win.focus() — falling back to
+ *     app.focus({ steal: true }) when the Windows foreground lock rejects
+ *     the plain focus (hover-open is not a user input event). skipTaskbar
+ *     is re-asserted so no taskbar button appears. Stealing the foreground
+ *     is exactly what the user asked for by clicking an input — or by the
+ *     notes editor auto-focusing.
  *   - While an input is focused the activated state is KEPT (input blur does
  *     not release it), so switching between inputs (input <-> textarea)
  *     never flickers the window or re-steals the foreground.
@@ -36,6 +39,7 @@
  * Every step fails silent: a hiccup degrades to "input focus request
  * ignored", never a crash.
  */
+import { app } from 'electron'
 import koffi from 'koffi'
 import { getMainWindow } from './window'
 
@@ -83,6 +87,12 @@ export function requestPanelFocus(): void {
   }
   try {
     win.focus()
+    // Windows foreground lock: a hover-opened panel is not a "user input"
+    // event, so win.focus() can be silently ignored and keystrokes keep
+    // going to the external app while the caret merely appears inside.
+    // app.focus({ steal: true }) bypasses the lock — exactly what the
+    // auto-focus-into-editor feature asked for.
+    if (!win.isFocused()) app.focus({ steal: true })
   } catch {
     // fail silent
   }

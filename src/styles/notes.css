@@ -315,13 +315,18 @@
 }
 
 .notes-preview .md-todo-box {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 10px;
   height: 10px;
   border: 1px solid var(--text-secondary);
   border-radius: 3px;
   flex-shrink: 0;
   align-self: center;
+  font-size: 8px;
+  line-height: 1;
+  color: var(--text-primary);
 }
 
 .notes-preview .md-todo-done {
@@ -338,6 +343,17 @@
   font-size: 11px;
   white-space: pre-wrap;
   color: var(--text-secondary);
+}
+
+.notes-preview .md-quote {
+  margin: 4px 0;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--edge-strong);
+  color: var(--text-secondary);
+}
+
+.notes-preview .md-quote p {
+  margin: 0;
 }
 
 .notes-preview p {
@@ -481,6 +497,17 @@
   padding: 3px 5px;
   font-size: 9.5px;
   white-space: pre-wrap;
+}
+
+.notes-card-preview .md-quote {
+  margin: 2px 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--edge-strong);
+  color: var(--text-secondary);
+}
+
+.notes-card-preview .md-quote p {
+  margin: 0;
 }
 
 /* ── Single-note mode: editor + all-notes modal ─────────────────── */

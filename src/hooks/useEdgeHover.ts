@@ -500,7 +500,6 @@ export function useEdgeHover(): void {
       // window deactivation and replays a focusin when the window regains
       // interactivity, which the App.tsx bridge would misread as a fresh
       // input click and re-activate the window (stealing the foreground).
-      const editing = notesEditorActive()
       const active = document.activeElement
       if (active instanceof HTMLElement && active.matches('input, textarea, [contenteditable]')) {
         active.blur()
@@ -510,9 +509,9 @@ export function useEdgeHover(): void {
       // Don't close during an external OS file drag — the drag surface may
       // temporarily shift focus to the OS drag-ghost or file manager.
       if (state.dragActive && !state.internalDragReq) return
-      // A note editor in progress holds the panel open across focus loss;
-      // the user is coming back to keep typing.
-      if (editing) return
+      // Clicking anywhere outside the panel hands the OS focus away; the
+      // panel must close then, even mid-edit — an active editor does NOT
+      // hold it open across a real focus loss (the note is saved live).
       scheduleClose(400)
     }
 

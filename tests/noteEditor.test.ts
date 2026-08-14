@@ -111,12 +111,12 @@ describe('continueOnEnter', () => {
 })
 
 describe('markdown decoration builder', () => {
-  const decorate = (doc: string, anchor = 0, head?: number) =>
+  const decorate = (doc: string, anchor = 0, head?: number, reading = false) =>
     buildDecorations({
       state: EditorState.create({
         doc,
         selection: { anchor, head: head ?? anchor },
-        extensions: [markdown({ base: markdownLanguage })]
+        extensions: [markdown({ base: markdownLanguage }), reading ? EditorState.readOnly.of(true) : []]
       })
     } as unknown as EditorView)
 
@@ -176,6 +176,40 @@ describe('markdown decoration builder', () => {
     expect(replaceCount('plain\n#title')).toBe(0)
     expect(replaceCount('plain\n>quote')).toBe(0)
     expect(replaceCount('plain\n-')).toBe(0)
+  })
+
+  it('hides heading/quote markers together with their trailing space', () => {
+    const widgetRanges = (doc: string, anchor = 0) => {
+      const out: [number, number][] = []
+      decorate(doc, anchor).between(0, doc.length, (f, t, v) => {
+        if (v.spec.widget) out.push([f, t])
+      })
+      return out
+    }
+    // 'plain\n' occupies 0..6; the widget must cover `# ` (6..8), not
+    // just `#` — otherwise the rendered heading keeps a phantom space.
+    expect(widgetRanges('plain\n# title')).toEqual([[6, 8]])
+    expect(widgetRanges('plain\n> quote')).toEqual([[6, 8]])
+    expect(widgetRanges('plain\n#   title')).toEqual([[6, 10]])
+    // Multiple spaces after a list bullet stay (they separate dot and text).
+    expect(widgetRanges('plain\n-   item')).toEqual([[6, 7]])
+  })
+
+  it('reading (readonly) mode never reveals any marker', () => {
+    const replaceCount = (doc: string, anchor = 0, reading = false) => {
+      let n = 0
+      decorate(doc, anchor, undefined, reading).between(0, doc.length, (_f, _t, value) => {
+        if (value.spec.widget) n++
+      })
+      return n
+    }
+    // Caret inside the content / at the marker edge: revealed when
+    // editing, hidden when reading.
+    expect(replaceCount('**bold**', 4)).toBe(0)
+    expect(replaceCount('**bold**', 4, true)).toBe(2)
+    expect(replaceCount('# title', 3)).toBe(0)
+    expect(replaceCount('# title', 3, true)).toBe(1)
+    expect(replaceCount('- [ ] task', 3, true)).toBe(2)
   })
 
   it('hides inline markers when the caret is away, reveals them while editing the construct', () => {

@@ -18,7 +18,7 @@
 import { useEffect, useRef } from 'react'
 import type { MutableRefObject } from 'react'
 import type { SyntaxNode } from '@lezer/common'
-import { EditorState } from '@codemirror/state'
+import { Compartment, EditorState } from '@codemirror/state'
 import type { Range } from '@codemirror/state'
 import {
   Decoration,
@@ -144,12 +144,15 @@ export function buildDecorations(view: EditorView): DecorationSet {
   const tree = syntaxTree(view.state)
   const { from: selFrom, to: selTo } = view.state.selection.main
   const selSpan = selFrom !== selTo
+  // Reading mode (readonly) is a pure render view: no marker is ever
+  // revealed, not even with the caret on the line or at a marker edge.
+  const reading = view.state.facet(EditorState.readOnly)
 
   tree.iterate({
     enter: (node) => {
       const { name, from, to } = node
       const line = view.state.doc.lineAt(from)
-      const caretOnLine = selFrom >= line.from && selFrom <= line.to
+      const caretOnLine = !reading && selFrom >= line.from && selFrom <= line.to
       if (MARKER_NODES[name]) {
         // Block markers (`#`, `>`, list markers): the caret on the line
         // reveals the raw marker so it can be edited (Obsidian behavior);
@@ -174,12 +177,16 @@ export function buildDecorations(view: EditorView): DecorationSet {
                     widget: new ListMarkerWidget(view.state.doc.sliceString(from, to))
                   }).range(from, to)
             )
+          } else if (active) {
+            // Heading/quote markers swallow their trailing space, so the
+            // rendered text starts flush at the line edge instead of
+            // keeping a phantom indent from the hidden `# ` / `> `.
+            let end = to
+            const doc = view.state.doc
+            while (end < doc.length && doc.sliceString(end, end + 1) === ' ') end++
+            decos.push(Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, end))
           } else {
-            decos.push(
-              active
-                ? Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to)
-                : mark(from, to, 'cm-md-marker')
-            )
+            decos.push(mark(from, to, 'cm-md-marker'))
           }
           return
         }
@@ -195,7 +202,7 @@ export function buildDecorations(view: EditorView): DecorationSet {
         const parent = node.node.parent
         const inContent = parent !== null && selFrom >= parent.from && selFrom <= parent.to
         const near =
-          inContent ||
+          (!reading && inContent) ||
           (caretOnLine &&
             ((selFrom >= from - 1 && selFrom <= to + 1) || (selTo >= from - 1 && selTo <= to + 1))) ||
           (selSpan && selFrom <= to && selTo >= from)
@@ -428,7 +435,8 @@ export function MarkdownEditor({
   onDocChange,
   onCaretChange,
   initialCaret,
-  editorRef
+  editorRef,
+  reading = false
 }: {
   value: string
   placeholder?: string
@@ -436,8 +444,11 @@ export function MarkdownEditor({
   onCaretChange: (pos: number) => void
   initialCaret?: number
   editorRef?: MutableRefObject<EditorView | null>
+  /** Reading mode = pure render view: readonly, no markdown markers. */
+  reading?: boolean
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
+  const readOnly = useRef(new Compartment()).current
 
   useEffect(() => {
     const host = hostRef.current
@@ -460,6 +471,7 @@ export function MarkdownEditor({
           markdownDeco,
           linkClick,
           enterContinuation,
+          readOnly.of(reading ? EditorState.readOnly.of(true) : []),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           cmPlaceholder(placeholder ?? ''),
           EditorView.lineWrapping,
@@ -487,5 +499,12 @@ export function MarkdownEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return <div ref={hostRef} className="notes-cm-host" />
+  // Toggle reading mode live: reconfigure the readonly compartment. The
+  // decorations read the same facet, so all markers hide/unhide together.
+  useEffect(() => {
+    const view = editorRef?.current
+    if (view) view.dispatch({ effects: readOnly.reconfigure(reading ? EditorState.readOnly.of(true) : []) })
+  }, [reading, editorRef, readOnly])
+
+  return <div ref={hostRef} className="notes-cm-host" data-reading={reading} />
 }

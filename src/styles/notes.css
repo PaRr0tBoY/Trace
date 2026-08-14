@@ -208,6 +208,13 @@
   color: #f87171;
 }
 
+/* Reading (pure render) mode: the toggle button stays lit and the editor
+ * caret is hidden — nothing suggests the text can be edited. */
+.notes-bar-btn.active {
+  background: rgba(var(--accent-rgb), 0.18);
+  color: var(--accent);
+}
+
 .notes-editor-title {
   flex: 1;
   min-width: 0;
@@ -423,6 +430,11 @@
 .notes-toolbar-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
+}
+
+.notes-cm-host[data-reading='true'] .cm-cursor,
+.notes-cm-host[data-reading='true'] .cm-selectionBackground {
+  display: none;
 }
 
 /* ── Markdown preview (MarkdownPreview) ─────────────────────── */

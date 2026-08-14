@@ -14,7 +14,7 @@
  */
 import { AnimatePresence, motion } from 'framer-motion'
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
-import { Bold, Italic, Strikethrough, Code, Link, Quote, List, ListOrdered, ListChecks } from 'lucide-react'
+import { Bold, Italic, Strikethrough, Code, Link, Quote, List, ListOrdered, ListChecks, BookOpen, PenLine } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
@@ -74,9 +74,9 @@ function NoteEditor({
   const pendingValue = useRef(note.content)
   const initialContent = useRef(note.content)
   const saveTimer = useRef<number | null>(null)
-  // The editor is always in live-rendering mode — there is no separate
-  // preview toggle anymore (removed per product request; the WYSIWYG
-  // decorations make the editor show the rendered result directly).
+  // Reading mode (Obsidian-style): a pure render view where all markdown
+  // markers stay hidden and the editor is readonly.
+  const [reading, setReading] = useState(false)
 
   const schedulePush = (value: string) => {
     pendingValue.current = value
@@ -146,6 +146,14 @@ function NoteEditor({
             </button>
             <button
               type="button"
+              className={`notes-bar-btn${reading ? ' active' : ''}`}
+              title={reading ? t('notes.editMode') : t('notes.readMode')}
+              onClick={() => setReading((v) => !v)}
+            >
+              {reading ? <BookOpen size={13} strokeWidth={2} /> : <PenLine size={13} strokeWidth={2} />}
+            </button>
+            <button
+              type="button"
               className="notes-bar-btn"
               title={t('notes.allNotes')}
               onClick={() => {
@@ -204,6 +212,14 @@ function NoteEditor({
             >
               <ChevronDownIcon width={14} height={14} />
             </button>
+            <button
+              type="button"
+              className={`notes-bar-btn${reading ? ' active' : ''}`}
+              title={reading ? t('notes.editMode') : t('notes.readMode')}
+              onClick={() => setReading((v) => !v)}
+            >
+              {reading ? <BookOpen size={14} strokeWidth={2} /> : <PenLine size={14} strokeWidth={2} />}
+            </button>
             <span className="notes-editor-title">{note.title || t('notes.untitled')}</span>
             <button
               type="button"
@@ -230,6 +246,7 @@ function NoteEditor({
         initialCaret={noteCaret[note.id]}
         onDocChange={schedulePush}
         onCaretChange={(pos) => setNoteCaret(note.id, pos)}
+        reading={reading}
       />
 
       <div className="notes-toolbar">

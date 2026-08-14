@@ -1,5 +1,5 @@
 /**
- * Drag detection (T4b, ADR-0007 T4a addendum).
+ * Drag detection (T4b, ADR-0007 T4a addendum + real-drag data 2026-08-14).
  *
  * Runs inside a utilityProcess (dragHost.ts) — same isolation rationale as
  * keyboardHook.ts/hookHost.ts: an OS hook callback dispatched from the
@@ -7,27 +7,25 @@
  * (verified on-device for WH_KEYBOARD_LL; the WinEvent hook gets the same
  * treatment to stay on the safe side).
  *
- * Primary source: SetWinEventHook for EVENT_SYSTEM_DRAGDROPSTART (0x0F) /
- * EVENT_SYSTEM_DRAGDROPEND (0x10), driven by a 4 ms PeekMessageW pump (WinEvent
- * callbacks are delivered via the message queue; no pump = silent hook).
- * The 0x0F event carries the drag SOURCE window hwnd — the only signal that
- * can classify file-vs-non-file at drag start. Classes that mean "file drag":
- * Explorer / desktop (CabinetWClass, SysListView32, Progman, WorkerW,
- * Shelldll_DefView, Shell_TrayWnd); everything else (browser selections,
- * Office, ...) is not a file drag and must never expand the panel.
+ * Primary START source: SetWinEventHook for EVENT_SYSTEM_CAPTURESTART (0x08).
+ * Measured on-device (2026-08-14, Explorer file drags): ole32 captures the
+ * mouse to its clipboard window — class CLIPBRDWNDCLASS — for the whole OLE
+ * drag; the event hwnd reads that class. 0x0F (DRAGDROPSTART) never fires on
+ * this system and the classic 'DragWindow' ghost is not a findable top-level
+ * window, so both earlier start paths are dead for real drags. Any OLE drag
+ * (files, text, links) expands the panel — the drop can land in the save
+ * zone regardless of payload; end-time heuristics keep it non-intrusive.
  *
- * Fallback source: 60 ms DragWindow poll (FindWindowW('DragWindow')). If the
- * hook events never fire (injected-drag experiments suggest they may not,
- * real-drag data pending), the poll still sees the OLE drag ghost window
- * appear/disappear. It has no source window, so isFileDrag is reported false
- * and the manager applies the ADR fallback: cursor inside the panel ⇒ file
- * drag (the "grab a file onto Trace" gesture).
+ * Primary END source: EVENT_SYSTEM_DRAGDROPEND (0x10) — fires 3/3 on real
+ * drags. EVENT_SYSTEM_CAPTUREEND (0x09, same CLIPBRDWND gate) is the
+ * equivalent fallback (same moment, capture release); both map to the
+ * success/cancel heuristic identically. The 60 ms DragWindow poll stays as a
+ * legacy fallback for systems that do create the ghost (Win10-era OLE).
  *
- * Both sources feed the same fact shape { isFileDrag, cursorInPanel,
- * dragActive } (dragSession.ts consumes it), so switching is seamless.
- * Dedup: the first source to see a drag start owns the session; the hook's
- * 0x10 is authoritative for the end (the poll cannot see the ghost vanish
- * reliably across all targets).
+ * All sources feed the same fact shape { isFileDrag, srcClass, cursor }
+ * (dragSession.ts consumes it), so switching is seamless. Dedup: the first
+ * source to see a drag start owns the session (activeBy); the end only
+ * fires for the owning source or via 0x10/hook.
  *
  * The callback itself only records the hwnd and defers the classification:
  * koffi calls from inside hook dispatch are what froze Electron (see
@@ -35,6 +33,8 @@
  */
 import koffi from 'koffi'
 
+const EVENT_SYSTEM_CAPTURESTART = 0x08
+const EVENT_SYSTEM_CAPTUREEND = 0x09
 const EVENT_SYSTEM_DRAGDROPSTART = 0x0f
 const EVENT_SYSTEM_DRAGDROPEND = 0x10
 const WINEVENT_OUTOFCONTEXT = 0x0000
@@ -129,7 +129,7 @@ export interface DragDetectStartFacts {
 }
 
 export interface DragDetectEndFacts {
-  reason: 'hook' | 'dragwindow'
+  reason: 'hook' | 'dragwindow' | 'capture'
   cursor: { x: number; y: number }
   /** Drop-target heuristics for T3 (ADR-0007 addendum point 2). */
   fgExe: string
@@ -181,7 +181,7 @@ function readCursor(): { x: number; y: number } {
 }
 
 /** Full end-time fact set: cursor + drop-target heuristics (T3 input). */
-function readEndFacts(reason: 'hook' | 'dragwindow'): DragDetectEndFacts {
+function readEndFacts(reason: 'hook' | 'dragwindow' | 'capture'): DragDetectEndFacts {
   const cursor = readCursor()
   const fg = getForegroundWindow ? getForegroundWindow() : null
   const fgPid = [0]
@@ -199,11 +199,12 @@ function readEndFacts(reason: 'hook' | 'dragwindow'): DragDetectEndFacts {
   return { reason, cursor, fgExe, fgClass: readClassName(fg), curClass, curExe }
 }
 
-// ---- session state (single drag session, dedup across both sources) ----
+// ---- session state (single drag session, dedup across all sources) ----
 let active = false
-/** Which source owns the current session ('hook' | 'poll'). */
-let activeBy: 'hook' | 'poll' | null = null
+/** Which source owns the current session ('hook' | 'poll' | 'capture'). */
+let activeBy: 'hook' | 'poll' | 'capture' | null = null
 let hookPtr: unknown = null
+let captureHookPtr: unknown = null
 let pumpTimer: ReturnType<typeof setInterval> | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let activeEvents: DragDetectEvents | null = null
@@ -211,6 +212,8 @@ let activeEvents: DragDetectEvents | null = null
 // The 0x0F source hwnd, captured inside the callback (koffi calls deferred —
 // see file header) and consumed by the deferred classification.
 let pendingStartHwnd: unknown = null
+// The 0x08/0x09 capture hwnd (the OLE drag window — class CLIPBRDWNDCLASS).
+let pendingCaptureHwnd: unknown = null
 
 /**
  * Persistent trampoline — an auto-registered JS callback only lives for one
@@ -219,7 +222,13 @@ let pendingStartHwnd: unknown = null
  * event-broadcast (see file header for the freeze rationale).
  */
 const winEventCb = koffi.register((_hook: unknown, event: number, hwnd: unknown, _idObject: number, _idChild: number, _idThread: number, _msTime: number): void => {
-  if (event === EVENT_SYSTEM_DRAGDROPSTART) {
+  if (event === EVENT_SYSTEM_CAPTURESTART) {
+    pendingCaptureHwnd = hwnd
+    defer(() => handleCaptureStart())
+  } else if (event === EVENT_SYSTEM_CAPTUREEND) {
+    pendingCaptureHwnd = hwnd
+    defer(() => handleCaptureEnd())
+  } else if (event === EVENT_SYSTEM_DRAGDROPSTART) {
     pendingStartHwnd = hwnd
     defer(() => handleHookStart())
   } else if (event === EVENT_SYSTEM_DRAGDROPEND) {
@@ -249,6 +258,47 @@ function handleHookEnd(): void {
   activeBy = null
   if (DEBUG) console.log('[DragDetect] end (hook)')
   activeEvents?.onEnd(readEndFacts('hook'))
+}
+
+/**
+ * CAPTURESTART with the OLE clipboard window: the mouse just got captured
+ * for a DoDragDrop loop (measured on-device — ole32 captures to class
+ * CLIPBRDWNDCLASS for the whole drag; plain clicks/selection-drags capture
+ * to the source window's own class). This is the ONLY start signal that
+ * fires on real drags here (0x0F never does, and the DragWindow ghost is
+ * not a findable top-level window on Win11). Any OLE drag expands the panel
+ * — the save zone accepts files, text and links alike.
+ */
+function handleCaptureStart(): void {
+  if (active) return // another source already owns the session
+  const cls = readClassName(pendingCaptureHwnd)
+  pendingCaptureHwnd = null
+  if (!cls.startsWith('CLIPBRDWND')) return // not an OLE drag
+  active = true
+  activeBy = 'capture'
+  const cursor = readCursor()
+  // Source window for the record (the drag's origin — Explorer etc.); the
+  // manager treats OLE drags as file drags regardless.
+  const src = windowFromPoint ? windowFromPoint(cursor) : null
+  const srcClass = readClassName(src)
+  if (DEBUG) console.log('[DragDetect] start (OLE capture) srcClass=' + srcClass)
+  activeEvents?.onStart({ isFileDrag: true, srcClass, cursor })
+}
+
+/**
+ * CAPTUREEND of the OLE clipboard window = the drag loop released the mouse
+ * (same moment DoDragDrop returns, so 0x10 fires too — first one wins, the
+ * session dedup drops the stray). Both map to the same end facts.
+ */
+function handleCaptureEnd(): void {
+  if (!active || activeBy !== 'capture') return
+  const cls = readClassName(pendingCaptureHwnd)
+  pendingCaptureHwnd = null
+  if (!cls.startsWith('CLIPBRDWND')) return
+  active = false
+  activeBy = null
+  if (DEBUG) console.log('[DragDetect] end (capture released)')
+  activeEvents?.onEnd(readEndFacts('capture'))
 }
 
 function pollOnce(): void {
@@ -291,10 +341,11 @@ export function startDragDetect(events: DragDetectEvents): void {
   activeEvents = events
   if (setWinEventHook && winEventProto) {
     hookPtr = setWinEventHook(EVENT_SYSTEM_DRAGDROPSTART, EVENT_SYSTEM_DRAGDROPEND, null, winEventCb, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS)
-    if (hookPtr) {
-      console.log('[DragDetect] ✓ init complete (SetWinEventHook 0x0F/0x10 + pump + DragWindow poll)')
+    captureHookPtr = setWinEventHook(EVENT_SYSTEM_CAPTURESTART, EVENT_SYSTEM_CAPTUREEND, null, winEventCb, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS)
+    if (captureHookPtr) {
+      console.log('[DragDetect] ✓ init complete (0x08/0x09 capture hook + 0x0F/0x10 hook + DragWindow poll)')
     } else {
-      console.error('[DragDetect] SetWinEventHook failed — DragWindow poll only (degraded classification)')
+      console.error('[DragDetect] capture hook failed — drag start detection degraded')
     }
   }
   pumpTimer = setInterval(() => {
@@ -307,7 +358,7 @@ export function startDragDetect(events: DragDetectEvents): void {
     }
   }, PUMP_MS)
   pollTimer = setInterval(pollOnce, DRAGWINDOW_POLL_MS)
-  if (!hookPtr) console.log('[DragDetect] ✓ init complete (DragWindow poll only)')
+  if (!captureHookPtr) console.log('[DragDetect] ✓ init complete (DragWindow poll only)')
 }
 
 /** Unhook, stop pumps, reset session. Idempotent. */
@@ -324,9 +375,14 @@ export function stopDragDetect(): void {
     unhookWinEvent(hookPtr)
     hookPtr = null
   }
+  if (captureHookPtr && unhookWinEvent) {
+    unhookWinEvent(captureHookPtr)
+    captureHookPtr = null
+  }
   activeEvents = null
   active = false
   activeBy = null
   dragWindowSeen = false
   pendingStartHwnd = null
+  pendingCaptureHwnd = null
 }

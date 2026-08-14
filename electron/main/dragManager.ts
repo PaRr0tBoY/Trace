@@ -47,7 +47,7 @@ interface HostStartMsg {
 
 interface HostEndMsg {
   type: 'end'
-  reason: 'hook' | 'dragwindow'
+  reason: 'hook' | 'dragwindow' | 'capture'
   cursor: { x: number; y: number }
   fgExe: string
   fgClass: string
@@ -144,13 +144,14 @@ function armTimeout(): void {
 
 function handleStart(msg: HostStartMsg): void {
   const cursorInPanel = cursorInPanelAt(msg.cursor)
-  // Real-drag data (ADR-0007 T4a): 0x0F never fires, so every start comes
-  // from the DragWindow poll, which cannot name a source window (srcClass
-  // ''). Classifying that as a non-file drag made the panel never expand —
-  // a drag from Explorer (cursor over Explorer, outside the panel) stayed
-  // dead. Unknown-source drags now count as file drags: the panel pops for
-  // any drag so the save zone can receive the drop (T5/T7 need it too);
-  // hook-path starts keep the precise class-based classification.
+  // Real-drag data (ADR-0007 T4a + 2026-08-14 capture measurements): starts
+  // come from the capture hook (OLE drags — ole32 captures the mouse to its
+  // CLIPBRDWNDCLASS window) or the DragWindow poll, neither of which names
+  // a source window the manager could classify; 0x0F never fires. Treating
+  // unknown-source drags as non-file made the panel never expand — a drag
+  // from Explorer stayed dead. Unknown-source drags now count as file drags:
+  // the panel pops for any drag so the save zone can receive the drop
+  // (T5/T7 need it too); hook-path starts keep the precise classification.
   const isFileDrag = msg.isFileDrag || msg.srcClass === ''
   const { state, commands } = dragSessionTransition(
     session,
@@ -168,7 +169,7 @@ function dragEndSignal(msg: HostEndMsg): DragEndSignal {
   // hook end = 0x10 seen → success iff the cursor sits on an Explorer target
   // (decideDragEnd). dragwindow end = ghost vanished without 0x10 → cancel.
   // timeout end is built by armTimeout (neither flag set → elapsedMs verdict).
-  return msg.reason === 'hook'
+  return msg.reason === 'hook' || msg.reason === 'capture'
     ? { dragEndSeen: true, cursorClass: msg.curClass, cursorExe: msg.curExe }
     : { dragEndSeen: false, dragWindowGone: true, cursorClass: msg.curClass, cursorExe: msg.curExe }
 }

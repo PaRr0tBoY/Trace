@@ -53,7 +53,7 @@ export interface DragSessionState {
   startedAt: number
 }
 
-export type DragEndReason = 'hook' | 'dragwindow' | 'timeout'
+export type DragEndReason = 'hook' | 'dragwindow' | 'capture' | 'timeout'
 
 export type DragSessionEvent =
   | { type: 'start'; isFileDrag: boolean; cursorInPanel: boolean; panelOpen: boolean }

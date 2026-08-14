@@ -40,6 +40,16 @@ interface Props {
   animateLayout?: boolean
 }
 
+// Shimmer bookkeeping, module-level so it survives card remounts: unpinning
+// moves a card between the pinned and recent lists and switching views
+// remounts the whole list. Per-instance refs would replay the shimmer on
+// every remount while the capture is still inside the 4s window.
+const flashedCaptures = new Map<string, number>() // `${itemId}:${capturedAt}` -> when flashed
+const FLASH_RECORD_TTL_MS = 60_000
+// A button copy already shows the ripple; the next capture change inside
+// this window is counted as flashed instead of shimmering.
+let suppressFlashUntil = 0
+
 
 
 
@@ -60,33 +70,44 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
   // 'extended' motion level: items captured within the last 4s flash the
   // accent once when the panel opens. It fires on `open` (not on mount) —
   // copies happen while the panel is closed, and a mount-time flash would
-  // play out invisibly in the background. Each distinct capture plays once
-  // (lastFlashedAt); re-copying the same item updates capturedAt and re-flashes.
+  // play out invisibly in the background. Each distinct capture plays once;
+  // re-copying the same item updates capturedAt and re-flashes.
+  //
+  // The "played" and "button-copy suppressed" marks are module-level, not
+  // instance refs: unpinning moves a card between the pinned and recent
+  // lists and switching views remounts the whole list — a per-instance ref
+  // would replay the shimmer on every remount while the capture is still
+  // inside the 4s window.
   const motionLevel = useStore((s) => s.settings.motionLevel)
   const open = useStore((s) => s.open)
   const [flashVisible, setFlashVisible] = useState(false)
-  const lastFlashedAt = useRef(0)
+  useEffect(() => {
+    if (!open) return
+    const now = Date.now()
+    if (motionLevel === 'extended' && item.capturedAt > now - 4000) {
+      const key = `${item.id}:${item.capturedAt}`
+      if (flashedCaptures.size > 128) {
+        const cutoff = now - FLASH_RECORD_TTL_MS
+        for (const [k, ts] of flashedCaptures) {
+          if (ts < cutoff) flashedCaptures.delete(k)
+        }
+      }
+      if (!flashedCaptures.has(key)) {
+        flashedCaptures.set(key, now)
+        if (now >= suppressFlashUntil) {
+          setFlashVisible(true)
+        }
+      }
+    }
+  }, [open, motionLevel, item.capturedAt])
+
   // Button-copy ripples start at the button's position inside the card.
   const cardRef = useRef<HTMLDivElement>(null)
   const [rippleOrigin, setRippleOrigin] = useState<{ x: number; y: number } | null>(null)
   // Epoch bumps on every button copy so the ripple replays even when clicks
   // land while `copied` is still true (remount via key change).
   const [rippleEpoch, setRippleEpoch] = useState(0)
-  // A button copy already shows the ripple, so its shimmer is suppressed
-  // (but still counted as played — reopening the panel must not re-flash it).
-  const suppressFlashUntil = useRef(0)
-  useEffect(() => {
-    if (!open) return
-    const now = Date.now()
-    if (motionLevel === 'extended' && item.capturedAt > now - 4000 && item.capturedAt !== lastFlashedAt.current) {
-      lastFlashedAt.current = item.capturedAt
-      if (now >= suppressFlashUntil.current) {
-        setFlashVisible(true)
-      }
-    }
-  }, [open, motionLevel, item.capturedAt])
 
-  
   const isPreviewing = useStore((s) => s.previewItemId) === item.id
   useEffect(() => {
     if (!open) setExpanded(false)
@@ -100,7 +121,7 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
     if (cardRect) {
       setRippleOrigin({ x: e.clientX - cardRect.left, y: e.clientY - cardRect.top })
     }
-    suppressFlashUntil.current = Date.now() + 800
+    suppressFlashUntil = Date.now() + 800
     copy(item.id)
     setCopied(true)
     setRippleEpoch((n) => n + 1)

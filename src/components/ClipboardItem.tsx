@@ -17,10 +17,12 @@
 import { memo, useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ClipboardItemDto } from '../../shared/types'
+import type { StationEntryDto } from '../../shared/station'
 import { MAX_STACK } from '../../shared/types'
 import type { DragRequest } from '../../shared/types'
 import { useStore } from '../store/appStore'
 import { useDragOut } from '../hooks/useDragOut'
+import { edge } from '../lib/edge'
 import { basename, formatBytes, previewText, relativeTime, formatImageDisplayName } from '../lib/format'
 import { getFileKind } from '../lib/fileType'
 import { playButtonClickSound, playToggleSound, playDeleteSound, playCardExpandSound } from '../lib/soundEffects'
@@ -38,6 +40,10 @@ interface Props {
   /** FLIP position animation on list reorder; disabled on long lists (the
       O(n) layout pass + spring on every card is the reorder-frame cost). */
   animateLayout?: boolean
+  /** Single-file transfer-station entry rendered in the clipboard card
+      style (feedback: 单个文件不显示为组卡片). `item` is the display
+      conversion of this entry; actions route to the station channels. */
+  stationEntry?: StationEntryDto
 }
 
 
@@ -48,7 +54,7 @@ interface Props {
 /* Main item card                                                      */
 /* ------------------------------------------------------------------ */
 
-function ClipboardItemBase({ item, instant, animateLayout }: Props) {
+function ClipboardItemBase({ item, instant, animateLayout, stationEntry }: Props) {
   const copy = useStore.getState().copy
   const paste = useStore.getState().paste
   const togglePin = useStore.getState().togglePin
@@ -58,7 +64,8 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
   const [copied, setCopied] = useState(false)
   const [expanded, setExpanded] = useState(false)
 
-  
+  const isStation = stationEntry !== undefined
+
   const open = useStore((s) => s.open)
   useEffect(() => {
     if (!open) setExpanded(false)
@@ -70,15 +77,23 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
   const onCopy = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     playButtonClickSound()
-    copy(item.id)
+    if (stationEntry) {
+      void edge.stationCopyMember({ id: stationEntry.id, paths: stationEntry.paths })
+    } else {
+      copy(item.id)
+    }
     setCopied(true)
     window.setTimeout(() => setCopied(false), 900)
-  }, [copy, item.id])
+  }, [copy, item.id, stationEntry])
 
   const onPaste = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation()
-    tryPaste(() => paste(item.id))
-  }, [paste, item.id])
+    if (stationEntry) {
+      tryPaste(() => edge.stationPasteMember({ id: stationEntry.id, paths: stationEntry.paths }))
+    } else {
+      tryPaste(() => paste(item.id))
+    }
+  }, [paste, item.id, stationEntry])
 
   const onExpand = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation()
@@ -147,7 +162,7 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
         className={`item-main${isPreviewing ? ' force-actions previewing' : ''}`}
         data-id={item.id}
         draggable={!isPreviewing && (!isBundle || !expanded)}
-        onDragStart={(e) => handleDragStart(e, { id: item.id })}
+        onDragStart={(e) => handleDragStart(e, { id: item.id, ...(stationEntry ? { paths: stationEntry.paths } : {}) })}
         onDragEnd={() => setInternalDragReq(null)}
         onDragOver={(e) => {
           const activeDrag = useStore.getState().internalDragReq
@@ -166,7 +181,11 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
             // If they drop an entire item or a subitem onto another item, we merge them.
             // Currently our merge logic merges the entire source item. 
             // In the future we might want to merge just the subitem.
-            window.edge.mergeItems(activeDrag.id, item.id)
+            if (stationEntry) {
+              void useStore.getState().stationMerge(activeDrag.id, stationEntry.id)
+            } else {
+              window.edge.mergeItems(activeDrag.id, item.id)
+            }
             setInternalDragReq(null)
           } else if (activeDrag && activeDrag.id === item.id) {
             e.preventDefault()
@@ -214,25 +233,31 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
             onClick={(e) => {
               e.currentTarget.blur()
               playToggleSound(!item.pinned)
-              togglePin(item.id, !item.pinned)
+              if (stationEntry) {
+                void useStore.getState().stationPin(stationEntry.id, !item.pinned)
+              } else {
+                togglePin(item.id, !item.pinned)
+              }
             }}
           >
             {item.pinned ? <PinFillIcon /> : <PinIcon />}
           </button>
-          <button
-            className={`act${isPreviewing ? ' preview-contract active' : ' preview-expand'}`}
-            title={isPreviewing ? t('header.close') : t('item.expand')}
-            onClick={(e) => {
-              e.stopPropagation()
-              e.currentTarget.blur()
-              playCardExpandSound(!isPreviewing)
-              const rect = e.currentTarget.closest('.item-main')?.getBoundingClientRect()
-              const rectData = rect ? { y: rect.y, height: rect.height } : undefined
-              useStore.getState().setPreviewItemId(isPreviewing ? null : item.id, rectData)
-            }}
-          >
-            {isPreviewing ? <ContractIcon /> : <ExpandIcon />}
-          </button>
+          {!isStation && (
+            <button
+              className={`act${isPreviewing ? ' preview-contract active' : ' preview-expand'}`}
+              title={isPreviewing ? t('header.close') : t('item.expand')}
+              onClick={(e) => {
+                e.stopPropagation()
+                e.currentTarget.blur()
+                playCardExpandSound(!isPreviewing)
+                const rect = e.currentTarget.closest('.item-main')?.getBoundingClientRect()
+                const rectData = rect ? { y: rect.y, height: rect.height } : undefined
+                useStore.getState().setPreviewItemId(isPreviewing ? null : item.id, rectData)
+              }}
+            >
+              {isPreviewing ? <ContractIcon /> : <ExpandIcon />}
+            </button>
+          )}
           <button className="act" title={t('item.copy')} onClick={(e) => {
             e.currentTarget.blur()
             onCopy(e)
@@ -260,7 +285,11 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
             onClick={(e) => {
               e.currentTarget.blur()
               playDeleteSound()
-              remove(item.id)
+              if (stationEntry) {
+                void useStore.getState().stationDelete(stationEntry.id)
+              } else {
+                remove(item.id)
+              }
             }}
           >
             <TrashIcon />

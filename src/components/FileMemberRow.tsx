@@ -4,8 +4,8 @@
  * Reuses the expanded-stack single-file interactions verbatim: drag starts
  * an OS drag of that one path, click pastes it (copy-subitem semantics: the
  * parent entry is promoted, no new entry is created), the copy button copies
- * the path, the pin button pins the parent entry. Deletion is entry-level:
- * station rows get one here (the flat view shows no group card).
+ * the path, the pin button pins the parent entry. No delete — deletion is
+ * entry-level.
  *
  * The parent entry may live in the transfer station (ADR-0006) instead of
  * the clipboard stack; actions then route to the station channels. Station
@@ -18,8 +18,8 @@ import { useStore } from '../store/appStore'
 import { useDragOut } from '../hooks/useDragOut'
 import { formatBytes } from '../lib/format'
 import { getFileKind } from '../lib/fileType'
-import { playButtonClickSound, playDeleteSound, playToggleSound } from '../lib/soundEffects'
-import { CopyIcon, FileKindIcon, PinIcon, PinFillIcon, MinusIcon, TrashIcon } from './icons'
+import { playButtonClickSound, playToggleSound } from '../lib/soundEffects'
+import { CopyIcon, FileKindIcon, PinIcon, PinFillIcon, MinusIcon } from './icons'
 import { tryPaste } from '../lib/tryPaste'
 import { t } from '../i18n'
 import type { FileMember } from '../lib/fileTabs'
@@ -126,24 +126,6 @@ export function FileMemberRow({ member, showPin = true, onSplit }: Props) {
       >
         <CopyIcon width={12} height={12} />
       </button>
-      {isStation && (
-        // Station rows delete the parent entry (ADR-0006): the flat files
-        // view shows members, not group cards, so this is the entry's only
-        // delete surface in the list.
-        <button
-          className="act danger"
-          title={t('item.delete')}
-          onClick={(e) => {
-            e.stopPropagation()
-            e.currentTarget.blur()
-            playDeleteSound()
-            void useStore.getState().stationDelete(member.itemId)
-          }}
-          style={{ width: 24, height: 24 }}
-        >
-          <TrashIcon width={12} height={12} />
-        </button>
-      )}
       {onSplit && (
         <button
           className="act subitem-delete-btn"

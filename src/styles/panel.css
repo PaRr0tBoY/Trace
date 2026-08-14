@@ -467,6 +467,15 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+/* T6: route-filter group separator in the files secondary row. */
+.filter-divider {
+  width: 1px;
+  height: 12px;
+  margin: 0 2px;
+  background: var(--divider);
+  flex-shrink: 0;
+}
+
 .filter-chip {
   outline: none;
 }

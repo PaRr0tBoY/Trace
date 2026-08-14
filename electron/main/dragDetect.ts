@@ -27,9 +27,11 @@
  * source to see a drag start owns the session (activeBy); the end only
  * fires for the owning source or via 0x10/hook.
  *
- * The callback itself only records the hwnd and defers the classification:
- * koffi calls from inside hook dispatch are what froze Electron (see
- * keyboardHook.ts). Deferred work runs ~1 ms later in a plain timer context.
+ * The callback itself only defers the classification (the event hwnd is
+ * captured per event — a shared mutable would be overwritten by the next
+ * capture event before the deferred handler runs): koffi calls from inside
+ * hook dispatch are what froze Electron (see keyboardHook.ts). Deferred
+ * work runs ~1 ms later in a plain timer context.
  */
 import koffi from 'koffi'
 
@@ -212,8 +214,6 @@ let activeEvents: DragDetectEvents | null = null
 // The 0x0F source hwnd, captured inside the callback (koffi calls deferred —
 // see file header) and consumed by the deferred classification.
 let pendingStartHwnd: unknown = null
-// The 0x08/0x09 capture hwnd (the OLE drag window — class CLIPBRDWNDCLASS).
-let pendingCaptureHwnd: unknown = null
 
 /**
  * Persistent trampoline — an auto-registered JS callback only lives for one
@@ -223,11 +223,15 @@ let pendingCaptureHwnd: unknown = null
  */
 const winEventCb = koffi.register((_hook: unknown, event: number, hwnd: unknown, _idObject: number, _idChild: number, _idThread: number, _msTime: number): void => {
   if (event === EVENT_SYSTEM_CAPTURESTART) {
-    pendingCaptureHwnd = hwnd
-    defer(() => handleCaptureStart())
+    // The hwnd is captured per event: a shared mutable would be overwritten
+    // by the next capture event before the deferred handler runs, and the
+    // end handler would read a stale/cleared handle and never end the
+    // session (observed: every drag left the panel stuck for the timeout).
+    const hwndAtEvent = hwnd
+    defer(() => handleCaptureStart(hwndAtEvent))
   } else if (event === EVENT_SYSTEM_CAPTUREEND) {
-    pendingCaptureHwnd = hwnd
-    defer(() => handleCaptureEnd())
+    const hwndAtEvent = hwnd
+    defer(() => handleCaptureEnd(hwndAtEvent))
   } else if (event === EVENT_SYSTEM_DRAGDROPSTART) {
     pendingStartHwnd = hwnd
     defer(() => handleHookStart())
@@ -269,10 +273,9 @@ function handleHookEnd(): void {
  * not a findable top-level window on Win11). Any OLE drag expands the panel
  * — the save zone accepts files, text and links alike.
  */
-function handleCaptureStart(): void {
+function handleCaptureStart(hwnd: unknown): void {
   if (active) return // another source already owns the session
-  const cls = readClassName(pendingCaptureHwnd)
-  pendingCaptureHwnd = null
+  const cls = readClassName(hwnd)
   if (!cls.startsWith('CLIPBRDWND')) return // not an OLE drag
   active = true
   activeBy = 'capture'
@@ -290,10 +293,9 @@ function handleCaptureStart(): void {
  * (same moment DoDragDrop returns, so 0x10 fires too — first one wins, the
  * session dedup drops the stray). Both map to the same end facts.
  */
-function handleCaptureEnd(): void {
+function handleCaptureEnd(hwnd: unknown): void {
   if (!active || activeBy !== 'capture') return
-  const cls = readClassName(pendingCaptureHwnd)
-  pendingCaptureHwnd = null
+  const cls = readClassName(hwnd)
   if (!cls.startsWith('CLIPBRDWND')) return
   active = false
   activeBy = null
@@ -384,5 +386,4 @@ export function stopDragDetect(): void {
   activeBy = null
   dragWindowSeen = false
   pendingStartHwnd = null
-  pendingCaptureHwnd = null
 }

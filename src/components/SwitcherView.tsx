@@ -45,6 +45,8 @@ export function SwitcherView() {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const [query, setQuery] = useState('')
   const [drill, setDrill] = useState<SwitcherEntryDto | null>(null)
+  /** Selected sub-row inside a drill group (local — main only tracks row-level selection). */
+  const [drillSel, setDrillSel] = useState<number | null>(null)
   const [icons, setIcons] = useState<Record<string, string | null>>({})
   const listRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -78,6 +80,48 @@ export function SwitcherView() {
   useEffect(() => {
     if (pinned && seedQuery) setQuery(seedQuery)
   }, [pinned, seedQuery])
+
+  // Entering a drill group: start the highlight on the window that was
+  // selected in the main list (the group row's first window), else row 0.
+  useEffect(() => {
+    if (!drill) {
+      setDrillSel(null)
+      return
+    }
+    const wins = drill.windows ?? []
+    const selEntry = entries[selected]
+    const idx = selEntry ? wins.findIndex((w) => w.index === selEntry.index) : -1
+    setDrillSel(idx === -1 ? 0 : idx)
+  }, [drill]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Drill groups have no search input, so keyboard navigation lives on the
+  // window: arrows move the highlight (synced to main for execution), Enter
+  // switches to the highlighted window, Esc cancels the session.
+  const drillWins = drill?.windows ?? []
+  useEffect(() => {
+    if (!drill) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        const dir = e.key === 'ArrowDown' ? 1 : -1
+        const cur = drillSel ?? 0
+        const next = Math.min(Math.max(cur + dir, 0), drillWins.length - 1)
+        if (next === cur) return
+        setDrillSel(next)
+        const w = drillWins[next]
+        if (w) edge.switcherHover(w.index)
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        const w = drillWins[drillSel ?? 0]
+        if (w) edge.switcherClick(w.index)
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        edge.switcherCancel()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drill, drillSel, drillWins])
 
   // Resolve app icons in one batch (existing app:icons pipeline, cached main-side).
   // Grouped rows carry their sub-windows — those exePaths need icons too.
@@ -215,11 +259,14 @@ export function SwitcherView() {
           drill.windows?.map((win: SwitcherEntryDto, i: number) => (
             <motion.button
               key={win.index}
-              className={`switcher-row switcher-subrow${win.index === selected ? ' selected' : ''}`}
+              className={`switcher-row switcher-subrow${i === drillSel ? ' selected' : ''}`}
               initial={ROW_MOTION.initial}
               animate={ROW_MOTION.animate}
               transition={{ ...ROW_MOTION.transition, delay: i * 0.02 }}
-              onMouseEnter={() => edge.switcherHover(win.index)}
+              onMouseEnter={() => {
+                setDrillSel(i)
+                edge.switcherHover(win.index)
+              }}
               onClick={() => edge.switcherClick(win.index)}
               tabIndex={-1}
             >

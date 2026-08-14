@@ -62,6 +62,11 @@ let active = false
 let windows: SwitcherWindow[] = []
 let rows: Row[] = []
 let selectedRow = 0
+/** Exact window selection (z-order index into `windows`). Row-level for
+ * keyboard advance; window-level for hover/click inside a drill group —
+ * execute must activate the window the user actually picked, not always
+ * the group's first. */
+let selectedWin = 0
 /** Panel interactivity before the session started — restored on exit. */
 let prevInteractive = false
 /** Safety net: a session must end (execute) within this window or it is reset. */
@@ -101,6 +106,12 @@ function rowByIndex(index: number): Row | null {
   return null
 }
 
+/** Select a row (and the exact window within it when hovering/clicking a drill sub-row). */
+function selectRow(row: Row, winIndex?: number): void {
+  selectedRow = rows.indexOf(row)
+  selectedWin = winIndex ?? windows.indexOf(row.wins[0])
+}
+
 function winToDto(w: SwitcherWindow, index: number): SwitcherEntryDto {
   return { title: w.title, exePath: w.exePath, isCurrent: w.isCurrent, index }
 }
@@ -133,7 +144,8 @@ export function switcherShow(opts: { shiftDown: boolean }): void {
     if (entries.length < 2) return
     windows = entries
     rows = buildRows(entries, loadSettings().switcherGroupWindows)
-    selectedRow = opts.shiftDown ? rows.length - 1 : Math.min(1, rows.length - 1)
+    const initialRow = rows[opts.shiftDown ? rows.length - 1 : Math.min(1, rows.length - 1)]
+    selectRow(initialRow)
     active = true
     prevInteractive = isInteractive()
     runtime.switcherActive = true
@@ -212,7 +224,7 @@ function touchSession(): void {
 /** Tab / Shift+Tab repeat (keyboardHook onAdvance). */
 export function switcherAdvance(delta: 1 | -1): void {
   if (!active || rows.length === 0) return
-  selectedRow = (selectedRow + delta + rows.length) % rows.length
+  selectRow(rows[(selectedRow + delta + rows.length) % rows.length])
   touchSession()
   console.log('[Switcher] advance to', selectedRow, 'of', rows.length)
   broadcast('switcher:select', selectedRow)
@@ -223,7 +235,7 @@ export function switcherHover(index: number): void {
   if (!active) return
   const row = rowByIndex(index)
   if (!row) return
-  selectedRow = rows.indexOf(row)
+  selectRow(row, index)
   touchSession()
 }
 
@@ -232,39 +244,43 @@ export function switcherPin(initialQuery?: string): void {
   if (!active) return
   setHookPinned(true)
   broadcast('switcher:pin', initialQuery)
-  // The panel has been a non-activated NOACTIVATE window all session; the OS
-  // only routes keystrokes to the foreground window and Chromium drops
-  // element.focus() in an inactive document, so the search input would never
-  // receive input. requestPanelFocus strips NOACTIVATE and calls win.focus(),
-  // but that plain SetForegroundWindow can't bypass the foreground lock here
-  // (no click granted this process input rights — keys went to the hook
-  // host). activateHwnd is the same AttachThreadInput + SwitchToThisWindow
-  // path the switcher's own execute uses, so it forces the panel active and
-  // the renderer's focus retry then lands.
+  // The panel has been a non-activated NOACTIVATE window all session, so the
+  // search input can't receive keys. requestPanelFocus strips NOACTIVATE and
+  // calls win.focus() — but the foreground lock refuses that here (no click
+  // ever granted this process input rights; keys went to the hook host).
+  // Real activation happens on Alt-up (switcherPinReleased), see there.
   requestPanelFocus()
-  activatePanel()
   touchSession()
 }
 
-/** Force the panel window into the foreground (AttachThreadInput path). */
+/**
+ * Force the panel window into the foreground. Deferred exactly like
+ * switcherExecute's activation: Alt-up leaves the system cleaning up menu
+ * mode for a few milliseconds, during which foreground changes are still
+ * refused — the pin-time attempts failed for this reason. With the defer,
+ * AttachThreadInput + SetForegroundWindow succeeds (the same path the
+ * switcher's own execute uses on every switch).
+ */
 function activatePanel(): void {
   const win = getMainWindow()
   if (!win || win.isDestroyed()) return
-  try {
-    activateHwnd(koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void')))
-  } catch {
-    // fail silent — requestPanelFocus already tried the plain path
-  }
+  setTimeout(() => {
+    if (!active || win.isDestroyed()) return
+    const hwnd = koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void'))
+    const ok = activateHwnd(hwnd)
+    // Nudge Chromium's webContents activation along the path a real click
+    // takes; harmless if the OS foreground is already ours.
+    win.focus()
+    if (!ok) console.log('[Switcher] panel activation FAILED (foreground lock held)')
+  }, 0)
 }
 
 /**
  * Real Alt-up after pinning (keyboardHook onPinReleased). Pin happens while
  * Alt is still physically held, and Windows refuses foreground changes while
- * Alt is down — SetForegroundWindow/SwitchToThisWindow both fail silently,
- * which is why the panel stayed unactivated and click-outside/Esc never
- * worked unless the user clicked the field first (a click grants the
- * process input rights). With Alt released, the same activation succeeds,
- * and the renderer's focus polling (which never gave up) then lands.
+ * Alt is down; with Alt released the lock is gone and the panel finally
+ * activates — click-outside (blur) and Esc then work without a manual
+ * click, and the renderer's focus polling (which never gave up) lands.
  */
 export function switcherPinReleased(): void {
   if (!active) return
@@ -275,8 +291,8 @@ export function switcherPinReleased(): void {
 export function switcherTouch(): void {
   touchSession()
   // Keydown reached the hook, so the user is typing — if the keystroke
-  // isn't landing in the panel (activation failed at pin time), pull the
-  // foreground back so the very next key reaches the search field.
+  // isn't landing in the panel (activation failed), pull the foreground
+  // back so the very next key reaches the search field.
   const win = getMainWindow()
   if (!win || win.isDestroyed() || win.isFocused()) return
   activatePanel()
@@ -292,14 +308,14 @@ export function switcherCancel(): void {
 
 /**
  * Execute the switch for the current highlight. Runs on Alt-up (onExecute),
- * a mouse click (switcher:click), or the search field's Enter. A grouped
- * row activates its most recent window (z-order first). Window activation
- * is deferred out of the hook callback so the OS keyboard processing is not
- * held up by SetForegroundWindow work.
+ * a mouse click (switcher:click), or the search field's Enter. The exact
+ * window the user picked (drill sub-row hover/click) wins over the row's
+ * first window. Window activation is deferred out of the hook callback so
+ * the OS keyboard processing is not held up by SetForegroundWindow work.
  */
 export function switcherExecute(): void {
   if (!active) return
-  const target = rows[selectedRow]?.wins[0]
+  const target = windows[selectedWin]
   const targetHwnd = target?.hwnd
   active = false
   runtime.switcherActive = false
@@ -337,6 +353,6 @@ export function switcherClick(index: number): void {
   if (!active) return
   const row = rowByIndex(index)
   if (!row) return
-  selectedRow = rows.indexOf(row)
+  selectRow(row, index)
   switcherExecute()
 }

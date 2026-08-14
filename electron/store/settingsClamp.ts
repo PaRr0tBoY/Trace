@@ -36,6 +36,10 @@ export function clampSettings(input: Settings): Settings {
   if (out.triggerAlignment !== 'top' && out.triggerAlignment !== 'center' && out.triggerAlignment !== 'bottom') {
     out.triggerAlignment = 'center'
   }
+  // Animation richness: enum only; anything else falls back to standard.
+  if (out.motionLevel !== 'standard' && out.motionLevel !== 'extended') {
+    out.motionLevel = 'standard'
+  }
   if (typeof out.language !== 'string' || !out.language.trim()) {
     out.language = 'system'
   }

@@ -52,6 +52,9 @@ export type View = 'clipboard' | 'files' | 'tasks'
 /** Restore-time preset: how long the panel keeps its last page after closing. */
 export type RestoreTime = 'instant' | 'relaxed' | 'delayed' | 'forever'
 
+/** Animation richness levels — see Settings.motionLevel. */
+export type MotionLevel = 'standard' | 'extended'
+
 /**
  * Accent theme id (values in shared/themes.ts). Color names are not
  * translated; localized labels live in i18n under `appearance.theme*`.
@@ -568,8 +571,19 @@ export interface Settings {
   incognito: boolean
   /** Start minimized when the OS logs in. */
   launchAtLogin: boolean
-  /** Reduce motion for the panel animations. */
-  reduceMotion: boolean
+  /**
+   * Animation richness, the single source of truth for all motion in the
+   * app (CSS transitions + Framer Motion + GSAP):
+   * - 'standard' — crisp functional motion: blade reveal, card enter/exit,
+   *                flyouts, toasts, hover feedback. No overshoot bounces.
+   * - 'extended' — standard plus delight: blade open bounce, tab-capsule
+   *                spring, new-item highlight, empty-state entrance, badge
+   *                pops, press feedback, list stagger, copy ripple.
+   * Deliberately NOT tied to the OS prefers-reduced-motion flag (see
+   * useOpenBounce): the OS "Show animations" setting silently killed every
+   * animation on the author's machine; the in-app setting is authoritative.
+   */
+  motionLevel: MotionLevel
   /** When true, automatically clears unpinned items on device/app restart. */
   /** When true, automatically clears unpinned items on device/app restart. */
   clearUnpinnedOnRestart: boolean
@@ -709,7 +723,7 @@ export const DEFAULT_SETTINGS: Settings = {
   panelHeight: 0.5,
   incognito: false,
   launchAtLogin: true,
-  reduceMotion: false,
+  motionLevel: 'standard',
   clearUnpinnedOnRestart: false,
   autoDeleteHours: 0,
   uiStyle: 'modern',

@@ -495,6 +495,13 @@
   background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
 }
+/* 'extended' motion level: physical press feedback on task action buttons. */
+:root[data-motion='extended'] .task-action-btn {
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+:root[data-motion='extended'] .task-action-btn:active {
+  transform: scale(0.88);
+}
 .task-action-btn.danger:hover {
   background: rgba(239, 68, 68, 0.16);
   color: #f87171;

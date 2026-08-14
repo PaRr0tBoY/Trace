@@ -20,6 +20,7 @@ export function TickIndicatorIcon({
   glowColor?: string
   size?: number
 }) {
+  const extended = useStore((s) => s.settings.motionLevel) === 'extended'
   return (
     <div
       style={{
@@ -32,19 +33,19 @@ export function TickIndicatorIcon({
         filter: `drop-shadow(0 0 10px ${glowColor})`
       }}
     >
-      {/* Floating & Breathing Motion Wrapper */}
+      {/* Floating & Breathing Motion Wrapper — the endless breathe loop is
+          decorative, so it plays only under the 'extended' motion level. */}
       <motion.div
-        animate={{
-          y: [-2.5, 2.5, -2.5],
-          rotate: [-4, 4, -4],
-          scale: [0.98, 1.04, 0.98]
-        }}
-        transition={{
-          duration: 2.4,
-          ease: 'easeInOut',
-          repeat: Infinity,
-          repeatType: 'mirror'
-        }}
+        animate={
+          extended
+            ? { y: [-2.5, 2.5, -2.5], rotate: [-4, 4, -4], scale: [0.98, 1.04, 0.98] }
+            : undefined
+        }
+        transition={
+          extended
+            ? { duration: 2.4, ease: 'easeInOut', repeat: Infinity, repeatType: 'mirror' }
+            : undefined
+        }
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >
         <svg
@@ -82,6 +83,7 @@ export function CopyIndicatorIcon({
   size?: number
 }) {
   const maskId = 'copy-icon-gap-mask'
+  const extended = useStore((s) => s.settings.motionLevel) === 'extended'
 
   return (
     <div
@@ -95,19 +97,19 @@ export function CopyIndicatorIcon({
         filter: `drop-shadow(0 0 10px ${glowColor})`
       }}
     >
-      {/* Floating & Breathing Motion Wrapper */}
+      {/* Floating & Breathing Motion Wrapper — the endless breathe loop is
+          decorative, so it plays only under the 'extended' motion level. */}
       <motion.div
-        animate={{
-          y: [-2.5, 2.5, -2.5],
-          rotate: [-4, 4, -4],
-          scale: [0.98, 1.04, 0.98]
-        }}
-        transition={{
-          duration: 2.4,
-          ease: 'easeInOut',
-          repeat: Infinity,
-          repeatType: 'mirror'
-        }}
+        animate={
+          extended
+            ? { y: [-2.5, 2.5, -2.5], rotate: [-4, 4, -4], scale: [0.98, 1.04, 0.98] }
+            : undefined
+        }
+        transition={
+          extended
+            ? { duration: 2.4, ease: 'easeInOut', repeat: Infinity, repeatType: 'mirror' }
+            : undefined
+        }
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >
         <svg
@@ -168,6 +170,7 @@ export function SparkleIndicatorIcon({
   glowColor?: string
   size?: number
 }) {
+  const extended = useStore((s) => s.settings.motionLevel) === 'extended'
   return (
     <div
       style={{
@@ -180,19 +183,19 @@ export function SparkleIndicatorIcon({
         filter: `drop-shadow(0 0 10px ${glowColor})`
       }}
     >
-      {/* Floating & Breathing Motion Wrapper */}
+      {/* Floating & Breathing Motion Wrapper — the endless breathe loop is
+          decorative, so it plays only under the 'extended' motion level. */}
       <motion.div
-        animate={{
-          y: [-2.5, 2.5, -2.5],
-          rotate: [-4, 4, -4],
-          scale: [0.98, 1.04, 0.98]
-        }}
-        transition={{
-          duration: 2.4,
-          ease: 'easeInOut',
-          repeat: Infinity,
-          repeatType: 'mirror'
-        }}
+        animate={
+          extended
+            ? { y: [-2.5, 2.5, -2.5], rotate: [-4, 4, -4], scale: [0.98, 1.04, 0.98] }
+            : undefined
+        }
+        transition={
+          extended
+            ? { duration: 2.4, ease: 'easeInOut', repeat: Infinity, repeatType: 'mirror' }
+            : undefined
+        }
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >
         <svg

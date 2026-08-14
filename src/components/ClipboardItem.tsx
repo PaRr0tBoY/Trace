@@ -38,6 +38,8 @@ interface Props {
   /** FLIP position animation on list reorder; disabled on long lists (the
       O(n) layout pass + spring on every card is the reorder-frame cost). */
   animateLayout?: boolean
+  /** Stagger delay for the enter animation ('extended' motion level; 0 otherwise). */
+  enterDelay?: number
 }
 
 
@@ -48,7 +50,7 @@ interface Props {
 /* Main item card                                                      */
 /* ------------------------------------------------------------------ */
 
-function ClipboardItemBase({ item, instant, animateLayout }: Props) {
+function ClipboardItemBase({ item, instant, animateLayout, enterDelay = 0 }: Props) {
   const copy = useStore.getState().copy
   const paste = useStore.getState().paste
   const togglePin = useStore.getState().togglePin
@@ -57,6 +59,12 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
   const startDrag = useDragOut()
   const [copied, setCopied] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  // 'extended' motion level: freshly captured items flash the accent once on
+  // mount (≤4s old — the moment the copy lands in the shelf).
+  const motionLevel = useStore((s) => s.settings.motionLevel)
+  const [flashVisible, setFlashVisible] = useState(
+    () => motionLevel === 'extended' && item.capturedAt > Date.now() - 4000
+  )
 
   
   const open = useStore((s) => s.open)
@@ -123,11 +131,29 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
         damping: 30,
         mass: 0.8,
         restDelta: 0.05,
-        restSpeed: 0.05
+        restSpeed: 0.05,
+        delay: enterDelay
       }}
       className={`item${item.pinned ? ' pinned' : ''}${isBundle ? ' bundle' : ''}`}
     >
-      {copied && (
+      {flashVisible && (
+        <motion.div
+          key="new-copy-highlight"
+          initial={{ opacity: 0.26 }}
+          animate={{ opacity: 0 }}
+          transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+          onAnimationComplete={() => setFlashVisible(false)}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: 16,
+            background: 'rgba(var(--accent-rgb), 0.28)',
+            pointerEvents: 'none',
+            zIndex: 14
+          }}
+        />
+      )}
+      {copied && motionLevel === 'extended' && (
         <motion.div
           key="copy-ripple"
           initial={{ opacity: 0.75, scale: 0.2 }}

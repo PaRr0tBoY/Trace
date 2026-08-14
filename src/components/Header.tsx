@@ -31,9 +31,14 @@ const TRACK_LEFT = 3
  * to it with the primary row's spring; `layout` animates the position/width
  * change. The measurement set is deduped so re-renders never loop.
  */
-function SecondaryRow({ children }: { children: React.ReactNode }) {
+function SecondaryRow({ extended, children }: { extended: boolean; children: React.ReactNode }) {
   const rowRef = useRef<HTMLDivElement>(null)
   const [selector, setSelector] = useState<{ left: number; width: number } | null>(null)
+  // The sliding capsule springs under 'extended'; 'standard' glides in a
+  // short tween with no overshoot. The flag comes in as a prop — reading the
+  // store here would subscribe SecondaryRow to every settings change and
+  // feed its layout-effect (which re-measures on every render) into a render
+  // loop under StrictMode.
 
   useLayoutEffect(() => {
     const row = rowRef.current
@@ -42,7 +47,13 @@ function SecondaryRow({ children }: { children: React.ReactNode }) {
     if (!chip) return
     const left = chip.offsetLeft
     const width = chip.offsetWidth
-    setSelector((prev) => (prev && prev.left === left && prev.width === width ? prev : { left, width }))
+    // Pre-check against the render-time value, then setState with a dedupe
+    // updater. Calling setState unconditionally here loops under StrictMode:
+    // the double-invoked updater leaves a pending update in the queue, which
+    // skips React's eager bailout and schedules a render every time.
+    if (!selector || selector.left !== left || selector.width !== width) {
+      setSelector((prev) => (prev && prev.left === left && prev.width === width ? prev : { left, width }))
+    }
   })
 
   return (
@@ -58,7 +69,7 @@ function SecondaryRow({ children }: { children: React.ReactNode }) {
         <motion.div
           initial={false}
           animate={{ left: selector.left, width: selector.width }}
-          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+          transition={extended ? { type: 'spring', stiffness: 500, damping: 35 } : { duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
           style={{
             position: 'absolute',
             top: 0,
@@ -96,6 +107,9 @@ export function Header() {
   const setTasksFilter = useStore((s) => s.setTasksFilter)
   const tasks = useStore((s) => s.tasks)
   const suggestions = useStore((s) => s.suggestions)
+  // 'extended' motion level pops the count badge when it changes (key remount
+  // replays the scale-in; standard keeps it static).
+  const extended = useStore((s) => s.settings.motionLevel) === 'extended'
   const badge = taskBadgeCount(tasks)
   /** L1 主动建议数（t47 边缘指示器：任务层折叠时在 tasks 芯片上亮琥珀点）。 */
   const l1Count = suggestions.filter((s) => s.level === 1).length
@@ -189,7 +203,11 @@ export function Header() {
   })
 
   const redBadge = (count: number) => (
-    <span
+    <motion.span
+      key={extended ? count : 'static'}
+      initial={extended ? { scale: 1.35 } : false}
+      animate={{ scale: 1 }}
+      transition={extended ? { type: 'spring', stiffness: 480, damping: 22, mass: 0.5 } : undefined}
       style={{
         position: 'absolute',
         top: -3,
@@ -209,7 +227,7 @@ export function Header() {
       }}
     >
       {count > 9 ? '9+' : count}
-    </span>
+    </motion.span>
   )
 
   const amberDot = (title: string, right = -3) => (
@@ -286,7 +304,7 @@ export function Header() {
             <motion.div
               initial={false}
               animate={{ x: primaryViewIndex * (PRIMARY_CHIP_WIDTH + PRIMARY_GAP) }}
-              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+              transition={extended ? { type: 'spring', stiffness: 500, damping: 35 } : { duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
               style={{
                 position: 'absolute',
                 left: TRACK_LEFT,
@@ -468,7 +486,7 @@ export function Header() {
             >
               <AnimatePresence initial={false} mode="wait">
                 {view === 'clipboard' && (
-              <SecondaryRow key="row-clipboard">
+              <SecondaryRow key="row-clipboard" extended={extended}>
                 {([
                   { id: 'all' as const, label: t('filters.all') },
                   { id: 'text' as const, label: t('filters.text') },
@@ -493,7 +511,7 @@ export function Header() {
             )}
 
             {view === 'files' && (
-              <SecondaryRow key="row-files">
+              <SecondaryRow key="row-files" extended={extended}>
                 <AnimatePresence initial={false}>
                   {hasFiles ? (
                     <motion.div
@@ -552,7 +570,7 @@ export function Header() {
             )}
 
             {view === 'tasks' && (
-              <SecondaryRow key="row-tasks">
+              <SecondaryRow key="row-tasks" extended={extended}>
                 <button
                   type="button"
                   data-chip-active={tasksFilter === 'existing'}

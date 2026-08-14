@@ -37,6 +37,9 @@ export function ItemList() {
   
   const isDraggingAny = useStore((s) => !!s.dragActive || !!s.internalDragReq)
   const open = useStore((s) => s.open)
+  // 'extended' motion level staggers the enter cascade (~18ms per card, capped at
+  // 12 like ENTER_ANIM_LIMIT so the tail of a long list never crawls in).
+  const stagger = useStore((s) => s.settings.motionLevel) === 'extended'
   
   const clipboardFilter = useStore((s) => s.clipboardFilter) || 'all'
   // When the type filter or search query changes, newly-mounted cards skip
@@ -257,7 +260,7 @@ export function ItemList() {
                     style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}
                   >
                     {pinned.map((it, idx) => (
-                      <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} />
+                      <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} enterDelay={stagger ? Math.min(idx, 11) * 0.018 : 0} />
                     ))}
                   </motion.div>
                 )}
@@ -270,7 +273,7 @@ export function ItemList() {
               {pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
               <AnimatePresence initial={false}>
                 {recent.map((it, idx) => (
-                  <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} />
+                  <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} enterDelay={stagger ? Math.min(idx, 11) * 0.018 : 0} />
                 ))}
               </AnimatePresence>
             </section>

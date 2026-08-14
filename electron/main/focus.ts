@@ -37,6 +37,7 @@
  * ignored", never a crash.
  */
 import koffi from 'koffi'
+import { app } from 'electron'
 import { getMainWindow } from './window'
 
 const WS_EX_NOACTIVATE = 0x08000000
@@ -85,6 +86,20 @@ export function requestPanelFocus(): void {
     win.focus()
   } catch {
     // fail silent
+  }
+  // The foreground lock silently refuses win.focus() when no user-input
+  // event ever touched this process (hover-opening the panel isn't one, and
+  // neither is a keyboard hook — keys went to the hook host, not to us).
+  // app.focus({ steal: true }) forces the OS foreground change. Verified
+  // on-device: without it the window shows the caret but keys stay with the
+  // foreground app (Chromium activates internally, the OS never routes input).
+  if (!win.isFocused() && app.focus) {
+    try {
+      app.focus({ steal: true })
+      win.focus()
+    } catch {
+      // fail silent
+    }
   }
 }
 

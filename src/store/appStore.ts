@@ -120,13 +120,13 @@ interface AppState {
   /** First character that started search mode by typing (type-to-search), consumed by SwitcherView. */
   switcherSeedQuery: string
   /** Latest hook-delivered control key (panel often isn't the OS foreground); consumed by SwitcherView. */
-  switcherControlKey: 'enter' | 'up' | 'down' | null
+  switcherControlKey: 'enter' | 'up' | 'down' | 'left' | 'right' | null
   /** Panel open state before the switcher took over — restored on hide. */
   switcherPrevOpen: boolean
   showSwitcher: (data: { entries: import('../../shared/types').SwitcherEntryDto[]; selectedIndex: number }) => void
   setSwitcherSelected: (index: number) => void
   setSwitcherPinned: (pinned: boolean, seedQuery?: string) => void
-  setSwitcherControlKey: (key: 'enter' | 'up' | 'down' | null) => void
+  setSwitcherControlKey: (key: 'enter' | 'up' | 'down' | 'left' | 'right' | null) => void
   hideSwitcher: () => void
   setSettingsOpen: (open: boolean) => void
   setDragActive: (active: boolean) => void

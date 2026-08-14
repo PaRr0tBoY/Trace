@@ -139,7 +139,8 @@ export function SwitcherView() {
   // Hook-delivered control keys (Enter/Esc/arrows). The hook swallows them
   // while pinned because the panel window often isn't the OS foreground, so
   // they would never reach the input — the intent comes over IPC instead.
-  // Esc is cancelled outright in main; here only enter/up/down arrive.
+  // Esc is cancelled outright in main; here only enter/up/down/left/right
+  // arrive. Left/right move between the main list and the drill-in view.
   const controlKey = useStore((s) => s.switcherControlKey)
   useEffect(() => {
     if (!controlKey) return
@@ -157,6 +158,10 @@ export function SwitcherView() {
       } else if (controlKey === 'enter') {
         const w = wins[drillSel ?? 0]
         if (w) edge.switcherClick(w.index)
+      } else if (controlKey === 'left') {
+        // Left exits the drill-in view back to the main list; the group row
+        // stays selected (drillSel re-initializes on re-entry).
+        setDrill(null)
       }
       return
     }
@@ -180,6 +185,13 @@ export function SwitcherView() {
             ? visibleRows.length - 1
             : Math.max(displayIndex - 1, 0)
       syncHover(next)
+    } else if (controlKey === 'right') {
+      // Right enters the drill-in view on a grouped row (mirrors Enter);
+      // single rows have nothing to drill into, ignore.
+      if (displayIndex === null) return
+      const entry = visibleRows[displayIndex]
+      if (!entry?.groupCount) return
+      setDrill(entry)
     }
   }, [controlKey, drill, drillSel, pinned, displayIndex, visibleRows])
 

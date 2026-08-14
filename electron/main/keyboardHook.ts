@@ -32,12 +32,14 @@
 import koffi from 'koffi'
 
 const WH_KEYBOARD_LL = 13
+const WH_MOUSE_LL = 14
 // Debug noise goes behind this switch (AGENTS.md logging rules).
 const DEBUG = false
 const WM_KEYDOWN = 0x100
 const WM_KEYUP = 0x101
 const WM_SYSKEYDOWN = 0x104
 const WM_SYSKEYUP = 0x105
+const WM_LBUTTONDOWN = 0x201
 const VK_TAB = 0x09
 const VK_MENU = 0x12
 const VK_LMENU = 0xA4
@@ -47,6 +49,8 @@ const VK_RETURN = 0x0D
 const VK_ESCAPE = 0x1B
 const VK_UP = 0x26
 const VK_DOWN = 0x28
+const VK_LEFT = 0x25
+const VK_RIGHT = 0x27
 const KEYEVENTF_KEYUP = 0x0002
 const PM_REMOVE = 0x0001
 const INPUT_KEYBOARD = 0x0001
@@ -55,6 +59,16 @@ const INPUT_KEYBOARD = 0x0001
 const KBDLLHOOKSTRUCT = koffi.struct('KBDLLHOOKSTRUCT', {
   vkCode: 'uint32_t',
   scanCode: 'uint32_t',
+  flags: 'uint32_t',
+  time: 'uint32_t',
+  dwExtraInfo: 'uintptr_t'
+})
+
+/** MSLLHOOKSTRUCT — screen point at offset 0; used for click-outside detection. */
+const MSLLHOOKSTRUCT = koffi.struct('MSLLHOOKSTRUCT', {
+  pt_x: 'int32_t',
+  pt_y: 'int32_t',
+  mouseData: 'uint32_t',
   flags: 'uint32_t',
   time: 'uint32_t',
   dwExtraInfo: 'uintptr_t'
@@ -138,7 +152,7 @@ export interface KeyboardHookEvents {
    * directly instead. 'escape' cancels the session outright; 'enter'/'up'/
    * 'down' are forwarded to the renderer, which resolves drill vs execute.
    */
-  onControlKey: (key: 'enter' | 'escape' | 'up' | 'down') => void
+  onControlKey: (key: 'enter' | 'escape' | 'up' | 'down' | 'left' | 'right') => void
   /**
    * Real Alt-up while pinned: the OS Alt state is already released by the
    * synthetic up, and the foreground lock is gone — the panel can finally
@@ -146,6 +160,14 @@ export interface KeyboardHookEvents {
    * SetForegroundWindow is refused).
    */
   onPinReleased: () => void
+  /**
+   * Left-button mouse-down while pinned, in physical screen pixels. The
+   * panel often never reaches the OS foreground (activation is
+   * best-effort), so click-outside can't be detected via the window's
+   * focus events — the mouse hook reports the click position and main
+   * decides whether it landed outside the panel.
+   */
+  onMouseDown: (pt: { x: number; y: number }) => void
 }
 
 type HookState = 'idle' | 'altDown' | 'pending' | 'tap' | 'armed' | 'pinned'
@@ -157,6 +179,7 @@ const TAP_THRESHOLD_MS = 50
 
 let state: HookState = 'idle'
 let hookPtr: unknown = null
+let mouseHookPtr: unknown = null
 let pumpTimer: ReturnType<typeof setInterval> | null = null
 let activeEvents: KeyboardHookEvents | null = null
 let tapTimer: ReturnType<typeof setTimeout> | null = null
@@ -213,6 +236,14 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
         }
         if (vk === VK_UP && isDown) {
           defer(() => activeEvents?.onControlKey('up'))
+          return 1n
+        }
+        if (vk === VK_LEFT && isDown) {
+          defer(() => activeEvents?.onControlKey('left'))
+          return 1n
+        }
+        if (vk === VK_RIGHT && isDown) {
+          defer(() => activeEvents?.onControlKey('right'))
           return 1n
         }
       }
@@ -298,6 +329,21 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
           defer(() => activeEvents?.onPin(vkToChar(vk, isShiftDown()) ?? undefined))
           return 1n
         }
+        if (isDown && (vk === VK_UP || vk === VK_DOWN || vk === VK_LEFT || vk === VK_RIGHT)) {
+          // Arrow keys while armed also pin the session (third search entry
+          // after type-to-search and Enter) and immediately act on the
+          // panel: up/down move the highlight, left/right switch between
+          // the main list and the drill-in view. The key rides along as the
+          // first control-key so the movement happens inside the panel.
+          const dir: 'up' | 'down' | 'left' | 'right' =
+            vk === VK_UP ? 'up' : vk === VK_DOWN ? 'down' : vk === VK_LEFT ? 'left' : 'right'
+          state = 'pinned'
+          defer(() => {
+            activeEvents?.onPin()
+            activeEvents?.onControlKey(dir)
+          })
+          return 1n
+        }
         if (isAlt && !isDown) {
           state = 'idle'
           defer(() => {
@@ -327,6 +373,28 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
           return 1n
         }
         if (isDown) defer(() => activeEvents?.onTouch())
+      }
+    }
+  }
+  return callNextHookEx ? callNextHookEx(hookPtr, nCode, wParam, lParam) : 1n
+}, koffi.pointer(koffi.proto('intptr_t (int nCode, uintptr_t wParam, intptr_t lParam)')))
+
+/**
+ * Mouse hook: reports left-button clicks while a search session is pinned,
+ * so main can cancel on click-outside even when the panel never reached the
+ * OS foreground (Electron focus events are unreliable for programmatically
+ * activated windows — see switcher.ts). Same purity discipline as the
+ * keyboard callback: no FFI/Electron calls inside the dispatch; the screen
+ * point is decoded here (plain reads) and the event deferred.
+ */
+const mousePtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bigint => {
+  if (nCode >= 0 && hookPtr && callNextHookEx) {
+    if (pinnedSession && wParam === WM_LBUTTONDOWN) {
+      try {
+        const m = koffi.decode(lParam, MSLLHOOKSTRUCT)
+        defer(() => activeEvents?.onMouseDown({ x: m.pt_x, y: m.pt_y }))
+      } catch {
+        // ignore malformed structs — click-outside detection degrades
       }
     }
   }
@@ -393,6 +461,12 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
     console.error('[Hook] SetWindowsHookExW failed — Alt+Tab takeover disabled')
     return
   }
+  // Same pump drives the mouse hook; failure only disables click-outside
+  // detection (keyboard takeover is unaffected).
+  mouseHookPtr = setWindowsHookExW(WH_MOUSE_LL, mousePtr, null, 0)
+  if (!mouseHookPtr) {
+    console.error('[Hook] mouse hook failed — click-outside detection disabled')
+  }
   pumpTimer = setInterval(() => {
     if (peekMessageW) {
       // Bounded drain: an unbounded while loop starves libuv timers while
@@ -433,6 +507,10 @@ export function stopKeyboardHook(): void {
   if (hookPtr && unhookWindowsHookEx) {
     unhookWindowsHookEx(hookPtr)
     hookPtr = null
+  }
+  if (mouseHookPtr && unhookWindowsHookEx) {
+    unhookWindowsHookEx(mouseHookPtr)
+    mouseHookPtr = null
   }
   activeEvents = null
   state = 'idle'

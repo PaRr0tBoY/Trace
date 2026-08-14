@@ -14,7 +14,7 @@
  */
 import { getMainWindow, setInteractive, isInteractive } from './window'
 import koffi from 'koffi'
-import { screen } from 'electron'
+import { app, screen } from 'electron'
 import { runtime } from './config'
 import { snapshotWindows, type SwitcherWindow } from './windowSnapshot'
 import { activateHwnd } from './windowSwitch'
@@ -31,6 +31,54 @@ const user32 = koffi.load('user32.dll')
 const getCursorPos = user32.func('bool GetCursorPos(void* lpPoint)')
 const setCursorPos = user32.func('bool SetCursorPos(int x, int y)')
 const mouseEvent = user32.func('void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, void* dwExtraInfo)')
+// OS foreground handle — used to detect click-outside abandonment.
+// Electron's focus events are NOT reliable here: a window activated via
+// SetForegroundWindow (activateHwnd) reports isFocused()=true forever and
+// never fires 'blur' when the OS foreground moves elsewhere (verified
+// on-device). Only a real mouse-activated window (WM_MOUSEACTIVATE, i.e. the
+// user clicking the search field) tracks focus correctly. The foreground
+// watch below polls GetForegroundWindow directly instead — OS truth, not
+// Electron's model.
+const getForegroundWindow = user32.func('GetForegroundWindow', 'void *', [])
+
+/**
+ * Foreground-window watch for pinned search mode. click-outside must cancel
+ * the session (like Esc), but it can only be detected via the OS foreground:
+ * once the panel HAS been the foreground window, any switch away means the
+ * user gave up on the switcher. A panel that never made it to the foreground
+ * (activation failed) is left alone — the user may still click it manually.
+ */
+let fgWatchTimer: ReturnType<typeof setInterval> | null = null
+let panelWasForeground = false
+function startForegroundWatch(): void {
+  if (fgWatchTimer) return
+  panelWasForeground = false
+  fgWatchTimer = setInterval(() => {
+    if (!active) return
+    const win = getMainWindow()
+    if (!win || win.isDestroyed()) return
+    let fg: unknown
+    try {
+      fg = getForegroundWindow()
+    } catch {
+      return
+    }
+    const panelHwnd = koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void'))
+    if (fg === panelHwnd) {
+      panelWasForeground = true
+    } else if (panelWasForeground) {
+      console.log('[Switcher] foreground left panel — cancel session')
+      setHookPinned(false)
+      resetSession()
+    }
+  }, 150)
+}
+function stopForegroundWatch(): void {
+  if (fgWatchTimer) {
+    clearInterval(fgWatchTimer)
+    fgWatchTimer = null
+  }
+}
 
 /** A visible switcher row: one window, or all windows of one app when grouped. */
 interface Row {
@@ -212,6 +260,7 @@ function ensureBlurWatch(): void {
 function resetSession(): void {
   clearTimeout(sessionTimer)
   sessionTimer = undefined
+  stopForegroundWatch()
   const wasActive = active
   active = false
   runtime.switcherActive = false
@@ -260,17 +309,41 @@ export function switcherPin(initialQuery?: string): void {
   // Real activation happens on Alt-up (switcherPinReleased), see there.
   requestPanelFocus()
   touchSession()
+  // click-outside detection: watch the OS foreground once pinned.
+  startForegroundWatch()
+}
+
+/**
+ * Is the panel the actual OS foreground window? win.isFocused() lies for
+ * programmatically activated windows (Electron reports true while the OS
+ * foreground never moved — foreground lock, verified on-device). Compare
+ * GetForegroundWindow against the panel's own hwnd instead: OS truth.
+ */
+function isPanelForeground(): boolean {
+  const win = getMainWindow()
+  if (!win || win.isDestroyed()) return false
+  try {
+    const hwnd = koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void'))
+    return getForegroundWindow() === hwnd
+  } catch {
+    return false
+  }
 }
 
 /**
  * Force the panel window into the foreground. Deferred exactly like
  * switcherExecute's activation: Alt-up leaves the system cleaning up menu
  * mode for a few milliseconds, during which foreground changes are still
- * refused. Two escalation steps:
+ * refused. Three escalation steps, each verified against the OS foreground
+ * (not Electron's isFocused, which reports success without the OS moving):
  *  1. activateHwnd — the AttachThreadInput + SetForegroundWindow path the
  *     switcher's own execute uses on every switch. Works for normal app
- *     windows; the Electron layered panel has refused it in practice.
- *  2. Simulated click on the search field — reproduces the one activation
+ *     windows; the Electron layered panel has refused it under a foreground
+ *     lock (e.g. a fullscreen window holding the front).
+ *  2. app.focus() — on Windows focuses the application's first window. This
+ *     is the path that actually lands when the foreground lock is gone but
+ *     SetForegroundWindow alone is refused (verified on the notes branch).
+ *  3. Simulated click on the search field — reproduces the one activation
  *     path that is proven to work: a real click grants the process input
  *     rights and the system activates the window (WM_MOUSEACTIVATE). The
  *     cursor jumps for <100ms and returns; the click lands on the field,
@@ -283,13 +356,20 @@ function activatePanel(): void {
     if (!active || win.isDestroyed()) return
     const hwnd = koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void'))
     activateHwnd(hwnd)
-    if (win.isFocused()) return
+    if (isPanelForeground()) return
+    try {
+      app.focus()
+      win.focus()
+    } catch {
+      // fail silent — escalation continues
+    }
+    if (isPanelForeground()) return
     clickSearchField()
     // One retry: the first click can land before the window finished its
     // current resize/layout pass (the click would hit the wrong element).
-    if (!win.isFocused()) {
+    if (!isPanelForeground()) {
       setTimeout(() => {
-        if (!active || win.isDestroyed() || win.isFocused()) return
+        if (!active || win.isDestroyed() || isPanelForeground()) return
         clickSearchField()
       }, 150)
     }
@@ -355,18 +435,42 @@ export function switcherCancel(): void {
 }
 
 /**
- * Control key while pinned (keyboardHook onControlKey): the hook swallowed
+/** Control key while pinned (keyboardHook onControlKey): the hook swallowed
  * the key because the panel window often isn't the OS foreground (so the
  * key would land in the window in front). Esc cancels outright; the rest
  * are resolved in the renderer (drill vs execute depends on local state).
  */
-export function switcherControlKey(key: 'enter' | 'escape' | 'up' | 'down'): void {
+export function switcherControlKey(key: 'enter' | 'escape' | 'up' | 'down' | 'left' | 'right'): void {
   if (!active) return
   if (key === 'escape') {
     switcherCancel()
     return
   }
   broadcast('switcher:control-key', key)
+}
+
+/**
+ * Left-button down while pinned (hook mouse-down). The panel often never
+ * reaches the OS foreground, so focus-based click-outside detection can't
+ * work; a click that lands outside the panel bounds means the user gave up
+ * on the switcher — drop the session like Esc. The click target's own
+ * activation is untouched (the mouse hook never swallows).
+ */
+export function switcherMouseDown(pt: { x: number; y: number }): void {
+  if (!active) return
+  const win = getMainWindow()
+  if (!win || win.isDestroyed()) return
+  try {
+    // Physical screen point vs the panel's screen rect (DIP→physical).
+    const b = win.getBounds()
+    const sr = screen.dipToScreenRect(win, b)
+    if (pt.x >= sr.x && pt.x <= sr.x + sr.width && pt.y >= sr.y && pt.y <= sr.y + sr.height) return
+    console.log('[Switcher] click outside panel — cancel session')
+    setHookPinned(false)
+    resetSession()
+  } catch (err) {
+    console.error('[Switcher] click-outside check failed:', err)
+  }
 }
 
 /**

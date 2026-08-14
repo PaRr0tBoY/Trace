@@ -349,7 +349,7 @@ export interface EventMap {
   /** Enter was pressed while armed (TabTab pattern): pinned open, search mode. Carries the first typed character when search was started by typing (undefined for Enter). */
   'switcher:pin': [initialQuery?: string]
   /** Control key swallowed by the hook while pinned (panel often not the OS foreground): renderer resolves drill vs execute. */
-  'switcher:control-key': [key: 'enter' | 'up' | 'down']
+  'switcher:control-key': [key: 'enter' | 'up' | 'down' | 'left' | 'right']
   /** Switcher is closing (Alt released or item clicked) — restore previous state. */
   'switcher:hide': []
 }

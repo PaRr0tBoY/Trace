@@ -23,7 +23,7 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
       stdio: 'inherit'
     })
     child.on('message', (msg: unknown) => {
-      const m = msg as { type?: string; shiftDown?: boolean; delta?: 1 | -1; initialQuery?: string; key?: string } | null
+      const m = msg as { type?: string; shiftDown?: boolean; delta?: 1 | -1; initialQuery?: string; key?: string; x?: number; y?: number } | null
       if (!m) return
       if (m.type === 'show') events.onShow({ shiftDown: m.shiftDown ?? false })
       else if (m.type === 'advance') events.onAdvance(m.delta === -1 ? -1 : 1)
@@ -32,7 +32,8 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
       else if (m.type === 'pin') events.onPin(m.initialQuery)
       else if (m.type === 'touch') events.onTouch()
       else if (m.type === 'pin-released') events.onPinReleased()
-      else if (m.type === 'control-key') events.onControlKey((m.key ?? 'enter') as 'enter' | 'escape' | 'up' | 'down')
+      else if (m.type === 'control-key') events.onControlKey((m.key ?? 'enter') as 'enter' | 'escape' | 'up' | 'down' | 'left' | 'right')
+      else if (m.type === 'mouse-down' && typeof m.x === 'number' && typeof m.y === 'number') events.onMouseDown({ x: m.x, y: m.y })
     })
     child.on('exit', () => {
       child = null

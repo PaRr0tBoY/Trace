@@ -92,9 +92,7 @@ export function Header() {
   const setClipboardFilter = useStore((s) => s.setClipboardFilter)
   const filesFilter = useStore((s) => s.filesFilter)
   const setFilesFilter = useStore((s) => s.setFilesFilter)
-  const stationRouteFilter = useStore((s) => s.stationRouteFilter)
-  const setStationRouteFilter = useStore((s) => s.setStationRouteFilter)
-  const stationCount = useStore((s) => s.station.length)
+  const station = useStore((s) => s.station)
   const tutorialStep = useStore((s) => s.tutorialStep)
   const tasksFilter = useStore((s) => s.tasksFilter)
   const setTasksFilter = useStore((s) => s.setTasksFilter)
@@ -238,6 +236,9 @@ export function Header() {
   // empties the visible list must keep the chips so the user can switch
   // back; otherwise the row (and the route chips inside it) vanishes.
   const hasFiles = files.corpusCount > 0
+  // The 'clipboard' pseudo-tab (T6 route filter) only exists while
+  // clipboard-captured station entries do; hidden during onboarding.
+  const hasClipboardRoute = tutorialStep <= 0 && station.some((e) => e.route === 'clipboard')
 
   return (
     <div
@@ -511,35 +512,25 @@ export function Header() {
                       transition={{ type: 'spring', stiffness: 400, damping: 34 }}
                       style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, overflow: 'hidden' }}
                     >
-                      {/* Route filter (T6): station entries narrow to clipboard captures; hidden during the onboarding tour. */}
-                      {tutorialStep <= 0 && stationCount > 0 && (
-                        <>
-                          <button
-                            type="button"
-                            data-chip-active={stationRouteFilter === 'all'}
-                            className={`filter-chip${stationRouteFilter === 'all' ? ' active' : ''}`}
-                            onClick={() => {
-                              playButtonClickSound()
-                              setStationRouteFilter('all')
-                            }}
-                            style={secondaryChipStyle(stationRouteFilter === 'all')}
-                          >
-                            <span>{t('filters.all')}</span>
-                          </button>
-                          <button
-                            type="button"
-                            data-chip-active={stationRouteFilter === 'clipboard'}
-                            className={`filter-chip${stationRouteFilter === 'clipboard' ? ' active' : ''}`}
-                            onClick={() => {
-                              playButtonClickSound()
-                              setStationRouteFilter('clipboard')
-                            }}
-                            style={secondaryChipStyle(stationRouteFilter === 'clipboard')}
-                          >
-                            <span>{t('filters.clipboard')}</span>
-                          </button>
-                          <span className="filter-divider" />
-                        </>
+                      {/* The route filter (T6) lives in this row as the
+                          'clipboard' pseudo-tab — one dimension, one active
+                          chip — so the sliding selector never gets two
+                          anchors (feedback: duplicated 全部 + stuck pill).
+                          It appears only while clipboard-captured station
+                          entries exist. */}
+                      {hasClipboardRoute && (
+                        <button
+                          type="button"
+                          data-chip-active={filesFilter === 'clipboard'}
+                          className={`filter-chip${filesFilter === 'clipboard' ? ' active' : ''}`}
+                          onClick={() => {
+                            playButtonClickSound()
+                            setFilesFilter('clipboard')
+                          }}
+                          style={secondaryChipStyle(filesFilter === 'clipboard')}
+                        >
+                          <span>{t('filters.clipboard')}</span>
+                        </button>
                       )}
                       <button
                         type="button"

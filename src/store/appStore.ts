@@ -13,7 +13,6 @@ import type { SuggestTitleContext, SuggestionAcceptOptions, DropResource } from 
 import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View, TraceRecordDto, IgnoreReason } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 import type { StationEntryDto } from '../../shared/station'
-import type { StationRouteFilter } from '../lib/stationRoute'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -52,12 +51,9 @@ interface AppState {
   /** Clipboard view second level (ADR-0004). */
   clipboardFilter: ClipboardFilter
   setClipboardFilter: (filter: ClipboardFilter) => void
-  /** Files view second level: 'all' | 'other' | a live extension tab (ADR-0004). */
+  /** Files view second level: 'all' | 'clipboard' | 'other' | a live extension tab (ADR-0004). */
   filesFilter: FilesFilter
   setFilesFilter: (filter: FilesFilter) => void
-  /** Station route filter (T6): 'all' shows every route, 'clipboard' only clipboard captures. */
-  stationRouteFilter: StationRouteFilter
-  setStationRouteFilter: (filter: StationRouteFilter) => void
   /** Tasks view second level (ADR-0004). */
   tasksFilter: TasksFilter
   setTasksFilter: (filter: TasksFilter) => void
@@ -217,8 +213,6 @@ export const useStore = create<AppState>((set, get) => ({
   setClipboardFilter: (clipboardFilter) => set({ clipboardFilter }),
   filesFilter: 'all',
   setFilesFilter: (filesFilter) => set({ filesFilter }),
-  stationRouteFilter: 'all',
-  setStationRouteFilter: (stationRouteFilter) => set({ stationRouteFilter }),
   tasksFilter: 'existing',
   setTasksFilter: (tasksFilter) => set({ tasksFilter }),
   open: false,

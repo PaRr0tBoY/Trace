@@ -124,7 +124,6 @@ export function useFileMembers(): FileViewData {
   const query = useStore((s) => s.query)
   const filesFilter = useStore((s) => s.filesFilter)
   const setFilesFilter = useStore((s) => s.setFilesFilter)
-  const stationRouteFilter = useStore((s) => s.stationRouteFilter)
   const tutorialStep = useStore((s) => s.tutorialStep)
 
   const data = useMemo(() => {
@@ -138,34 +137,40 @@ export function useFileMembers(): FileViewData {
       }
     })
     // Extension tabs come from the FULL corpus — every file item and every
-    // station entry, both routes, no search — so switching 全部/剪贴板 or
-    // typing a query never reshuffles the tab set (feedback: tabs must stay
-    // stable). Content under the active tab still applies route + search.
+    // station entry, both routes, no search — so switching tabs or typing a
+    // query never reshuffles the tab set (feedback: tabs must stay stable).
+    // Content under the active tab still applies route + search.
     const corpus = tutorialStep <= 0
       ? [...collectFileMembers(items), ...collectStationMembers(station)]
       : collectFileMembers(filteredByTutorial)
     const tabs = deriveFileTabs(corpus, MAX_EXT_TABS)
-    // Station members feed the same member list/tabs (ADR-0006); hidden
-    // during the onboarding tour so the tutorial items stay uncluttered.
-    // The route filter (T6) narrows the station first; legacy stack file
-    // items only show under 'all' (they have no route).
-    const stationMembers = tutorialStep <= 0 ? collectStationMembers(filterStationByRoute(station, stationRouteFilter)) : []
+    // The 'clipboard' pseudo-tab narrows the station to clipboard-captured
+    // entries (T6 route filter folded into this single dimension); it only
+    // exists while such entries do. Legacy stack file items have no route
+    // and hide under it.
+    const clipboardOnly = filesFilter === 'clipboard'
+    const hasClipboardRoute = tutorialStep <= 0 && station.some((e) => e.route === 'clipboard')
+    const stationMembers = tutorialStep <= 0
+      ? collectStationMembers(clipboardOnly ? filterStationByRoute(station, 'clipboard') : station)
+      : []
     const members = [
-      ...(stationRouteFilter === 'clipboard' ? [] : collectFileMembers(filteredByTutorial)),
+      ...(clipboardOnly ? [] : collectFileMembers(filteredByTutorial)),
       ...stationMembers
     ]
     const q = query.trim().toLowerCase()
     const searched = q ? members.filter((m) => m.name.toLowerCase().includes(q)) : members
-    const activeFilter = isFileTabAlive(corpus, filesFilter, MAX_EXT_TABS) ? filesFilter : 'all'
+    const activeFilter = clipboardOnly
+      ? (hasClipboardRoute ? 'clipboard' : 'all')
+      : isFileTabAlive(corpus, filesFilter, MAX_EXT_TABS) ? filesFilter : 'all'
     return {
       members: searched,
-      tabMembers: activeFilter === 'all' ? null : filterMembersByTab(searched, activeFilter),
+      tabMembers: activeFilter === 'all' || activeFilter === 'clipboard' ? null : filterMembersByTab(searched, activeFilter),
       tabs: tabs.tabs,
       otherCount: tabs.otherCount,
       corpusCount: corpus.length,
       activeFilter
     }
-  }, [items, station, query, filesFilter, stationRouteFilter, tutorialStep])
+  }, [items, station, query, filesFilter, tutorialStep])
 
   // A vanished tab falls back to 'all' (ADR-0004); sync the store so the
   // header highlight matches what is rendered.

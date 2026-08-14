@@ -69,7 +69,7 @@ export function FileListView() {
   // filter. Station entries are hidden during the onboarding tour.
   const fileItems = useStore((s) => s.items)
   const station = useStore((s) => s.station)
-  const stationRouteFilter = useStore((s) => s.stationRouteFilter)
+  const filesFilter = useStore((s) => s.filesFilter)
   const groupedEntries = useMemo(() => {
     type Row = { kind: 'station'; entry: StationEntryDto } | { kind: 'item'; item: ClipboardItemDto }
     const filtered = fileItems.filter((it) => {
@@ -82,20 +82,22 @@ export function FileListView() {
       ? filtered.filter((it) => it.data.kind === 'files' && it.data.paths.some((p) => basename(p).toLowerCase().includes(q)))
       : filtered
     const stationVisible = tutorialStep <= 0
-    // Route filter (T6): 'clipboard' keeps only clipboard-captured station
-    // entries; stack file items have no route and hide under it.
-    const routeStation = stationVisible ? filterStationByRoute(station, stationRouteFilter) : []
+    // The 'clipboard' pseudo-tab (T6): station entries narrow to
+    // clipboard-captured entries; stack file items have no route and hide
+    // under it.
+    const clipboardOnly = filesFilter === 'clipboard'
+    const routeStation = stationVisible ? filterStationByRoute(station, clipboardOnly ? 'clipboard' : 'all') : []
     const stationSearched = q
       ? routeStation.filter((e) => e.paths.some((p) => basename(p).toLowerCase().includes(q)))
       : routeStation
     const toStationRows = (entries: StationEntryDto[]): Row[] => entries.map((entry) => ({ kind: 'station' as const, entry }))
     const toItemRows = (items: ClipboardItemDto[]): Row[] => items.map((item) => ({ kind: 'item' as const, item }))
-    const visibleItems = stationRouteFilter === 'clipboard' ? [] : searched
+    const visibleItems = clipboardOnly ? [] : searched
     return {
       pinned: [...toStationRows(stationSearched.filter((e) => e.pinned)), ...toItemRows(visibleItems.filter((it) => it.pinned))],
       recent: [...toStationRows(stationSearched.filter((e) => !e.pinned)), ...toItemRows(visibleItems.filter((it) => !it.pinned))]
     }
-  }, [fileItems, station, query, tutorialStep, stationRouteFilter])
+  }, [fileItems, station, query, tutorialStep, filesFilter])
 
   const staleCount = useMemo(() => countStale(station), [station])
   const stationPinned = useMemo(

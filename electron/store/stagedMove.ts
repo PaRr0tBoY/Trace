@@ -33,6 +33,7 @@ import type { MoveMode } from '../../shared/types'
  */
 export const EXPLORER_WINDOW_CLASSES = [
   'CabinetWClass', // Explorer folder windows
+  'XamlExplorerHostIslandWindow', // Win11 22H2+ Explorer host (real-drag data 2026-08-14)
   'SysListView32', // file list views (Explorer, desktop list view)
   'Progman', // desktop root
   'WorkerW', // desktop wallpaper host (modern Windows)

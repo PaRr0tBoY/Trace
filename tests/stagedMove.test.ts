@@ -122,6 +122,7 @@ describe('decideDragEnd — T4a layered drag-end heuristic', () => {
 describe('isExplorerTarget', () => {
   it('matches explorer classes exactly and the explorer process case-insensitively', () => {
     expect(isExplorerTarget('CabinetWClass', undefined)).toBe(true)
+    expect(isExplorerTarget('XamlExplorerHostIslandWindow', undefined)).toBe(true) // Win11 22H2+ Explorer (real-drag data)
     expect(isExplorerTarget(undefined, 'EXPLORER.EXE')).toBe(true)
     expect(isExplorerTarget('cabinetwclass')).toBe(false) // class names are case-sensitive
     expect(isExplorerTarget('', '')).toBe(false)

@@ -50,7 +50,7 @@ const DEBUG = false
 
 /** Source-window classes that classify a drag as a file drag. */
 export const FILE_DRAG_CLASSES = new Set([
-  'CabinetWClass', 'SysListView32', 'Progman', 'WorkerW',
+  'CabinetWClass', 'XamlExplorerHostIslandWindow', 'SysListView32', 'Progman', 'WorkerW',
   'Shelldll_DefView', 'Shell_TrayWnd'
 ])
 

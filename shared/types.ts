@@ -658,6 +658,9 @@ export interface Settings {
   fontSizeScale?: number
   /** Active UI language code ('system' | 'en' | 'es' | 'fr' | 'de' | ...). Default: 'system'. */
   language?: string
+  /** Notes view layout: 'list' = management list (default), 'single' = one
+   * note editor with the list inside a modal. */
+  noteViewMode?: 'list' | 'single'
   /** Master switch for the whole task system (capture + state machine + suggestions). */
   taskCaptureEnabled: boolean
   /** L0 foreground/window event capture. Off = nothing leaves the machine. */
@@ -762,6 +765,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hoverActivation: true,
   fontSizeScale: 1.0,
   language: 'system',
+  noteViewMode: 'list',
   taskCaptureEnabled: true,
   l0CaptureEnabled: true,
   evidenceRetentionDays: 30,

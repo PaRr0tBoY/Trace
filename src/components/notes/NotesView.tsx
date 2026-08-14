@@ -18,7 +18,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import type { NoteDto } from '../../../shared/types'
-import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ExpandIcon, ContractIcon } from '../icons'
+import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ExpandIcon, ContractIcon, BundleIcon, CloseIcon } from '../icons'
 import { playButtonClickSound } from '../../lib/soundEffects'
 import { MarkdownPreview } from './markdown'
 
@@ -97,8 +97,24 @@ function applyCommand(ta: HTMLTextAreaElement, cmd: MdCommand): void {
   ta.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
-/** Full-height editor with a compact Markdown toolbar. Live-saved main-side. */
-function NoteEditor({ note, onBack }: { note: NoteDto; onBack: () => void }) {
+/** Full-height editor with a compact Markdown toolbar. Live-saved main-side.
+ *
+ * variant 'list' (management mode): back / title / pin / delete.
+ * variant 'single' (single-note mode): title / open-all-notes modal / new —
+ * pin & delete live inside the modal list instead. */
+function NoteEditor({
+  note,
+  onBack,
+  variant = 'list',
+  onOpenModal,
+  onNew
+}: {
+  note: NoteDto
+  onBack?: () => void
+  variant?: 'list' | 'single'
+  onOpenModal?: () => void
+  onNew?: () => void
+}) {
   const { t } = useTranslation()
   const updateNote = useStore((s) => s.updateNote)
   const deleteNote = useStore((s) => s.deleteNote)
@@ -134,32 +150,62 @@ function NoteEditor({ note, onBack }: { note: NoteDto; onBack: () => void }) {
   return (
     <div className="notes-editor">
       <div className="notes-editor-bar">
-        <button
-          type="button"
-          className="notes-bar-btn"
-          title={t('notes.back')}
-          onClick={() => {
-            playButtonClickSound()
-            onBack()
-          }}
-        >
-          <ChevronLeftIcon width={14} height={14} />
-        </button>
-        <span className="notes-editor-title">{note.title || t('notes.untitled')}</span>
-        <button
-          type="button"
-          className="notes-bar-btn"
-          title={note.pinned ? t('notes.unpin') : t('notes.pin')}
-          onClick={() => {
-            playButtonClickSound()
-            void updateNote(note.id, { pinned: !note.pinned })
-          }}
-        >
-          {note.pinned ? <PinFillIcon width={13} height={13} /> : <PinIcon width={13} height={13} />}
-        </button>
-        <button type="button" className="notes-bar-btn danger" title={t('notes.delete')} onClick={handleDelete}>
-          <TrashIcon width={13} height={13} />
-        </button>
+        {variant === 'single' ? (
+          <>
+            <span className="notes-editor-title">{note.title || t('notes.untitled')}</span>
+            <button
+              type="button"
+              className="notes-bar-btn"
+              title={t('notes.allNotes')}
+              onClick={() => {
+                playButtonClickSound()
+                onOpenModal?.()
+              }}
+            >
+              <BundleIcon width={13} height={13} />
+            </button>
+            <button
+              type="button"
+              className="notes-bar-btn"
+              title={t('notes.new')}
+              onClick={() => {
+                playButtonClickSound()
+                onNew?.()
+              }}
+            >
+              <PlusIcon width={13} height={13} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="notes-bar-btn"
+              title={t('notes.back')}
+              onClick={() => {
+                playButtonClickSound()
+                onBack()
+              }}
+            >
+              <ChevronLeftIcon width={14} height={14} />
+            </button>
+            <span className="notes-editor-title">{note.title || t('notes.untitled')}</span>
+            <button
+              type="button"
+              className="notes-bar-btn"
+              title={note.pinned ? t('notes.unpin') : t('notes.pin')}
+              onClick={() => {
+                playButtonClickSound()
+                void updateNote(note.id, { pinned: !note.pinned })
+              }}
+            >
+              {note.pinned ? <PinFillIcon width={13} height={13} /> : <PinIcon width={13} height={13} />}
+            </button>
+            <button type="button" className="notes-bar-btn danger" title={t('notes.delete')} onClick={handleDelete}>
+              <TrashIcon width={13} height={13} />
+            </button>
+          </>
+        )}
       </div>
 
       <textarea
@@ -276,12 +322,71 @@ const NoteCard = forwardRef<HTMLDivElement, { note: NoteDto; onEdit: () => void 
   )
 })
 
+/** All-notes modal for single-note mode: search + card list (pin / fold /
+ * delete live on the cards). Picking a card switches the editor behind it. */
+function NotesModal({
+  open,
+  notes,
+  onClose,
+  onSelect
+}: {
+  open: boolean
+  notes: NoteDto[]
+  onClose: () => void
+  onSelect: (id: string) => void
+}) {
+  const { t } = useTranslation()
+  const [q, setQ] = useState('')
+
+  const filtered = useMemo(() => {
+    if (!q.trim()) return notes
+    const s = q.trim().toLowerCase()
+    return notes.filter((n) => n.title.toLowerCase().includes(s) || n.content.toLowerCase().includes(s))
+  }, [notes, q])
+
+  if (!open) return null
+
+  return (
+    <div className="notes-modal-backdrop" onClick={onClose}>
+      <div className="notes-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="notes-modal-head">
+          <span className="notes-modal-title">{t('notes.allNotes')}</span>
+          <button type="button" className="notes-bar-btn" title={t('notes.back')} onClick={onClose}>
+            <CloseIcon width={13} height={13} />
+          </button>
+        </div>
+        <input
+          className="notes-modal-search"
+          value={q}
+          placeholder={t('notes.search')}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <div className="notes-modal-scroll">
+          <AnimatePresence initial={false} mode="popLayout">
+            {filtered.map((note) => (
+              <NoteCard key={note.id} note={note} onEdit={() => onSelect(note.id)} />
+            ))}
+          </AnimatePresence>
+          {filtered.length === 0 && (
+            <div className="notes-empty">
+              <p>{notes.length === 0 ? t('notes.empty') : t('notes.noMatches')}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function NotesView() {
   const { t } = useTranslation()
   const notes = useStore((s) => s.notes)
   const query = useStore((s) => s.query)
   const createNote = useStore((s) => s.createNote)
+  const noteViewMode = useStore((s) => s.settings.noteViewMode ?? 'list')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [currentId, setCurrentId] = useState<string | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
 
   const filtered = useMemo(() => {
     if (!query.trim()) return notes
@@ -290,12 +395,58 @@ export function NotesView() {
   }, [notes, query])
 
   const editing = editingId !== null ? notes.find((n) => n.id === editingId) : undefined
+  const current = currentId !== null ? notes.find((n) => n.id === currentId) : undefined
+
+  // Single-note mode: always keep a note open — the first in list order, or
+  // a fresh one when the shelf is empty. Also recovers when the open note is
+  // deleted from the modal (or elsewhere).
+  useEffect(() => {
+    if (noteViewMode !== 'single') return
+    if (currentId !== null && notes.some((n) => n.id === currentId)) return
+    if (notes.length > 0) {
+      setCurrentId(notes[0].id)
+    } else {
+      void createNote('').then((id) => setCurrentId(id))
+    }
+  }, [noteViewMode, notes, currentId, createNote])
 
   const handleNew = () => {
     playButtonClickSound()
     // main returns the created id — the note may sort below pinned notes,
     // so index 0 is not a safe assumption
     void createNote('').then((id) => setEditingId(id))
+  }
+
+  const handleNewSingle = () => {
+    playButtonClickSound()
+    void createNote('').then((id) => setCurrentId(id))
+  }
+
+  if (noteViewMode === 'single') {
+    if (!current) {
+      // The effect above is still creating/selecting a note — keep the frame.
+      return <div className="notes-list" />
+    }
+    return (
+      <div className="notes-single">
+        <NoteEditor
+          key={current.id}
+          note={current}
+          variant="single"
+          onOpenModal={() => setModalOpen(true)}
+          onNew={handleNewSingle}
+        />
+        <NotesModal
+          open={modalOpen}
+          notes={notes}
+          onClose={() => setModalOpen(false)}
+          onSelect={(id) => {
+            setCurrentId(id)
+            setModalOpen(false)
+          }}
+        />
+      </div>
+    )
   }
 
   if (editing) {

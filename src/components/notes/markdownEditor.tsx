@@ -78,7 +78,7 @@ class HiddenMarkerWidget extends WidgetType {
  * items — the source `-`/`1.` is replaced by what the preview shows.
  * Backspace at line start still deletes the whole marker (the widget is
  * one replacement range), turning the line into plain text. */
-class ListMarkerWidget extends WidgetType {
+export class ListMarkerWidget extends WidgetType {
   constructor(private readonly text: string) {
     super()
   }
@@ -113,10 +113,9 @@ class TaskCheckboxWidget extends WidgetType {
 
   toDOM(view: EditorView): HTMLElement {
     const box = document.createElement('span')
-    box.className = 'cm-task-box'
+    box.className = this.checked ? 'cm-task-box checked' : 'cm-task-box'
     box.setAttribute('role', 'checkbox')
     box.setAttribute('aria-checked', String(this.checked))
-    box.textContent = this.checked ? '✓' : ''
     // Keep the click from moving the editor caret onto the widget.
     box.addEventListener('mousedown', (e) => e.preventDefault())
     box.addEventListener('click', (e) => {
@@ -163,8 +162,11 @@ export function buildDecorations(view: EditorView): DecorationSet {
           }
           const active = view.state.doc.sliceString(to, to + 1) === ' '
           if (active && name === 'ListMark') {
-            // Task lines show no bullet — the checkbox is the marker.
-            const isTask = node.node.parent?.getChild('TaskMarker') !== null
+            // Task lines show no bullet: the checkbox is the marker. The
+            // TaskMarker lives under a `Task` node, which is the ListItem's
+            // direct child (ListMark -> ListItem -> Task -> TaskMarker).
+            const parent = node.node.parent
+            const isTask = parent !== null && parent.getChild('Task') !== null
             decos.push(
               isTask
                 ? Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to)
@@ -238,8 +240,10 @@ export function buildDecorations(view: EditorView): DecorationSet {
         case 'TaskMarker': {
           // The caret on the line reveals the raw `[ ]` so it can be
           // edited; elsewhere the clickable checkbox widget takes over.
+          // The checkbox replaces the whole `- [ ]` prefix (marker and
+          // box), so a task line never shows a bullet.
           if (caretOnLine) break
-          const listItem = node.node.parent
+          const listItem = node.node.parent?.parent
           const listMark = listItem?.getChild('ListMark')
           const replaceFrom = listMark ? listMark.from : from
           const checked = view.state.doc.sliceString(from, to).toLowerCase().includes('x')

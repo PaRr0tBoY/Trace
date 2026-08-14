@@ -283,23 +283,23 @@
   cursor: pointer;
 }
 
-/* Heading scale is deliberately close to body (13px): the note stays
- * readable in the 270px blade, headings lead by weight and a compact
- * line height instead of ballooning. */
+/* Heading scale leads clearly from body (13px): h1 sits at 18px, each
+ * level steps down ~2px so the hierarchy reads at a glance in the narrow
+ * blade. h4+ keep body size but step to secondary text. */
 .cm-md-h1 {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.cm-md-h2 {
   font-size: 16px;
   font-weight: 700;
   line-height: 1.45;
 }
 
-.cm-md-h2 {
-  font-size: 14.5px;
-  font-weight: 700;
-  line-height: 1.5;
-}
-
 .cm-md-h3 {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -328,26 +328,53 @@
   border-left: 2px solid rgba(var(--accent-rgb), 0.5);
 }
 
-/* Task checkbox widget — same look as the rendered .md-todo-box. */
+/* Task checkbox widget — fixed 13px geometry so the box never shifts
+ * between states; the check is drawn in CSS (no glyph metrics). Checked
+ * boxes fill with the theme accent and pop in, so completing a task
+ * reads as a small reward instead of a color swap. */
 .cm-task-box {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 13px;
   height: 13px;
   margin-right: 5px;
-  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
   border-radius: 4px;
-  color: var(--accent);
-  font-size: 9px;
-  line-height: 1;
+  background: transparent;
   vertical-align: -1px;
   cursor: pointer;
   user-select: none;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.cm-task-box.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  animation: cm-task-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.cm-task-box.checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  width: 5px;
+  height: 2.5px;
+  border-left: 1.5px solid #fff;
+  border-bottom: 1.5px solid #fff;
+  transform: rotate(-45deg);
 }
 
 .cm-task-box:hover {
   border-color: var(--accent);
+}
+
+@keyframes cm-task-pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); }
 }
 
 /* Single-note empty state: hint + create button instead of a fabricated note. */

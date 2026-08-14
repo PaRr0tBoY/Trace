@@ -9,7 +9,7 @@ import { EditorState } from '@codemirror/state'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import type { EditorView } from '@codemirror/view'
 import { continueOnEnter, flipTaskLine } from '../src/components/notes/editorInput'
-import { buildDecorations } from '../src/components/notes/markdownEditor'
+import { buildDecorations, ListMarkerWidget } from '../src/components/notes/markdownEditor'
 
 describe('flipTaskLine', () => {
   it('flips an unchecked task to checked, keeping the closing bracket', () => {
@@ -150,6 +150,23 @@ describe('markdown decoration builder', () => {
     // Task lines render the checkbox but no bullet (2 widgets: hidden
     // ListMark + checkbox).
     expect(replaceCount('plain\n- [ ] task')).toBe(2)
+    expect(replaceCount('plain\n- [x] done')).toBe(2)
+    // And neither widget is a bullet: task lines must never show the
+    // unordered-list dot (regression: the dot appeared because the
+    // TaskMarker was looked up under ListItem, but it lives under a
+    // `Task` node, and the checkbox replace range excluded the `- `).
+    const bulletCount = (doc: string, anchor = 0) => {
+      let n = 0
+      decorate(doc, anchor).between(0, doc.length, (_f, _t, value) => {
+        if (value.spec.widget instanceof ListMarkerWidget) n++
+      })
+      return n
+    }
+    expect(bulletCount('plain\n- [ ] task')).toBe(0)
+    expect(bulletCount('plain\n- [x] done')).toBe(0)
+    expect(bulletCount('plain\n- [ ] task', 3)).toBe(0)
+    // Non-task lists keep their bullet.
+    expect(bulletCount('plain\n- item')).toBe(1)
     // Caret on the marker line → raw marker revealed, no widgets.
     expect(replaceCount('# title', 3)).toBe(0)
     expect(replaceCount('> quote', 3)).toBe(0)

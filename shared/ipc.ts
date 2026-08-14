@@ -9,7 +9,8 @@
  *   - `Renderer -> Main` calls (invoke/handle) are listed in `InvokeMap`.
  *   - `Main -> Renderer` events (send/on) are listed in `EventMap`.
  */
-import type { AppRef, ClipboardItemDto, DragRequest, IgnoreReason, LocalModelSource, LocalModelStatus, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, MergeResult, ProviderConfig, Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
+import type { AppRef, ClipboardItemDto, DragRequest, IgnoreReason, LocalModelSource, LocalModelStatus, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, ProviderConfig, Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
+import type { StationContentInput, StationEntryDto } from './station'
 
 /** Result of a connection test against one provider (ai:test-provider). */
 export interface ProviderTestResult {
@@ -63,8 +64,8 @@ export interface SuggestionAcceptOptions {
 /* ------------------------------------------------------------------ */
 
 export interface InvokeMap {
-  /** Returns the full current item list + settings + tasks on startup. */
-  'state:load': { args: []; result: { items: ClipboardItemDto[]; settings: Settings; version: string; tasks: TaskDto[] } }
+  /** Returns the full current item list + station entries + settings + tasks on startup. */
+  'state:load': { args: []; result: { items: ClipboardItemDto[]; station: StationEntryDto[]; settings: Settings; version: string; tasks: TaskDto[] } }
 
   /** Set an item's pinned state. */
   'item:set-pinned': { args: [id: string, pinned: boolean]; result: ClipboardItemDto[] }
@@ -91,14 +92,29 @@ export interface InvokeMap {
   /** Copy a sub-item and paste it directly into the active application. */
   'item:paste-subitem': { args: [req: DragRequest]; result: boolean }
 
-  /** Add local file paths dragged into the shelf. */
-  'item:add-files': { args: [paths: string[]]; result: ClipboardItemDto[] }
+  /* --------------------------- transfer station (ADR-0006) --------------------------- */
 
-  /** Merge an item into another. Returns why it failed (full / incompatible). */
-  'item:merge': { args: [sourceId: string, targetId: string]; result: MergeResult }
+  /** Full current station entry list (also included in state:load). */
+  'station:list': { args: []; result: StationEntryDto[] }
 
-  /** Split a sub-item out of a bundle into a new standalone item. */
-  'item:split': { args: [req: DragRequest]; result: boolean }
+  /** Enter dragged-in file paths into the station (route = 拖入). */
+  'station:enter': { args: [paths: string[]]; result: StationEntryDto[] }
+
+  /** Stage non-file drag-in content (text/image) as files and enter the
+   *  station (T7). */
+  'station:enter-content': { args: [input: StationContentInput]; result: StationEntryDto[] }
+
+  /** Set an entry's pinned state. */
+  'station:pin': { args: [id: string, pinned: boolean]; result: StationEntryDto[] }
+
+  /** Remove an entry (and, for in-transit entries, dispose of the staged copy). */
+  'station:delete': { args: [id: string]; result: StationEntryDto[] }
+
+  /** Copy one file member (path) onto the system clipboard. */
+  'station:copy-member': { args: [req: DragRequest]; result: boolean }
+
+  /** Copy one file member and paste it directly into the active application. */
+  'station:paste-member': { args: [req: DragRequest]; result: boolean }
 
   /** Update a persisted setting. */
   'settings:update': { args: [patch: Partial<Settings>]; result: Settings }
@@ -305,6 +321,8 @@ export interface InvokeMap {
 export interface EventMap {
   /** Full new item list whenever the history changes. */
   'state:items': [items: ClipboardItemDto[]]
+  /** Full new station entry list whenever the transfer station changes (ADR-0006). */
+  'state:station': [entries: StationEntryDto[]]
   /** Full task list whenever the task domain changes. */
   'state:tasks': [tasks: TaskDto[]]
   /** Pending suggestion cards (transient, replaced on each analysis). */
@@ -315,6 +333,10 @@ export interface EventMap {
   'local-model:status': [status: LocalModelStatus]
   /** Toggle the panel open/closed from the main process (e.g. tray). */
   'window:toggle': [open?: boolean]
+  /** OS drag session started/ended (T4b): renderer must not collapse the panel mid-drag. */
+  'drag:active': [active: boolean]
+  /** Drag indicator visibility: a file drag waits for the detection zone. */
+  'drag:indicator': [show: boolean]
   /** Open the panel directly to settings from the main process (e.g. tray). */
   'window:open-settings': []
   /** Fired when an OS drag initiated by the app has completed. */

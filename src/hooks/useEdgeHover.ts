@@ -162,9 +162,12 @@ export function useEdgeHover(): void {
       if (state.switcherActive) return // switcher owns the panel (ADR-0005)
       if (state.debugHoldOpen) return
       if (state.sliderActive) return
-      if (state.dragActive && !state.internalDragReq) return
+      // Any live drag keeps the panel up — OS file drags AND in-panel item
+      // drags dragged out across the edge (user feedback 2026-08-14: never
+      // collapse while the drag is still in flight).
+      if (state.dragActive) return
 
-      // If the indicator style flyout is open, let it play its exit spring first.
+      // If the indicator style flyout is open, let it play its exit spring fir…
       // The Electron window resize (inside setOpen) would cut the flyout animation
       // in half if we close both simultaneously — so we sequence it properly.
       if (state.styleFlyoutOpen) {
@@ -199,7 +202,8 @@ export function useEdgeHover(): void {
       if (state.switcherActive) return // switcher owns the panel (ADR-0005)
       if (state.debugHoldOpen) return
       if (state.sliderActive) return
-      if (state.dragActive && !state.internalDragReq) return
+      // Any live drag keeps the panel up (see closePanel).
+      if (state.dragActive) return
       if (graceTimer !== undefined) return // already closing
 
       // If position/display/slider was recently changed (< 1.75s ago), wait out remaining preview stay window
@@ -493,13 +497,25 @@ export function useEdgeHover(): void {
       }
       const state = useStore.getState()
       if (!state.open) return
-      // Don't close during an external OS file drag — the drag surface may
-      // temporarily shift focus to the OS drag-ghost or file manager.
-      if (state.dragActive && !state.internalDragReq) return
+      // Don't close during a live drag — the drag surface may temporarily
+      // shift focus to the OS drag-ghost or file manager.
+      if (state.dragActive) return
       scheduleClose(400)
     }
 
     // ── OS file drag awareness ─────────────────────────────────────────────
+    // T4b: the main-process drag detector pushes the global OS drag session
+    // state — while a drag is in flight the panel must not collapse (the
+    // cursor poll would close it the moment the cursor crosses the blade
+    // edge, mid-drag). The renderer's own HTML5 events below cover drags
+    // inside the window; this covers everything else.
+    const unsubDragActive = window.edge.onDragActive((active) => {
+      useStore.getState().setDragActive(active)
+    })
+    const unsubDragIndicator = window.edge.onDragIndicator((show) => {
+      useStore.getState().setDragIndicator(show)
+    })
+
     const onDocDragEnter = (e: DragEvent) => {
       if (e.dataTransfer?.types.includes('Files')) {
         e.preventDefault()
@@ -513,11 +529,14 @@ export function useEdgeHover(): void {
         cancelClose()
       }
     }
-    const onDocDragLeave = (e: DragEvent) => {
-      if (!e.relatedTarget) {
-        useStore.getState().setDragActive(false)
-        if (useStore.getState().internalDragReq) scheduleClose(0)
-      }
+    const onDocDragLeave = (_e: DragEvent) => {
+      // No dragActive flip here: DOM drag events on an OLE drag are
+      // unreliable (dragleave often never fires), and dragActive's authority
+      // is the main-process drag:active push. Clearing it here released the
+      // close-guards while the drag was still in flight and collapsed the
+      // panel mid-drag — the exact bug this branch's comment describes.
+      // A drag that left the window may still come back (user feedback
+      // 2026-08-14: keep the drop view until the drag ends).
     }
     const onDocDrop = (e: DragEvent) => {
       e.preventDefault()
@@ -544,6 +563,8 @@ export function useEdgeHover(): void {
 
     return () => {
       unsubCursorEdge()
+      unsubDragActive()
+      unsubDragIndicator()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('blur', onWindowBlur)
       window.removeEventListener(PANEL_LEAVE_EVENT, onPanelLeave)

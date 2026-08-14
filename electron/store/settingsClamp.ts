@@ -36,6 +36,9 @@ export function clampSettings(input: Settings): Settings {
   if (out.triggerAlignment !== 'top' && out.triggerAlignment !== 'center' && out.triggerAlignment !== 'bottom') {
     out.triggerAlignment = 'center'
   }
+  if (out.moveMode !== 'copy' && out.moveMode !== 'move') {
+    out.moveMode = 'move'
+  }
   if (typeof out.language !== 'string' || !out.language.trim()) {
     out.language = 'system'
   }

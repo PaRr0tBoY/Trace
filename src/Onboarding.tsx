@@ -43,27 +43,6 @@ export function Onboarding() {
       placeholderColor: 'linear-gradient(135deg, #43E97B 0%, #38F9D7 100%)'
     },
     {
-      id: 'slide-4',
-      title: t('onboarding.stacksTitle'),
-      description: t('onboarding.stacksDesc'),
-      videoSrc: 'stack.webm',
-      placeholderColor: 'linear-gradient(135deg, #FA709A 0%, #FEE140 100%)'
-    },
-    {
-      id: 'slide-5-ungroup',
-      title: t('onboarding.ungroupTitle'),
-      description: t('onboarding.ungroupDesc'),
-      videoSrc: 'ungroup.webm',
-      placeholderColor: 'linear-gradient(135deg, #FAD961 0%, #F76B1C 100%)'
-    },
-    {
-      id: 'slide-5',
-      title: t('onboarding.mergeTitle'),
-      description: t('onboarding.mergeDesc'),
-      videoSrc: 'merge.webm',
-      placeholderColor: 'linear-gradient(135deg, #667EEA 0%, #764BA2 100%)'
-    },
-    {
       id: 'slide-preview',
       title: t('onboarding.previewTitle'),
       description: t('onboarding.previewDesc'),

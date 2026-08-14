@@ -12,13 +12,15 @@ import { psHost } from './powershell'
 import { requestPanelFocus, releasePanelFocus, releasePanelFocusNow } from './focus'
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
 import { rehomeTraceAfterMerge } from '../store/traceStore'
-import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getTitleSuggester, getMemoryStore, getMemoryGraph, getTraceStore, getLocalModelManager, getLocalModelRuntime, resetLocalModelRuntime, ensureLocalModelLoaded } from './state'
+import { getStore, getStationStore, stationClipboardItem, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getTitleSuggester, getMemoryStore, getMemoryGraph, getTraceStore, getLocalModelManager, getLocalModelRuntime, resetLocalModelRuntime, ensureLocalModelLoaded } from './state'
 import type { FactRecord } from '../store/memoryGraph'
 import { isTraceRecordDto, renderTraceReportHtml } from './traceReport'
 import { getMainWindow } from './window'
 import { setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
-import { startDragOut, resolveDragData } from './drag'
+import { startDragOut, resolveDragData, prefetchFileIcons, stageMoveDrag } from './drag'
+import { disposeToRecycleBin } from './recycleBin'
+import { enterContentToStation } from './contentToFile'
 import { activateAppWindow } from './windowSwitch'
 import { switcherHover, switcherClick } from './switcher'
 import { clipboardSignature } from '../clipboard/formats'
@@ -29,7 +31,8 @@ import { recentEvents } from './eventBus'
 import { acceptWithResource } from './suggestionDrop'
 import { ProviderChain, testProvider } from './provider'
 import { logAi } from './aiLog'
-import type { ItemData, MergeResult, MemoryFactDto, MemoryFactPanelPayload, MemoryListPayload, ResourceRef, Task } from '../../shared/types'
+import { applyIncognito } from './tray'
+import type { ItemData, MemoryFactDto, MemoryFactPanelPayload, MemoryListPayload, ResourceRef, Task } from '../../shared/types'
 
 /**
  * Returns true if the current system clipboard content matches the given item data.
@@ -42,7 +45,6 @@ import type { ItemData, MergeResult, MemoryFactDto, MemoryFactPanelPayload, Memo
 function clipboardMatchesItem(data: ItemData): boolean {
   const sig = clipboardSignature()
   if (data.kind === 'text') return sig === `text:${data.text}`
-  if (data.kind === 'files') return sig === `files:${data.paths.join('\n')}`
   if (data.kind === 'image') {
     // sig format: "image:<W>x<H>:<hash>" — check the dimension prefix to avoid a full pixel read.
     // If another image with the same dimensions is on the clipboard, we over-clear, which is
@@ -195,11 +197,86 @@ export function registerIpc(): void {
   handle('state:load', () => {
     return {
       items: getStore().toDto(),
+      station: getStationStore().toDto(),
       settings: loadSettings(),
       version: app.getVersion(),
       tasks: getTaskStore().toDto()
     }
   })
+
+  /* --------------------------- transfer station (ADR-0006) --------------------------- */
+
+  handle('station:list', () => getStationStore().toDto())
+
+  handle('station:enter', (paths) => {
+    const result = addFiles(paths)
+    if (result.stacksCreated > 1) {
+      toast(`Split into ${result.stacksCreated} station entries (max 10 each)`, 'info')
+    }
+    return getStationStore().toDto()
+  })
+
+  handle('station:enter-content', (input) => enterContentToStation(input))
+
+  handle('station:pin', (id, pinned) => {
+    getStationStore().pin(id, pinned)
+    return getStationStore().toDto()
+  })
+
+  handle('station:delete', (id) => {
+    const entry = getStationStore().get(id)
+    // An in-transit entry holds its files in the staging area: deleting it
+    // sends them to the Recycle Bin (ADR-0007). A failed disposal keeps the
+    // entry so the user can retry — nothing is ever permanently deleted.
+    if (entry?.inTransit && entry.paths.length > 0 && !disposeToRecycleBin(entry.paths)) {
+      toast('Held files could not be sent to the Recycle Bin; entry kept for retry', 'error')
+      return getStationStore().toDto()
+    }
+    getStationStore().remove(id)
+    // A deleted entry that is still on the clipboard must not zombie
+    // re-enter on the next watcher tick (same contract as item:delete).
+    getWatcher().resyncSignature()
+    return getStationStore().toDto()
+  })
+
+  handle('station:copy-member', async (req) => {
+    if (!req || typeof req.id !== 'string' || !req.paths || req.paths.length === 0) return false
+    const entry = getStationStore().get(req.id)
+    if (!entry) return false
+    const paths = req.paths.filter((p) => entry.paths.includes(p))
+    if (paths.length === 0) return false
+    await writeFileListToClipboard(paths)
+    return true
+  })
+
+  handle('station:paste-member', async (req) => {
+    const watcher = getWatcher()
+    const now = Date.now()
+    if (now - _lastPasteTime < PASTE_GUARD_MS) return false
+    _lastPasteTime = now
+    if (!req || typeof req.id !== 'string' || !req.paths || req.paths.length === 0) return false
+    const entry = getStationStore().get(req.id)
+    if (!entry) return false
+    const paths = req.paths.filter((p) => entry.paths.includes(p))
+    if (paths.length === 0) return false
+
+    watcher.setPaused(true)
+    try {
+      await writeFileListToClipboard(paths)
+      pushState.togglePanel(false)
+      setTimeout(() => {
+        simulatePaste()
+      }, 50)
+    } finally {
+      setTimeout(() => {
+        watcher.invalidateSignature()
+        watcher.setPaused(loadSettings().incognito)
+      }, 350)
+    }
+    return true
+  })
+
+  /* --------------------------- ai provider --------------------------- */
 
   /* --------------------------- ai provider --------------------------- */
 
@@ -304,7 +381,9 @@ export function registerIpc(): void {
   })
 
   handle('task:link-item', (taskId, itemId) => {
-    const item = getStore().get(itemId)
+    // Station entries link as files resources (ADR-0006): the station lookup
+    // falls back when the id is not a clipboard-stack item.
+    const item = getStore().get(itemId) ?? stationClipboardItem(itemId)
     if (item) {
       getTaskStore().linkItem(taskId, buildClipboardRef(item))
     }
@@ -393,7 +472,9 @@ export function registerIpc(): void {
     const ref: ResourceRef | null =
       resource.kind === 'clipboard'
         ? (() => {
-            const item = getStore().get(resource.itemId)
+            // Station entries link as files resources (ADR-0006): the station
+            // lookup falls back when the id is not a clipboard-stack item.
+            const item = getStore().get(resource.itemId) ?? stationClipboardItem(resource.itemId)
             return item ? buildClipboardRef(item) : null
           })()
         : { kind: 'files', paths: resource.paths }
@@ -596,18 +677,14 @@ export function registerIpc(): void {
   })
 
   handle('item:copy-subitem', async (req) => {
-    // Resolve a single sub-item (one file of a bundle, or one image of a
-    // collection) and write just that onto the clipboard — not the whole item.
+    // Resolve a single image of a collection and write just that onto the
+    // clipboard — not the whole item. (File members live in the station and
+    // use station:copy-member.)
     const dto = getStore().toDto().find((d) => d.id === req.id)
     if (!dto) return false
 
     let wrote = false
-    if (dto.data.kind === 'files' && req.paths && req.paths.length > 0) {
-      // Write real file references so pasting into Explorer copies the file,
-      // not a path string.
-      await writeFileListToClipboard(req.paths)
-      wrote = true
-    } else if (dto.data.kind === 'image-collection' && req.imageId) {
+    if (dto.data.kind === 'image-collection' && req.imageId) {
       const img = dto.data.images.find((i) => i.imageId === req.imageId)
       if (img) {
         // Single image from a collection: write full bitmap + file reference atomically.
@@ -705,10 +782,7 @@ export function registerIpc(): void {
 
     try {
       let wrote = false
-      if (dto.data.kind === 'files' && req.paths && req.paths.length > 0) {
-        await writeFileListToClipboard(req.paths)
-        wrote = true
-      } else if (dto.data.kind === 'image-collection' && req.imageId) {
+      if (dto.data.kind === 'image-collection' && req.imageId) {
         const img = dto.data.images.find((i) => i.imageId === req.imageId)
         if (img) {
           // Single image from a collection: write full bitmap + file reference atomically.
@@ -741,45 +815,20 @@ export function registerIpc(): void {
     return true
   })
 
-  handle('item:add-files', (paths) => {
-    const result = addFiles(paths)
-    // If a large drop was split into several stacks, let the user know why
-    // they suddenly see multiple items instead of one bundle.
-    if (result.stacksCreated > 1) {
-      toast(`Split into ${result.stacksCreated} stacks (max 10 each)`, 'info')
-    }
-    return getStore().toDto()
-  })
-
   handle('item:remove-subitem', (req) => {
     const success = getStore().removeSubitem(req)
     if (success) pushState.items()
     return success
   })
 
-  handle('item:merge', (sourceId, targetId) => {
-    const result: MergeResult = getStore().merge(sourceId, targetId)
-    if (result.ok) {
-      pushState.items()
-    } else if (result.reason === 'full') {
-      toast(result.message || 'Collection is full (10 max)', 'info')
-    } else if (result.reason === 'incompatible') {
-      toast(result.message || 'Cannot combine different item types', 'info')
-    }
-    // 'notfound' fails silently
-    return result
-  })
-
-  handle('item:split', (req) => {
-    console.log('[IPC] item:split called with req=', JSON.stringify(req))
-    const success = getStore().split(req)
-    console.log('[IPC] item:split success=', success)
-    if (success) pushState.items()
-    return success
-  })
-
   handle('settings:update', (patch) => {
     const next = saveSettings(patch)
+    if (patch.incognito !== undefined) {
+      // The tray toggle applies the watcher pause through this hook; the
+      // settings sheet must too — otherwise capture keeps polling until the
+      // next event gate (still correct, but the pause is the contract).
+      applyIncognito(next.incognito)
+    }
     if (patch.launchAtLogin !== undefined && app.isPackaged) {
       try {
         app.setLoginItemSettings({
@@ -923,12 +972,39 @@ export function registerSendListeners(): void {
 
   on('item:start-drag', (sender, req) => {
     console.log('[IPC] item:start-drag req=', JSON.stringify(req))
-    const data = resolveDragData(req)
+    // Station whole-entry drags (no explicit paths) fall back to a files
+    // bundle built from the entry's paths (ADR-0006). Member drags carry
+    // explicit paths and are resolved by resolveDragData directly.
+    let data = resolveDragData(req)
+    if (!data) {
+      const entry = req.paths && req.paths.length > 0 ? undefined : getStationStore().get(req.id)
+      if (entry) {
+        const paths = entry.paths.filter((p) => existsSync(p))
+        if (paths.length > 0) {
+          data = { kind: 'files', paths }
+          prefetchFileIcons(paths)
+        }
+      }
+    }
     if (!data) {
       console.log('[IPC] start-drag: no data resolved')
       return
     }
     console.log('[IPC] start-drag: kind=', data.kind)
+
+    // ADR-0007 M-a: in move mode a station file drag stages the originals
+    // into the takeover area before the OS drag sources them; the entry is
+    // retargeted and marked in-transit. 'skip' means a file is missing — the
+    // drag must not start at all.
+    if (data.kind === 'files' && loadSettings().moveMode === 'move') {
+      const staged = stageMoveDrag(req, data)
+      if (staged.ok) {
+        data = staged.data
+      } else if (staged.reason === 'skip') {
+        console.log('[IPC] start-drag: skipped — entry has missing files')
+        return
+      }
+    }
 
     // Pause the always-on-top heartbeat for the duration of the drag.
     // The heartbeat fires SetWindowPos(HWND_TOPMOST) every 500 ms, which
@@ -1043,12 +1119,6 @@ export async function writeItemToClipboard(data: ItemData): Promise<void> {
       }
       break
     }
-
-    case 'files':
-      // Write real file references so pasting into Explorer copies the files,
-      // not path strings.
-      await writeFileListToClipboard(data.paths)
-      break
   }
 }
 /** Parses raw GitHub markdown release notes into clean plain text highlights (stripping image/video/HTML tags). */

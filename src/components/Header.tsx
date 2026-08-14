@@ -13,7 +13,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from '../store/appStore'
-import { GearIcon, CloseIcon, InfoIcon } from './icons'
+import { CloseIcon, InfoIcon } from './icons'
 import { playButtonClickSound } from '../lib/soundEffects'
 import { taskBadgeCount } from '../lib/taskGroups'
 import { useFileMembers } from '../hooks/useFilteredItems'
@@ -92,6 +92,8 @@ export function Header() {
   const setClipboardFilter = useStore((s) => s.setClipboardFilter)
   const filesFilter = useStore((s) => s.filesFilter)
   const setFilesFilter = useStore((s) => s.setFilesFilter)
+  const station = useStore((s) => s.station)
+  const tutorialStep = useStore((s) => s.tutorialStep)
   const tasksFilter = useStore((s) => s.tasksFilter)
   const setTasksFilter = useStore((s) => s.setTasksFilter)
   const tasks = useStore((s) => s.tasks)
@@ -229,8 +231,14 @@ export function Header() {
     />
   )
 
-  // Files second row: hidden entirely when no file entries exist.
-  const hasFiles = files.members.length > 0
+  // Files second row: hidden entirely when no file entries exist at all
+  // (ADR-0004). Corpus-based, not route-filtered — a route/tab that
+  // empties the visible list must keep the chips so the user can switch
+  // back; otherwise the row (and the route chips inside it) vanishes.
+  const hasFiles = files.corpusCount > 0
+  // The 'clipboard' pseudo-tab (T6 route filter) only exists while
+  // clipboard-captured station entries do; hidden during onboarding.
+  const hasClipboardRoute = tutorialStep <= 0 && station.some((e) => e.route === 'clipboard')
 
   return (
     <div
@@ -332,17 +340,14 @@ export function Header() {
           </div>
         )}
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          flexShrink: 0,
-          paddingRight: 2,
-          // When the chips are centered the buttons float at the right edge
-          // (they'd otherwise push the row's center off by half their width).
-          ...(settingsOpen ? {} : { position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' })
-        }}>
-          {settingsOpen && (
+        {settingsOpen && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            flexShrink: 0,
+            paddingRight: 2
+          }}>
             <button
               type="button"
               className={`icon-btn${settingsSubView === 'changelog' ? ' active' : ''}`}
@@ -385,48 +390,36 @@ export function Header() {
                 />
               )}
             </button>
-          )}
 
-          <button
-            type="button"
-            className={`icon-btn${settingsOpen ? ' active' : ''}`}
-            title={settingsOpen ? t('header.close') : t('header.settings')}
-            onClick={() => {
-              playButtonClickSound()
-              if (settingsOpen) {
+            {/* The settings entry point lives in the shared footer
+                (ViewFooter); this button only closes the sheet. */}
+            <button
+              type="button"
+              className="icon-btn active"
+              title={t('header.close')}
+              onClick={() => {
+                playButtonClickSound()
                 setSettingsOpen(false)
                 setSettingsSubView('main')
-                return
-              }
-              const state = useStore.getState()
-              const hasActiveFlyout = !!(state.previewItemId || state.styleFlyoutOpen)
-              if (hasActiveFlyout) {
-                state.setPreviewItemId(null)
-                state.setStyleFlyoutOpen(false)
-                setTimeout(() => {
-                  useStore.getState().setSettingsOpen(true)
-                }, 220)
-              } else {
-                setSettingsOpen(true)
-              }
-            }}
-            style={{
-              color: '#ffffff',
-              background: 'transparent',
-              border: 'none',
-              boxShadow: 'none',
-              flexShrink: 0,
-              cursor: 'pointer',
-              width: 32,
-              height: 32,
-              display: 'grid',
-              placeItems: 'center',
-              position: 'relative'
-            }}
-          >
-            {settingsOpen ? <CloseIcon /> : <GearIcon />}
-          </button>
-        </div>
+              }}
+              style={{
+                color: '#ffffff',
+                background: 'transparent',
+                border: 'none',
+                boxShadow: 'none',
+                flexShrink: 0,
+                cursor: 'pointer',
+                width: 32,
+                height: 32,
+                display: 'grid',
+                placeItems: 'center',
+                position: 'relative'
+              }}
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Row 2: second-level chips — hidden entirely when the files view
@@ -504,6 +497,26 @@ export function Header() {
                       transition={{ type: 'spring', stiffness: 400, damping: 34 }}
                       style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, overflow: 'hidden' }}
                     >
+                      {/* The route filter (T6) lives in this row as the
+                          'clipboard' pseudo-tab — one dimension, one active
+                          chip — so the sliding selector never gets two
+                          anchors (feedback: duplicated 全部 + stuck pill).
+                          It appears only while clipboard-captured station
+                          entries exist. */}
+                      {hasClipboardRoute && (
+                        <button
+                          type="button"
+                          data-chip-active={filesFilter === 'clipboard'}
+                          className={`filter-chip${filesFilter === 'clipboard' ? ' active' : ''}`}
+                          onClick={() => {
+                            playButtonClickSound()
+                            setFilesFilter('clipboard')
+                          }}
+                          style={secondaryChipStyle(filesFilter === 'clipboard')}
+                        >
+                          <span>{t('filters.clipboard')}</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         data-chip-active={filesFilter === 'all'}

@@ -9,7 +9,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'electron/main/index.ts'),
-          hookHost: resolve(__dirname, 'electron/main/hookHost.ts')
+          hookHost: resolve(__dirname, 'electron/main/hookHost.ts'),
+          dragHost: resolve(__dirname, 'electron/main/dragHost.ts')
         }
       }
     }

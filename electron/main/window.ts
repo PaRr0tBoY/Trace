@@ -328,7 +328,8 @@ export function stopCursorPoll(): void {
   }
 }
 
-function getStickGeometry(): { x: number; y: number; width: number; height: number } {
+/** The screen rect the expanded panel occupies (drag detection zone). */
+export function getStickGeometry(): { x: number; y: number; width: number; height: number } {
   let settings = loadSettings()
   const primaryDisplay = screen.getPrimaryDisplay()
   const allDisplays = screen.getAllDisplays().map(d => ({

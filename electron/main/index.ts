@@ -20,6 +20,7 @@ import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushSt
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
 import { startKeyboardHook, stopKeyboardHook } from './hookManager'
+import { startDragDetect, stopDragDetect } from './dragManager'
 import { switcherShow, switcherAdvance, switcherExecute, switcherTapExecute } from './switcher'
 import { ForegroundWatcher } from './foreground'
 import { ocrFromForeground } from './ocr'
@@ -77,6 +78,7 @@ app.on('before-quit', () => {
   stopStateTimers()
   stopFullscreenMonitor()
   stopKeyboardHook()
+  stopDragDetect()
   foregroundWatcher?.stop()
   attributor?.dispose()
   getWatcher().stop()
@@ -116,6 +118,11 @@ app.whenReady().then(async () => {
     onExecute: switcherExecute,
     onTapExecute: switcherTapExecute
   })
+
+  // OS drag detection (T4b, ADR-0007): SetWinEventHook 0x0F/0x10 in a
+  // utilityProcess + DragWindow poll fallback; feeds the dragSession state
+  // machine (panel expand on file drag anywhere, heartbeat pause, retract).
+  startDragDetect()
 
   // Register Alt+C global shortcut to toggle panel
   try {

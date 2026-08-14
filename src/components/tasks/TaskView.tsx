@@ -10,7 +10,7 @@
  * restore mechanism (ADR-0004) can remember/reset it and edit protection
  * can see it; the convert panel is a local edit session.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import type { TaskDto } from '../../../shared/types'
@@ -21,11 +21,18 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { ContentPicker } from './ContentPicker'
 import { TaskProposalCard } from './TaskProposalCard'
 import { TracePanel } from './TracePanel'
+import type { ViewFooterState } from '../ViewFooter'
 
 /** Which "AI 依据" chain the shared TracePanel is showing (t42). */
 type TraceTarget = { kind: 'proposal'; id: string } | { kind: 'task'; id: string } | null
 
-export function TaskView() {
+interface Props {
+  /** Report this view's footer state up to Panel (the toolbar lives outside
+   *  the view-transition animation and is rendered once, at Panel level). */
+  onFooterChange: (footer: ViewFooterState | null) => void
+}
+
+export function TaskView({ onFooterChange }: Props) {
   const { t } = useTranslation()
   const tasks = useStore((s) => s.tasks)
   const suggestions = useStore((s) => s.suggestions)
@@ -92,6 +99,40 @@ export function TaskView() {
     if (editing === confirmDelete.id) setEditingTask(null)
     setConfirmDeleteTaskId(null)
   }
+
+  /**
+   * Per-tab clear (user feedback 2026-08-14): the existing-tasks tab wipes
+   * every task, the candidates tab dismisses every suggestion — never the
+   * other tab's content.
+   */
+  const clearCurrentTab = useCallback((): void => {
+    const state = useStore.getState()
+    if (tasksFilter === 'candidates') {
+      void (async () => {
+        for (const s of state.suggestions) {
+          await state.ignoreSuggestion(s.id)
+        }
+      })()
+    } else {
+      void (async () => {
+        for (const task of state.tasks) {
+          await state.deleteTask(task.id)
+        }
+      })()
+    }
+  }, [tasksFilter])
+
+  // Footer data, hoisted so the shared toolbar (rendered by Panel outside
+  // the view-transition animation) gets it before the browser paints.
+  useLayoutEffect(() => {
+    onFooterChange({
+      count: tasksFilter === 'candidates' ? suggestions.length : tasks.length,
+      noun: 'task',
+      clearLabel: t('item.clear'),
+      clearTitle: tasksFilter === 'candidates' ? t('tasks.dismissAll') : t('tasks.clearAll'),
+      onClear: clearCurrentTab
+    })
+  }, [tasksFilter, suggestions.length, tasks.length, clearCurrentTab, onFooterChange, t])
 
   return (
     <div className="task-view">

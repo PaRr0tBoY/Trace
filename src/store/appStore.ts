@@ -12,6 +12,7 @@ import { shouldRestoreToLanding } from '../lib/restore'
 import type { SuggestTitleContext, SuggestionAcceptOptions, DropResource } from '../../shared/ipc'
 import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View, TraceRecordDto, IgnoreReason } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
+import type { StationEntryDto } from '../../shared/station'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -27,7 +28,18 @@ export type SettingsTab = 'behaviour' | 'position' | 'appearance' | 'tasks' | 'p
 
 interface AppState {
   items: ClipboardItemDto[]
+  /** Transfer station entries (ADR-0006): files domain, separate from the stack. */
+  station: StationEntryDto[]
   tasks: TaskDto[]
+  setStation: (entries: StationEntryDto[]) => void
+  /* station mutations (delegate to main; authoritative list comes back) */
+  stationEnter: (paths: string[]) => Promise<void>
+  stationPin: (id: string, pinned: boolean) => Promise<void>
+  stationDelete: (id: string) => Promise<void>
+  stationCopyMember: (req: DragRequest) => Promise<void>
+  stationPasteMember: (req: DragRequest) => Promise<void>
+  /** Delete every stale entry (T6 cleanup banner). */
+  stationClearStale: () => Promise<void>
   suggestions: TaskProposal[]
   settings: Settings
   /** True until the first `state:load` resolves. */
@@ -37,7 +49,7 @@ interface AppState {
   /** Clipboard view second level (ADR-0004). */
   clipboardFilter: ClipboardFilter
   setClipboardFilter: (filter: ClipboardFilter) => void
-  /** Files view second level: 'all' | 'other' | a live extension tab (ADR-0004). */
+  /** Files view second level: 'all' | 'clipboard' | 'other' | a live extension tab (ADR-0004). */
   filesFilter: FilesFilter
   setFilesFilter: (filter: FilesFilter) => void
   /** Tasks view second level (ADR-0004). */
@@ -83,6 +95,9 @@ interface AppState {
   setPickerTaskId: (id: string | null) => void
   /** True while an OS file drag is hovering the panel (prevents premature close). */
   dragActive: boolean
+  /** Drag indicator visibility (T4b feedback): a file drag waits for the detection zone. */
+  dragIndicator: boolean
+  setDragIndicator: (show: boolean) => void
   /** True if the active drag originated from within the app itself. Stores the drag request (which item/sub-item). */
   internalDragReq: import('../../shared/types').DragRequest | null
   /** Active toasts (auto-dismissed after a short delay). */
@@ -189,6 +204,7 @@ interface AppState {
 
 export const useStore = create<AppState>((set, get) => ({
   items: [],
+  station: [],
   tasks: [],
   suggestions: [],
   settings: { ...DEFAULT_SETTINGS },
@@ -244,6 +260,8 @@ export const useStore = create<AppState>((set, get) => ({
   pickerTaskId: null,
   setPickerTaskId: (pickerTaskId) => set({ pickerTaskId }),
   dragActive: false,
+  dragIndicator: false,
+  setDragIndicator: (dragIndicator) => set({ dragIndicator }),
   internalDragReq: null,
   toasts: [],
   tutorialStep: 0,
@@ -276,14 +294,39 @@ export const useStore = create<AppState>((set, get) => ({
   flareKey: 0,
 
   async hydrate() {
-    const { items, settings, version, tasks } = await edge.loadState()
+    const { items, station, settings, version, tasks } = await edge.loadState()
     set({ 
       items, 
+      station, 
       settings, 
       currentVersion: version,
       tasks,
       hydrated: true
     })
+  },
+  setStation: (station) => set({ station }),
+
+  async stationEnter(paths) {
+    set({ station: await edge.stationEnter(paths) })
+  },
+  async stationPin(id, pinned) {
+    set({ station: await edge.stationPin(id, pinned) })
+  },
+  async stationDelete(id) {
+    set({ station: await edge.stationDelete(id) })
+  },
+  async stationCopyMember(req) {
+    await edge.stationCopyMember(req)
+  },
+  async stationPasteMember(req) {
+    await edge.stationPasteMember(req)
+  },
+  /** Delete every stale entry (T6 cleanup banner); in-transit entries are never stale by construction. */
+  async stationClearStale() {
+    const staleIds = get().station.filter((e) => e.stale).map((e) => e.id)
+    for (const id of staleIds) {
+      await get().stationDelete(id)
+    }
   },
 
   setItems: (items) => {
@@ -320,6 +363,22 @@ export const useStore = create<AppState>((set, get) => ({
     // Already open (e.g. tray "Open Settings"): this is not a close→open
     // transition, so the restore anchor semantics (ADR-0004) don't apply.
     if (s.open) {
+      set(patch)
+      return
+    }
+    // A drag expand always lands on the transfer station view (the drop
+    // surface); the restore anchor must never leak another view into a
+    // drag session (user feedback 2026-08-14).
+    if (s.dragActive) {
+      patch.view = 'files'
+      patch.filesFilter = 'all'
+      patch.settingsOpen = false
+      patch.settingsSubView = 'main'
+      patch.query = ''
+      patch.selectedTaskId = null
+      patch.editingTask = null
+      patch.confirmDeleteTaskId = null
+      patch.pickerTaskId = null
       set(patch)
       return
     }
@@ -361,7 +420,10 @@ export const useStore = create<AppState>((set, get) => ({
     if (internalDragReq === null) {
       set({ internalDragReq: null, dragActive: false })
     } else {
-      set({ internalDragReq })
+      // An in-panel drag counts as an active drag: the panel must stay up
+      // and the drag view locked while the item is dragged out across the
+      // edge (user feedback 2026-08-14).
+      set({ internalDragReq, dragActive: true })
     }
     edge.setInternalDrag(!!internalDragReq)
   },

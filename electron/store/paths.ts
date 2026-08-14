@@ -20,6 +20,16 @@ export const PATHS = {
   indexFile: () => join(root(), 'items.json'),
   /** Path to the task index JSON. */
   tasksFile: () => join(root(), 'tasks.json'),
+  /** Path to the transfer station index JSON (ADR-0006). */
+  stationFile: () => join(root(), 'station.json'),
+  /** Directory for content staged from non-file drag-in (T7): text/image
+   *  drops become real files here before entering the station. */
+  stationContentDir: () => join(root(), 'station-content'),
+  /** Directory holding the files of in-transit entries (ADR-0007 M-a):
+   *  originals are taken over here at drag start. Never cleaned at startup
+   *  (unlike tempDir) — in-transit entries own these files until the move
+   *  completes or the entry is deleted. */
+  stationStageDir: () => join(root(), 'station-stage'),
   /** Path to the long-term memory index JSON. */
   memoriesFile: () => join(root(), 'memories.json'),
   /**
@@ -47,7 +57,7 @@ export const PATHS = {
 
 /** Idempotently create every directory the app needs. Safe to call repeatedly. */
 export function ensureDirs(): void {
-  for (const dir of [PATHS.imagesDir(), PATHS.tempDir(), PATHS.modelsDir()]) {
+  for (const dir of [PATHS.imagesDir(), PATHS.tempDir(), PATHS.modelsDir(), PATHS.stationContentDir(), PATHS.stationStageDir()]) {
     mkdirSync(dir, { recursive: true })
   }
 }

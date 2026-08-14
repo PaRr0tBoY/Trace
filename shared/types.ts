@@ -39,9 +39,12 @@ export type ClipboardFilter = 'all' | 'text' | 'links' | 'images'
 /**
  * Second-level filter inside the files view (ADR-0004): the dynamic
  * extension tabs ('.pdf', …) are added by the renderer; 'other' holds
- * extension-less members. The value is the raw `path.extname` result.
+ * extension-less members; 'clipboard' narrows the station to clipboard-
+ * captured entries (T6 route filter, merged into this single dimension so
+ * the row has exactly one active chip). The value is the raw
+ * `path.extname` result.
  */
-export type FilesFilter = 'all' | 'other' | (string & {})
+export type FilesFilter = 'all' | 'clipboard' | 'other' | (string & {})
 
 /** Second-level filter inside the tasks view (ADR-0004). */
 export type TasksFilter = 'existing' | 'candidates'
@@ -57,6 +60,13 @@ export type RestoreTime = 'instant' | 'relaxed' | 'delayed' | 'forever'
  * translated; localized labels live in i18n under `appearance.theme*`.
  */
 export type ThemeColor = 'graphite' | 'cobalt' | 'verdigris' | 'amber' | 'violet'
+
+/**
+ * Drag-out semantics (ADR-0007): 'copy' drags the original paths and leaves
+ * entry and source untouched; 'move' stages the originals into the station
+ * staging area at drag start (接管式移动) and completes on a successful drop.
+ */
+export type MoveMode = 'copy' | 'move'
 
 /**
  * Landing page applied on first launch and after the restore time expires
@@ -134,17 +144,6 @@ export interface DragRequest {
   id: string
   paths?: string[]
   imageId?: string
-  splitPlacement?: 'before' | 'after'
-}
-
-/**
- * Outcome of a merge attempt. `reason` tells the renderer *why* it failed so it
- * can show a precise message (e.g. "collection full" vs "can't mix types").
- */
-export interface MergeResult {
-  ok: boolean
-  reason?: 'full' | 'incompatible' | 'notfound'
-  message?: string
 }
 
 /* ------------------------------------------------------------------ */
@@ -573,6 +572,12 @@ export interface Settings {
   /** When true, automatically clears unpinned items on device/app restart. */
   /** When true, automatically clears unpinned items on device/app restart. */
   clearUnpinnedOnRestart: boolean
+  /**
+   * Drag-out semantics (ADR-0007): 'copy' = destination gets a copy, entry
+   * and source untouched; 'move' (default) = staged takeover move, the
+   * original is taken into the station at drag start.
+   */
+  moveMode: MoveMode
   /** Hours after which unpinned items are automatically purged (0 = Never). */
   autoDeleteHours: number
   /** UI visual style density ('modern' | 'compact'). */
@@ -711,6 +716,7 @@ export const DEFAULT_SETTINGS: Settings = {
   launchAtLogin: true,
   reduceMotion: false,
   clearUnpinnedOnRestart: false,
+  moveMode: 'move',
   autoDeleteHours: 0,
   uiStyle: 'modern',
   themeColor: 'graphite',

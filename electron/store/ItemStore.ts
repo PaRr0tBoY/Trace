@@ -9,22 +9,19 @@
  *   - Persist the index to JSON and image bytes to per-item PNG files.
  *   - Convert internal items to the serializable DTO form for the renderer.
  */
-import { existsSync, readFileSync, writeFileSync, rmSync, statSync, readdirSync } from 'node:fs'
-import { join, extname, basename as pathBasename } from 'node:path'
+import { existsSync, readFileSync, writeFileSync, rmSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { safeStorage } from 'electron'
 import {
   type ClipboardItem,
   type ClipboardItemDto,
   type DragRequest,
   type ItemData,
-  type MergeResult,
-  type FileEntry,
-  type SourceApp,
-  MAX_STACK
+  type SourceApp
 } from '../../shared/types'
 import { PATHS } from './paths'
 import { createId } from './ids'
-import { thumbUrl, thumbUrlForPath } from '../main/imageProtocol'
+import { thumbUrl } from '../main/imageProtocol'
 
 /** Stable, content-based key used for deduplication. */
 function signature(data: ItemData): string {
@@ -36,6 +33,9 @@ function signature(data: ItemData): string {
     case 'image-collection':
       return `image-collection|${data.images.map((i) => i.imageId).join(',')}`
     case 'files':
+      // Legacy-transient only: a files item exists in the stack between
+      // load() and the startup migration into the transfer station (T2);
+      // it is never deduped or added post-init.
       return `files|${data.paths.join('\n')}`
   }
 }
@@ -231,91 +231,6 @@ export class ItemStore {
     this.persist()
   }
 
-  merge(sourceId: string, targetId: string): MergeResult {
-    if (sourceId === targetId) return { ok: false }
-    const srcIdx = this.items.findIndex(x => x.id === sourceId)
-    const tgtIdx = this.items.findIndex(x => x.id === targetId)
-    if (srcIdx < 0 || tgtIdx < 0) return { ok: false, reason: 'notfound' }
-
-    const src = this.items[srcIdx]
-    const tgt = this.items[tgtIdx]
-
-    // Determine how to merge based on kinds
-    // 1. Image(s) + Image(s) -> Image Collection / Image File Stack (any screenshot or image file)
-    // 2. Files + Files -> Files (any non-image files stack together)
-
-    let newData: ItemData | null = null
-
-    const isImageItem = (item: ClipboardItem): boolean => {
-      if (item.data.kind === 'image' || item.data.kind === 'image-collection') return true
-      if (item.data.kind === 'files' && item.data.paths.length > 0) {
-        return item.data.paths.every((p) => isImageExt(p))
-      }
-      return false
-    }
-
-    const getImagePaths = (item: ClipboardItem): string[] => {
-      if (item.data.kind === 'files') return item.data.paths
-      if (item.data.kind === 'image') return [this.imagePath(item.data.imageId, item.data.ext)]
-      if (item.data.kind === 'image-collection') return item.data.images.map((img) => this.imagePath(img.imageId, img.ext))
-      return []
-    }
-
-    const srcIsImage = isImageItem(src)
-    const tgtIsImage = isImageItem(tgt)
-
-    if (srcIsImage && tgtIsImage) {
-      if (src.data.kind !== 'files' && tgt.data.kind !== 'files') {
-        const srcData = src.data
-        const tgtData = tgt.data
-        const srcImages = srcData.kind === 'image-collection' ? srcData.images : srcData.kind === 'image' ? [{ imageId: srcData.imageId, width: srcData.width, height: srcData.height, bytes: srcData.bytes, ext: srcData.ext }] : []
-        const tgtImages = tgtData.kind === 'image-collection' ? tgtData.images : tgtData.kind === 'image' ? [{ imageId: tgtData.imageId, width: tgtData.width, height: tgtData.height, bytes: tgtData.bytes, ext: tgtData.ext }] : []
-        const seen = new Set(tgtImages.map((i) => i.imageId))
-        const combined = [...tgtImages, ...srcImages.filter((i) => !seen.has(i.imageId))]
-
-        if (combined.length > MAX_STACK) return { ok: false, reason: 'full', message: 'An image collection can hold a maximum of 10 items' }
-        newData = { kind: 'image-collection', images: combined }
-      } else {
-        const srcPaths = getImagePaths(src)
-        const tgtPaths = getImagePaths(tgt)
-        const seen = new Set(tgtPaths)
-        const combined = [...tgtPaths, ...srcPaths.filter((p) => !seen.has(p))]
-
-        if (combined.length > MAX_STACK) return { ok: false, reason: 'full', message: 'An image collection can hold a maximum of 10 items' }
-        newData = { kind: 'files', paths: combined }
-      }
-    } else if (src.data.kind === 'files' && tgt.data.kind === 'files') {
-      const seen = new Set(tgt.data.paths)
-      const combined = [...tgt.data.paths, ...src.data.paths.filter((p) => !seen.has(p))]
-
-      if (combined.length > MAX_STACK) return { ok: false, reason: 'full', message: 'A folder bundle can hold a maximum of 10 files' }
-      newData = { kind: 'files', paths: combined }
-    }
-
-    if (!newData) {
-      if (srcIsImage || tgtIsImage) {
-        return { ok: false, reason: 'incompatible', message: 'Images can only be grouped with other images' }
-      } else if (src.data.kind === 'files' || tgt.data.kind === 'files') {
-        return { ok: false, reason: 'incompatible', message: 'Files can only be grouped with other files' }
-      }
-      return { ok: false, reason: 'incompatible', message: 'Text and links cannot be grouped together' }
-    }
-
-    // Update target item
-    this.sigToId.delete(signature(tgt.data))
-    tgt.data = newData
-    this.sigToId.set(signature(newData), tgt.id)
-    tgt.capturedAt = Date.now() // bump time
-
-    // Remove source item completely but DO NOT delete its underlying files/images
-    // because they are now owned by the target!
-    const [removed] = this.items.splice(srcIdx, 1)
-    this.sigToId.delete(signature(removed.data))
-
-    this.persist()
-    return { ok: true }
-  }
-
   public removeSubitem(req: DragRequest): boolean {
     const sourceItem = this.get(req.id)
     if (!sourceItem) return false
@@ -333,91 +248,6 @@ export class ItemStore {
       } else if (sourceItem.data.images.length === 0) {
         this.items.splice(sourceIndex, 1)
       }
-      this.rebuildIndex()
-      this.persist()
-      return true
-    }
-
-    if (req.paths && req.paths.length > 0 && sourceItem.data.kind === 'files') {
-      const targetPaths = req.paths
-      sourceItem.data.paths = sourceItem.data.paths.filter(p => !targetPaths.includes(p))
-      
-      if (sourceItem.data.paths.length === 0) {
-        this.items.splice(sourceIndex, 1)
-      }
-      this.rebuildIndex()
-      this.persist()
-      return true
-    }
-
-    return false
-  }
-
-  public split(req: DragRequest): boolean {
-    const sourceItem = this.get(req.id)
-    if (!sourceItem) return false
-    const sourceIndex = this.items.findIndex(i => i.id === req.id)
-    if (sourceIndex === -1) return false
-
-    // Splitting from an image collection
-    if (sourceItem.data.kind === 'image-collection' && req.imageId) {
-      const imgIdx = sourceItem.data.images.findIndex(i => i.imageId === req.imageId)
-      if (imgIdx === -1) return false
-      
-      const targetImg = sourceItem.data.images[imgIdx]
-      sourceItem.data.images.splice(imgIdx, 1)
-      
-      if (sourceItem.data.images.length === 1) {
-        sourceItem.data = { kind: 'image', ...sourceItem.data.images[0] }
-      } else if (sourceItem.data.images.length === 0) {
-        this.items.splice(sourceIndex, 1)
-      }
-
-      const newItem: ClipboardItem = {
-        id: createId(),
-        capturedAt: Date.now(),
-        hitCount: 1,
-        pinned: false,
-        data: { kind: 'image', imageId: targetImg.imageId, width: targetImg.width, height: targetImg.height, bytes: targetImg.bytes }
-      }
-      this.items.splice(req.splitPlacement === 'after' ? sourceIndex + 1 : sourceIndex, 0, newItem)
-      this.rebuildIndex()
-      this.persist()
-      return true
-    }
-
-    // Splitting from a file collection
-    if (req.paths && req.paths.length > 0 && sourceItem.data.kind === 'files') {
-      const sourcePaths = sourceItem.data.paths
-      const targetPaths = req.paths
-      
-      sourceItem.data.paths = sourcePaths.filter(p => !targetPaths.includes(p))
-      
-      if (sourceItem.data.paths.length === 0) {
-        this.items.splice(sourceIndex, 1)
-      }
-
-      let newData: ItemData = { kind: 'files', paths: targetPaths }
-      if (targetPaths.length === 1) {
-        const p = targetPaths[0]
-        const imgName = pathBasename(p)
-        if (/^[a-z0-9]{6,12}-[a-z0-9]{6,12}\.[a-z0-9]+$/i.test(imgName) || p.includes('trace/images') || p.includes('trace\\images') || p.includes('trace/temp') || p.includes('trace\\temp')) {
-          const imageId = imgName.split('.')[0]
-          const ext = extname(p).slice(1) || 'png'
-          let bytes = 0
-          try { bytes = statSync(p).size } catch {}
-          newData = { kind: 'image', imageId, width: 0, height: 0, bytes, ext }
-        }
-      }
-
-      const newItem: ClipboardItem = {
-        id: createId(),
-        capturedAt: Date.now(),
-        hitCount: 1,
-        pinned: false,
-        data: newData
-      }
-      this.items.splice(req.splitPlacement === 'after' ? sourceIndex + 1 : sourceIndex, 0, newItem)
       this.rebuildIndex()
       this.persist()
       return true
@@ -546,18 +376,6 @@ export class ItemStore {
           data: { kind: 'image-collection', images: imagesWithPreviews }
         }
       }
-      if (it.data.kind === 'files') {
-        // Build per-file metadata entries. Image files get a thumbnail URL —
-        // the protocol serves it lazily, so there is no per-entry payload cost.
-        const entries = it.data.paths.map((p) => {
-          const entry = buildFileEntry(p)
-          return entry.isImage ? { ...entry, preview: thumbUrlForPath(p) } : entry
-        })
-        return {
-          ...it,
-          data: { ...it.data, entries }
-        }
-      }
       return { ...it, data: it.data }
     })
   }
@@ -572,30 +390,4 @@ export class ItemStore {
   }
 }
 
-/** Check if a file path points to an image by extension. */
-function isImageExt(p: string): boolean {
-  return /\.(png|jpe?g|gif|webp|bmp|svg|avif|ico|tiff?|jfif|pjpeg|pjp)$/i.test(p)
-}
 
-/**
- * Build display metadata for a single file path. `size` is best-effort (0 when
- * the file can't be stat'd — e.g. a path on a disconnected drive); the renderer
- * hides the size label when it's 0.
- */
-const fileEntryCache = new Map<string, FileEntry>()
-
-function buildFileEntry(p: string): FileEntry {
-  if (fileEntryCache.has(p)) return fileEntryCache.get(p)!
-  let size = 0
-  try {
-    size = statSync(p).size
-  } catch {
-    /* file missing / unreadable — size stays 0 */
-  }
-  const ext = (extname(p).slice(1) || '').toLowerCase()
-  const name = pathBasename(p)
-  const entry = { name, ext, size, isImage: isImageExt(p) }
-  if (fileEntryCache.size > 500) fileEntryCache.clear()
-  fileEntryCache.set(p, entry)
-  return entry
-}

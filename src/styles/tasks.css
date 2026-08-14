@@ -66,6 +66,7 @@
 /* Whole card is a drop target (t25). */
 .task-suggestion-card.drop-over {
   border-color: var(--accent);
+  border-style: dashed;
   background: rgba(var(--accent-rgb), 0.12);
 }
 
@@ -902,55 +903,64 @@
   -webkit-backdrop-filter: blur(28px);
 }
 
-/* Fixed save zone on top: drop = save into the clipboard shelf. */
+/* Bottom save zone (T5): the labelled landing surface. Flex-grows to fill
+   the remaining height (min height keeps it visible and roomy), dashed
+   border reads as "drop here". Copy is contextual in TaskDropPanel. */
 .drop-save-zone {
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-height: 110px;
   display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 16px;
   border: 1px dashed var(--edge-strong);
-  border-radius: 12px;
-  background: var(--bg-2);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
   cursor: copy;
   user-select: none;
+  text-align: center;
   transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.drop-save-zone.noop {
+  cursor: default;
 }
 .drop-save-zone.over {
   border-color: var(--accent);
-  border-style: solid;
+  border-style: dashed;
   background: rgba(var(--accent-rgb), 0.12);
 }
 .drop-save-zone-icon {
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   background: rgba(var(--accent-rgb), 0.14);
   color: var(--accent);
 }
 .drop-save-zone-text {
-  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 3px;
 }
 .drop-save-zone-title {
-  font-size: calc(13px * var(--font-scale, 1));
+  font-size: calc(13.5px * var(--font-scale, 1));
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
 }
 .drop-save-zone-hint {
-  font-size: calc(10.5px * var(--font-scale, 1));
+  font-size: calc(11px * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* Scrollable targets below the save zone: task rows + suggestion cards. */
+/* Scrollable targets above the save zone: task rows + suggestion cards. */
 .task-drop-scroll {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -982,6 +992,7 @@
 }
 .task-drop-row.over {
   border-color: var(--accent);
+  border-style: dashed;
   background: rgba(var(--accent-rgb), 0.12);
 }
 .task-drop-row-title {
@@ -994,49 +1005,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Hover hint replaces the row content while the drag is over the task
+   (user feedback: the card turns into an operation hint). */
+.task-drop-row-hint {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(11.5px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .task-drop-row .app-icon {
   flex-shrink: 0;
-}
-
-/* Fallback when there are no tasks and no suggestions: centered save hint. */
-.task-drop-fallback {
-  position: absolute;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  pointer-events: none;
-  background: rgba(6, 6, 8, 0.82);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  text-align: center;
-  padding: 24px;
-}
-.task-drop-fallback-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.9);
-}
-.task-drop-fallback-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
-  letter-spacing: 0.01em;
-}
-.task-drop-fallback-hint {
-  font-size: 12px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.5);
-  line-height: 1.4;
 }
 
 /* ---------- content picker (add content) ---------- */

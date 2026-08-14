@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/appStore'
 import { PANEL_LEAVE_EVENT, PANEL_ENTER_EVENT } from '../hooks/useEdgeHover'
+import { useFilteredItems, matchesClipboardFilter } from '../hooks/useFilteredItems'
 import { Header } from './Header'
 import { ItemList } from './ItemList'
 import { SearchBar } from './SearchBar'
@@ -21,19 +22,39 @@ import { TaskView } from './tasks/TaskView'
 import { SwitcherView } from './SwitcherView'
 import { FileListView } from './FileListView'
 import { TaskDropPanel } from './tasks/TaskDropPanel'
-import { linkDraggedItem, acceptSuggestionDrop } from './tasks/dropActions'
+import { linkDraggedItem, acceptSuggestionDrop, dropOnSaveZone } from './tasks/dropActions'
 import { ToastStack } from './Toast'
-import { TrashIcon } from './icons'
+import { ViewFooter, type ViewFooterState } from './ViewFooter'
 import { t } from '../i18n'
 
 export function Panel() {
   const open = useStore((s) => s.open)
-const switcherActive = useStore((s) => s.switcherActive)
-  const total = useStore((s) => s.items.length)
+  const switcherActive = useStore((s) => s.switcherActive)
+  // Files/tasks views report their footer data up here (the bar lives
+  // outside the view-transition animation); clipboard is derived locally.
+  const [reportedFooter, setReportedFooter] = useState<ViewFooterState | null>(null)
   const clear = useStore((s) => s.clear)
   const settings = useStore((s) => s.settings)
   const settingsOpen = useStore((s) => s.settingsOpen)
   const view = useStore((s) => s.view)
+
+  // Clipboard-view footer: count + clear are scoped to the active type
+  // filter (user feedback 2026-08-14: clear only the current view, e.g.
+  // the image filter clears images only). The count shows what the user
+  // sees (query-filtered); clear removes every unpinned item matching the
+  // type filter regardless of the search query.
+  const { pinned: visiblePinned, recent: visibleRecent } = useFilteredItems()
+  const visibleTotal = visiblePinned.length + visibleRecent.length
+  const clipboardFilter = useStore((s) => s.clipboardFilter)
+  const clearScopedClipboard = (): void => {
+    const state = useStore.getState()
+    const filter = state.clipboardFilter || 'all'
+    const ids = state.items.filter((it) => !it.pinned && matchesClipboardFilter(it, filter)).map((it) => it.id)
+    if (ids.length > 0) void clear(ids)
+  }
+  const clipboardScopeCount = useStore((s) => s.items).filter(
+    (it) => !it.pinned && matchesClipboardFilter(it, clipboardFilter || 'all')
+  ).length
 
   // NOTE: closing the panel intentionally keeps the settings sheet, its sub
   // view, and the search query — the restore mechanism (ADR-0004) decides
@@ -86,15 +107,8 @@ const switcherActive = useStore((s) => s.switcherActive)
       setInternalDragReq(null)
       setDragActive(false)
 
-      const splitSubitem = (): void => {
-        if (req.imageId || (req.paths && req.paths.length > 0)) window.edge.splitItem(req)
-      }
-
       const el = document.elementFromPoint(pos.x, pos.y)
-      if (!el) {
-        splitSubitem()
-        return
-      }
+      if (!el) return
 
       // Drop-binding panel targets (t25).
       const taskRow = el.closest('[data-drop-task-id]')
@@ -111,9 +125,11 @@ const switcherActive = useStore((s) => s.switcherActive)
         return
       }
 
-      // Save zone = shelf-level drop: split sub-items out.
-      if (el.closest('.drop-save-zone, .split-dropzone')) {
-        splitSubitem()
+      // Save zone (T5): a labelled landing surface. Internal drags are
+      // no-ops (the item already lives in the panel), external content is
+      // routed here by handleOsFileDrop.
+      if (el.closest('.drop-save-zone')) {
+        void dropOnSaveZone(req)
         return
       }
 
@@ -127,15 +143,13 @@ const switcherActive = useStore((s) => s.switcherActive)
       if (itemEl) {
         const targetId = itemEl.getAttribute('data-id')
         if (targetId && targetId !== req.id) {
-          // Dropped on a DIFFERENT item: merge
-          window.edge.mergeItems(req.id, targetId)
+          // Drop-on-another-item merging was removed with the grouping
+          // feature (user feedback 2026-08-14) — entries stay standalone.
         } else if (targetId === req.id) {
           // Dropped on the SAME item: do nothing, keep it in the collection
         }
-      } else {
-        // Dropped on empty space (e.g. padding): split
-        splitSubitem()
       }
+      // Dropped on empty space: no-op.
     })
 
     /**
@@ -156,7 +170,7 @@ const switcherActive = useStore((s) => s.switcherActive)
 
   /**
    * Route an OS file drop by its coordinates: task row -> link files,
-   * suggestion card -> accept + bind, anywhere else -> save into the shelf.
+   * suggestion card -> accept + bind, anywhere else -> station entry.
    */
   const handleOsFileDrop = (e: Event): void => {
     const detail = (e as CustomEvent<{ paths: string[]; x: number; y: number }>).detail
@@ -191,7 +205,7 @@ const switcherActive = useStore((s) => s.switcherActive)
       return
     }
 
-    void window.edge.addFiles(detail.paths)
+    void dropOnSaveZone(null, detail.paths)
   }
 
   const onDragEnter = (e: React.DragEvent) => {
@@ -208,29 +222,26 @@ const switcherActive = useStore((s) => s.switcherActive)
   const onDragLeave = (e: React.DragEvent) => {
     const related = e.relatedTarget as Node | null
     if (related && e.currentTarget.contains(related)) return
-    setDragActive(false)
+    // Deliberately no setDragActive(false) here: DOM drag events on an OLE
+    // drag are unreliable (enter without leave happens), and dragActive's
+    // authority is the main-process drag:active push — a premature clear
+    // releases the close-guards mid-drag and the panel collapses while the
+    // user is still dragging (user feedback 2026-08-14).
   }
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    console.log('[Panel] onDrop internalDragReq=', internalDragReq)
     if (internalDragReq) {
-      e.preventDefault()
-      // If it reaches here, it means it was dropped on the general panel background
-      // (not on another item, which would have called stopPropagation).
-      // Check if it's a subitem that should be split out:
-      if (internalDragReq.imageId || (internalDragReq.paths && internalDragReq.paths.length > 0)) {
-        console.log('[Panel] calling splitItem')
-        window.edge.splitItem(internalDragReq)
-      } else {
-        console.log('[Panel] internalDragReq has no subitem, not splitting')
-      }
+      // Dropped on the general panel background: no-op. Batch-member split
+      // lives on the card button only (T5).
       setInternalDragReq(null)
     } else if (hasFiles(e)) {
       e.preventDefault()
     }
-    setDragActive(false)
+    // No setDragActive(false) here either — an OS drop is settled by the
+    // main drag:active push once DoDragDrop returns; internal drops are
+    // settled by setInternalDragReq(null) above.
   }
 
   return (
@@ -324,7 +335,7 @@ const switcherActive = useStore((s) => s.switcherActive)
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
-                <TaskView />
+                <TaskView onFooterChange={setReportedFooter} />
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to top, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
               </motion.div>
             ) : view === 'files' ? (
@@ -337,7 +348,7 @@ const switcherActive = useStore((s) => s.switcherActive)
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
-                <FileListView />
+                <FileListView onFooterChange={setReportedFooter} />
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to top, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
               </motion.div>
             ) : (
@@ -350,92 +361,32 @@ const switcherActive = useStore((s) => s.switcherActive)
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
                 <ItemList />
-                <div className="footer" style={{ position: 'relative' }}>
-                  <div style={{ position: 'absolute', top: -18, left: 0, right: 0, height: 18, background: 'linear-gradient(to top, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
-                  <span className="count">
-                    {total} item{total === 1 ? '' : 's'}
-                  </span>
-                  <div className="spacer" />
-                  <button 
-                    className="text-btn danger"
-                    onClick={() => clear()} 
-                    disabled={total === 0} 
-                    title="Clear shelf" 
-                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                  >
-                    <TrashIcon width={14} height={14} />
-                    <span>Clear</span>
-                  </button>
-                </div>
               </motion.div>
             )}
           </AnimatePresence>
+          {/* One toolbar for every content view, fixed below the animated
+              content area (user feedback 2026-08-14). Settings and switcher
+              sessions have no footer. */}
+          {!settingsOpen && !switcherActive && (
+            view === 'clipboard' ? (
+              <ViewFooter
+                count={visibleTotal}
+                noun="item"
+                clearLabel={t('item.clear')}
+                clearTitle={t('item.clearScoped')}
+                clearDisabled={clipboardScopeCount === 0}
+                onClear={clearScopedClipboard}
+              />
+            ) : reportedFooter ? (
+              <ViewFooter {...reportedFooter} />
+            ) : null
+          )}
           <TaskDropPanel />
-          <SplitDropZone />
             </>
           )}
         </div>
       </motion.div>
     </div>
-  )
-}
-
-/*
-function getTutorialText(step: number): string {
-  switch (step) {
-    case 1:
-      return 'Click the trash icon on the pinned card below to delete it.'
-    case 2:
-      return 'Copy any text or image (Ctrl + C) from another application to capture it.'
-    case 3:
-      return 'Drag the image card below and drop it onto your desktop.'
-    case 4:
-      return 'Click the files card below to expand the stack and view its contents.'
-    case 5:
-      return 'Click the Clear button at the bottom of the panel to finish.'
-    default:
-      return ''
-  }
-}
-*/
-
-function SplitDropZone() {
-  const internalDragReq = useStore((s) => s.internalDragReq)
-  const isSubitemDragging = !!(
-    internalDragReq &&
-    (internalDragReq.imageId || (internalDragReq.paths && internalDragReq.paths.length > 0))
-  )
-
-  const [isOver, setIsOver] = useState(false)
-
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsOver(true)
-  }
-
-  const handleDragLeave = () => {
-    setIsOver(false)
-  }
-
-  return (
-    <AnimatePresence>
-      {isSubitemDragging && (
-        <motion.div
-          className={`split-dropzone${isOver ? ' active' : ''}`}
-          onDragOver={(e) => e.preventDefault()}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          initial={{ opacity: 0, x: -15 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -15 }}
-          transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-          style={{ y: '-50%' }}
-        >
-          <div className="glow-line" />
-        </motion.div>
-      )}
-    </AnimatePresence>
   )
 }

@@ -21,6 +21,7 @@ import { useEdgeHover } from './hooks/useEdgeHover'
 export default function App() {
   const hydrate = useStore((s) => s.hydrate)
   const setItems = useStore((s) => s.setItems)
+  const setStation = useStore((s) => s.setStation)
   const setTasks = useStore((s) => s.setTasks)
   const setSuggestions = useStore((s) => s.setSuggestions)
   const setSettings = useStore((s) => s.setSettings)
@@ -34,6 +35,7 @@ export default function App() {
   useEffect(() => {
     void hydrate()
     const offItems = edge.onItems((items) => setItems(items))
+    const offStation = edge.onStation((entries) => setStation(entries))
     const offTasks = edge.onTasks((tasks) => setTasks(tasks))
     const offSuggestions = edge.onSuggestions((suggestions) => setSuggestions(suggestions))
     const offSettings = edge.onSettings((next) => setSettings(next))
@@ -92,6 +94,7 @@ export default function App() {
     })
     return () => {
       offItems()
+      offStation()
       offTasks()
       offSuggestions()
       offSettings()
@@ -102,7 +105,7 @@ export default function App() {
       offSwitcherSelect()
       offSwitcherHide()
     }
-  }, [hydrate, setItems, setSettings, pushToast])
+  }, [hydrate, setItems, setStation, setSettings, pushToast])
 
   // The panel window is created focusable:false (upstream legacy), so clicking
   // Keyboard-focus bridge (ticket 21): the panel is created with the OS style

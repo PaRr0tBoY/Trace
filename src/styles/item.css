@@ -110,6 +110,31 @@
   letter-spacing: 0.03em;
 }
 
+/* Status badges in the card meta row (T6): in-transit (accent) vs missing (red). */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 500;
+  letter-spacing: inherit;
+  text-transform: uppercase;
+}
+.status-badge .status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+.status-badge.in-transit {
+  color: var(--accent);
+}
+.status-badge.missing {
+  color: #ff9090;
+}
+
 /* Scroll to top button */
 .scroll-top-btn {
   position: fixed;
@@ -577,38 +602,169 @@
   }
 }
 
-.split-dropzone {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 80px;
-  z-index: 110;
+
+/* ── T6: pinned badge grid ───────────────────────────────────────────── */
+
+.pinned-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.pinned-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  height: 56px;
+  padding: 5px 3px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.pinned-tile:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.pinned-tile.missing {
+  opacity: 0.5;
+}
+
+.pinned-tile-icon {
   display: flex;
   align-items: center;
-  pointer-events: auto;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  justify-content: center;
+  height: 20px;
 }
 
-.split-dropzone .glow-line {
-  width: 2px;
-  height: 60%;
-  max-height: 280px;
-  background: linear-gradient(to bottom, transparent, rgba(249, 115, 22, 0.85), transparent);
-  border-radius: 9999px;
-  box-shadow: 0 0 16px rgba(249, 115, 22, 0.4);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  margin-left: 0px;
-  pointer-events: none;
+.pinned-tile-name {
+  width: 100%;
+  font-size: calc(10px * var(--font-scale, 1));
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.88);
+  text-align: center;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-all;
 }
 
-.split-dropzone.active {
-  width: 100px;
+/* Status dots: top-left, missing (red) takes precedence over in-transit. */
+.pinned-tile-dot {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  z-index: 2;
+}
+.pinned-tile-dot.missing {
+  background: #ff8080;
+  box-shadow: 0 0 6px rgba(255, 128, 128, 0.8);
+}
+.pinned-tile-dot.in-transit {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
 }
 
-.split-dropzone.active .glow-line {
-  width: 3.5px;
-  height: 72%;
-  max-height: 340px;
-  background: linear-gradient(to bottom, transparent, #f97316, transparent);
-  box-shadow: 0 0 24px rgba(249, 115, 22, 0.9), 0 0 40px rgba(249, 115, 22, 0.5);
+/* Hover unpin shortcut. */
+.pinned-tile-unpin {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--bg-2);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  padding: 0;
+  z-index: 3;
+}
+.pinned-tile:hover .pinned-tile-unpin {
+  display: flex;
+}
+.pinned-tile-unpin:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ── T6: stale cleanup banner ────────────────────────────────────────── */
+
+.stale-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 4px 0 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(80, 22, 22, 0.5);
+  border: 1px solid rgba(255, 120, 120, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.stale-banner-text {
+  font-size: calc(11px * var(--font-scale, 1));
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.35;
+}
+
+.stale-banner-btn {
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 128, 128, 0.4);
+  background: rgba(255, 80, 80, 0.18);
+  color: #ff9d9d;
+  font: inherit;
+  font-size: calc(10.5px * var(--font-scale, 1));
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.stale-banner-btn:hover {
+  background: rgba(255, 80, 80, 0.3);
+  border-color: rgba(255, 128, 128, 0.6);
+  color: #fff;
+}
+
+/* Incognito notice (feedback): same anatomy as the stale banner, but the
+   "resume recording" action reads as a recovery, not a cleanup — accent
+   colored instead of red. */
+.stale-banner.incognito-banner {
+  background: rgba(26, 26, 20, 0.55);
+  border-color: rgba(var(--accent-rgb), 0.28);
+}
+
+.stale-banner.incognito-banner .stale-banner-btn {
+  border-color: rgba(var(--accent-rgb), 0.45);
+  background: rgba(var(--accent-rgb), 0.16);
+  color: var(--accent);
+}
+
+.stale-banner.incognito-banner .stale-banner-btn:hover {
+.stale-banner.incognito-banner .stale-banner-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
 }

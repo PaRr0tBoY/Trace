@@ -327,6 +327,11 @@
   font-size: 8px;
   line-height: 1;
   color: var(--text-primary);
+  cursor: pointer;
+}
+
+.notes-preview .md-todo-box:hover {
+  border-color: var(--edge-strong);
 }
 
 .notes-preview .md-todo-done {

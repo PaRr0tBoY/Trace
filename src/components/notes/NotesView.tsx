@@ -12,7 +12,7 @@
  * component only renders what the store holds.
  */
 import { AnimatePresence, motion } from 'framer-motion'
-import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bold, Italic, Strikethrough, Code, Link, Quote, List, ListOrdered, ListChecks } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useStore } from '../../store/appStore'
@@ -190,6 +190,48 @@ function NoteEditor({
     setMode(next)
   }
 
+  // Preview checkbox toggle: flip `- [x]` ↔ `- [ ]` on the clicked source
+  // line. Reads the note from the store so the callback stays referentially
+  // stable (no re-render churn) while always toggling the latest content.
+  const toggleTodo = useCallback(
+    (line: number) => {
+      const current = useStore.getState().notes.find((n) => n.id === note.id)
+      if (!current) return
+      const lines = current.content.split('\n')
+      if (line < 0 || line >= lines.length) return
+      const m = /^(\s*[-*•]\s+)\[([ xX])\](.*)$/.exec(lines[line])
+      if (!m) return
+      const [, prefix, mark, rest] = m
+      lines[line] = `${prefix}[${mark.toLowerCase() === 'x' ? ' ' : 'x'}${rest}`
+      void updateNote(note.id, { content: lines.join('\n') })
+    },
+    [note.id, updateNote]
+  )
+
+  // A toggle performed in preview changes note.content; the uncontrolled
+  // textarea keeps its mount-time value and the pending/initial refs would
+  // flush stale content over it — sync them while in preview so a later
+  // flush (mode switch / unmount) never overwrites the toggle.
+  useEffect(() => {
+    if (mode !== 'preview') return
+    pendingValue.current = note.content
+    initialContent.current = note.content
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, note.content])
+
+  // Switching back to edit: refresh the textarea with the current content
+  // (defaultValue only applies on mount, so toggles made in preview would
+  // otherwise be invisible in the editor).
+  useEffect(() => {
+    if (mode !== 'edit') return
+    const ta = taRef.current
+    if (!ta || ta.value === note.content) return
+    ta.value = note.content
+    pendingValue.current = note.content
+    initialContent.current = note.content
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
+
   /** Programmatic edit on the (uncontrolled) textarea + schedule the save. */
   const applyEdit = (next: string, caret: number) => {
     const ta = taRef.current
@@ -326,7 +368,7 @@ function NoteEditor({
         />
       ) : (
         <div className="notes-preview">
-          <MarkdownPreview text={note.content} />
+          <MarkdownPreview text={note.content} onToggleTodo={toggleTodo} />
         </div>
       )}
 

@@ -76,6 +76,13 @@ describe('MarkdownPreview block scope', () => {
 
   it('renders an empty todo item with its checkbox', () => {
     expect(html('- [ ]\n- [x] done')).toContain('<ul class="md-todo">')
-    expect(html('- [ ]\n- [x] done')).toContain('<span class="md-todo-box"></span>')
+    expect(html('- [ ]\n- [x] done')).toContain('aria-checked="false"')
+  })
+
+  it('marks todo checkboxes as interactive toggles', () => {
+    const done = html('- [x] done')
+    expect(done).toContain('role="checkbox"')
+    expect(done).toContain('aria-checked="true"')
+    expect(html('- [ ] open')).toContain('aria-checked="false"')
   })
 })

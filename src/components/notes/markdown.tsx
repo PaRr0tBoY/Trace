@@ -97,7 +97,7 @@ function collectList(start: number, lines: string[], re: RegExp): RegExpExecArra
 /** Block-starting prefixes — a paragraph ends where a new block begins. */
 const BLOCK_START = /^(```|#{1,6}\s|>|[-*•]\s|\d+\.\s)/
 
-function renderBlocks(text: string): ReactNode[] {
+function renderBlocks(text: string, onToggleTodo?: (line: number) => void): ReactNode[] {
   const lines = text.split('\n')
   const blocks: ReactNode[] = []
   let i = 0
@@ -173,9 +173,29 @@ function renderBlocks(text: string): ReactNode[] {
             const t = todos[j]
             if (t) {
               const done = t[1].toLowerCase() === 'x'
+              // The checkbox toggles the task when a callback is wired up
+              // (preview mode); line = absolute line number in the source.
               return (
                 <li key={j} className={done ? 'md-todo-done' : undefined}>
-                  <span className="md-todo-box">{done ? '✓' : ''}</span>
+                  <span
+                    className="md-todo-box"
+                    role="checkbox"
+                    aria-checked={done}
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onToggleTodo?.(i + j)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        onToggleTodo?.(i + j)
+                      }
+                    }}
+                  >
+                    {done ? '✓' : ''}
+                  </span>
                   {renderInline(t[2], `t${blockIndex}-${j}`)}
                 </li>
               )
@@ -225,7 +245,14 @@ function renderBlocks(text: string): ReactNode[] {
   return blocks
 }
 
-export function MarkdownPreview({ text }: { text: string }) {
-  const blocks = useMemo(() => renderBlocks(text), [text])
+export function MarkdownPreview({
+  text,
+  onToggleTodo
+}: {
+  text: string
+  /** Called with the source line of a clicked todo checkbox (preview toggle). */
+  onToggleTodo?: (line: number) => void
+}) {
+  const blocks = useMemo(() => renderBlocks(text, onToggleTodo), [text, onToggleTodo])
   return <>{blocks}</>
 }

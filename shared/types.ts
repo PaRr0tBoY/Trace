@@ -578,7 +578,7 @@ export interface Settings {
    *                flyouts, toasts, hover feedback. No overshoot bounces.
    * - 'extended' — standard plus delight: blade open bounce, tab-capsule
    *                spring, new-item highlight, empty-state entrance, badge
-   *                pops, press feedback, list stagger, copy ripple.
+   *                pops, press feedback, copy ripple.
    * Deliberately NOT tied to the OS prefers-reduced-motion flag (see
    * useOpenBounce): the OS "Show animations" setting silently killed every
    * animation on the author's machine; the in-app setting is authoritative.

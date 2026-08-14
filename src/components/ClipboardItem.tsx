@@ -14,7 +14,7 @@
  * clamped preview; file items list names or bundle badge. Motion is handled by
  * the parent list (layout/AnimatePresence), so this component stays presentational.
  */
-import { memo, useState, useCallback, useEffect } from 'react'
+import { memo, useState, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ClipboardItemDto } from '../../shared/types'
 import { MAX_STACK } from '../../shared/types'
@@ -38,8 +38,6 @@ interface Props {
   /** FLIP position animation on list reorder; disabled on long lists (the
       O(n) layout pass + spring on every card is the reorder-frame cost). */
   animateLayout?: boolean
-  /** Stagger delay for the enter animation ('extended' motion level; 0 otherwise). */
-  enterDelay?: number
 }
 
 
@@ -50,7 +48,7 @@ interface Props {
 /* Main item card                                                      */
 /* ------------------------------------------------------------------ */
 
-function ClipboardItemBase({ item, instant, animateLayout, enterDelay = 0 }: Props) {
+function ClipboardItemBase({ item, instant, animateLayout }: Props) {
   const copy = useStore.getState().copy
   const paste = useStore.getState().paste
   const togglePin = useStore.getState().togglePin
@@ -62,13 +60,16 @@ function ClipboardItemBase({ item, instant, animateLayout, enterDelay = 0 }: Pro
   // 'extended' motion level: items captured within the last 4s flash the
   // accent once when the panel opens. It fires on `open` (not on mount) —
   // copies happen while the panel is closed, and a mount-time flash would
-  // play out invisibly in the background.
+  // play out invisibly in the background. Each distinct capture plays once
+  // (lastFlashedAt); re-copying the same item updates capturedAt and re-flashes.
   const motionLevel = useStore((s) => s.settings.motionLevel)
   const open = useStore((s) => s.open)
   const [flashVisible, setFlashVisible] = useState(false)
+  const lastFlashedAt = useRef(0)
   useEffect(() => {
     if (!open) return
-    if (motionLevel === 'extended' && item.capturedAt > Date.now() - 4000) {
+    if (motionLevel === 'extended' && item.capturedAt > Date.now() - 4000 && item.capturedAt !== lastFlashedAt.current) {
+      lastFlashedAt.current = item.capturedAt
       setFlashVisible(true)
     }
   }, [open, motionLevel, item.capturedAt])
@@ -136,8 +137,7 @@ function ClipboardItemBase({ item, instant, animateLayout, enterDelay = 0 }: Pro
         damping: 30,
         mass: 0.8,
         restDelta: 0.05,
-        restSpeed: 0.05,
-        delay: enterDelay
+        restSpeed: 0.05
       }}
       className={`item${item.pinned ? ' pinned' : ''}${isBundle ? ' bundle' : ''}`}
     >
@@ -146,7 +146,7 @@ function ClipboardItemBase({ item, instant, animateLayout, enterDelay = 0 }: Pro
           key="new-copy-highlight"
           initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
-          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 1.8, ease: [0.16, 1, 0.3, 1] }}
           onAnimationComplete={() => setFlashVisible(false)}
           style={{
             position: 'absolute',
@@ -164,7 +164,7 @@ function ClipboardItemBase({ item, instant, animateLayout, enterDelay = 0 }: Pro
           key="copy-ripple"
           initial={{ opacity: 0.9, scale: 0.2 }}
           animate={{ opacity: 0, scale: 1.6 }}
-          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
           style={{
             position: 'absolute',
             inset: 0,

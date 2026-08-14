@@ -127,7 +127,7 @@ AI 管道通道（t42/t51/t54）：`trace:list-by-decision/list-by-task/get-by-i
 
 ### 设置（`electron/store/settings.ts`）
 - 扁平 JSON，读取时深合并到 `DEFAULT_SETTINGS` 并**钳制数值**（hotZoneHeight 0.2–0.6、historyLimit 50–2000、autoDeleteHours ≥ 0、uiStyle 枚举、themeColor/restoreTime/tasksFilter 枚举钳制在 `settingsClamp.ts`）。新加设置字段要同时登记 `shared/types.ts` 的 `Settings`/`DEFAULT_SETTINGS` 和这里的 `merge()`。
-- **动画档位 `motionLevel`（'standard' | 'extended'，默认 standard）是全部动效的唯一事实源**：CSS 侧经 `applyMotionLevel`（`src/lib/theme.ts`）写 `data-motion` 属性（extended 专属 CSS 规则挂 `:root[data-motion='extended']` 下，如 .act 按压缩放），Framer 侧由各组件读 motionLevel === 'extended' 门控（bounce/胶囊弹簧/高亮/stagger/波纹），GSAP 由 LiquidOctopusLoader 与 CopyIndicatorCurve 图标自读 store 门控。**`reducedMotion="never"` 固定**——刻意不跟随 OS `prefers-reduced-motion`（作者机器 OS 动画关闭曾静默杀掉全部动画，见 useOpenBounce 注释）。standard = 干脆的功能动画（reveal/卡片进出/flyout/toast/曲线 morph）；extended = 再加回弹与装饰 delight（面板回弹、标签胶囊弹簧、新条目高亮、空状态淡入、徽章弹簧、列表 stagger、按压缩放、复制波纹、图标呼吸、章鱼脉冲）。
+- **动画档位 `motionLevel`（'standard' | 'extended'，默认 standard）是全部动效的唯一事实源**：CSS 侧经 `applyMotionLevel`（`src/lib/theme.ts`）写 `data-motion` 属性（extended 专属 CSS 规则挂 `:root[data-motion='extended']` 下，如 .act 按压缩放），Framer 侧由各组件读 motionLevel === 'extended' 门控（bounce/胶囊弹簧/高亮/波纹），GSAP 由 LiquidOctopusLoader 与 CopyIndicatorCurve 图标自读 store 门控。**`reducedMotion="never"` 固定**——刻意不跟随 OS `prefers-reduced-motion`（作者机器 OS 动画关闭曾静默杀掉全部动画，见 useOpenBounce 注释）。standard = 干脆的功能动画（reveal/卡片进出/flyout/toast/曲线 morph）；extended = 再加回弹与装饰 delight（面板回弹、标签胶囊弹簧、视图滑动过渡、新条目高亮、空状态淡入、徽章弹簧、按压缩放、复制波纹、图标呼吸、章鱼脉冲）。
 - Settings UI 是 4-tab（behaviour/position/appearance/tasks，ADR-0004）；`settingsTab` 在 store 里，restore 机制记住它。
 
 ### 渲染层

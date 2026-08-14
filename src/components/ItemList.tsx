@@ -3,7 +3,7 @@
  *
  * Renders Pinned (if any) and Recent sections, handles OS drag-in of files &
  * images onto the shelf, and shows the empty state when there's nothing.
- * AnimatePresence here gives items their staggered enter/exit.
+ * AnimatePresence here gives items their enter/exit.
  *
  * Drag-in awareness: sets `dragActive` on the store while OS files are being
  * dragged over the panel so the edge-hover hook knows not to close mid-drag.
@@ -37,10 +37,7 @@ export function ItemList() {
   
   const isDraggingAny = useStore((s) => !!s.dragActive || !!s.internalDragReq)
   const open = useStore((s) => s.open)
-  // 'extended' motion level staggers the enter cascade (~18ms per card, capped at
-  // 12 like ENTER_ANIM_LIMIT so the tail of a long list never crawls in).
-  const stagger = useStore((s) => s.settings.motionLevel) === 'extended'
-  
+
   const clipboardFilter = useStore((s) => s.clipboardFilter) || 'all'
   // When the type filter or search query changes, newly-mounted cards skip
   // their enter animation — the list swaps in place instead of the old batch
@@ -260,7 +257,7 @@ export function ItemList() {
                     style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}
                   >
                     {pinned.map((it, idx) => (
-                      <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} enterDelay={stagger ? Math.min(idx, 11) * 0.018 : 0} />
+                      <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} />
                     ))}
                   </motion.div>
                 )}
@@ -273,7 +270,7 @@ export function ItemList() {
               {pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
               <AnimatePresence initial={false}>
                 {recent.map((it, idx) => (
-                  <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} enterDelay={stagger ? Math.min(idx, 11) * 0.018 : 0} />
+                  <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} />
                 ))}
               </AnimatePresence>
             </section>

@@ -122,6 +122,16 @@ const api = {
   removeSubitem: (req: import('../../shared/types').DragRequest) => invoke('item:remove-subitem', req),
   mergeItems: (sourceId: string, targetId: string) => invoke('item:merge', sourceId, targetId),
   splitItem: (req: import('../../shared/types').DragRequest) => invoke('item:split', req),
+
+  /* Transfer station (ADR-0006) */
+  stationList: () => invoke('station:list'),
+  stationEnter: (paths: string[]) => invoke('station:enter', paths),
+  stationPin: (id: string, pinned: boolean) => invoke('station:pin', id, pinned),
+  stationDelete: (id: string) => invoke('station:delete', id),
+  stationSplit: (req: import('../../shared/types').DragRequest) => invoke('station:split', req),
+  stationMerge: (sourceId: string, targetId: string) => invoke('station:merge', sourceId, targetId),
+  stationCopyMember: (req: import('../../shared/types').DragRequest) => invoke('station:copy-member', req),
+  stationPasteMember: (req: import('../../shared/types').DragRequest) => invoke('station:paste-member', req),
   getDisplays: () => invoke('displays:list'),
   getReleases: () => invoke('app:get-releases'),
   updateSettings: (patch: Partial<InvokeResult<'settings:update'>>) =>
@@ -188,6 +198,7 @@ const api = {
 
   /* Main -> Renderer */
   onItems: (cb: (items: EventArgs<'state:items'>[0]) => void) => on('state:items', cb),
+  onStation: (cb: (entries: EventArgs<'state:station'>[0]) => void) => on('state:station', cb),
   onTasks: (cb: (tasks: EventArgs<'state:tasks'>[0]) => void) => on('state:tasks', cb),
   onSuggestions: (cb: (suggestions: EventArgs<'state:suggestions'>[0]) => void) => on('state:suggestions', cb),
   onSettings: (cb: (settings: EventArgs<'state:settings'>[0]) => void) => on('state:settings', cb),

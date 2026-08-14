@@ -26,6 +26,9 @@ import { ToastStack } from './Toast'
 import { TrashIcon } from './icons'
 import { t } from '../i18n'
 
+/** True when the id names a transfer station entry (ADR-0006). */
+const isStationId = (id: string): boolean => useStore.getState().station.some((e) => e.id === id)
+
 export function Panel() {
   const open = useStore((s) => s.open)
 const switcherActive = useStore((s) => s.switcherActive)
@@ -87,7 +90,13 @@ const switcherActive = useStore((s) => s.switcherActive)
       setDragActive(false)
 
       const splitSubitem = (): void => {
-        if (req.imageId || (req.paths && req.paths.length > 0)) window.edge.splitItem(req)
+        if (req.imageId || (req.paths && req.paths.length > 0)) {
+          if (isStationId(req.id)) {
+            window.edge.stationSplit(req)
+          } else {
+            window.edge.splitItem(req)
+          }
+        }
       }
 
       const el = document.elementFromPoint(pos.x, pos.y)
@@ -127,8 +136,13 @@ const switcherActive = useStore((s) => s.switcherActive)
       if (itemEl) {
         const targetId = itemEl.getAttribute('data-id')
         if (targetId && targetId !== req.id) {
-          // Dropped on a DIFFERENT item: merge
-          window.edge.mergeItems(req.id, targetId)
+          // Dropped on a DIFFERENT item: merge (station entries merge inside
+          // the station domain, ADR-0006).
+          if (isStationId(req.id)) {
+            window.edge.stationMerge(req.id, targetId)
+          } else {
+            window.edge.mergeItems(req.id, targetId)
+          }
         } else if (targetId === req.id) {
           // Dropped on the SAME item: do nothing, keep it in the collection
         }
@@ -191,7 +205,7 @@ const switcherActive = useStore((s) => s.switcherActive)
       return
     }
 
-    void window.edge.addFiles(detail.paths)
+    void useStore.getState().stationEnter(detail.paths)
   }
 
   const onDragEnter = (e: React.DragEvent) => {
@@ -221,8 +235,13 @@ const switcherActive = useStore((s) => s.switcherActive)
       // (not on another item, which would have called stopPropagation).
       // Check if it's a subitem that should be split out:
       if (internalDragReq.imageId || (internalDragReq.paths && internalDragReq.paths.length > 0)) {
-        console.log('[Panel] calling splitItem')
-        window.edge.splitItem(internalDragReq)
+        if (isStationId(internalDragReq.id)) {
+          console.log('[Panel] calling stationSplit')
+          window.edge.stationSplit(internalDragReq)
+        } else {
+          console.log('[Panel] calling splitItem')
+          window.edge.splitItem(internalDragReq)
+        }
       } else {
         console.log('[Panel] internalDragReq has no subitem, not splitting')
       }

@@ -13,7 +13,7 @@ import { useEffect, useMemo } from 'react'
 import { useStore } from '../store/appStore'
 import type { ClipboardItemDto, ClipboardFilter, FilesFilter } from '../../shared/types'
 import { basename } from '../lib/format'
-import { collectFileMembers, deriveFileTabs, filterMembersByTab, isFileTabAlive, isImageItem, MAX_EXT_TABS, type FileMember } from '../lib/fileTabs'
+import { collectFileMembers, collectStationMembers, deriveFileTabs, filterMembersByTab, isFileTabAlive, isImageItem, MAX_EXT_TABS, type FileMember } from '../lib/fileTabs'
 
 function matches(it: ClipboardItemDto, q: string): boolean {
   if (!q) return true
@@ -110,6 +110,7 @@ export interface FileViewData {
  */
 export function useFileMembers(): FileViewData {
   const items = useStore((s) => s.items)
+  const station = useStore((s) => s.station)
   const query = useStore((s) => s.query)
   const filesFilter = useStore((s) => s.filesFilter)
   const setFilesFilter = useStore((s) => s.setFilesFilter)
@@ -125,7 +126,10 @@ export function useFileMembers(): FileViewData {
           return true
       }
     })
-    const members = collectFileMembers(filteredByTutorial)
+    // Station members feed the same member list/tabs (ADR-0006); hidden
+    // during the onboarding tour so the tutorial items stay uncluttered.
+    const stationMembers = tutorialStep <= 0 ? collectStationMembers(station) : []
+    const members = [...collectFileMembers(filteredByTutorial), ...stationMembers]
     const q = query.trim().toLowerCase()
     const searched = q ? members.filter((m) => m.name.toLowerCase().includes(q)) : members
     const tabs = deriveFileTabs(searched, MAX_EXT_TABS)
@@ -137,7 +141,7 @@ export function useFileMembers(): FileViewData {
       otherCount: tabs.otherCount,
       activeFilter
     }
-  }, [items, query, filesFilter, tutorialStep])
+  }, [items, station, query, filesFilter, tutorialStep])
 
   // A vanished tab falls back to 'all' (ADR-0004); sync the store so the
   // header highlight matches what is rendered.

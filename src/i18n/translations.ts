@@ -144,6 +144,8 @@ export interface TranslationKeys {
     moreImages: string
     moreFiles: string
     singleFile: string
+    /** Station route badge (ADR-0006); only en is populated, others fall back to en. */
+    routeClipboard?: string
     scrollToTop: string
   }
   fileKinds: {
@@ -837,6 +839,7 @@ export const en: TranslationKeys = {
     "moreImages": "+{count} more images",
     "moreFiles": "+{count} more files",
     "singleFile": "1 file",
+    "routeClipboard": "Clipboard",
     "scrollToTop": "Scroll to top"
   },
   "fileKinds": {

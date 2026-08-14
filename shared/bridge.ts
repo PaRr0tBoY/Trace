@@ -11,7 +11,7 @@ import type { ProviderTestResult, SuggestTitleContext, SuggestionAcceptOptions, 
 
 export interface EdgeApi {
   /* Renderer -> Main */
-  loadState: () => Promise<{ items: import('./types').ClipboardItemDto[]; settings: Settings; version: string; tasks: TaskDto[] }>
+  loadState: () => Promise<{ items: import('./types').ClipboardItemDto[]; station: import('./station').StationEntryDto[]; settings: Settings; version: string; tasks: TaskDto[] }>
   setPinned: (id: string, pinned: boolean) => Promise<import('./types').ClipboardItemDto[]>
   deleteItem: (id: string) => Promise<import('./types').ClipboardItemDto[]>
   clearItems: () => Promise<import('./types').ClipboardItemDto[]>
@@ -26,9 +26,27 @@ export interface EdgeApi {
    * from the DOM `dragstart` event, and main calls `event.sender.startDrag`.
    */
   startDrag: (req: DragRequest) => void
-  addFiles: (paths: string[]) => Promise<import('./types').ClipboardItemDto[]>
+  addFiles: (paths: string[]) => Promise<import('./station').StationEntryDto[]>
   mergeItems: (sourceId: string, targetId: string) => Promise<import('./types').MergeResult>
   splitItem: (req: import('./types').DragRequest) => Promise<boolean>
+
+  /* Transfer station (ADR-0006) */
+  /** Full current station entry list (also included in loadState). */
+  stationList: () => Promise<import('./station').StationEntryDto[]>
+  /** Enter dragged-in file paths (route = 拖入). */
+  stationEnter: (paths: string[]) => Promise<import('./station').StationEntryDto[]>
+  /** Set an entry's pinned state. */
+  stationPin: (id: string, pinned: boolean) => Promise<import('./station').StationEntryDto[]>
+  /** Remove an entry. */
+  stationDelete: (id: string) => Promise<import('./station').StationEntryDto[]>
+  /** Split members out of an entry into a new standalone entry. */
+  stationSplit: (req: import('./types').DragRequest) => Promise<import('./station').StationSplitResult>
+  /** Merge source entry into target (deduplicated). */
+  stationMerge: (sourceId: string, targetId: string) => Promise<import('./station').StationMergeResult>
+  /** Copy one file member onto the system clipboard. */
+  stationCopyMember: (req: import('./types').DragRequest) => Promise<boolean>
+  /** Copy one file member and paste it into the active application. */
+  stationPasteMember: (req: import('./types').DragRequest) => Promise<boolean>
   updateSettings: (patch: Partial<Settings>) => Promise<Settings>
   setInteractive: (value: boolean) => Promise<void>
   setPreviewMode: (active: boolean) => Promise<void>
@@ -124,6 +142,7 @@ export interface EdgeApi {
 
   /* Main -> Renderer */
   onItems: (cb: (items: import('./types').ClipboardItemDto[]) => void) => () => void
+  onStation: (cb: (entries: import('./station').StationEntryDto[]) => void) => () => void
   onTasks: (cb: (tasks: TaskDto[]) => void) => () => void
   onSettings: (cb: (settings: Settings) => void) => () => void
   onSuggestions: (cb: (suggestions: TaskProposal[]) => void) => () => void

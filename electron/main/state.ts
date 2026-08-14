@@ -6,6 +6,7 @@
  * here so there's one path that re-pushes the DTO list.
  */
 import { ItemStore } from '../store/ItemStore'
+import { StationStore, STATION_STORAGE_VERSION, type StationIndex } from '../store/stationStore'
 import { ClipboardWatcher } from '../clipboard/ClipboardWatcher'
 import { loadSettings, saveSettings } from '../store/settings'
 import { TaskStore, type TaskIndex } from '../store/TaskStore'
@@ -36,9 +37,9 @@ import {
 } from '../store/memoryGraph'
 import { MemoryStore, type MemoryIndex } from '../store/MemoryStore'
 import type { ClipboardItem, ClipboardItemDto, Settings, TaskProposal, TaskDto, UsageEvent } from '../../shared/types'
-import { MAX_STACK } from '../../shared/types'
+import type { StationEntryDto } from '../../shared/station'
 import { createId } from '../store/ids'
-import { nativeImage, BrowserWindow, powerMonitor, safeStorage, app } from 'electron'
+import { BrowserWindow, powerMonitor, safeStorage, app } from 'electron'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PATHS } from '../store/paths'
@@ -76,6 +77,11 @@ import {
 } from '../store/decisionProvider'
 
 const store = new ItemStore()
+const stationStore = new StationStore({
+  loadIndex: () => loadStationFile(),
+  saveIndex: (index) => saveStationFile(index),
+  onChange: () => pushState.station()
+})
 const watcher = new ClipboardWatcher(600)
 let pruneTimer: ReturnType<typeof setInterval> | null = null
 let wakeTimer: ReturnType<typeof setTimeout> | null = null
@@ -146,6 +152,50 @@ function loadTasksFile(): TaskIndex | null {
   } catch (err) {
     console.error('[Task] tasks.json load failed:', err)
     return null
+  }
+}
+
+/**
+ * Station persistence adapter: station.json with the same DPAPI envelope as
+ * tasks.json — station entries carry real file paths (work context). The
+ * persisted shape is the raw StationEntry list (ADR-0006); a corrupt or
+ * legacy file degrades to an empty station (entries are references, so
+ * nothing is lost on disk).
+ */
+function loadStationFile(): StationIndex | null {
+  try {
+    const file = PATHS.stationFile()
+    if (!existsSync(file)) return null
+    const text = readFileSync(file, 'utf8').trim()
+    if (!text) return null
+    const parsed = JSON.parse(text) as { encrypted?: boolean; payload?: string; entries?: unknown }
+    if (parsed.encrypted === true && typeof parsed.payload === 'string') {
+      if (!safeStorage.isEncryptionAvailable()) return null
+      return JSON.parse(safeStorage.decryptString(Buffer.from(parsed.payload, 'base64'))) as StationIndex
+    }
+    if (Array.isArray(parsed.entries)) return parsed as StationIndex
+    return null
+  } catch (err) {
+    console.error('[Station] station.json load failed:', err)
+    return null
+  }
+}
+
+function saveStationFile(index: StationIndex): void {
+  try {
+    const file = PATHS.stationFile()
+    if (safeStorage.isEncryptionAvailable()) {
+      const envelope = {
+        v: STATION_STORAGE_VERSION,
+        encrypted: true,
+        payload: safeStorage.encryptString(JSON.stringify(index)).toString('base64')
+      }
+      writeFileSync(file, JSON.stringify(envelope, null, 2), 'utf8')
+    } else {
+      writeFileSync(file, JSON.stringify(index, null, 2), 'utf8')
+    }
+  } catch (err) {
+    console.error('[Station] station.json save failed:', err)
   }
 }
 
@@ -290,7 +340,27 @@ function handleSystemWake(): void {
 /** Initialize persistence + start the clipboard watcher. */
 export function initState(): void {
   store.load()
-  // Task sessions persist in the SQLite canonical store (task_sessions,
+  // Transfer station (ADR-0006): hydrate first, then migrate legacy
+  // clipboard-stack file items into it (route = 剪贴板) so nothing
+  // disappears silently on upgrade. The migrated ids are removed from the
+  // stack afterwards — the stack keeps only text/image items from here on.
+  stationStore.load()
+  const legacyFiles = store
+    .list()
+    .filter((it) => it.data.kind === 'files')
+    .map((it) => ({
+      id: it.id,
+      capturedAt: it.capturedAt,
+      pinned: it.pinned,
+      data: it.data
+    }))
+  const migratedIds = stationStore.migrateLegacy(legacyFiles)
+  for (const id of migratedIds) store.delete(id)
+  if (migratedIds.length > 0) {
+    console.log(`[Station] migrated ${migratedIds.length} legacy file items from the clipboard stack`)
+    pushState.items()
+  }
+  pushState.station()
   // t37). Open the handle after app ready and attach before taskStore.load()
   // so startup hydration sees every previously recorded session. A corrupt
   // or ABI-mismatched database degrades to in-memory sessions only — the
@@ -341,6 +411,7 @@ export function initState(): void {
     store.clearUnpinned()
   }
   store.pruneExpired(loadSettings().autoDeleteHours)
+  stationStore.prune(loadSettings().autoDeleteHours)
 
   for (const item of store.toDto()) {
     if (item.data.kind === 'files' && item.data.paths) {
@@ -353,14 +424,22 @@ export function initState(): void {
     if (data.kind === 'image' && png && data.imageId) {
       store.stageImageBytes(data.imageId, png)
     }
-    if (data.kind === 'files' && data.paths) {
-      prefetchFileIcons(data.paths)
-    }
     // One foreground read per capture, shared by the item's sourceApp
     // (ADR-0001) and the t14 attribution event — same source, same gate.
     const settings = loadSettings()
     const foreground =
       settings.taskCaptureEnabled && settings.l0CaptureEnabled ? queryForegroundSnapshot() : null
+    // File copies land in the transfer station (ADR-0006), not the clipboard
+    // stack; the HDROP capture pipeline is unchanged. Text/image copies keep
+    // the stack path below.
+    if (data.kind === 'files' && data.paths) {
+      prefetchFileIcons(data.paths)
+      const entries = stationStore.enter(data.paths, 'clipboard')
+      if (entries.length > 0) {
+        logClipboardCapture(stationClipboardItem(entries[0].id), foreground)
+      }
+      return
+    }
     store.add(
       data,
       settings.historyLimit,
@@ -394,6 +473,11 @@ export function initState(): void {
       // Pruned items should be re-capturable if still on the clipboard.
       watcher.resyncSignature()
       pushState.items()
+    }
+    // Station retention rides the same sweep (ADR-0006: reuse autoDeleteHours;
+    // pinned/in-transit entries are exempt inside the domain module).
+    if (stationStore.prune(loadSettings().autoDeleteHours).length > 0) {
+      pushState.station()
     }
   }, 60_000)
 
@@ -492,7 +576,9 @@ function logClipboardCapture(item: ClipboardItem | undefined, foreground: Foregr
 function handleEvidenceEvent(event: UsageEvent): void {
   if (evidenceStore === null) return
   if (event.type === 'clipboard' && event.itemId) {
-    const item = getStore().get(event.itemId)
+    // Files are station entries now (ADR-0006): the preview falls back to the
+    // station lookup so the by-id detail keeps answering "what was copied".
+    const item = getStore().get(event.itemId) ?? stationClipboardItem(event.itemId)
     evidenceStore.record(
       evidenceFromUsageEvent(event, { preview: item ? buildClipboardPreview(item) : undefined })
     )
@@ -543,6 +629,29 @@ export function stopStateTimers(): void {
 
 export function getStore(): ItemStore {
   return store
+}
+
+/** Transfer station singleton (ADR-0006): files domain, distinct from the
+ * clipboard stack. Hydrated + migrated in initState(). */
+export function getStationStore(): StationStore {
+  return stationStore
+}
+
+/**
+ * Synthesize a ClipboardItem-shaped view of a station entry, so the shared
+ * clipboard pipelines (attribution events, evidence previews, task resource
+ * linking) keep working for station entries without entering the stack.
+ */
+export function stationClipboardItem(id: string): ClipboardItem | undefined {
+  const entry = stationStore.get(id)
+  if (!entry) return undefined
+  return {
+    id: entry.id,
+    data: { kind: 'files', paths: [...entry.paths] },
+    capturedAt: entry.capturedAt,
+    hitCount: 1,
+    pinned: entry.pinned
+  }
 }
 
 export function getWatcher(): ClipboardWatcher {
@@ -1096,6 +1205,10 @@ export const pushState = {
     const dto: ClipboardItemDto[] = store.toDto()
     send('state:items', dto)
   },
+  station(): void {
+    const dto: StationEntryDto[] = getStationStore().toDto()
+    send('state:station', dto)
+  },
   async tasks(): Promise<void> {
     const dto: TaskDto[] = await attachAppIcons(taskStore.toDto())
     send('state:tasks', dto)
@@ -1131,98 +1244,34 @@ export { loadSettings, saveSettings }
 /**
  * Result of importing dropped files: how many stacks were created and whether
  * any overflow was chunked, so the IPC layer can show an informative toast.
+/**
+ * Enter dropped file paths into the transfer station (ADR-0006).
+ *
+ * Every dropped path — image files and folders included — is referenced by
+ * its original path (the old drag-in image re-staging path is gone; image
+ * content copies still flow to the clipboard stack via the watcher).
+ * Batches chunk at MAX_STACK per entry inside the domain module.
  */
 export interface AddFilesResult {
-  /** Total number of separate items/stacks created (1 means a single bundle). */
+  /** Total number of separate station entries created (1 means a single bundle). */
   stacksCreated: number
 }
 
 /**
- * Import dropped file paths.
+ * Enter dropped file paths into the transfer station (ADR-0006).
  *
- * Drops are partitioned into images vs. other files (so a mixed drop of e.g.
- * 2 images + 3 docs becomes an image-collection *and* a files bundle instead of
- * collapsing everything into a generic bundle that loses image previews). Each
- * partition is then chunked into stacks of at most MAX_STACK items.
+ * Every dropped path — image files and folders included — is referenced by
+ * its original path (the old drag-in image re-staging path is gone; image
+ * content copies still flow to the clipboard stack via the watcher).
+ * Batches chunk at MAX_STACK per entry inside the domain module.
  */
 export function addFiles(paths: string[]): AddFilesResult {
-  // Prevent duplicating items when a user accidentally drops our own staged temp
-  // files back into the app. Real files are deduplicated automatically by path,
-  // but images are staged to temp-drag and would otherwise get new IDs.
+  // Prevent duplicating entries when a user accidentally drops our own staged
+  // temp files back into the app (real files dedupe by path anyway).
   const clean = paths.filter((p) => !p.startsWith(PATHS.tempDir()))
   if (clean.length === 0) return { stacksCreated: 0 }
 
-  const imageExts = /\.(png|jpe?g|gif|webp|bmp|svg|avif|ico|tiff?|jfif|pjpeg|pjp)$/i
-  const imagePaths: string[] = []
-  const otherPaths: string[] = []
-  for (const p of clean) (imageExts.test(p) ? imagePaths : otherPaths).push(p)
-
-  if (otherPaths.length > 0) {
-    prefetchFileIcons(otherPaths)
-  }
-
-  const limit = loadSettings().historyLimit
-  let stacksCreated = 0
-
-  // --- images -> image collections (chunked to MAX_STACK) ---
-  if (imagePaths.length > 0) {
-    const images = []
-    for (const p of imagePaths) {
-      try {
-        const rawBytes = readFileSync(p)
-        let img = nativeImage.createFromBuffer(rawBytes)
-        if (img.isEmpty()) {
-          const ext = p.split('.').pop()?.toLowerCase() ?? 'png'
-          const mime = ext === 'svg' ? 'image/svg+xml'
-            : ext === 'gif' ? 'image/gif'
-            : ext === 'webp' ? 'image/webp'
-            : ext === 'bmp' ? 'image/bmp'
-            : ext === 'avif' ? 'image/avif'
-            : ext === 'ico' ? 'image/x-icon'
-            : ext === 'jpg' || ext === 'jpeg' || ext === 'jfif' || ext === 'pjpeg' || ext === 'pjp' ? 'image/jpeg'
-            : ext === 'tif' || ext === 'tiff' ? 'image/tiff'
-            : 'image/png'
-          const dataUrl = `data:${mime};base64,${rawBytes.toString('base64')}`
-          img = nativeImage.createFromDataURL(dataUrl)
-        }
-
-        const ext = p.split('.').pop()?.toLowerCase() || 'png'
-        let width = 300
-        let height = 300
-        if (!img.isEmpty()) {
-          const size = img.getSize()
-          if (size.width > 0 && size.height > 0) {
-            width = size.width
-            height = size.height
-          }
-        }
-
-        const imageId = createId()
-        store.stageImageBytes(imageId, rawBytes, ext)
-        images.push({ imageId, width, height, bytes: rawBytes.length, ext })
-      } catch {
-        otherPaths.push(p) // unreadable -> treat as plain file
-      }
-    }
-
-    for (let i = 0; i < images.length; i += MAX_STACK) {
-      const chunk = images.slice(i, i + MAX_STACK)
-      if (chunk.length === 1) {
-        store.add({ kind: 'image', ...chunk[0] }, limit)
-      } else {
-        store.add({ kind: 'image-collection', images: chunk }, limit)
-      }
-      stacksCreated++
-    }
-  }
-
-  // --- other files -> files bundles (chunked to MAX_STACK) ---
-  for (let i = 0; i < otherPaths.length; i += MAX_STACK) {
-    const chunk = otherPaths.slice(i, i + MAX_STACK)
-    store.add({ kind: 'files', paths: chunk }, limit)
-    stacksCreated++
-  }
-
-  if (stacksCreated > 0) pushState.items()
-  return { stacksCreated }
+  prefetchFileIcons(clean)
+  const created = stationStore.enter(clean, 'drag-in')
+  return { stacksCreated: created.length }
 }

@@ -1,7 +1,8 @@
 /**
  * FileListView — the files view body (ADR-0004).
  *
- * 'all' renders the grouped file entries (reusing ClipboardItemCard); an
+ * 'all' renders the grouped entries — transfer station cards (ADR-0006)
+ * first, then legacy stack file entries (reusing ClipboardItemCard); an
  * extension tab or 'other' renders single file *members* as rows with the
  * same interactions as the expanded stack: drag out the single path, click
  * to paste it, copy button → copy-subitem (never creates a new entry), pin
@@ -12,11 +13,14 @@ import { useStore } from '../store/appStore'
 import { useTranslation } from '../i18n'
 import { useFileMembers } from '../hooks/useFilteredItems'
 import { ClipboardItemCard } from './ClipboardItem'
+import { StationEntryCard } from './StationEntryCard'
 import { FileMemberRow } from './FileMemberRow'
 import { EmptyState } from './EmptyState'
 import { isImageItem } from '../lib/fileTabs'
 import { basename } from '../lib/format'
 import type { FileMember } from '../lib/fileTabs'
+import type { StationEntryDto } from '../../shared/station'
+import type { ClipboardItemDto } from '../../shared/types'
 
 export function FileListView() {
   const { t } = useTranslation()
@@ -24,10 +28,13 @@ export function FileListView() {
   const tutorialStep = useStore((s) => s.tutorialStep)
   const files = useFileMembers()
 
-  // Grouped mode: every non-image file entry, pinned first. Independent of
-  // the clipboard view's second-level filter.
+  // Grouped mode: station entries + every non-image file entry, pinned
+  // first in each domain. Independent of the clipboard view's second-level
+  // filter. Station entries are hidden during the onboarding tour.
   const fileItems = useStore((s) => s.items)
+  const station = useStore((s) => s.station)
   const groupedEntries = useMemo(() => {
+    type Row = { kind: 'station'; entry: StationEntryDto } | { kind: 'item'; item: ClipboardItemDto }
     const filtered = fileItems.filter((it) => {
       if (tutorialStep <= 0) return it.data.kind === 'files' && !isImageItem(it)
       if (tutorialStep === 4) return it.id === 'onboarding-files'
@@ -37,10 +44,20 @@ export function FileListView() {
     const searched = q
       ? filtered.filter((it) => it.data.kind === 'files' && it.data.paths.some((p) => basename(p).toLowerCase().includes(q)))
       : filtered
-    const pinned = searched.filter((it) => it.pinned)
-    const recent = searched.filter((it) => !it.pinned)
-    return { pinned, recent }
-  }, [fileItems, query, tutorialStep])
+    const stationVisible = tutorialStep <= 0
+    const stationSearched = q
+      ? station.filter((e) => e.paths.some((p) => basename(p).toLowerCase().includes(q)))
+      : station
+    const toStationRows = (entries: StationEntryDto[]): Row[] => entries.map((entry) => ({ kind: 'station' as const, entry }))
+    const toItemRows = (items: ClipboardItemDto[]): Row[] => items.map((item) => ({ kind: 'item' as const, item }))
+    return {
+      pinned: [...toStationRows(stationVisible ? stationSearched.filter((e) => e.pinned) : []), ...toItemRows(searched.filter((it) => it.pinned))],
+      recent: [...toStationRows(stationVisible ? stationSearched.filter((e) => !e.pinned) : []), ...toItemRows(searched.filter((it) => !it.pinned))]
+    }
+  }, [fileItems, station, query, tutorialStep])
+
+  const renderRow = (row: { kind: 'station'; entry: StationEntryDto } | { kind: 'item'; item: ClipboardItemDto }) =>
+    row.kind === 'station' ? <StationEntryCard key={row.entry.id} entry={row.entry} /> : <ClipboardItemCard key={row.item.id} item={row.item} instant={false} />
 
   if (files.tabMembers === null) {
     const total = groupedEntries.pinned.length + groupedEntries.recent.length
@@ -52,17 +69,13 @@ export function FileListView() {
         {groupedEntries.pinned.length > 0 && (
           <section className="pinned-section">
             <div className="section-label">{t('item.pinned')}</div>
-            {groupedEntries.pinned.map((it) => (
-              <ClipboardItemCard key={it.id} item={it} instant={false} />
-            ))}
+            {groupedEntries.pinned.map(renderRow)}
           </section>
         )}
         {groupedEntries.recent.length > 0 && (
           <section>
             {groupedEntries.pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
-            {groupedEntries.recent.map((it) => (
-              <ClipboardItemCard key={it.id} item={it} instant={false} />
-            ))}
+            {groupedEntries.recent.map(renderRow)}
           </section>
         )}
       </div>

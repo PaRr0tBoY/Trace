@@ -12,6 +12,7 @@ import { shouldRestoreToLanding } from '../lib/restore'
 import type { SuggestTitleContext, SuggestionAcceptOptions, DropResource } from '../../shared/ipc'
 import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View, TraceRecordDto, IgnoreReason } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
+import type { StationEntryDto } from '../../shared/station'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -27,7 +28,18 @@ export type SettingsTab = 'behaviour' | 'position' | 'appearance' | 'tasks' | 'p
 
 interface AppState {
   items: ClipboardItemDto[]
+  /** Transfer station entries (ADR-0006): files domain, separate from the stack. */
+  station: StationEntryDto[]
   tasks: TaskDto[]
+  setStation: (entries: StationEntryDto[]) => void
+  /* station mutations (delegate to main; authoritative list comes back) */
+  stationEnter: (paths: string[]) => Promise<void>
+  stationPin: (id: string, pinned: boolean) => Promise<void>
+  stationDelete: (id: string) => Promise<void>
+  stationSplit: (req: DragRequest) => Promise<void>
+  stationMerge: (sourceId: string, targetId: string) => Promise<import('../../shared/station').StationMergeResult>
+  stationCopyMember: (req: DragRequest) => Promise<void>
+  stationPasteMember: (req: DragRequest) => Promise<void>
   suggestions: TaskProposal[]
   settings: Settings
   /** True until the first `state:load` resolves. */
@@ -189,6 +201,7 @@ interface AppState {
 
 export const useStore = create<AppState>((set, get) => ({
   items: [],
+  station: [],
   tasks: [],
   suggestions: [],
   settings: { ...DEFAULT_SETTINGS },
@@ -276,14 +289,38 @@ export const useStore = create<AppState>((set, get) => ({
   flareKey: 0,
 
   async hydrate() {
-    const { items, settings, version, tasks } = await edge.loadState()
+    const { items, station, settings, version, tasks } = await edge.loadState()
     set({ 
       items, 
+      station, 
       settings, 
       currentVersion: version,
       tasks,
       hydrated: true
     })
+  },
+  setStation: (station) => set({ station }),
+
+  async stationEnter(paths) {
+    set({ station: await edge.stationEnter(paths) })
+  },
+  async stationPin(id, pinned) {
+    set({ station: await edge.stationPin(id, pinned) })
+  },
+  async stationDelete(id) {
+    set({ station: await edge.stationDelete(id) })
+  },
+  async stationSplit(req) {
+    await edge.stationSplit(req)
+  },
+  async stationMerge(sourceId, targetId) {
+    return edge.stationMerge(sourceId, targetId)
+  },
+  async stationCopyMember(req) {
+    await edge.stationCopyMember(req)
+  },
+  async stationPasteMember(req) {
+    await edge.stationPasteMember(req)
   },
 
   setItems: (items) => {

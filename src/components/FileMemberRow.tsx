@@ -6,6 +6,11 @@
  * parent entry is promoted, no new entry is created), the copy button copies
  * the path, the pin button pins the parent entry. No delete — deletion is
  * entry-level.
+ *
+ * The parent entry may live in the transfer station (ADR-0006) instead of
+ * the clipboard stack; actions then route to the station channels. Station
+ * members skip the pin button (station cards pin at entry level) and can
+ * render a split-out button via `onSplit`.
  */
 import { useCallback } from 'react'
 import { motion } from 'framer-motion'
@@ -14,14 +19,24 @@ import { useDragOut } from '../hooks/useDragOut'
 import { formatBytes } from '../lib/format'
 import { getFileKind } from '../lib/fileType'
 import { playButtonClickSound, playToggleSound } from '../lib/soundEffects'
-import { CopyIcon, FileKindIcon, PinIcon, PinFillIcon } from './icons'
+import { CopyIcon, FileKindIcon, PinIcon, PinFillIcon, MinusIcon } from './icons'
 import { tryPaste } from '../lib/tryPaste'
 import { t } from '../i18n'
 import type { FileMember } from '../lib/fileTabs'
 import { edge } from '../lib/edge'
 
-export function FileMemberRow({ member }: { member: FileMember }) {
+interface Props {
+  member: FileMember
+  /** Hide the entry-level pin button (station cards pin from the card header). */
+  showPin?: boolean
+  /** Render a split-out (ungroup) button; the caller decides the split target. */
+  onSplit?: (e: React.MouseEvent) => void
+}
+
+export function FileMemberRow({ member, showPin = true, onSplit }: Props) {
+  const stationEntry = useStore((s) => s.station.find((e) => e.id === member.itemId) ?? null)
   const item = useStore((s) => s.items.find((it) => it.id === member.itemId) ?? null)
+  const entry = stationEntry ?? item
   const startDrag = useDragOut()
   const setInternalDragReq = useStore((s) => s.setInternalDragReq)
 
@@ -32,20 +47,27 @@ export function FileMemberRow({ member }: { member: FileMember }) {
     startDrag({ id: member.itemId, paths: [member.path] })
   }, [member.itemId, member.path, setInternalDragReq, startDrag])
 
-  if (!item) return null
+  if (!entry) return null
+  const isStation = !!stationEntry
+  // Missing on-disk files stay visible but dimmed (station staleness, ADR-0006).
+  const dimmed = member.exists === false
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       className="fluid-list-row"
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: 'pointer', ...(dimmed ? { opacity: 0.45 } : {}) }}
       draggable
       onDragStartCapture={handleDragStart}
       onDragEnd={() => setInternalDragReq(null)}
       onClick={(e) => {
         e.stopPropagation()
-        tryPaste(() => edge.pasteSubitem({ id: member.itemId, paths: [member.path] }))
+        if (isStation) {
+          tryPaste(() => edge.stationPasteMember({ id: member.itemId, paths: [member.path] }))
+        } else {
+          tryPaste(() => edge.pasteSubitem({ id: member.itemId, paths: [member.path] }))
+        }
       }}
     >
       {member.isImage && member.preview ? (
@@ -68,19 +90,25 @@ export function FileMemberRow({ member }: { member: FileMember }) {
         <div className="fluid-list-text">{member.name}</div>
         {member.size > 0 && <div className="fluid-list-sub">{formatBytes(member.size)}</div>}
       </div>
-      <button
-        className={`act${item.pinned ? ' active' : ''}`}
-        title={item.pinned ? t('item.unpin') : t('item.pin')}
-        onClick={(e) => {
-          e.stopPropagation()
-          e.currentTarget.blur()
-          playToggleSound(!item.pinned)
-          void useStore.getState().togglePin(item.id, !item.pinned)
-        }}
-        style={{ width: 24, height: 24 }}
-      >
-        {item.pinned ? <PinFillIcon width={12} height={12} /> : <PinIcon width={12} height={12} />}
-      </button>
+      {showPin && (
+        <button
+          className={`act${entry.pinned ? ' active' : ''}`}
+          title={entry.pinned ? t('item.unpin') : t('item.pin')}
+          onClick={(e) => {
+            e.stopPropagation()
+            e.currentTarget.blur()
+            playToggleSound(!entry.pinned)
+            if (isStation) {
+              void useStore.getState().stationPin(member.itemId, !entry.pinned)
+            } else {
+              void useStore.getState().togglePin(member.itemId, !entry.pinned)
+            }
+          }}
+          style={{ width: 24, height: 24 }}
+        >
+          {entry.pinned ? <PinFillIcon width={12} height={12} /> : <PinIcon width={12} height={12} />}
+        </button>
+      )}
       <button
         className="act subitem-copy-btn"
         title={t('item.copyFilePath')}
@@ -88,12 +116,30 @@ export function FileMemberRow({ member }: { member: FileMember }) {
           e.stopPropagation()
           e.currentTarget.blur()
           playButtonClickSound()
-          void edge.copySubitem({ id: member.itemId, paths: [member.path] })
+          if (isStation) {
+            void edge.stationCopyMember({ id: member.itemId, paths: [member.path] })
+          } else {
+            void edge.copySubitem({ id: member.itemId, paths: [member.path] })
+          }
         }}
         style={{ width: 24, height: 24 }}
       >
         <CopyIcon width={12} height={12} />
       </button>
+      {onSplit && (
+        <button
+          className="act subitem-delete-btn"
+          title={t('item.ungroup')}
+          onClick={(e) => {
+            e.stopPropagation()
+            e.currentTarget.blur()
+            onSplit(e)
+          }}
+          style={{ width: 24, height: 24 }}
+        >
+          <MinusIcon width={12} height={12} />
+        </button>
+      )}
     </motion.div>
   )
 }

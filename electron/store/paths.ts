@@ -20,6 +20,8 @@ export const PATHS = {
   indexFile: () => join(root(), 'items.json'),
   /** Path to the task index JSON. */
   tasksFile: () => join(root(), 'tasks.json'),
+  /** Path to the transfer station index JSON (ADR-0006). */
+  stationFile: () => join(root(), 'station.json'),
   /** Path to the long-term memory index JSON. */
   memoriesFile: () => join(root(), 'memories.json'),
   /**

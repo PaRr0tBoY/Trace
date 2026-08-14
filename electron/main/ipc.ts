@@ -12,13 +12,13 @@ import { psHost } from './powershell'
 import { requestPanelFocus, releasePanelFocus, releasePanelFocusNow } from './focus'
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
 import { rehomeTraceAfterMerge } from '../store/traceStore'
-import { getStore, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getTitleSuggester, getMemoryStore, getMemoryGraph, getTraceStore, getLocalModelManager, getLocalModelRuntime, resetLocalModelRuntime, ensureLocalModelLoaded } from './state'
+import { getStore, getStationStore, stationClipboardItem, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getTitleSuggester, getMemoryStore, getMemoryGraph, getTraceStore, getLocalModelManager, getLocalModelRuntime, resetLocalModelRuntime, ensureLocalModelLoaded } from './state'
 import type { FactRecord } from '../store/memoryGraph'
 import { isTraceRecordDto, renderTraceReportHtml } from './traceReport'
 import { getMainWindow } from './window'
 import { setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
-import { startDragOut, resolveDragData } from './drag'
+import { startDragOut, resolveDragData, prefetchFileIcons } from './drag'
 import { activateAppWindow } from './windowSwitch'
 import { switcherHover, switcherClick } from './switcher'
 import { clipboardSignature } from '../clipboard/formats'
@@ -195,11 +195,87 @@ export function registerIpc(): void {
   handle('state:load', () => {
     return {
       items: getStore().toDto(),
+      station: getStationStore().toDto(),
       settings: loadSettings(),
       version: app.getVersion(),
       tasks: getTaskStore().toDto()
     }
   })
+
+  /* --------------------------- transfer station (ADR-0006) --------------------------- */
+
+  handle('station:list', () => getStationStore().toDto())
+
+  handle('station:enter', (paths) => {
+    const result = addFiles(paths)
+    if (result.stacksCreated > 1) {
+      toast(`Split into ${result.stacksCreated} station entries (max 10 each)`, 'info')
+    }
+    return getStationStore().toDto()
+  })
+
+  handle('station:pin', (id, pinned) => {
+    getStationStore().pin(id, pinned)
+    return getStationStore().toDto()
+  })
+
+  handle('station:delete', (id) => {
+    getStationStore().remove(id)
+    // A deleted entry that is still on the clipboard must not zombie
+    // re-enter on the next watcher tick (same contract as item:delete).
+    getWatcher().resyncSignature()
+    return getStationStore().toDto()
+  })
+
+  handle('station:split', (req) => {
+    if (!req || typeof req.id !== 'string' || !Array.isArray(req.paths)) {
+      return { ok: false as const, reason: 'notfound' as const }
+    }
+    return getStationStore().split(req.id, req.paths)
+  })
+
+  handle('station:merge', (sourceId, targetId) => {
+    return getStationStore().merge(sourceId, targetId)
+  })
+
+  handle('station:copy-member', async (req) => {
+    if (!req || typeof req.id !== 'string' || !req.paths || req.paths.length === 0) return false
+    const entry = getStationStore().get(req.id)
+    if (!entry) return false
+    const paths = req.paths.filter((p) => entry.paths.includes(p))
+    if (paths.length === 0) return false
+    await writeFileListToClipboard(paths)
+    return true
+  })
+
+  handle('station:paste-member', async (req) => {
+    const watcher = getWatcher()
+    const now = Date.now()
+    if (now - _lastPasteTime < PASTE_GUARD_MS) return false
+    _lastPasteTime = now
+    if (!req || typeof req.id !== 'string' || !req.paths || req.paths.length === 0) return false
+    const entry = getStationStore().get(req.id)
+    if (!entry) return false
+    const paths = req.paths.filter((p) => entry.paths.includes(p))
+    if (paths.length === 0) return false
+
+    watcher.setPaused(true)
+    try {
+      await writeFileListToClipboard(paths)
+      pushState.togglePanel(false)
+      setTimeout(() => {
+        simulatePaste()
+      }, 50)
+    } finally {
+      setTimeout(() => {
+        watcher.invalidateSignature()
+        watcher.setPaused(loadSettings().incognito)
+      }, 350)
+    }
+    return true
+  })
+
+  /* --------------------------- ai provider --------------------------- */
 
   /* --------------------------- ai provider --------------------------- */
 
@@ -304,7 +380,9 @@ export function registerIpc(): void {
   })
 
   handle('task:link-item', (taskId, itemId) => {
-    const item = getStore().get(itemId)
+    // Station entries link as files resources (ADR-0006): the station lookup
+    // falls back when the id is not a clipboard-stack item.
+    const item = getStore().get(itemId) ?? stationClipboardItem(itemId)
     if (item) {
       getTaskStore().linkItem(taskId, buildClipboardRef(item))
     }
@@ -393,7 +471,9 @@ export function registerIpc(): void {
     const ref: ResourceRef | null =
       resource.kind === 'clipboard'
         ? (() => {
-            const item = getStore().get(resource.itemId)
+            // Station entries link as files resources (ADR-0006): the station
+            // lookup falls back when the id is not a clipboard-stack item.
+            const item = getStore().get(resource.itemId) ?? stationClipboardItem(resource.itemId)
             return item ? buildClipboardRef(item) : null
           })()
         : { kind: 'files', paths: resource.paths }
@@ -742,13 +822,13 @@ export function registerIpc(): void {
   })
 
   handle('item:add-files', (paths) => {
+    // Legacy drag-in entry point (kept until T8 removes the channel): drops
+    // land in the transfer station now (ADR-0006).
     const result = addFiles(paths)
-    // If a large drop was split into several stacks, let the user know why
-    // they suddenly see multiple items instead of one bundle.
     if (result.stacksCreated > 1) {
-      toast(`Split into ${result.stacksCreated} stacks (max 10 each)`, 'info')
+      toast(`Split into ${result.stacksCreated} station entries (max 10 each)`, 'info')
     }
-    return getStore().toDto()
+    return getStationStore().toDto()
   })
 
   handle('item:remove-subitem', (req) => {
@@ -923,7 +1003,20 @@ export function registerSendListeners(): void {
 
   on('item:start-drag', (sender, req) => {
     console.log('[IPC] item:start-drag req=', JSON.stringify(req))
-    const data = resolveDragData(req)
+    // Station whole-entry drags (no explicit paths) fall back to a files
+    // bundle built from the entry's paths (ADR-0006). Member drags carry
+    // explicit paths and are resolved by resolveDragData directly.
+    let data = resolveDragData(req)
+    if (!data) {
+      const entry = req.paths && req.paths.length > 0 ? undefined : getStationStore().get(req.id)
+      if (entry) {
+        const paths = entry.paths.filter((p) => existsSync(p))
+        if (paths.length > 0) {
+          data = { kind: 'files', paths }
+          prefetchFileIcons(paths)
+        }
+      }
+    }
     if (!data) {
       console.log('[IPC] start-drag: no data resolved')
       return

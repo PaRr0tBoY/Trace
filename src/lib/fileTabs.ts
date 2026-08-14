@@ -10,6 +10,7 @@
  */
 import type { ClipboardItemDto, FilesFilter } from '../../shared/types'
 import { basename, isImagePath } from './format'
+import type { StationEntryDto } from '../../shared/station'
 
 /**
  * Max extension tabs in the files second row ('all' + 'other' always
@@ -38,6 +39,7 @@ export function isImageItem(it: ClipboardItemDto): boolean {
 }
 
 /** One renderable row in the files view: a single member of a file entry. */
+/** One renderable row in the files view: a single member of a file entry. */
 export interface FileMember {
   itemId: string
   /** Raw member path. */
@@ -49,6 +51,8 @@ export interface FileMember {
   name: string
   size: number
   isImage: boolean
+  /** False when the file is missing on disk (station entries; the entry is stale). */
+  exists?: boolean
   preview?: string
 }
 
@@ -87,6 +91,34 @@ export function collectFileMembers(items: ClipboardItemDto[]): FileMember[] {
         size: entry?.size ?? 0,
         isImage: entry?.isImage ?? false,
         ...(entry?.isImage && entry.preview ? { preview: entry.preview } : {})
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * All file members across the transfer station (ADR-0006), in entry order.
+ * Parallel to collectFileMembers; station entries carry their own per-path
+ * metadata (stats cache) instead of FileEntry records.
+ */
+export function collectStationMembers(entries: StationEntryDto[]): FileMember[] {
+  const out: FileMember[] = []
+  for (const it of entries) {
+    const paths = it.paths
+    for (let i = 0; i < paths.length; i++) {
+      const m = it.members[i]
+      const path = paths[i]
+      out.push({
+        itemId: it.id,
+        path,
+        index: i,
+        ext: extname(path) || null,
+        name: m?.name ?? basename(path),
+        size: m?.size ?? 0,
+        isImage: m?.isImage ?? false,
+        exists: m?.exists,
+        ...(m?.isImage && m.exists ? { preview: `tracelocal://thumb/${encodeURIComponent(path)}` } : {})
       })
     }
   }

@@ -124,6 +124,28 @@ export class TransferStation {
     this.createId = opts?.createId ?? defaultCreateId
   }
 
+  /**
+   * Restore persisted entries at startup (the read side of the JSON index;
+   * the persisted shape is StationEntry as-is, ADR-0006). Malformed rows are
+   * dropped so a corrupt index can never break hydration.
+   */
+  hydrate(entries: StationEntry[]): void {
+    const clean = entries.filter(
+      (e) =>
+        e &&
+        typeof e.id === 'string' &&
+        Array.isArray(e.paths) &&
+        e.paths.every((p) => typeof p === 'string') &&
+        (e.route === 'drag-in' || e.route === 'clipboard') &&
+        typeof e.pinned === 'boolean' &&
+        typeof e.inTransit === 'boolean' &&
+        typeof e.capturedAt === 'number' &&
+        e.stats !== null &&
+        typeof e.stats === 'object'
+    )
+    this.entries = clean
+  }
+
   private statPaths(paths: string[]): Record<string, FileStat> {
     const stats: Record<string, FileStat> = {}
     for (const p of paths) {

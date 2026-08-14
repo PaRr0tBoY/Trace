@@ -101,6 +101,15 @@ export interface FileViewData {
   tabs: { ext: string; count: number }[]
   /** Number of extension-less members (the 'other' bucket). */
   otherCount: number
+  /**
+   * File members in the FULL corpus (every file item + every station
+   * entry, both routes, no search) — whether the files view has any
+   * entries at all, regardless of the active route/tab. The header uses
+   * it to keep the second row (route chips + tabs) alive when the route
+   * filter empties the visible list — otherwise the route chips vanish
+   * and the user cannot switch back (feedback trap).
+   */
+  corpusCount: number
   /** The active filter — falls back to 'all' when the tab vanished. */
   activeFilter: FilesFilter
 }
@@ -153,6 +162,7 @@ export function useFileMembers(): FileViewData {
       tabMembers: activeFilter === 'all' ? null : filterMembersByTab(searched, activeFilter),
       tabs: tabs.tabs,
       otherCount: tabs.otherCount,
+      corpusCount: corpus.length,
       activeFilter
     }
   }, [items, station, query, filesFilter, stationRouteFilter, tutorialStep])

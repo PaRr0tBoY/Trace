@@ -233,8 +233,11 @@ export function Header() {
     />
   )
 
-  // Files second row: hidden entirely when no file entries exist.
-  const hasFiles = files.members.length > 0
+  // Files second row: hidden entirely when no file entries exist at all
+  // (ADR-0004). Corpus-based, not route-filtered — a route/tab that
+  // empties the visible list must keep the chips so the user can switch
+  // back; otherwise the row (and the route chips inside it) vanishes.
+  const hasFiles = files.corpusCount > 0
 
   return (
     <div

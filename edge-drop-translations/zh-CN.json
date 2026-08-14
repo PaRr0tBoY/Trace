@@ -4,7 +4,10 @@
     "text": "文本",
     "links": "链接",
     "images": "图片",
-    "files": "文件"
+    "files": "文件",
+    "notes": "笔记",
+    "clipboard": "剪贴板",
+    "tasks": "任务"
   },
   "tabs": {
     "behaviour": "行为",
@@ -246,5 +249,28 @@
     "version": "版本",
     "supportPromo": "Edge-Drop 完全免费且开源。如果它能帮助提升您的日常工作效率，欢迎支持开发，让它变得更好！",
     "supportOnKofi": "在 Ko-fi 上支持"
+  },
+  "notes": {
+    "new": "新建笔记",
+    "note": "条笔记",
+    "notes": "条笔记",
+    "untitled": "无标题",
+    "empty": "还没有笔记。点击「新建笔记」随手记点什么吧。",
+    "noMatches": "没有匹配的笔记",
+    "placeholder": "输入内容…",
+    "back": "返回笔记列表",
+    "edit": "编辑笔记",
+    "pin": "置顶",
+    "unpin": "取消置顶",
+    "delete": "删除笔记",
+    "fold": "收起",
+    "expand": "展开",
+    "bold": "加粗",
+    "italic": "斜体",
+    "code": "行内代码",
+    "link": "链接",
+    "quote": "引用",
+    "list": "列表",
+    "todo": "待办"
   }
 }

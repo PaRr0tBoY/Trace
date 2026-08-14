@@ -19,9 +19,9 @@ import { taskBadgeCount } from '../lib/taskGroups'
 import { useFileMembers } from '../hooks/useFilteredItems'
 import { useTranslation } from '../i18n'
 
-/** Primary chips: centered in the 256px content area; 58px keeps the group
- * (184px) clear of the 34px right buttons (222px) with a 2px gap. */
-const PRIMARY_CHIP_WIDTH = 58
+/** Primary chips: centered in the 256px content area; 50px keeps the group
+ * (4 × 50 + 3 × 2 = 206px) clear of the right buttons. */
+const PRIMARY_CHIP_WIDTH = 50
 const PRIMARY_GAP = 2
 const TRACK_LEFT = 3
 
@@ -126,11 +126,11 @@ export function Header() {
     state.setStyleFlyoutOpen(false)
   }
 
-  const primaryViewIndex = view === 'clipboard' ? 0 : view === 'files' ? 1 : 2
+  const primaryViewIndex = view === 'clipboard' ? 0 : view === 'files' ? 1 : view === 'tasks' ? 2 : 3
 
   // Dynamic chip font: longest label across the row drives the size (the
   // 270px panel caps every row at ~200px; long labels ellipsize).
-  const primaryMaxLen = Math.max(t('filters.clipboard').length, t('filters.files').length, t('filters.tasks').length)
+  const primaryMaxLen = Math.max(t('filters.clipboard').length, t('filters.files').length, t('filters.tasks').length, t('filters.notes').length)
   const primaryFontSize = primaryMaxLen >= 12 ? 7.5 : primaryMaxLen >= 9 ? 8.5 : primaryMaxLen >= 6 ? 9.5 : 10.5
 
   const primaryChipStyle = (active: boolean): React.CSSProperties => ({
@@ -305,7 +305,8 @@ export function Header() {
             {[
               { id: 'clipboard' as const, label: t('filters.clipboard') },
               { id: 'files' as const, label: t('filters.files') },
-              { id: 'tasks' as const, label: t('filters.tasks') }
+              { id: 'tasks' as const, label: t('filters.tasks') },
+              { id: 'notes' as const, label: t('filters.notes') }
             ].map((f) => {
               const active = view === f.id
               return (
@@ -432,7 +433,7 @@ export function Header() {
       {/* ── Row 2: second-level chips — hidden entirely when the files view
              has no entries (two rows spring back to one, ADR-0004) ── */}
       <AnimatePresence initial={false}>
-        {!settingsOpen && !(view === 'files' && !hasFiles) && (
+        {!settingsOpen && !(view === 'files' && !hasFiles) && view !== 'notes' && (
           <motion.div
             key="secondary-row"
             initial={{ opacity: 0, height: 0 }}

@@ -10,7 +10,7 @@ import { create } from 'zustand'
 import { edge } from '../lib/edge'
 import { shouldRestoreToLanding } from '../lib/restore'
 import type { SuggestTitleContext, SuggestionAcceptOptions, DropResource } from '../../shared/ipc'
-import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View, TraceRecordDto, IgnoreReason } from '../../shared/types'
+import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View, TraceRecordDto, IgnoreReason, NoteDto, NotePatch } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
@@ -29,6 +29,7 @@ interface AppState {
   items: ClipboardItemDto[]
   tasks: TaskDto[]
   suggestions: TaskProposal[]
+  notes: NoteDto[]
   settings: Settings
   /** True until the first `state:load` resolves. */
   hydrated: boolean
@@ -106,6 +107,7 @@ interface AppState {
   setItems: (items: ClipboardItemDto[]) => void
   setTasks: (tasks: TaskDto[]) => void
   setSuggestions: (suggestions: TaskProposal[]) => void
+  setNotes: (notes: NoteDto[]) => void
   setSettings: (next: Settings) => void
 
   /* UI */
@@ -168,6 +170,11 @@ interface AppState {
   /** Ask the provider chain for 1-3 title candidates for a task draft (null = no AI/failure). */
   suggestTaskTitle: (ctx: SuggestTitleContext) => Promise<string[] | null>
 
+  /* note mutations (delegate to main; authoritative list comes back) */
+  createNote: (content?: string) => Promise<string>
+  updateNote: (id: string, patch: NotePatch) => Promise<void>
+  deleteNote: (id: string) => Promise<void>
+
   /* memory panel (delegate to main; the refreshed buckets come back) */
   memories: MemoryListPayload | null
   loadMemories: () => Promise<void>
@@ -191,6 +198,7 @@ export const useStore = create<AppState>((set, get) => ({
   items: [],
   tasks: [],
   suggestions: [],
+  notes: [],
   settings: { ...DEFAULT_SETTINGS },
   hydrated: false,
   query: '',
@@ -276,12 +284,13 @@ export const useStore = create<AppState>((set, get) => ({
   flareKey: 0,
 
   async hydrate() {
-    const { items, settings, version, tasks } = await edge.loadState()
+    const { items, settings, version, tasks, notes } = await edge.loadState()
     set({ 
       items, 
       settings, 
       currentVersion: version,
       tasks,
+      notes,
       hydrated: true
     })
   },
@@ -305,6 +314,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   setTasks: (tasks) => set({ tasks }),
   setSuggestions: (suggestions) => set({ suggestions }),
+  setNotes: (notes) => set({ notes }),
   setSettings: (next) => set({ settings: next }),
 
   setQuery: (query) => set({ query }),
@@ -492,6 +502,20 @@ export const useStore = create<AppState>((set, get) => ({
 
   async suggestTaskTitle(ctx) {
     return edge.suggestTaskTitle(ctx)
+  },
+
+  async createNote(content) {
+    const res = await edge.createNote(content)
+    set({ notes: res.notes })
+    return res.createdId
+  },
+
+  async updateNote(id, patch) {
+    set({ notes: await edge.updateNote(id, patch) })
+  },
+
+  async deleteNote(id) {
+    set({ notes: await edge.deleteNote(id) })
   },
 
   memories: null,

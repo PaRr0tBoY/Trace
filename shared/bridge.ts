@@ -5,13 +5,13 @@
  * contract lives in one place. The actual implementation lives in the preload;
  * the renderer only ever sees `window.edge` typed as this interface.
  */
-import type { Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget, LocalModelSource, LocalModelStatus } from './types'
+import type { Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget, LocalModelSource, LocalModelStatus, Note, NoteDto, NotePatch } from './types'
 import type { DragRequest, ProviderConfig } from './types'
 import type { ProviderTestResult, SuggestTitleContext, SuggestionAcceptOptions, DropResource } from './ipc'
 
 export interface EdgeApi {
   /* Renderer -> Main */
-  loadState: () => Promise<{ items: import('./types').ClipboardItemDto[]; settings: Settings; version: string; tasks: TaskDto[] }>
+  loadState: () => Promise<{ items: import('./types').ClipboardItemDto[]; settings: Settings; version: string; tasks: TaskDto[]; notes: NoteDto[] }>
   setPinned: (id: string, pinned: boolean) => Promise<import('./types').ClipboardItemDto[]>
   deleteItem: (id: string) => Promise<import('./types').ClipboardItemDto[]>
   clearItems: () => Promise<import('./types').ClipboardItemDto[]>
@@ -70,6 +70,12 @@ export interface EdgeApi {
   /** Resolve exePaths to icon dataURLs (cache-first; null = extraction failed). */
   getAppIcons: (exePaths: string[]) => Promise<Record<string, string | null>>
 
+  /* Notes domain */
+  loadNotes: () => Promise<NoteDto[]>
+  createNote: (content?: string) => Promise<{ notes: NoteDto[]; createdId: string }>
+  updateNote: (id: string, patch: NotePatch) => Promise<NoteDto[]>
+  deleteNote: (id: string) => Promise<NoteDto[]>
+
   /* AI provider */
   testProvider: (config: ProviderConfig) => Promise<ProviderTestResult>
 
@@ -124,6 +130,7 @@ export interface EdgeApi {
 
   /* Main -> Renderer */
   onItems: (cb: (items: import('./types').ClipboardItemDto[]) => void) => () => void
+  onNotes: (cb: (notes: Note[]) => void) => () => void
   onTasks: (cb: (tasks: TaskDto[]) => void) => () => void
   onSettings: (cb: (settings: Settings) => void) => () => void
   onSuggestions: (cb: (suggestions: TaskProposal[]) => void) => () => void

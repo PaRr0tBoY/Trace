@@ -23,6 +23,7 @@ export default function App() {
   const setItems = useStore((s) => s.setItems)
   const setTasks = useStore((s) => s.setTasks)
   const setSuggestions = useStore((s) => s.setSuggestions)
+  const setNotes = useStore((s) => s.setNotes)
   const setSettings = useStore((s) => s.setSettings)
   const pushToast = useStore((s) => s.pushToast)
   const settings = useStore((s) => s.settings)
@@ -36,6 +37,7 @@ export default function App() {
     const offItems = edge.onItems((items) => setItems(items))
     const offTasks = edge.onTasks((tasks) => setTasks(tasks))
     const offSuggestions = edge.onSuggestions((suggestions) => setSuggestions(suggestions))
+    const offNotes = edge.onNotes((notes) => setNotes(notes))
     const offSettings = edge.onSettings((next) => setSettings(next))
     const offToast = edge.onToast((t) => pushToast(t))
     const offToggle = edge.onToggle((forceOpen) => {
@@ -94,6 +96,7 @@ export default function App() {
       offItems()
       offTasks()
       offSuggestions()
+      offNotes()
       offSettings()
       offToast()
       offToggle()

@@ -5,6 +5,7 @@ export interface TranslationKeys {
     links: string
     images: string
     files: string
+    notes: string
     tasks: string
     clipboard: string
     existingTasks: string
@@ -521,7 +522,31 @@ export interface TranslationKeys {
     starOnGithub: string
     githubPromo: string
     version: string
+  },
+  notes: {
+    new: string
+    note: string
+    notes: string
+    untitled: string
+    empty: string
+    noMatches: string
+    placeholder: string
+    back: string
+    edit: string
+    pin: string
+    unpin: string
+    delete: string
+    fold: string
+    expand: string
+    bold: string
+    italic: string
+    code: string
+    link: string
+    quote: string
+    list: string
+    todo: string
   }
+
 }
 
 export interface LanguageMeta {
@@ -698,6 +723,7 @@ export const en: TranslationKeys = {
     "links": "Links",
     "images": "Images",
     "files": "Files",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Clipboard",
     "existingTasks": "Existing tasks",
@@ -1212,7 +1238,30 @@ export const en: TranslationKeys = {
     "starOnGithub": "Star on GitHub",
     "githubPromo": "If you like Trace, please consider starring the project on GitHub!",
     "version": "Version"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const es: TranslationKeys = {
@@ -1222,6 +1271,7 @@ export const es: TranslationKeys = {
     "links": "Enlaces",
     "images": "Imágenes",
     "files": "Archivos",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Portapapeles",
     "existingTasks": "Tareas existentes",
@@ -1736,7 +1786,30 @@ export const es: TranslationKeys = {
     "starOnGithub": "Estrella en GitHub",
     "githubPromo": "Si te gusta Trace, ¡considera darle una estrella en GitHub!",
     "version": "Versión"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const fr: TranslationKeys = {
@@ -1746,6 +1819,7 @@ export const fr: TranslationKeys = {
     "links": "Liens",
     "images": "Images",
     "files": "Fichiers",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Presse-papiers",
     "existingTasks": "Tâches existantes",
@@ -2260,7 +2334,30 @@ export const fr: TranslationKeys = {
     "starOnGithub": "Étoile sur GitHub",
     "githubPromo": "Si vous aimez Trace, pensez à mettre une étoile au projet sur GitHub !",
     "version": "Version"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const de: TranslationKeys = {
@@ -2270,6 +2367,7 @@ export const de: TranslationKeys = {
     "links": "Links",
     "images": "Bilder",
     "files": "Dateien",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Zwischenablage",
     "existingTasks": "Vorhandene Aufgaben",
@@ -2784,7 +2882,30 @@ export const de: TranslationKeys = {
     "starOnGithub": "Auf GitHub markieren",
     "githubPromo": "Wenn Ihnen Trace gefällt, geben Sie dem Projekt bitte einen Stern auf GitHub!",
     "version": "Version"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const it: TranslationKeys = {
@@ -2794,6 +2915,7 @@ export const it: TranslationKeys = {
     "links": "Link",
     "images": "Immagini",
     "files": "File",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Appunti",
     "existingTasks": "Attività esistenti",
@@ -3308,7 +3430,30 @@ export const it: TranslationKeys = {
     "starOnGithub": "Metti stella su GitHub",
     "githubPromo": "Se ti piace Trace, valuta di mettere una stella al progetto su GitHub!",
     "version": "Versione"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const pt: TranslationKeys = {
@@ -3318,6 +3463,7 @@ export const pt: TranslationKeys = {
     "links": "Links",
     "images": "Imagens",
     "files": "Arquivos",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Área de transferência",
     "existingTasks": "Tarefas existentes",
@@ -3832,7 +3978,30 @@ export const pt: TranslationKeys = {
     "starOnGithub": "Dar estrela no GitHub",
     "githubPromo": "Se você gosta do Trace, considere dar uma estrela no projeto no GitHub!",
     "version": "Versão"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const ru: TranslationKeys = {
@@ -3842,6 +4011,7 @@ export const ru: TranslationKeys = {
     "links": "Лінки",
     "images": "Фото",
     "files": "Файлы",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Буфер обмена",
     "existingTasks": "Существующие задачи",
@@ -4356,7 +4526,30 @@ export const ru: TranslationKeys = {
     "starOnGithub": "Поставить звезду на GitHub",
     "githubPromo": "Если вам нравится Trace, пожалуйста, поставьте звёзду проекту на GitHub!",
     "version": "Версия"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const ja: TranslationKeys = {
@@ -4366,6 +4559,7 @@ export const ja: TranslationKeys = {
     "links": "リンク",
     "images": "画像",
     "files": "ファイル",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "クリップボード",
     "existingTasks": "既存のタスク",
@@ -4880,7 +5074,30 @@ export const ja: TranslationKeys = {
     "starOnGithub": "GitHub でスター",
     "githubPromo": "Trace を気に入っていただけたら、GitHub でスターをよろしくお願いします！",
     "version": "バージョン"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const ko: TranslationKeys = {
@@ -4890,6 +5107,7 @@ export const ko: TranslationKeys = {
     "links": "링크",
     "images": "이미지",
     "files": "파일",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "클립보드",
     "existingTasks": "기존 작업",
@@ -5404,7 +5622,30 @@ export const ko: TranslationKeys = {
     "starOnGithub": "GitHub에서 별표",
     "githubPromo": "Trace이 마음에 드시면 GitHub에서 프로젝트에 별표를 고려해 주세요!",
     "version": "버전"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const zhCN: TranslationKeys = {
@@ -5414,6 +5655,7 @@ export const zhCN: TranslationKeys = {
     "links": "链接",
     "images": "图片",
     "files": "文件",
+    "notes": "笔记",
     "tasks": "任务",
     "clipboard": "剪贴板",
     "existingTasks": "已有任务",
@@ -5928,7 +6170,30 @@ export const zhCN: TranslationKeys = {
     "starOnGithub": "在 GitHub 上加星",
     "githubPromo": "如果您喜欢 Trace，请在 GitHub 上为项目加星！",
     "version": "版本"
-  }
+  },
+  "notes": {
+    new: '新建笔记',
+    note: '条笔记',
+    notes: '条笔记',
+    untitled: '无标题',
+    empty: '还没有笔记。点击「新建笔记」随手记点什么吧。',
+    noMatches: '没有匹配的笔记',
+    placeholder: '输入内容…',
+    back: '返回笔记列表',
+    edit: '编辑笔记',
+    pin: '置顶',
+    unpin: '取消置顶',
+    delete: '删除笔记',
+    fold: '收起',
+    expand: '展开',
+    bold: '加粗',
+    italic: '斜体',
+    code: '行内代码',
+    link: '链接',
+    quote: '引用',
+    list: '列表',
+    todo: '待办',
+  },
 }
 
 export const zhTW: TranslationKeys = {
@@ -5938,6 +6203,7 @@ export const zhTW: TranslationKeys = {
     "links": "連結",
     "images": "圖片",
     "files": "檔案",
+    "notes": "Notes",
     "tasks": "任務",
     "clipboard": "剪貼簿",
     "existingTasks": "既有任務",
@@ -6452,7 +6718,30 @@ export const zhTW: TranslationKeys = {
     "starOnGithub": "在 GitHub 上加星",
     "githubPromo": "如果您喜歡 Trace，請在 GitHub 上為專案加星！",
     "version": "版本"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const hi: TranslationKeys = {
@@ -6462,6 +6751,7 @@ export const hi: TranslationKeys = {
     "links": "लिंक",
     "images": "छवियाँ",
     "files": "फ़ाइलें",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "क्लिपबोर्ड",
     "existingTasks": "मौजूदा कार्य",
@@ -6976,7 +7266,30 @@ export const hi: TranslationKeys = {
     "starOnGithub": "GitHub पर स्टार दें",
     "githubPromo": "यदि आपको Trace पसंद आता है, तो कृपया GitHub पर प्रोजेक्ट को स्टार देने पर विचार करें!",
     "version": "संस्करण"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const ar: TranslationKeys = {
@@ -6986,6 +7299,7 @@ export const ar: TranslationKeys = {
     "links": "روابط",
     "images": "صور",
     "files": "ملفات",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "الحافظة",
     "existingTasks": "المهام الحالية",
@@ -7500,7 +7814,30 @@ export const ar: TranslationKeys = {
     "starOnGithub": "نجمة على GitHub",
     "githubPromo": "إذا أحببت Trace، يُرجى النظر في تمييز المشروع بنجمة على GitHub!",
     "version": "الإصدار"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const bn: TranslationKeys = {
@@ -7510,6 +7847,7 @@ export const bn: TranslationKeys = {
     "links": "লিংক",
     "images": "ছবি",
     "files": "ফাইল",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "ক্লিপবোর্ড",
     "existingTasks": "বিদ্যমান কাজ",
@@ -8024,7 +8362,30 @@ export const bn: TranslationKeys = {
     "starOnGithub": "GitHub-এ তারা দিন",
     "githubPromo": "আপনি যদি Trace পছন্দ করেন, তবে GitHub-এ প্রকল্পে তারা দেওয়ার কথা বিবেচনা করুন!",
     "version": "সংস্করণ"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const tr: TranslationKeys = {
@@ -8034,6 +8395,7 @@ export const tr: TranslationKeys = {
     "links": "Bağlantılar",
     "images": "Görseller",
     "files": "Dosyalar",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Pano",
     "existingTasks": "Mevcut görevler",
@@ -8548,7 +8910,30 @@ export const tr: TranslationKeys = {
     "starOnGithub": "GitHub'da Yıldızla",
     "githubPromo": "Trace'u beğendiyseniz, lütfen GitHub'da projeye yıldız vermeyi düşünün!",
     "version": "Sürüm"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const vi: TranslationKeys = {
@@ -8558,6 +8943,7 @@ export const vi: TranslationKeys = {
     "links": "Liên kết",
     "images": "Hình ảnh",
     "files": "Tệp",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Bảng nhớ tạm",
     "existingTasks": "Nhiệm vụ hiện có",
@@ -9072,7 +9458,30 @@ export const vi: TranslationKeys = {
     "starOnGithub": "Đánh sao trên GitHub",
     "githubPromo": "Nếu bạn thích Trace, hãy cân nhắc đánh sao cho dự án trên GitHub!",
     "version": "Phiên bản"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const pl: TranslationKeys = {
@@ -9082,6 +9491,7 @@ export const pl: TranslationKeys = {
     "links": "Linki",
     "images": "Obrazy",
     "files": "Pliki",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Schowek",
     "existingTasks": "Istniejące zadania",
@@ -9596,7 +10006,30 @@ export const pl: TranslationKeys = {
     "starOnGithub": "Daj gwiazdkę na GitHub",
     "githubPromo": "Jeśli lubisz Trace, rozważ dodanie gwiazdki projektowi na GitHub!",
     "version": "Wersja"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const nl: TranslationKeys = {
@@ -9606,6 +10039,7 @@ export const nl: TranslationKeys = {
     "links": "Links",
     "images": "Foto's",
     "files": "Bestanden",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Klembord",
     "existingTasks": "Bestaande taken",
@@ -10120,7 +10554,30 @@ export const nl: TranslationKeys = {
     "starOnGithub": "Ster op GitHub",
     "githubPromo": "Als je Trace leuk vindt, overweeg dan om het project een ster te geven op GitHub!",
     "version": "Versie"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const sv: TranslationKeys = {
@@ -10130,6 +10587,7 @@ export const sv: TranslationKeys = {
     "links": "Länkar",
     "images": "Bilder",
     "files": "Filer",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Urklipp",
     "existingTasks": "Befintliga uppgifter",
@@ -10644,7 +11102,30 @@ export const sv: TranslationKeys = {
     "starOnGithub": "Stjärnmärk på GitHub",
     "githubPromo": "Om du gillar Trace, överväg att stjärnmärka projektet på GitHub!",
     "version": "Version"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const id: TranslationKeys = {
@@ -10654,6 +11135,7 @@ export const id: TranslationKeys = {
     "links": "Tautan",
     "images": "Gambar",
     "files": "Berkas",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Papan klip",
     "existingTasks": "Tugas yang ada",
@@ -11168,7 +11650,30 @@ export const id: TranslationKeys = {
     "starOnGithub": "Beri bintang di GitHub",
     "githubPromo": "Jika Anda menyukai Trace, harap pertimbangkan untuk memberi bintang pada proyek di GitHub!",
     "version": "Versi"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const uk: TranslationKeys = {
@@ -11178,6 +11683,7 @@ export const uk: TranslationKeys = {
     "links": "Лінки",
     "images": "Фото",
     "files": "Файли",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Буфер обміну",
     "existingTasks": "Наявні завдання",
@@ -11692,7 +12198,30 @@ export const uk: TranslationKeys = {
     "starOnGithub": "Поставити зірку на GitHub",
     "githubPromo": "Якщо вам подобається Trace, будь ласка, поставте зірку проєкту на GitHub!",
     "version": "Версія"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const el: TranslationKeys = {
@@ -11702,6 +12231,7 @@ export const el: TranslationKeys = {
     "links": "Σύνδ.",
     "images": "Φωτό",
     "files": "Αρχεία",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Πρόχειρο",
     "existingTasks": "Υπάρχουσες εργασίες",
@@ -12216,7 +12746,30 @@ export const el: TranslationKeys = {
     "starOnGithub": "Αστέρι στο GitHub",
     "githubPromo": "Αν σας αρέσει το Trace, εξετάστε την δυνατότητα να ασφαλίσετε το έργο στο GitHub!",
     "version": "Έκδοση"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const cs: TranslationKeys = {
@@ -12226,6 +12779,7 @@ export const cs: TranslationKeys = {
     "links": "Odkazy",
     "images": "Fotky",
     "files": "Soubory",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Schránka",
     "existingTasks": "Existující úkoly",
@@ -12740,7 +13294,30 @@ export const cs: TranslationKeys = {
     "starOnGithub": "Ohvězdičkovat na GitHub",
     "githubPromo": "Pokud se vám Trace líbí, zvažte prosím ohvězdičkování projektu na GitHub!",
     "version": "Verze"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const ro: TranslationKeys = {
@@ -12750,6 +13327,7 @@ export const ro: TranslationKeys = {
     "links": "Linkuri",
     "images": "Poze",
     "files": "Fișiere",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Clipboard",
     "existingTasks": "Sarcini existente",
@@ -13264,7 +13842,30 @@ export const ro: TranslationKeys = {
     "starOnGithub": "Marchează cu stea pe GitHub",
     "githubPromo": "Dacă îți place Trace, te rugăm să iei în considerare marcarea cu stea a proiectului pe GitHub!",
     "version": "Versiune"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const hu: TranslationKeys = {
@@ -13274,6 +13875,7 @@ export const hu: TranslationKeys = {
     "links": "Hivatkozások",
     "images": "Képek",
     "files": "Fájlok",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Vágólap",
     "existingTasks": "Meglévő feladatok",
@@ -13788,7 +14390,30 @@ export const hu: TranslationKeys = {
     "starOnGithub": "Csillagozás a GitHubon",
     "githubPromo": "Ha tetszik az Trace, fontolja meg a projekt csillagozását a GitHubon!",
     "version": "Verzió"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const da: TranslationKeys = {
@@ -13798,6 +14423,7 @@ export const da: TranslationKeys = {
     "links": "Links",
     "images": "Billeder",
     "files": "Filer",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Udklipsholder",
     "existingTasks": "Eksisterende opgaver",
@@ -14312,7 +14938,30 @@ export const da: TranslationKeys = {
     "starOnGithub": "Giv stjerne på GitHub",
     "githubPromo": "Hvis du kan lide Trace, så overvej at give projektet en stjerne på GitHub!",
     "version": "Version"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const fi: TranslationKeys = {
@@ -14322,6 +14971,7 @@ export const fi: TranslationKeys = {
     "links": "Linkit",
     "images": "Kuvat",
     "files": "Tiedostot",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Leikepöytä",
     "existingTasks": "Olemassa olevat tehtävät",
@@ -14836,7 +15486,30 @@ export const fi: TranslationKeys = {
     "starOnGithub": "Anna tähti GitHubissa",
     "githubPromo": "Jos pidät Traceista, harkitse projektin tähteyttä GitHubissa!",
     "version": "Versio"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const th: TranslationKeys = {
@@ -14846,6 +15519,7 @@ export const th: TranslationKeys = {
     "links": "ลิงก์",
     "images": "รูปภาพ",
     "files": "ไฟล์",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "คลิปบอร์ด",
     "existingTasks": "งานที่มีอยู่",
@@ -15360,7 +16034,30 @@ export const th: TranslationKeys = {
     "starOnGithub": "ติดดาวบน GitHub",
     "githubPromo": "หากคุณชอบ Trace โปรดพิจารณาติดดาวให้โปรเจกต์บน GitHub!",
     "version": "เวอร์ชัน"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const he: TranslationKeys = {
@@ -15370,6 +16067,7 @@ export const he: TranslationKeys = {
     "links": "קישורים",
     "images": "תמונות",
     "files": "קבצים",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "לוח",
     "existingTasks": "משימות קיימות",
@@ -15884,7 +16582,30 @@ export const he: TranslationKeys = {
     "starOnGithub": "כוכב ב-GitHub",
     "githubPromo": "אם אתה אוהב את Trace, אנא שקול לתת כוכב לפרויקט ב-GitHub!",
     "version": "גרסה"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const no: TranslationKeys = {
@@ -15894,6 +16615,7 @@ export const no: TranslationKeys = {
     "links": "Lenker",
     "images": "Bilder",
     "files": "Filer",
+    "notes": "Notes",
     "tasks": "Tasks",
     "clipboard": "Utklippstavle",
     "existingTasks": "Eksisterende oppgaver",
@@ -16408,7 +17130,30 @@ export const no: TranslationKeys = {
     "starOnGithub": "Gi stjerne på GitHub",
     "githubPromo": "Hvis du liker Trace, vennligst vurder å gi prosjektet en stjerne på GitHub!",
     "version": "Versjon"
-  }
+  },
+  "notes": {
+    new: 'New note',
+    note: 'note',
+    notes: 'notes',
+    untitled: 'Untitled',
+    empty: 'No notes yet. Tap New note to jot something down.',
+    noMatches: 'No notes match your search',
+    placeholder: 'Type something…',
+    back: 'Back to notes',
+    edit: 'Edit note',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    delete: 'Delete note',
+    fold: 'Collapse',
+    expand: 'Expand',
+    bold: 'Bold',
+    italic: 'Italic',
+    code: 'Inline code',
+    link: 'Link',
+    quote: 'Quote',
+    list: 'List',
+    todo: 'Todo',
+  },
 }
 
 export const TRANSLATIONS: Record<string, TranslationKeys> = {

@@ -253,6 +253,10 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
         // don't hit the 30s self-heal timeout.
         if (isAlt && !isDown) {
           state = 'idle'
+          // The real Alt-up is swallowed so no switch executes — but without
+          // a synthetic up the OS keeps Alt held, and every later letter is
+          // treated as an Alt-combo that never reaches the panel input.
+          defer(() => sendSyntheticAltUp())
           return 1n
         }
         if (isDown) defer(() => activeEvents?.onTouch())

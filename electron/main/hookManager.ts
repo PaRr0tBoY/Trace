@@ -23,14 +23,15 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
       stdio: 'inherit'
     })
     child.on('message', (msg: unknown) => {
-      const m = msg as { type?: string; shiftDown?: boolean; delta?: 1 | -1 } | null
+      const m = msg as { type?: string; shiftDown?: boolean; delta?: 1 | -1; initialQuery?: string } | null
       if (!m) return
       if (m.type === 'show') events.onShow({ shiftDown: m.shiftDown ?? false })
       else if (m.type === 'advance') events.onAdvance(m.delta === -1 ? -1 : 1)
       else if (m.type === 'execute') events.onExecute()
       else if (m.type === 'tap') events.onTapExecute({ shiftDown: m.shiftDown ?? false })
-      else if (m.type === 'pin') events.onPin()
+      else if (m.type === 'pin') events.onPin(m.initialQuery)
       else if (m.type === 'touch') events.onTouch()
+      else if (m.type === 'pin-released') events.onPinReleased()
     })
     child.on('exit', () => {
       child = null

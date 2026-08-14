@@ -54,17 +54,14 @@ export function SwitcherView() {
   // async and Chromium silently drops element.focus() in an inactive
   // document (no focusin fires, so the t21 focusin->activate chain never
   // starts). autoFocus lands too early, so keep re-arming the bridge and
-  // retrying until the field actually owns focus.
+  // retrying until the field actually owns focus — no try cap: activation
+  // now happens on Alt-up (after pin), which can be later than any fixed
+  // retry window.
   useEffect(() => {
     if (!pinned) return
     edge.requestInputFocus()
-    let tries = 0
     const t = setInterval(() => {
       if (document.activeElement === searchRef.current) {
-        clearInterval(t)
-        return
-      }
-      if (++tries > 10) {
         clearInterval(t)
         return
       }
@@ -73,6 +70,14 @@ export function SwitcherView() {
     }, 40)
     return () => clearInterval(t)
   }, [pinned])
+
+  // Type-to-search: the first character arrives with the pin message
+  // (main swallowed the key — the panel wasn't focused yet) and seeds the
+  // query here.
+  const seedQuery = useStore((s) => s.switcherSeedQuery)
+  useEffect(() => {
+    if (pinned && seedQuery) setQuery(seedQuery)
+  }, [pinned, seedQuery])
 
   // Resolve app icons in one batch (existing app:icons pipeline, cached main-side).
   // Grouped rows carry their sub-windows — those exePaths need icons too.
@@ -148,7 +153,13 @@ export function SwitcherView() {
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      if (displayIndex !== null) executeRow(displayIndex)
+      if (displayIndex === null) return
+      const entry = visibleRows[displayIndex]
+      if (!entry) return
+      // Enter mirrors a mouse click: grouped rows drill into their window
+      // list (the user picks one specific window), single rows switch.
+      if (entry.groupCount) setDrill(entry)
+      else executeRow(displayIndex)
     } else if (e.key === 'Escape') {
       e.preventDefault()
       edge.switcherCancel()
@@ -187,7 +198,13 @@ export function SwitcherView() {
             />
           )}
           {drill && (
-            <button className="switcher-back" onClick={() => setDrill(null)}>
+            <button
+              className="switcher-back"
+              onClick={() => {
+                setDrill(null)
+                setHoverIndex(null)
+              }}
+            >
               ← Back
             </button>
           )}
@@ -198,7 +215,7 @@ export function SwitcherView() {
           drill.windows?.map((win: SwitcherEntryDto, i: number) => (
             <motion.button
               key={win.index}
-              className="switcher-row switcher-subrow"
+              className={`switcher-row switcher-subrow${win.index === selected ? ' selected' : ''}`}
               initial={ROW_MOTION.initial}
               animate={ROW_MOTION.animate}
               transition={{ ...ROW_MOTION.transition, delay: i * 0.02 }}

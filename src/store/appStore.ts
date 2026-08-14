@@ -117,11 +117,13 @@ interface AppState {
   switcherSelected: number
   /** Search mode (Enter while armed, TabTab pattern): panel stays up on Alt-up. */
   switcherPinned: boolean
+  /** First character that started search mode by typing (type-to-search), consumed by SwitcherView. */
+  switcherSeedQuery: string
   /** Panel open state before the switcher took over — restored on hide. */
   switcherPrevOpen: boolean
   showSwitcher: (data: { entries: import('../../shared/types').SwitcherEntryDto[]; selectedIndex: number }) => void
   setSwitcherSelected: (index: number) => void
-  setSwitcherPinned: (pinned: boolean) => void
+  setSwitcherPinned: (pinned: boolean, seedQuery?: string) => void
   hideSwitcher: () => void
   setSettingsOpen: (open: boolean) => void
   setDragActive: (active: boolean) => void
@@ -208,15 +210,16 @@ export const useStore = create<AppState>((set, get) => ({
   switcherEntries: [],
   switcherSelected: 0,
   switcherPinned: false,
+  switcherSeedQuery: '',
   switcherPrevOpen: false,
   showSwitcher: ({ entries, selectedIndex }) => {
-    set({ switcherActive: true, switcherEntries: entries, switcherSelected: selectedIndex, switcherPinned: false, switcherPrevOpen: get().open, open: true })
+    set({ switcherActive: true, switcherEntries: entries, switcherSelected: selectedIndex, switcherPinned: false, switcherSeedQuery: '', switcherPrevOpen: get().open, open: true })
   },
   setSwitcherSelected: (index) => set({ switcherSelected: index }),
-  setSwitcherPinned: (pinned) => set({ switcherPinned: pinned }),
+  setSwitcherPinned: (pinned, seedQuery) => set({ switcherPinned: pinned, switcherSeedQuery: seedQuery ?? '' }),
   hideSwitcher: () => {
     const prevOpen = get().switcherPrevOpen
-    const finish = () => set({ switcherActive: false, switcherEntries: [], switcherPinned: false })
+    const finish = () => set({ switcherActive: false, switcherEntries: [], switcherPinned: false, switcherSeedQuery: '' })
     if (prevOpen) {
       // Panel was already open before the session: no collapse animation,
       // switch straight back to the previous page.

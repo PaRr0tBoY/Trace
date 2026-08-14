@@ -201,7 +201,7 @@ const api = {
   onToast: (cb: (toast: { id: string; message: string; tone: 'info' | 'error' }) => void) => on('ui:toast', cb),
   onSwitcherShow: (cb: (data: EventArgs<'switcher:show'>[0]) => void) => on('switcher:show', cb),
   onSwitcherSelect: (cb: (index: number) => void) => on('switcher:select', cb),
-  onSwitcherPin: (cb: () => void) => on('switcher:pin', cb),
+  onSwitcherPin: (cb: (initialQuery?: string) => void) => on('switcher:pin', cb),
   onSwitcherHide: (cb: () => void) => on('switcher:hide', cb),
 
   /* Drag helpers */

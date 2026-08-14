@@ -228,10 +228,10 @@ export function switcherHover(index: number): void {
 }
 
 /** Enter while armed (keyboardHook onPin): pin the session open for search. */
-export function switcherPin(): void {
+export function switcherPin(initialQuery?: string): void {
   if (!active) return
   setHookPinned(true)
-  broadcast('switcher:pin')
+  broadcast('switcher:pin', initialQuery)
   // The panel has been a non-activated NOACTIVATE window all session; the OS
   // only routes keystrokes to the foreground window and Chromium drops
   // element.focus() in an inactive document, so the search input would never
@@ -242,15 +242,33 @@ export function switcherPin(): void {
   // path the switcher's own execute uses, so it forces the panel active and
   // the renderer's focus retry then lands.
   requestPanelFocus()
-  const win = getMainWindow()
-  if (win && !win.isDestroyed()) {
-    try {
-      activateHwnd(koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void')))
-    } catch {
-      // fail silent — requestPanelFocus already tried the plain path
-    }
-  }
+  activatePanel()
   touchSession()
+}
+
+/** Force the panel window into the foreground (AttachThreadInput path). */
+function activatePanel(): void {
+  const win = getMainWindow()
+  if (!win || win.isDestroyed()) return
+  try {
+    activateHwnd(koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void')))
+  } catch {
+    // fail silent — requestPanelFocus already tried the plain path
+  }
+}
+
+/**
+ * Real Alt-up after pinning (keyboardHook onPinReleased). Pin happens while
+ * Alt is still physically held, and Windows refuses foreground changes while
+ * Alt is down — SetForegroundWindow/SwitchToThisWindow both fail silently,
+ * which is why the panel stayed unactivated and click-outside/Esc never
+ * worked unless the user clicked the field first (a click grants the
+ * process input rights). With Alt released, the same activation succeeds,
+ * and the renderer's focus polling (which never gave up) then lands.
+ */
+export function switcherPinReleased(): void {
+  if (!active) return
+  activatePanel()
 }
 
 /** Any keydown while pinned: keep the safety timeout alive during typing. */
@@ -261,11 +279,7 @@ export function switcherTouch(): void {
   // foreground back so the very next key reaches the search field.
   const win = getMainWindow()
   if (!win || win.isDestroyed() || win.isFocused()) return
-  try {
-    activateHwnd(koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void')))
-  } catch {
-    // fail silent — best effort
-  }
+  activatePanel()
 }
 
 /** Esc in search mode (renderer): drop the session — TabTab's cancel. */

@@ -148,6 +148,6 @@ export interface EdgeApi {
   switcherCancel: () => void
   onSwitcherShow: (cb: (data: { entries: SwitcherEntryDto[]; selectedIndex: number }) => void) => () => void
   onSwitcherSelect: (cb: (index: number) => void) => () => void
-  onSwitcherPin: (cb: () => void) => () => void
+  onSwitcherPin: (cb: (initialQuery?: string) => void) => () => void
   onSwitcherHide: (cb: () => void) => () => void
 }

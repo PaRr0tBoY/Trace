@@ -23,8 +23,9 @@ startKeyboardHook({
   onAdvance: (delta) => process.parentPort?.postMessage({ type: 'advance', delta }),
   onExecute: () => process.parentPort?.postMessage({ type: 'execute' }),
   onTapExecute: ({ shiftDown }) => process.parentPort?.postMessage({ type: 'tap', shiftDown }),
-  onPin: () => process.parentPort?.postMessage({ type: 'pin' }),
-  onTouch: () => process.parentPort?.postMessage({ type: 'touch' })
+  onPin: (initialQuery) => process.parentPort?.postMessage({ type: 'pin', initialQuery }),
+  onTouch: () => process.parentPort?.postMessage({ type: 'touch' }),
+  onPinReleased: () => process.parentPort?.postMessage({ type: 'pin-released' })
 })
 
 process.parentPort?.on('message', (e: { data?: { type?: string; pinned?: boolean } }) => {

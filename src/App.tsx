@@ -88,8 +88,8 @@ export default function App() {
     const offSwitcherSelect = edge.onSwitcherSelect((index) => {
       useStore.getState().setSwitcherSelected(index)
     })
-    const offSwitcherPin = edge.onSwitcherPin(() => {
-      useStore.getState().setSwitcherPinned(true)
+    const offSwitcherPin = edge.onSwitcherPin((initialQuery) => {
+      useStore.getState().setSwitcherPinned(true, initialQuery)
     })
     const offSwitcherHide = edge.onSwitcherHide(() => {
       useStore.getState().hideSwitcher()

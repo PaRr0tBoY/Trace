@@ -125,9 +125,16 @@ export interface KeyboardHookEvents {
   /** Quick Alt+Tab tap (Tab released inside the threshold): switch directly, no UI. */
   onTapExecute: (opts: { shiftDown: boolean }) => void
   /** Enter while the switcher is armed: pin it open and enter search mode (TabTab-style). */
-  onPin: () => void
+  onPin: (initialQuery?: string) => void
   /** Any keydown while pinned — keeps the session's safety timeout alive during typing. */
   onTouch: () => void
+  /**
+   * Real Alt-up while pinned: the OS Alt state is already released by the
+   * synthetic up, and the foreground lock is gone — the panel can finally
+   * be activated (pin itself happens while Alt is still held, when
+   * SetForegroundWindow is refused).
+   */
+  onPinReleased: () => void
 }
 
 type HookState = 'idle' | 'altDown' | 'pending' | 'tap' | 'armed' | 'pinned'
@@ -237,6 +244,16 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
           defer(() => activeEvents?.onPin())
           return 1n
         }
+        if (isDown && isPrintableVk(vk)) {
+          // Type-to-search: any printable key while armed pins the session
+          // and seeds the search field with that first character. The key
+          // is swallowed — the panel isn't focused yet, so passing it
+          // through would deliver it to the window in front; the character
+          // rides along in the pin message instead.
+          state = 'pinned'
+          defer(() => activeEvents?.onPin(vkToChar(vk, isShiftDown()) ?? undefined))
+          return 1n
+        }
         if (isAlt && !isDown) {
           state = 'idle'
           defer(() => {
@@ -261,8 +278,13 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
           state = 'idle'
           // The real Alt-up is swallowed so no switch executes — but without
           // a synthetic up the OS keeps Alt held, and every later letter is
-          // treated as an Alt-combo that never reaches the panel input.
-          defer(() => sendSyntheticAltUp())
+          // treated as an Alt-combo that never reaches the panel input. The
+          // foreground lock is gone once Alt is up — that's when the panel
+          // can finally be activated (see onPinReleased).
+          defer(() => {
+            sendSyntheticAltUp()
+            activeEvents?.onPinReleased()
+          })
           return 1n
         }
         if (isDown) defer(() => activeEvents?.onTouch())
@@ -296,6 +318,29 @@ function clearTapTimer(): void {
 /** Alt is still held when the deferred handler runs — Shift state is stable. */
 function isShiftDown(): boolean {
   return getAsyncKeyState ? (getAsyncKeyState(VK_SHIFT) & 0x8000) !== 0 : false
+}
+
+// US-layout virtual-key → character mapping for the "type to search while
+// Alt+Tab is still held" entry (TabTab pattern). Letters and digits cover
+// every real-world case; symbol rows are a best-effort bonus.
+const SHIFTED_DIGITS: Record<number, string> = { 0x30: '!', 0x31: '@', 0x32: '#', 0x33: '$', 0x34: '%', 0x35: '^', 0x36: '&', 0x37: '*', 0x38: '(', 0x39: ')' }
+const SHIFTED_SYMBOLS: Record<number, string> = { 0xBA: ':', 0xBB: '+', 0xBC: '<', 0xBD: '_', 0xBE: '>', 0xBF: '?', 0xC0: '~', 0xDB: '{', 0xDC: '|', 0xDD: '}', 0xDE: '"' }
+const PLAIN_SYMBOLS: Record<number, string> = { 0xBA: ';', 0xBB: '=', 0xBC: ',', 0xBD: '-', 0xBE: '.', 0xBF: '/', 0xC0: '`', 0xDB: '[', 0xDC: '\\', 0xDD: ']', 0xDE: "'" }
+
+/** True for keys that should start search when pressed while armed. */
+function isPrintableVk(vk: number): boolean {
+  if (vk === 0x20) return true // space
+  if (vk >= 0x30 && vk <= 0x39) return true // digits
+  if (vk >= 0x41 && vk <= 0x5A) return true // letters
+  return vk in PLAIN_SYMBOLS
+}
+
+/** vkCode → display character (US layout), or null. */
+function vkToChar(vk: number, shift: boolean): string | null {
+  if (vk === 0x20) return ' '
+  if (vk >= 0x30 && vk <= 0x39) return shift ? SHIFTED_DIGITS[vk] : String.fromCharCode(vk)
+  if (vk >= 0x41 && vk <= 0x5A) return shift ? String.fromCharCode(vk) : String.fromCharCode(vk + 32)
+  return shift ? (SHIFTED_SYMBOLS[vk] ?? null) : (PLAIN_SYMBOLS[vk] ?? null)
 }
 
 const pumpMsg = { hwnd: null, message: 0, wParam: 0n, lParam: 0n, time: 0, pt_x: 0, pt_y: 0 }

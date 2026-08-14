@@ -20,6 +20,7 @@ import type {
 } from '../../shared/ipc'
 import type { EdgeApi } from '../../shared/bridge'
 import type { DragRequest } from '../../shared/types'
+import type { StationContentInput } from '../../shared/station'
 
 /** Typed invoke wrapper derived from the shared contracts. */
 function invoke<C extends InvokeChannel>(
@@ -77,34 +78,91 @@ win.addEventListener('drop', (e: any) => {
   }
 
   const files = e.dataTransfer?.files
-  if (!files || !files.length) return
+  if (files && files.length > 0) {
+    const paths: string[] = []
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const p = webUtils.getPathForFile(files[i])
+        if (p) paths.push(p)
+      } catch {
+        /* ignore unreadable entries */
+      }
+    }
 
-  const paths: string[] = []
-  for (let i = 0; i < files.length; i++) {
-    try {
-      const p = webUtils.getPathForFile(files[i])
-      if (p) paths.push(p)
-    } catch {
-      /* ignore unreadable entries */
+    if (paths.length > 0) {
+      e.preventDefault()
+      // Renderer's Panel claims the drop synchronously (shared-DOM attribute,
+      // visible across worlds) by resolving the target from these coordinates.
+      // Windows without a Panel listener (e.g. onboarding) must not swallow
+      // the drop: fall back to the plain save-to-shelf path.
+      const docEl = win.document?.documentElement
+      if (docEl) docEl.removeAttribute('data-trace-drop-claimed')
+      win.dispatchEvent(new CustomEvent('trace-os-drop', {
+        detail: { paths, x: e.clientX, y: e.clientY }
+      }))
+      if (docEl && !docEl.hasAttribute('data-trace-drop-claimed')) {
+        invoke('item:add-files', paths).catch(console.error)
+      }
+      return
     }
   }
 
-  if (paths.length > 0) {
-    e.preventDefault()
-    // Renderer's Panel claims the drop synchronously (shared-DOM attribute,
-    // visible across worlds) by resolving the target from these coordinates.
-    // Windows without a Panel listener (e.g. onboarding) must not swallow
-    // the drop: fall back to the plain save-to-shelf path.
-    const docEl = win.document?.documentElement
-    if (docEl) docEl.removeAttribute('data-trace-drop-claimed')
-    win.dispatchEvent(new CustomEvent('trace-os-drop', {
-      detail: { paths, x: e.clientX, y: e.clientY }
-    }))
-    if (docEl && !docEl.hasAttribute('data-trace-drop-claimed')) {
-      invoke('item:add-files', paths).catch(console.error)
-    }
-  }
+  // Non-file content drops (T7): image data (a File without a disk path, e.g.
+  // an image dragged out of a web page) and plain text (selected text). These
+  // are staged as real files in main and enter the station like any other
+  // path. The drop must be claimed either way, or the browser would navigate
+  // to text/uri-list content on an unclaimed drop.
+  void handleContentDrop(e)
 }, true)
+
+/**
+ * Read non-file drag content (image items + plain text) and hand it to main
+ * as `station:enter-content`. When the drop carries File objects at all, only
+ * image items are considered — text/plain of a virtual file is not reliable
+ * content, and the window must never navigate on a drop it did not claim.
+ */
+async function handleContentDrop(e: any): Promise<void> {
+  const dt = e.dataTransfer
+  if (!dt) return
+  // Any drop that reaches this point must be claimed: an unclaimed drop with
+  // text/uri-list content (e.g. a dragged link) navigates the window away.
+  e.preventDefault()
+
+  let text = ''
+  try {
+    // A drop that carries File objects at all is treated as files-only:
+    // text/plain of a virtual file is not reliable content.
+    const hasFiles = dt.files && dt.files.length > 0
+    if (!hasFiles) text = dt.getData('text/plain')
+  } catch {
+    /* dataTransfer access can throw for cross-app drags */
+  }
+
+  const imageItems: File[] = []
+  for (let i = 0; i < (dt.items?.length ?? 0); i++) {
+    const item = dt.items[i]
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      const f = item.getAsFile()
+      if (f) imageItems.push(f)
+    }
+  }
+
+  if (!text && imageItems.length === 0) return
+
+  const input: StationContentInput = {}
+  if (text) input.text = text
+  for (const f of imageItems) {
+    try {
+      const buf = await f.arrayBuffer()
+      input.images = input.images ?? []
+      input.images.push({ data: new Uint8Array(buf), mime: f.type || 'application/octet-stream' })
+    } catch {
+      /* unreadable content item — skip */
+    }
+  }
+  if (!input.text && !input.images) return
+  invoke('station:enter-content', input).catch((err) => console.error('[Preload] station:enter-content failed', err))
+}
 
 const api = {
   /* Renderer -> Main */
@@ -126,6 +184,7 @@ const api = {
   /* Transfer station (ADR-0006) */
   stationList: () => invoke('station:list'),
   stationEnter: (paths: string[]) => invoke('station:enter', paths),
+  stationEnterContent: (input: StationContentInput) => invoke('station:enter-content', input),
   stationPin: (id: string, pinned: boolean) => invoke('station:pin', id, pinned),
   stationDelete: (id: string) => invoke('station:delete', id),
   stationSplit: (req: import('../../shared/types').DragRequest) => invoke('station:split', req),

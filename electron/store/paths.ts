@@ -22,6 +22,9 @@ export const PATHS = {
   tasksFile: () => join(root(), 'tasks.json'),
   /** Path to the transfer station index JSON (ADR-0006). */
   stationFile: () => join(root(), 'station.json'),
+  /** Directory for content staged from non-file drag-in (T7): text/image
+   *  drops become real files here before entering the station. */
+  stationContentDir: () => join(root(), 'station-content'),
   /** Path to the long-term memory index JSON. */
   memoriesFile: () => join(root(), 'memories.json'),
   /**
@@ -49,7 +52,7 @@ export const PATHS = {
 
 /** Idempotently create every directory the app needs. Safe to call repeatedly. */
 export function ensureDirs(): void {
-  for (const dir of [PATHS.imagesDir(), PATHS.tempDir(), PATHS.modelsDir()]) {
+  for (const dir of [PATHS.imagesDir(), PATHS.tempDir(), PATHS.modelsDir(), PATHS.stationContentDir()]) {
     mkdirSync(dir, { recursive: true })
   }
 }

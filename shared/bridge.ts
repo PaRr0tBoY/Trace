@@ -35,6 +35,8 @@ export interface EdgeApi {
   stationList: () => Promise<import('./station').StationEntryDto[]>
   /** Enter dragged-in file paths (route = 拖入). */
   stationEnter: (paths: string[]) => Promise<import('./station').StationEntryDto[]>
+  /** Stage non-file drag-in content as files and enter the station (T7). */
+  stationEnterContent: (input: import('./station').StationContentInput) => Promise<import('./station').StationEntryDto[]>
   /** Set an entry's pinned state. */
   stationPin: (id: string, pinned: boolean) => Promise<import('./station').StationEntryDto[]>
   /** Remove an entry. */

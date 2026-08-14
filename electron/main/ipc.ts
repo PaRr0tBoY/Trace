@@ -19,6 +19,7 @@ import { getMainWindow } from './window'
 import { setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData, prefetchFileIcons } from './drag'
+import { enterContentToStation } from './contentToFile'
 import { activateAppWindow } from './windowSwitch'
 import { switcherHover, switcherClick } from './switcher'
 import { clipboardSignature } from '../clipboard/formats'
@@ -213,6 +214,8 @@ export function registerIpc(): void {
     }
     return getStationStore().toDto()
   })
+
+  handle('station:enter-content', (input) => enterContentToStation(input))
 
   handle('station:pin', (id, pinned) => {
     getStationStore().pin(id, pinned)

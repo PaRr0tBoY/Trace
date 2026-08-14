@@ -40,3 +40,16 @@ export type StationMergeResult =
 export type StationSplitResult =
   | { ok: true }
   | { ok: false; reason: 'notfound' | 'in-transit' | 'no-paths' }
+
+/** Non-file drag-in content (T7): selected text and/or image data without a
+ *  disk path. Images carry raw bytes (Uint8Array survives the bridge as a
+ *  copy); main stages both as real files, then enters them via station:enter. */
+export interface StationContentInput {
+  text?: string
+  images?: {
+    /** Raw image bytes as read from the DataTransfer file item. */
+    data: Uint8Array
+    /** Image MIME (e.g. image/png); drives the staged file extension. */
+    mime: string
+  }[]
+}

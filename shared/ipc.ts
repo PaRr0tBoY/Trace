@@ -10,7 +10,7 @@
  *   - `Main -> Renderer` events (send/on) are listed in `EventMap`.
  */
 import type { AppRef, ClipboardItemDto, DragRequest, IgnoreReason, LocalModelSource, LocalModelStatus, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, MergeResult, ProviderConfig, Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
-import type { StationEntryDto, StationMergeResult, StationSplitResult } from './station'
+import type { StationContentInput, StationEntryDto, StationMergeResult, StationSplitResult } from './station'
 
 /** Result of a connection test against one provider (ai:test-provider). */
 export interface ProviderTestResult {
@@ -108,6 +108,10 @@ export interface InvokeMap {
 
   /** Enter dragged-in file paths into the station (route = 拖入). */
   'station:enter': { args: [paths: string[]]; result: StationEntryDto[] }
+
+  /** Stage non-file drag-in content (text/image) as files and enter the
+   *  station (T7). */
+  'station:enter-content': { args: [input: StationContentInput]; result: StationEntryDto[] }
 
   /** Set an entry's pinned state. */
   'station:pin': { args: [id: string, pinned: boolean]; result: StationEntryDto[] }

@@ -25,7 +25,7 @@ import type { SuggestTitleContext } from '../../../shared/ipc'
 import type { AppRef, ResourceSnapshot, TaskProposal, TaskDto } from '../../../shared/types'
 import { appKeyFromIdentity } from '../../../shared/appKey'
 import { AppIcon } from './AppIcon'
-import { CheckIcon, FileIcon, ImageIcon, LinkIcon } from '../icons'
+import { CheckIcon, ChevronLeftIcon, EditIcon, FileIcon, ImageIcon, LinkIcon } from '../icons'
 import { relativeTime } from '../../lib/format'
 import {
   buildClipboardRows,
@@ -98,10 +98,18 @@ export function TaskEditor({ task, suggestion, onSave, onCancel }: Props) {
   })
   const [saving, setSaving] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
+  /**
+   * Convert mode shows the suggested title as text with an edit icon (same
+   * pattern as TaskDetail); editing opens the input. Create/edit keep the
+   * always-editable input, so the form starts in edit state there.
+   */
+  const [titleEditing, setTitleEditing] = useState(
+    !suggestion || (task?.title ?? suggestion.title ?? '').trim().length === 0
+  )
 
   useEffect(() => {
-    titleRef.current?.focus()
-  }, [])
+    if (titleEditing) titleRef.current?.focus()
+  }, [titleEditing])
 
   // App options are computed main-side (event bus ∪ clipboard sourceApps);
   // load once on mount. Icon/app failures degrade to the empty grid state.
@@ -257,18 +265,47 @@ export function TaskEditor({ task, suggestion, onSave, onCancel }: Props) {
 
   return (
     <div className="task-editor">
-      <input
-        ref={titleRef}
-        className="task-editor-input"
-        placeholder={t('tasks.titlePlaceholder')}
-        value={title}
-        maxLength={120}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') void handleSave()
-          if (e.key === 'Escape') onCancel()
-        }}
-      />
+      {suggestion && (
+        <div className="task-detail-header">
+          <button type="button" className="task-btn ghost" onClick={onCancel}>
+            <ChevronLeftIcon width={14} height={14} />
+            {t('tasks.back')}
+          </button>
+        </div>
+      )}
+      {suggestion && !titleEditing ? (
+        <div className="task-detail-title-row">
+          <div className="task-detail-title" title={title}>
+            {title}
+          </div>
+          <button
+            type="button"
+            className="task-btn ghost task-detail-title-edit"
+            onClick={() => setTitleEditing(true)}
+            title={t('tasks.edit')}
+          >
+            <EditIcon width={14} height={14} />
+          </button>
+        </div>
+      ) : (
+        <input
+          ref={titleRef}
+          className="task-editor-input"
+          placeholder={t('tasks.titlePlaceholder')}
+          value={title}
+          maxLength={120}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void handleSave()
+            if (e.key === 'Escape') onCancel()
+          }}
+          onBlur={() => {
+            // Back to the read view once a title exists; an emptied title
+            // stays editable so the form never shows a blank title text.
+            if (suggestion && title.trim().length > 0) setTitleEditing(false)
+          }}
+        />
+      )}
 
       <section className="task-editor-section">
         <div className="task-editor-section-title">{t('tasks.processesTitle')}</div>
@@ -356,7 +393,7 @@ export function TaskEditor({ task, suggestion, onSave, onCancel }: Props) {
         className="task-editor-textarea"
         placeholder={t('tasks.notePlaceholder')}
         value={note}
-        rows={4}
+        rows={5}
         onChange={(e) => setNote(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Escape') onCancel()
@@ -391,9 +428,11 @@ export function TaskEditor({ task, suggestion, onSave, onCancel }: Props) {
       )}
 
       <div className="task-editor-actions">
-        <button type="button" className="task-btn" onClick={onCancel} disabled={saving}>
-          {t('tasks.cancel')}
-        </button>
+        {!suggestion && (
+          <button type="button" className="task-btn" onClick={onCancel} disabled={saving}>
+            {t('tasks.cancel')}
+          </button>
+        )}
         <button
           type="button"
           className="task-btn primary"

@@ -1262,6 +1262,11 @@
 .task-editor::-webkit-scrollbar {
   display: none;
 }
+/* The form is a scrollable column: no child may shrink below its natural
+   size (flex default would crush the note box against a tall form). */
+.task-editor > * {
+  flex-shrink: 0;
+}
 .task-editor-input,
 .task-editor-textarea {
   width: 100%;

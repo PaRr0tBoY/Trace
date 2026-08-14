@@ -564,7 +564,7 @@ export function Header() {
                   style={secondaryChipStyle(tasksFilter === 'existing')}
                 >
                   <span>{t('filters.existingTasks')}</span>
-                  {tasksFilter === 'existing' && badge > 0 && redBadge(badge)}
+                  {badge > 0 && redBadge(badge)}
                 </button>
                 <button
                   type="button"
@@ -577,7 +577,7 @@ export function Header() {
                   style={secondaryChipStyle(tasksFilter === 'candidates')}
                 >
                   <span>{t('filters.candidateTasks')}</span>
-                  {tasksFilter === 'candidates' && suggestions.length > 0 && amberDot(t('tasks.suggestionBadge', { count: suggestions.length }))}
+                  {suggestions.length > 0 && amberDot(t('tasks.suggestionBadge', { count: suggestions.length }))}
                 </button>
               </SecondaryRow>
             )}

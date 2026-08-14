@@ -1139,7 +1139,8 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                 </motion.div>
               )}
 
-              {/* ── Tab 4: Tasks (fork additions: AI providers & memory) ── */}
+              {/* ── Tab 4: Tasks — AI 引擎配置在前（云端链 + 本地模型），
+                  记忆审查在后（长期记忆 + 记忆图）。 ── */}
               {activeTab === 'tasks' && (
                 <motion.div
                   key="tab-tasks"
@@ -1148,10 +1149,11 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                   exit={{ opacity: 0, scale: 0.98, y: -4 }}
                   transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                 >
-                  {/* ── GROUP: Tasks ──────────────────────────────────────── */}
-                  <div className="setting-group-label">{t('tabs.tasks')}</div>
-
                   <AIProviderSection />
+
+                  <div className="setting-divider" />
+
+                  <LocalModelSection />
 
                   <div className="setting-divider" />
 
@@ -1160,10 +1162,6 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                   <div className="setting-divider" />
 
                   <MemoryGraphPanel />
-
-                  <div className="setting-divider" />
-
-                  <LocalModelSection />
 
                   {PersistentFooter}
                 </motion.div>
@@ -1731,7 +1729,7 @@ function MemorySection() {
   }
 
   const rowActions = (m: Memory, actions: Array<{ action: MemoryAction; label: string; danger?: boolean }>) => (
-    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+    <div className="row-actions">
       {actions.map((a) => (
         <button
           key={a.action}
@@ -1757,12 +1755,10 @@ function MemorySection() {
   )
 
   const memoryRow = (m: Memory, actions: Array<{ action: MemoryAction; label: string; danger?: boolean }>) => (
-    <div key={m.id} className="setting-row vertical" style={{ gap: 2, padding: '6px 0' }}>
-      <div style={{ fontSize: 12.5, lineHeight: 1.35, wordBreak: 'break-word' }}>{m.content}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>{metaLine(m)}</div>
-        {rowActions(m, actions)}
-      </div>
+    <div key={m.id} className="setting-row vertical" style={{ gap: 4, padding: '8px 0' }}>
+      <div style={{ fontSize: 12.5, lineHeight: 1.35, wordBreak: 'break-word', width: '100%' }}>{m.content}</div>
+      {metaLine(m)}
+      {rowActions(m, actions)}
     </div>
   )
 
@@ -2145,8 +2141,6 @@ function PrivacySection() {
 
   return (
     <>
-      <div className="setting-group-label">{t('tabs.privacy')}</div>
-
       {/* ── GROUP: Capture ────────────────────────────────────────────── */}
       <div className="setting-group-label">{t('privacy.captureGroup')}</div>
 
@@ -2214,7 +2208,7 @@ function PrivacySection() {
           {blockable.length === 0 ? (
             <div className="setting-desc" style={{ fontSize: 10.5, opacity: 0.6 }}>{t('privacy.blockedAppsEmpty')}</div>
           ) : (
-            <div className="task-editor-apps">
+            <div className="task-editor-apps setting-apps-grid">
               {blockable.map((app) => {
                 const key = normalizeAppKey(app.exePath as string)
                 const selected = denied.has(key)

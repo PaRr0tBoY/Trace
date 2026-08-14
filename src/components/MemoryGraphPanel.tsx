@@ -126,7 +126,7 @@ export function MemoryGraphPanel() {
   }
 
   const factRow = (fact: MemoryFactDto, showType: boolean) => (
-    <div key={fact.id} className="setting-row vertical" style={{ gap: 2, padding: '6px 0' }}>
+    <div key={fact.id} className="setting-row vertical" style={{ gap: 4, padding: '8px 0' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, width: '100%' }}>
         {fact.source === 'user' && (
           <span className="pill display-pill" style={{ padding: '1px 6px', fontSize: 9, flexShrink: 0, color: '#7fd0a0' }}>
@@ -135,58 +135,54 @@ export function MemoryGraphPanel() {
         )}
         <div style={{ fontSize: 12.5, lineHeight: 1.35, wordBreak: 'break-word', flex: 1, minWidth: 0 }}>{fact.content}</div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-        <div className="setting-desc" style={{ flex: 1, minWidth: 0, fontSize: 10, opacity: 0.75 }}>
-          {metaLine(fact, showType)}
-        </div>
-        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-          {actionsFor(fact.userState).map((a) => (
-            <button
-              key={a.action}
-              className="pill display-pill"
-              style={{ padding: '3px 8px', fontSize: 10.5, cursor: 'pointer', ...(a.danger ? { color: '#ff8a8a' } : {}) }}
-              onClick={() => act(fact.id, a.action)}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
+      <div className="setting-desc" style={{ fontSize: 10, opacity: 0.75 }}>{metaLine(fact, showType)}</div>
+      <div className="row-actions">
+        {actionsFor(fact.userState).map((a) => (
+          <button
+            key={a.action}
+            className="pill display-pill"
+            style={{ padding: '3px 8px', fontSize: 10.5, cursor: 'pointer', ...(a.danger ? { color: '#ff8a8a' } : {}) }}
+            onClick={() => act(fact.id, a.action)}
+          >
+            {a.label}
+          </button>
+        ))}
       </div>
     </div>
   )
 
-  const conflictCard = (conflict: MemoryFactConflictDto, side: 'active' | 'invalidated') => {
+  /** 冲突裁决卡：同一容器内上下两栏（有效 / 失效），底部一行三选裁决。 */
+  const conflictSide = (conflict: MemoryFactConflictDto, side: 'active' | 'invalidated') => {
     const fact = side === 'active' ? conflict.active : conflict.invalidated
-    const isActive = side === 'active'
     return (
-      <div
-        className="setting-row vertical"
-        style={{
-          gap: 2,
-          padding: '8px',
-          borderRadius: 8,
-          flex: 1,
-          minWidth: 0,
-          border: `1px solid ${isActive ? 'rgba(127,208,160,0.35)' : 'rgba(255,138,138,0.35)'}`
-        }}
-      >
-        <div style={{ fontSize: 10, opacity: 0.7, marginBottom: 2 }}>
-          {isActive ? t('memoryGraph.activeSide') : t('memoryGraph.invalidatedSide')}
-        </div>
-        <div style={{ fontSize: 12.5, lineHeight: 1.35, wordBreak: 'break-word' }}>{fact.content}</div>
-        <div className="setting-desc" style={{ fontSize: 10, opacity: 0.75 }}>
-          {metaLine(fact, false)}
-        </div>
-        <button
-          className="pill display-pill"
-          style={{ padding: '3px 8px', fontSize: 10.5, cursor: 'pointer', marginTop: 4, alignSelf: 'flex-start' }}
-          onClick={() => resolve(conflict, isActive ? 'keep-active' : 'keep-invalidated')}
-        >
-          {isActive ? t('memoryGraph.keepActive') : t('memoryGraph.keepInvalidated')}
-        </button>
+      <div className={`conflict-side${side === 'active' ? ' active' : ''}`}>
+        <span className="conflict-side-badge">
+          {side === 'active' ? t('memoryGraph.activeSide') : t('memoryGraph.invalidatedSide')}
+        </span>
+        <div className="conflict-side-content">{fact.content}</div>
+        <div className="setting-desc conflict-side-meta">{metaLine(fact, false)}</div>
       </div>
     )
   }
+
+  const conflictBlock = (conflict: MemoryFactConflictDto) => (
+    <div key={`${conflict.active.id}-${conflict.invalidated.id}`} className="conflict-block">
+      <div className="conflict-type">{typeLabel(conflict.active.type)}</div>
+      {conflictSide(conflict, 'active')}
+      {conflictSide(conflict, 'invalidated')}
+      <div className="conflict-verdicts">
+        <button className="pill conflict-verdict" onClick={() => resolve(conflict, 'keep-active')}>
+          {t('memoryGraph.keepActive')}
+        </button>
+        <button className="pill conflict-verdict" onClick={() => resolve(conflict, 'keep-invalidated')}>
+          {t('memoryGraph.keepInvalidated')}
+        </button>
+        <button className="pill conflict-verdict danger" onClick={() => resolve(conflict, 'keep-none')}>
+          {t('memoryGraph.keepNone')}
+        </button>
+      </div>
+    </div>
+  )
 
   /** 分组视图：画像两分（显式永远优先）+ 其余 type 组 + 扩展 type 兜底组。 */
   const visible = filter === 'all' ? facts : facts.filter((f) => f.type === filter)
@@ -216,8 +212,8 @@ export function MemoryGraphPanel() {
       <div className="setting-group-label">{t('memoryGraph.sectionTitle')}</div>
       <div className="setting-desc" style={{ marginTop: 2, marginBottom: 8 }}>{t('memoryGraph.sectionDesc')}</div>
 
-      {/* Type filter pills: 过滤视图（spec 决策 10：分组 = 按 fact type 过滤）。 */}
-      <div className="setting-pills" style={{ marginBottom: 8 }}>
+      {/* Type filter chips: 自然宽度换行，9 个 chip 在面板宽度下排成两行。 */}
+      <div className="setting-pills filter-chips" style={{ marginBottom: 8 }}>
         {(['all', ...FACT_TYPES] as const).map((type) => (
           <button
             key={type}
@@ -229,28 +225,13 @@ export function MemoryGraphPanel() {
         ))}
       </div>
 
-      {/* ── Conflicts: 并排展示 + 三选裁决（不自动覆盖） ── */}
+      {/* ── Conflicts: 上下两栏 + 底部三选裁决（不自动覆盖） ── */}
       <div className="setting-title" style={{ fontSize: 12, marginBottom: 2 }}>{t('memoryGraph.conflictsTitle')}</div>
-      <div className="setting-desc" style={{ fontSize: 10.5, opacity: 0.75, marginBottom: 4 }}>{t('memoryGraph.conflictsDesc')}</div>
+      <div className="setting-desc" style={{ fontSize: 10.5, opacity: 0.75, marginBottom: 8 }}>{t('memoryGraph.conflictsDesc')}</div>
       {conflicts.length === 0 ? (
         <div className="setting-desc" style={{ fontSize: 10.5, opacity: 0.6 }}>{t('memoryGraph.conflictsEmpty')}</div>
       ) : (
-        conflicts.map((c) => (
-          <div key={`${c.active.id}-${c.invalidated.id}`} className="setting-row vertical" style={{ gap: 6, padding: '4px 0 8px' }}>
-            <div style={{ fontSize: 10, opacity: 0.6 }}>{typeLabel(c.active.type)}</div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', width: '100%' }}>
-              {conflictCard(c, 'active')}
-              {conflictCard(c, 'invalidated')}
-            </div>
-            <button
-              className="pill display-pill"
-              style={{ padding: '3px 8px', fontSize: 10.5, cursor: 'pointer', alignSelf: 'flex-start', color: '#ff8a8a' }}
-              onClick={() => resolve(c, 'keep-none')}
-            >
-              {t('memoryGraph.keepNone')}
-            </button>
-          </div>
-        ))
+        conflicts.map((c) => conflictBlock(c))
       )}
 
       <div className="setting-divider" />

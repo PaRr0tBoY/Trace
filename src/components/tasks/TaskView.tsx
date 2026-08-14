@@ -10,7 +10,7 @@
  * restore mechanism (ADR-0004) can remember/reset it and edit protection
  * can see it; the convert panel is a local edit session.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import type { TaskDto } from '../../../shared/types'
@@ -67,6 +67,23 @@ export function TaskView() {
   useEffect(() => {
     if (convertId && !converting) setConvertId(null)
   }, [convertId, converting])
+
+  // Switching the secondary tab (existing/candidates) returns to that tab's
+  // list — no task sub-view (detail, editor, convert, picker, delete
+  // confirm, trace) may linger across the switch (ref guard: the effect
+  // must not fire on mount, where a kept sub-view is a deliberate restore).
+  const prevTasksFilter = useRef(tasksFilter)
+  useEffect(() => {
+    if (prevTasksFilter.current !== tasksFilter) {
+      prevTasksFilter.current = tasksFilter
+      setSelectedTaskId(null)
+      setEditingTask(null)
+      setConvertId(null)
+      setPickerTaskId(null)
+      setConfirmDeleteTaskId(null)
+      setTraceTarget(null)
+    }
+  }, [tasksFilter, setSelectedTaskId, setEditingTask, setPickerTaskId, setConfirmDeleteTaskId])
 
   const handleDeleteConfirm = async () => {
     if (!confirmDelete) return

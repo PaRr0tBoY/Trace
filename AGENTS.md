@@ -53,6 +53,6 @@ typecheck 只校验签名，「声明了没注册」查不出——新增通道�
 ## 文档树（按需加载）
 
 - `docs/ipc-contract.md` — IPC 通道契约、任务/AI 通道清单、handler 丢失教训
-- `docs/architecture.md` — 关键子系统（边缘触发器、剪贴板、ItemStore、拖拽、Alt+Tab 切换器、决策/记忆管道、设置、渲染层）+ 行为陷阱（输入框焦点 t21、userData、搜索框样式等）
+- `docs/architecture.md` — 关键子系统（边缘触发器、剪贴板、ItemStore、拖拽、Alt+Tab 切换器、决策/记忆管道、设置、渲染层）+ 行为陷阱（输入框焦点 t21、userData、搜索框样式、better-sqlite3 依赖陷阱等）+ 动效/性能经验（motionLevel 动画档位、切换器 pinned/搜索模式、appIcons 磁盘缓存与预取）
 - `docs/ui-verification.md` — UI 改动验证：无头渲染器预览 + `window.edge` 模拟桥（勿动真机）
 - `docs/history.md` — 仓库/分支状态与历史决策（upstream 合并、已删除路径、tutorial 死链清理）

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo } from 'react'
 import gsap from 'gsap'
+import { useStore } from '../store/appStore'
 
 // Raw SVG Path for the Central Octopus Logo
 const OCTO_PATH =
@@ -44,6 +45,10 @@ export function LiquidOctopusLoader({
   }, [])
 
   useEffect(() => {
+    // The pulse/rotation loop is decorative (and runs forever) — play it only
+    // under the 'extended' motion level; 'standard' keeps the static logo.
+    if (useStore.getState().settings.motionLevel !== 'extended') return
+
     // 1. Gentle logo pulse & breathing
     const mainTl = gsap.timeline({ repeat: -1 })
     mainTl.to(

@@ -16,12 +16,14 @@ import { createWindow, getMainWindow, setInteractive, setVisible, startCursorPol
 import { createTray, registerIncognitoApplier } from './tray'
 import { registerIpc, registerSendListeners, getProviderChain } from './ipc'
 import { prewarmDragIcons } from './drag'
+import { loadAppIconCacheFromDisk, prewarmAppIcons, resolveAppIcon } from './appIcons'
+import { snapshotWindows } from './windowSnapshot'
 import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushState, stopStateTimers, setSuggestionChat, setSuggestionOcr } from './state'
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
 import { startKeyboardHook, stopKeyboardHook } from './hookManager'
 import { startDragDetect, stopDragDetect } from './dragManager'
-import { switcherShow, switcherAdvance, switcherExecute, switcherTapExecute } from './switcher'
+import { switcherShow, switcherAdvance, switcherExecute, switcherTapExecute, switcherPin, switcherPinReleased, switcherTouch, switcherControlKey, switcherMouseDown } from './switcher'
 import { ForegroundWatcher } from './foreground'
 import { ocrFromForeground } from './ocr'
 import { createAttributor, type Attributor } from './attributor'
@@ -116,7 +118,12 @@ app.whenReady().then(async () => {
     onShow: switcherShow,
     onAdvance: switcherAdvance,
     onExecute: switcherExecute,
-    onTapExecute: switcherTapExecute
+    onTapExecute: switcherTapExecute,
+    onPin: switcherPin,
+    onTouch: switcherTouch,
+    onPinReleased: switcherPinReleased,
+    onControlKey: switcherControlKey,
+    onMouseDown: switcherMouseDown
   })
 
   // OS drag detection (T4b, ADR-0007): SetWinEventHook 0x0F/0x10 in a
@@ -140,8 +147,29 @@ app.whenReady().then(async () => {
   }
   registerIpc()
   registerSendListeners()
+  // Restore the app-icon disk cache before the first push attaches icons.
+  loadAppIconCacheFromDisk()
   initState()
   prewarmDragIcons()
+  // Background icon prewarm: every app with a window right now gets its icon
+  // fetched while idle, so the switcher / task editor / suggestion cards show
+  // real icons from the first open. Apps that open later are covered by the
+  // incremental subscription below.
+  setTimeout(() => {
+    try {
+      prewarmAppIcons(snapshotWindows()).catch(() => {})
+    } catch {
+      /* window enumeration unavailable (non-Win32): incremental events still feed the cache */
+    }
+  }, 1500)
+  // Incremental extraction: whenever an app comes to the foreground (or is
+  // the copy source), its icon is fetched in the background — by the time the
+  // panel shows it the cache is warm. resolveAppIcon never rejects.
+  subscribeEvents((event) => {
+    if ('exePath' in event && typeof event.exePath === 'string' && event.exePath.length > 0) {
+      void resolveAppIcon(event.exePath)
+    }
+  })
 
   // Wire the provider chain into the suggestion engine (after initState so the
   // engine's singletons exist; the 30s+ silence floor guarantees the chain is

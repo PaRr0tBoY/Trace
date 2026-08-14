@@ -14,7 +14,7 @@
  * clamped preview; file items list names or bundle badge. Motion is handled by
  * the parent list (layout/AnimatePresence), so this component stays presentational.
  */
-import { memo, useState, useCallback, useEffect } from 'react'
+import { memo, useState, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ClipboardItemDto } from '../../shared/types'
 import type { StationEntryDto } from '../../shared/station'
@@ -46,6 +46,16 @@ interface Props {
   stationEntry?: StationEntryDto
 }
 
+// Shimmer bookkeeping, module-level so it survives card remounts: unpinning
+// moves a card between the pinned and recent lists and switching views
+// remounts the whole list. Per-instance refs would replay the shimmer on
+// every remount while the capture is still inside the 4s window.
+const flashedCaptures = new Map<string, number>() // `${itemId}:${capturedAt}` -> when flashed
+const FLASH_RECORD_TTL_MS = 60_000
+// A button copy already shows the ripple; the next capture change inside
+// this window is counted as flashed instead of shimmering.
+let suppressFlashUntil = 0
+
 
 
 
@@ -63,27 +73,71 @@ function ClipboardItemBase({ item, instant, animateLayout, stationEntry }: Props
   const startDrag = useDragOut()
   const [copied, setCopied] = useState(false)
   const [expanded, setExpanded] = useState(false)
-
   const isStation = stationEntry !== undefined
 
+  // 'extended' motion level: items captured within the last 4s flash the
+  // accent once when the panel opens. It fires on `open` (not on mount) —
+  // copies happen while the panel is closed, and a mount-time flash would
+  // play out invisibly in the background. Each distinct capture plays once;
+  // re-copying the same item updates capturedAt and re-flashes.
+  //
+  // The "played" and "button-copy suppressed" marks are module-level, not
+  // instance refs: unpinning moves a card between the pinned and recent
+  // lists and switching views remounts the whole list — a per-instance ref
+  // would replay the shimmer on every remount while the capture is still
+  // inside the 4s window.
+  const motionLevel = useStore((s) => s.settings.motionLevel)
   const open = useStore((s) => s.open)
+  const [flashVisible, setFlashVisible] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const now = Date.now()
+    if (motionLevel === 'extended' && item.capturedAt > now - 4000) {
+      const key = `${item.id}:${item.capturedAt}`
+      if (flashedCaptures.size > 128) {
+        const cutoff = now - FLASH_RECORD_TTL_MS
+        for (const [k, ts] of flashedCaptures) {
+          if (ts < cutoff) flashedCaptures.delete(k)
+        }
+      }
+      if (!flashedCaptures.has(key)) {
+        flashedCaptures.set(key, now)
+        if (now >= suppressFlashUntil) {
+          setFlashVisible(true)
+        }
+      }
+    }
+  }, [open, motionLevel, item.capturedAt])
+
+  // Button-copy ripples start at the button's position inside the card.
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [rippleOrigin, setRippleOrigin] = useState<{ x: number; y: number } | null>(null)
+  // Epoch bumps on every button copy so the ripple replays even when clicks
+  // land while `copied` is still true (remount via key change).
+  const [rippleEpoch, setRippleEpoch] = useState(0)
+
+  const isPreviewing = useStore((s) => s.previewItemId) === item.id
   useEffect(() => {
     if (!open) setExpanded(false)
   }, [open])
-
-  const isPreviewing = useStore((s) => s.previewItemId) === item.id
   const isBundle = (item.data.kind === 'files' && item.data.paths.length > 1) || item.data.kind === 'image-collection'
 
   const onCopy = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     playButtonClickSound()
+    const cardRect = cardRef.current?.getBoundingClientRect()
+    if (cardRect) {
+      setRippleOrigin({ x: e.clientX - cardRect.left, y: e.clientY - cardRect.top })
+    }
+    suppressFlashUntil = Date.now() + 800
     if (stationEntry) {
       void edge.stationCopyMember({ id: stationEntry.id, paths: stationEntry.paths })
     } else {
       copy(item.id)
     }
     setCopied(true)
-    window.setTimeout(() => setCopied(false), 900)
+    setRippleEpoch((n) => n + 1)
+    window.setTimeout(() => setCopied(false), 1000)
   }, [copy, item.id, stationEntry])
 
   const onPaste = useCallback((e?: React.MouseEvent) => {
@@ -127,6 +181,7 @@ function ClipboardItemBase({ item, instant, animateLayout, stationEntry }: Props
 
   return (
     <motion.div
+      ref={cardRef}
       layout={animateLayout ? 'position' : false}
       initial={!instant && open ? { opacity: 0, scale: 0.96, y: 6 } : false}
       animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -142,21 +197,62 @@ function ClipboardItemBase({ item, instant, animateLayout, stationEntry }: Props
       }}
       className={`item${item.pinned ? ' pinned' : ''}${isBundle ? ' bundle' : ''}`}
     >
-      {copied && (
+      {flashVisible && (
         <motion.div
-          key="copy-ripple"
-          initial={{ opacity: 0.75, scale: 0.2 }}
-          animate={{ opacity: 0, scale: 1.6 }}
-          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          key="new-copy-shimmer"
+          initial={{ x: '-120%' }}
+          animate={{ x: '250%' }}
+          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
+          onAnimationComplete={() => setFlashVisible(false)}
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: 0,
+            width: '55%',
+            background:
+              'linear-gradient(90deg, transparent, rgba(var(--accent-rgb), 0.4) 40%, rgba(var(--accent-rgb), 0.75) 50%, rgba(var(--accent-rgb), 0.4) 60%, transparent)',
+            filter: 'blur(5px)',
+            pointerEvents: 'none',
+            zIndex: 14
+          }}
+        />
+      )}
+      {copied && motionLevel === 'extended' && rippleOrigin && (
+        <motion.div
+          key={`copy-ripple-${rippleEpoch}`}
           style={{
             position: 'absolute',
             inset: 0,
             borderRadius: 16,
-            background: 'radial-gradient(circle at center, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 45%, transparent 75%)',
+            overflow: 'hidden',
             pointerEvents: 'none',
             zIndex: 15
           }}
-        />
+        >
+          <motion.div
+            initial={{ opacity: 0.9, scale: 0 }}
+            animate={{ opacity: 0, scale: 28 }}
+            transition={{
+              // Reach full coverage (28px -> 784px diameter, past any card's
+              // farthest corner) fast, then linger: opacity fades over the
+              // whole duration instead of riding the same ease-out curve.
+              scale: { duration: 0.7, ease: [0.16, 1, 0.3, 1] },
+              opacity: { duration: 1.3, ease: [0.16, 1, 0.3, 1] }
+            }}
+            style={{
+              position: 'absolute',
+              left: rippleOrigin.x,
+              top: rippleOrigin.y,
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              background:
+                'radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.14) 60%, transparent 100%)',
+              transform: 'translate(-50%, -50%)'
+            }}
+          />
+        </motion.div>
       )}
       <div
         className={`item-main${isPreviewing ? ' force-actions previewing' : ''}`}

@@ -593,6 +593,19 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
 
                   <div className="setting-divider" />
 
+                  <div className="setting-row vertical">
+                    <div className="setting-info">
+                      <div className="setting-title">{t('behaviour.switcherGroupTitle')}</div>
+                      <div className="setting-desc">{t('behaviour.switcherGroupDesc')}</div>
+                    </div>
+                    <Toggle
+                      checked={settings.switcherGroupWindows}
+                      onChange={(v) => patch({ switcherGroupWindows: v })}
+                    />
+                  </div>
+
+                  <div className="setting-divider" />
+
                   {PersistentFooter}
                 </motion.div>
               )}
@@ -1135,6 +1148,35 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                           onClick={() => {
                             playButtonClickSound()
                             patch({ fontSizeScale: opt.val })
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="setting-divider" />
+
+                  {/* ── GROUP: Motion ────────────────────────────────────── */}
+                  <div className="setting-group-label" style={{ marginTop: 20 }}>{t('appearance.motionTitle')}</div>
+
+                  <div className="setting-row vertical">
+                    <div className="setting-info">
+                      <div className="setting-title">{t('appearance.motionTitle')}</div>
+                      <div className="setting-desc">{t('appearance.motionDesc')}</div>
+                    </div>
+                    <div className="setting-pills">
+                      {([
+                        { label: t('appearance.motionStandard'), val: 'standard' },
+                        { label: t('appearance.motionExtended'), val: 'extended' }
+                      ] as const).map((opt) => (
+                        <button
+                          key={opt.val}
+                          className={`pill ${(settings.motionLevel ?? 'standard') === opt.val ? 'active' : ''}`}
+                          onClick={() => {
+                            playButtonClickSound()
+                            patch({ motionLevel: opt.val })
                           }}
                         >
                           {opt.label}

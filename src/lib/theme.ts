@@ -1,13 +1,19 @@
 /**
  * Theme: writes dynamic CSS properties to :root.
  */
-import type { ThemeColor } from '../../shared/types'
+import type { MotionLevel, ThemeColor } from '../../shared/types'
 import { THEME_ACCENTS } from '../../shared/themes'
 
 
-/** Apply reduce-motion preference as a data attribute the CSS can key off. */
-export function applyReduceMotion(reduce: boolean): void {
-  document.documentElement.dataset.motion = reduce ? 'reduce' : 'full'
+/**
+ * Push the motion level onto :root as a data attribute the CSS keys off:
+ * - `data-motion='standard'` → baseline (no CSS-only extras).
+ * - `data-motion='extended'` → CSS-only delight rules (e.g. .act press scale)
+ *   activate.
+ * Framer Motion is covered separately by <MotionConfig> in App.tsx.
+ */
+export function applyMotionLevel(level: MotionLevel): void {
+  document.documentElement.dataset.motion = level
 }
 
 /**

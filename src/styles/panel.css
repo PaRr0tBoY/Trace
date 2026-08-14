@@ -15,7 +15,9 @@
 
 /* pointer-events on individual children is set inline via React (open ? auto : none) */
 
-/* The blade itself — a tall rounded-right panel. */
+/* The blade itself — a tall rounded-right panel. Its background lives on the
+   .blade-bg layer below (which carries the open bounce); this layer holds
+   content and never scales, so the bounce moves only the black shape. */
 .blade {
   position: relative; /* Inside motion wrapper */
   flex-shrink: 0;
@@ -24,9 +26,6 @@
   flex-direction: column;
   border-top-right-radius: 24px;
   border-bottom-right-radius: 24px;
-  /* Completely deep black */
-  background: #000000;
-  
   /* No back shadow and no edges */
   box-shadow: none;
   overflow: hidden;
@@ -51,6 +50,29 @@
 }
 .blade-container.blade-top .blade {
   margin: 0 auto;
+  border-radius: 0 0 24px 24px;
+}
+
+/* The background layer. It fills the blade and carries the Dynamic-Island-
+   style open bounce (scale overshoot on .blade-bg, driven by Framer in
+   Panel.tsx) — content in .blade above it stays put, only the black shape
+   pokes past the rest width and settles back, like BoringNotch's notch. */
+.blade-bg {
+  position: absolute;
+  inset: 0;
+  background: #000000;
+  border-top-right-radius: 24px;
+  border-bottom-right-radius: 24px;
+  pointer-events: none;
+  z-index: 0;
+}
+.blade-container.blade-right .blade-bg {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-top-left-radius: 24px;
+  border-bottom-left-radius: 24px;
+}
+.blade-container.blade-top .blade-bg {
   border-radius: 0 0 24px 24px;
 }
 
@@ -100,10 +122,10 @@
    stays resident because the panel opens/closes on every edge hover. */
 .blade-container {
   will-change: clip-path;
-  /* Opening: 0.26s fast-then-slow (exponential ease-out) — the blade bursts
+  /* Opening: 0.3s fast-then-slow (exponential ease-out) — the blade bursts
      out of the edge and decelerates into place. Closing (`.closing` class) is
      a very fast linear 0.1s sweep: constant speed, no curve, gone in a blink. */
-  transition: clip-path 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: clip-path 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 /* Alt+Tab switcher session (ADR-0005): snappier — a switcher must feel
    instant, not like an edge-hover bloom. */
@@ -496,6 +518,7 @@
   overflow: hidden;
   padding: 8px 10px 12px;
   min-height: 0;
+  position: relative;
 }
 
 .switcher-list {
@@ -515,6 +538,7 @@
   width: 100%;
   padding: 8px 10px;
   border: none;
+  outline: none;
   background: transparent;
   border-radius: 10px;
   color: var(--text-primary);
@@ -582,4 +606,78 @@
 }
 .switcher-list::-webkit-scrollbar {
   display: none; /* Chrome/Safari */
+}
+
+/* ── Switcher search mode (TabTab pattern, pinned session) ───────── */
+.switcher-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 10px;
+  flex-shrink: 0;
+}
+
+.switcher-search input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 10px;
+  background: var(--bg-2);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.switcher-search input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.switcher-back {
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--bg-3);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.switcher-back:hover {
+  background: var(--bg-4, var(--bg-3));
+}
+
+/* Window-count badge on grouped rows — pinned to the row's right edge,
+   independent of how long the app title is. */
+.switcher-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--bg-3);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Drill-in sub-rows (grouped window list) sit slightly deeper. */
+.switcher-row.switcher-subrow {
+  padding-left: 18px;
+}
+
+.switcher-empty {
+  padding: 18px 10px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
 }

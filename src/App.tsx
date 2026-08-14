@@ -4,7 +4,7 @@
  * Wires up:
  *   - hydration (load items + settings on mount)
  *   - main->renderer event subscriptions (items/settings pushed from main)
- *   - theme application (accent + reduce-motion)
+ *   - theme application (accent + motion level)
  *   - the edge-hover controller (open/close the blade)
  *   - the Panel itself
  */
@@ -14,8 +14,9 @@ import { CopyIndicatorCurve } from './components/CopyIndicatorCurve'
 import { PreviewFlyout } from './components/PreviewFlyout'
 import { IndicatorStyleFlyout } from './components/IndicatorStyleFlyout'
 import { useStore } from './store/appStore'
+import { MotionConfig } from 'framer-motion'
 import { edge } from './lib/edge'
-import { applyReduceMotion, applyTheme } from './lib/theme'
+import { applyMotionLevel, applyTheme } from './lib/theme'
 import { useEdgeHover } from './hooks/useEdgeHover'
 
 export default function App() {
@@ -89,6 +90,12 @@ export default function App() {
     const offSwitcherSelect = edge.onSwitcherSelect((index) => {
       useStore.getState().setSwitcherSelected(index)
     })
+    const offSwitcherPin = edge.onSwitcherPin((initialQuery) => {
+      useStore.getState().setSwitcherPinned(true, initialQuery)
+    })
+    const offSwitcherControlKey = edge.onSwitcherControlKey((key) => {
+      useStore.getState().setSwitcherControlKey(key)
+    })
     const offSwitcherHide = edge.onSwitcherHide(() => {
       useStore.getState().hideSwitcher()
     })
@@ -103,6 +110,8 @@ export default function App() {
       offOpenSettings()
       offSwitcherShow()
       offSwitcherSelect()
+      offSwitcherPin()
+      offSwitcherControlKey()
       offSwitcherHide()
     }
   }, [hydrate, setItems, setStation, setSettings, pushToast])
@@ -164,20 +173,24 @@ export default function App() {
     }
   }, [])
 
-  // Apply theme whenever settings change.
+  // Apply theme + motion level whenever settings change.
   useEffect(() => {
-    applyReduceMotion(settings.reduceMotion)
+    applyMotionLevel(settings.motionLevel)
     applyTheme(settings.themeColor ?? 'graphite')
     const scale = settings.fontSizeScale ?? 1.0
     document.documentElement.style.setProperty('--font-scale', String(scale))
-  }, [settings.reduceMotion, settings.fontSizeScale, settings.themeColor])
+  }, [settings.motionLevel, settings.fontSizeScale, settings.themeColor])
 
   return (
-    <>
+    // reducedMotion is pinned to "never": the OS prefers-reduced-motion flag is
+    // deliberately ignored (it silently killed all animation on the author's
+    // machine once) — motionLevel is the single source of truth for Framer,
+    // CSS (data-motion) and GSAP (LiquidOctopusLoader's own gate).
+    <MotionConfig reducedMotion="never">
       <Panel />
       <CopyIndicatorCurve />
       <PreviewFlyout isRight={settings.stickPosition === 'right'} />
       <IndicatorStyleFlyout isRight={settings.stickPosition === 'right'} />
-    </>
+    </MotionConfig>
   )
 }

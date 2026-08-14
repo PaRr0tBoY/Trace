@@ -2,16 +2,24 @@
  * Panel — the blade that grows out of the left edge.
  *
  * Motion: when `open` flips true the blade's clip-path releases from the edge
- * strip (the "spoke") to the full panel while the scale animates up. Both are
- * compositor-friendly: scale is a transform (Framer-driven), clip-path is a
- * promoted compositor clip driven by the CSS transition in panel.css. No
- * filter/blur — repainting the whole blade every frame was the jank source.
+ * strip (the "spoke") to the full panel — the reveal, driven by the CSS
+ * transition in panel.css. Under the 'extended' motion level the background
+ * layer (.blade-bg) also overshoots ~2% past the rest edge and settles back
+ * (useOpenBounce) — a Dynamic-Island-style poke that moves only the black
+ * shape; content in .blade stays put. 'standard' keeps the plain reveal
+ * (scale pinned at 1). All compositor-friendly: scale is a transform
+ * (Framer-driven), clip-path is a promoted compositor clip. No filter/blur —
+ * repainting the whole blade every frame was the jank source. Unlike the
+ * flyout presets, this motion is intentionally not gated on
+ * prefers-reduced-motion (see useOpenBounce) — the reveal always animates
+ * and the OS "animations off" setting was silently killing it.
  * When closed, the clip-path keeps only the spoke visible so the window stays
  * transparent and click-through.
  */
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/appStore'
+import { useOpenBounce } from '../hooks/useAdaptiveSpring'
 import { PANEL_LEAVE_EVENT, PANEL_ENTER_EVENT } from '../hooks/useEdgeHover'
 import { useFilteredItems, matchesClipboardFilter } from '../hooks/useFilteredItems'
 import { Header } from './Header'
@@ -55,6 +63,15 @@ export function Panel() {
   const clipboardScopeCount = useStore((s) => s.items).filter(
     (it) => !it.pinned && matchesClipboardFilter(it, clipboardFilter || 'all')
   ).length
+
+  // Blade open motion — under 'extended' a Dynamic-Island-style
+  // exceed-and-settle timed to the clip reveal's end; 'standard' stays flat.
+  const openBounce = useOpenBounce()
+  const extended = settings.motionLevel === 'extended'
+  // View/settings transitions: 'extended' slides with direction (x ±10);
+  // 'standard' cross-fades — the slide is directional delight, not navigation.
+  const viewSlide = extended ? 10 : 0
+  const viewSlideOut = extended ? -10 : 0
 
   // NOTE: closing the panel intentionally keeps the settings sheet, its sub
   // view, and the search query — the restore mechanism (ADR-0004) decides
@@ -260,9 +277,7 @@ export function Panel() {
           left: settings.stickPosition === 'right' ? 'auto' : 0,
           right: settings.stickPosition === 'right' ? 0 : 'auto',
           zIndex: 10,
-          pointerEvents: open ? 'auto' : 'none',
-          originX: settings.stickPosition === 'right' ? 1 : 0,
-          originY: 0.5
+          pointerEvents: open ? 'auto' : 'none'
         }}
         animate={{
           // Mirror the clip for the right edge: the blade hugs the window's
@@ -273,20 +288,31 @@ export function Panel() {
               : 'inset(calc(0% - 100px) calc(0% - 100px) calc(0% - 100px) 0px round 0px 24px 24px 0px)'
             : settings.stickPosition === 'right'
               ? `inset(calc(50% - ${halfTrigger}px) 0px calc(50% - ${halfTrigger}px) calc(100% - ${settings.hotZoneWidth || 3}px) round 24px 0px 0px 24px)`
-              : `inset(calc(50% - ${halfTrigger}px) calc(100% - ${settings.hotZoneWidth || 3}px) calc(50% - ${halfTrigger}px) 0px round 0px 24px 24px 0px)`,
-          scale: open ? 1 : 0.92
-        }}
-        transition={{
-          scale: {
-            // Scale keeps the original ratio to clip-path (~0.76x: it finished
-            // ahead of the clip in the initial 0.46/0.35 pairing). Opening 0.2s
-            // fast-then-slow, closing 0.08s linear, both ahead of the clip.
-            // Switcher sessions (ADR-0005) run ~2x faster — snappier feel.
-            duration: switcherActive ? (open ? 0.1 : 0.06) : open ? 0.2 : 0.08,
-            ease: switcherActive ? (open ? [0.22, 1, 0.36, 1] : [0, 0, 1, 1]) : open ? [0.22, 1, 0.36, 1] : [0, 0, 1, 1]
-          }
+              : `inset(calc(50% - ${halfTrigger}px) calc(100% - ${settings.hotZoneWidth || 3}px) calc(50% - ${halfTrigger}px) 0px round 0px 24px 24px 0px)`
         }}
       >
+        {/* The black shape. The open bounce (extended level only, useOpenBounce)
+            lives here — content in .blade below never scales, so only the
+            background pokes past and settles back. */}
+        <motion.div
+          className="blade-bg"
+          style={{
+            originX: settings.stickPosition === 'right' ? 1 : 0,
+            originY: 0.5
+          }}
+          animate={{
+            scale: switcherActive ? 1 : open && extended ? [1, 1.02, 1] : 1
+          }}
+          transition={{
+            scale: switcherActive
+              ? { duration: open ? 0.1 : 0.06, ease: open ? [0.22, 1, 0.36, 1] : [0, 0, 1, 1] }
+              : open
+                ? extended
+                  ? openBounce
+                  : { duration: 0, ease: [0, 0, 1, 1] }
+                : { duration: 0.08, ease: [0, 0, 1, 1] }
+          }}
+        />
         <div className={`flare-top${settings.stickPosition === 'right' ? ' flare-right' : ''}`}>
           <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M 0 0 L 0 30 L 30 30 A 30 30 0 0 1 0 0 Z" fill="#000000" />
@@ -302,10 +328,26 @@ export function Panel() {
           className="blade"
           style={{ height: panelHeightStr }}
         >
-          {switcherActive ? (
-            <SwitcherView />
-          ) : (
-            <>
+          <AnimatePresence initial={false}>
+            {switcherActive ? (
+              <motion.div
+                key="switcher"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.1 }}
+                style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+              >
+                <SwitcherView />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="main"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.1 }}
+                style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+              >
           <Header />
 
           {!settingsOpen && view !== 'tasks' && <SearchBar />}
@@ -315,9 +357,9 @@ export function Panel() {
             {settingsOpen ? (
               <motion.div
                 key="settings"
-                initial={{ opacity: 0, x: 10 }}
+                initial={{ opacity: 0, x: viewSlide }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
+                exit={{ opacity: 0, x: viewSlideOut }}
                 transition={{ duration: 0.15 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
@@ -328,9 +370,9 @@ export function Panel() {
             ) : view === 'tasks' ? (
               <motion.div
                 key="tasks"
-                initial={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, x: viewSlide }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
+                exit={{ opacity: 0, x: viewSlideOut }}
                 transition={{ duration: 0.15 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
@@ -341,9 +383,9 @@ export function Panel() {
             ) : view === 'files' ? (
               <motion.div
                 key="files"
-                initial={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, x: viewSlide }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
+                exit={{ opacity: 0, x: viewSlideOut }}
                 transition={{ duration: 0.15 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
@@ -354,9 +396,9 @@ export function Panel() {
             ) : (
               <motion.div
                 key="list"
-                initial={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, x: viewSlide }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
+                exit={{ opacity: 0, x: viewSlideOut }}
                 transition={{ duration: 0.15 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
@@ -383,8 +425,9 @@ export function Panel() {
             ) : null
           )}
           <TaskDropPanel />
-            </>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
     </div>

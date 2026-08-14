@@ -201,6 +201,7 @@ const api = {
   expandPanel: () => send('panel:expand'),
   switcherHover: (index: number) => send('switcher:hover', index),
   switcherClick: (index: number) => send('switcher:click', index),
+  switcherCancel: () => send('switcher:cancel'),
 
   /* Task domain */
   loadTasks: () => invoke('task:load'),
@@ -267,6 +268,8 @@ const api = {
   onToast: (cb: (toast: { id: string; message: string; tone: 'info' | 'error' }) => void) => on('ui:toast', cb),
   onSwitcherShow: (cb: (data: EventArgs<'switcher:show'>[0]) => void) => on('switcher:show', cb),
   onSwitcherSelect: (cb: (index: number) => void) => on('switcher:select', cb),
+  onSwitcherPin: (cb: (initialQuery?: string) => void) => on('switcher:pin', cb),
+  onSwitcherControlKey: (cb: (key: 'enter' | 'up' | 'down' | 'left' | 'right') => void) => on('switcher:control-key', cb),
   onSwitcherHide: (cb: () => void) => on('switcher:hide', cb),
 
   /* Drag helpers */

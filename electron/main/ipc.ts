@@ -22,7 +22,7 @@ import { startDragOut, resolveDragData, prefetchFileIcons, stageMoveDrag } from 
 import { disposeToRecycleBin } from './recycleBin'
 import { enterContentToStation } from './contentToFile'
 import { activateAppWindow } from './windowSwitch'
-import { switcherHover, switcherClick } from './switcher'
+import { switcherHover, switcherClick, switcherCancel } from './switcher'
 import { clipboardSignature } from '../clipboard/formats'
 import { buildClipboardRef } from '../store/TaskStore'
 import { mergeAppOptions } from './appOptions'
@@ -968,6 +968,10 @@ export function registerSendListeners(): void {
 
   on('switcher:click', (_sender, index) => {
     switcherClick(index)
+  })
+
+  on('switcher:cancel', () => {
+    switcherCancel()
   })
 
   on('item:start-drag', (sender, req) => {

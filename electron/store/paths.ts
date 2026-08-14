@@ -47,6 +47,8 @@ export const PATHS = {
   modelsDir: () => join(root(), 'models'),
   /** Path to the settings JSON. */
   settingsFile: () => join(root(), 'settings.json'),
+  /** App icon disk cache: dataURLs keyed by normalized exePath (t26). */
+  appIconsFile: () => join(root(), 'app-icons.json'),
   /** Scratch dir for temp files handed to native drag-out. */
   tempDir: () => join(root(), 'temp'),
   /** App icon (used by window + native drag image). */

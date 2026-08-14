@@ -32,17 +32,25 @@
 import koffi from 'koffi'
 
 const WH_KEYBOARD_LL = 13
+const WH_MOUSE_LL = 14
 // Debug noise goes behind this switch (AGENTS.md logging rules).
 const DEBUG = false
 const WM_KEYDOWN = 0x100
 const WM_KEYUP = 0x101
 const WM_SYSKEYDOWN = 0x104
 const WM_SYSKEYUP = 0x105
+const WM_LBUTTONDOWN = 0x201
 const VK_TAB = 0x09
 const VK_MENU = 0x12
 const VK_LMENU = 0xA4
 const VK_RMENU = 0xA5
 const VK_SHIFT = 0x10
+const VK_RETURN = 0x0D
+const VK_ESCAPE = 0x1B
+const VK_UP = 0x26
+const VK_DOWN = 0x28
+const VK_LEFT = 0x25
+const VK_RIGHT = 0x27
 const KEYEVENTF_KEYUP = 0x0002
 const PM_REMOVE = 0x0001
 const INPUT_KEYBOARD = 0x0001
@@ -51,6 +59,16 @@ const INPUT_KEYBOARD = 0x0001
 const KBDLLHOOKSTRUCT = koffi.struct('KBDLLHOOKSTRUCT', {
   vkCode: 'uint32_t',
   scanCode: 'uint32_t',
+  flags: 'uint32_t',
+  time: 'uint32_t',
+  dwExtraInfo: 'uintptr_t'
+})
+
+/** MSLLHOOKSTRUCT — screen point at offset 0; used for click-outside detection. */
+const MSLLHOOKSTRUCT = koffi.struct('MSLLHOOKSTRUCT', {
+  pt_x: 'int32_t',
+  pt_y: 'int32_t',
+  mouseData: 'uint32_t',
   flags: 'uint32_t',
   time: 'uint32_t',
   dwExtraInfo: 'uintptr_t'
@@ -123,9 +141,36 @@ export interface KeyboardHookEvents {
   onExecute: () => void
   /** Quick Alt+Tab tap (Tab released inside the threshold): switch directly, no UI. */
   onTapExecute: (opts: { shiftDown: boolean }) => void
+  /** Enter while the switcher is armed: pin it open and enter search mode (TabTab-style). */
+  onPin: (initialQuery?: string) => void
+  /** Any keydown while pinned — keeps the session's safety timeout alive during typing. */
+  onTouch: () => void
+  /**
+   * Enter/Esc/arrow while pinned. The panel window often can't be
+   * programmatically activated (foreground lock), so these keys would never
+   * reach the search input — the hook swallows them and delivers the intent
+   * directly instead. 'escape' cancels the session outright; 'enter'/'up'/
+   * 'down' are forwarded to the renderer, which resolves drill vs execute.
+   */
+  onControlKey: (key: 'enter' | 'escape' | 'up' | 'down' | 'left' | 'right') => void
+  /**
+   * Real Alt-up while pinned: the OS Alt state is already released by the
+   * synthetic up, and the foreground lock is gone — the panel can finally
+   * be activated (pin itself happens while Alt is still held, when
+   * SetForegroundWindow is refused).
+   */
+  onPinReleased: () => void
+  /**
+   * Left-button mouse-down while pinned, in physical screen pixels. The
+   * panel often never reaches the OS foreground (activation is
+   * best-effort), so click-outside can't be detected via the window's
+   * focus events — the mouse hook reports the click position and main
+   * decides whether it landed outside the panel.
+   */
+  onMouseDown: (pt: { x: number; y: number }) => void
 }
 
-type HookState = 'idle' | 'altDown' | 'pending' | 'tap' | 'armed'
+type HookState = 'idle' | 'altDown' | 'pending' | 'tap' | 'armed' | 'pinned'
 
 // Tab held this long (before key-repeat kicks in at ~500ms) counts as "hold"
 // → show the switcher. Released sooner = a quick tap → switch directly, like
@@ -134,9 +179,16 @@ const TAP_THRESHOLD_MS = 50
 
 let state: HookState = 'idle'
 let hookPtr: unknown = null
+let mouseHookPtr: unknown = null
 let pumpTimer: ReturnType<typeof setInterval> | null = null
 let activeEvents: KeyboardHookEvents | null = null
 let tapTimer: ReturnType<typeof setTimeout> | null = null
+// Session-level marker for pinned search mode. Deliberately separate from
+// `state`: Alt-up (the pin gesture's release) moves the state machine back
+// to idle — but the search session lives on until setPinned(false). Control
+// keys and Tab must keep belonging to the panel for the whole session, or
+// they fall through to the foreground window the moment Alt comes up.
+let pinnedSession = false
 
 // Persistent trampoline: an auto-registered JS callback only lives for the
 // duration of one FFI call, but SetWindowsHookExW fires the callback later —
@@ -158,7 +210,43 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
       const isDown = wParam === WM_KEYDOWN || wParam === WM_SYSKEYDOWN
       const isAlt = vk === VK_MENU || vk === VK_LMENU || vk === VK_RMENU
       const isTab = vk === VK_TAB
+      const isReturn = vk === VK_RETURN
       if (DEBUG) console.log('[Hook]', 'wParam=' + wParam, 'vk=' + vk.toString(16), 'state=' + state)
+
+      // Pinned search session: the panel owns Tab and the control keys for
+      // the whole session, not just while `state === 'pinned'` (Alt-up has
+      // already moved the machine back to idle by the time the user types).
+      // Tab stays swallowed — repeats must never reach the OS as a live
+      // Alt+Tab combo. Enter/Esc/arrows are delivered via onControlKey and
+      // resolved by the switcher (Esc cancels in main, the rest in the
+      // renderer against its local selection state).
+      if (pinnedSession) {
+        if (isTab) return 1n
+        if (isReturn && isDown) {
+          defer(() => activeEvents?.onControlKey('enter'))
+          return 1n
+        }
+        if (vk === VK_ESCAPE && isDown) {
+          defer(() => activeEvents?.onControlKey('escape'))
+          return 1n
+        }
+        if (vk === VK_DOWN && isDown) {
+          defer(() => activeEvents?.onControlKey('down'))
+          return 1n
+        }
+        if (vk === VK_UP && isDown) {
+          defer(() => activeEvents?.onControlKey('up'))
+          return 1n
+        }
+        if (vk === VK_LEFT && isDown) {
+          defer(() => activeEvents?.onControlKey('left'))
+          return 1n
+        }
+        if (vk === VK_RIGHT && isDown) {
+          defer(() => activeEvents?.onControlKey('right'))
+          return 1n
+        }
+      }
 
       if (state === 'idle') {
         if (isAlt && isDown) state = 'altDown'
@@ -224,6 +312,38 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
           return 1n
         }
         if (isTab && !isDown) return 1n // swallow Tab up — no ghost Tab for the OS
+        if (isReturn && isDown) {
+          // Enter pins the switcher open and enters search mode (TabTab
+          // pattern): Alt-up must NOT execute, keyboard passes to the panel.
+          state = 'pinned'
+          defer(() => activeEvents?.onPin())
+          return 1n
+        }
+        if (isDown && isPrintableVk(vk)) {
+          // Type-to-search: any printable key while armed pins the session
+          // and seeds the search field with that first character. The key
+          // is swallowed — the panel isn't focused yet, so passing it
+          // through would deliver it to the window in front; the character
+          // rides along in the pin message instead.
+          state = 'pinned'
+          defer(() => activeEvents?.onPin(vkToChar(vk, isShiftDown()) ?? undefined))
+          return 1n
+        }
+        if (isDown && (vk === VK_UP || vk === VK_DOWN || vk === VK_LEFT || vk === VK_RIGHT)) {
+          // Arrow keys while armed also pin the session (third search entry
+          // after type-to-search and Enter) and immediately act on the
+          // panel: up/down move the highlight, left/right switch between
+          // the main list and the drill-in view. The key rides along as the
+          // first control-key so the movement happens inside the panel.
+          const dir: 'up' | 'down' | 'left' | 'right' =
+            vk === VK_UP ? 'up' : vk === VK_DOWN ? 'down' : vk === VK_LEFT ? 'left' : 'right'
+          state = 'pinned'
+          defer(() => {
+            activeEvents?.onPin()
+            activeEvents?.onControlKey(dir)
+          })
+          return 1n
+        }
         if (isAlt && !isDown) {
           state = 'idle'
           defer(() => {
@@ -232,6 +352,49 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
           })
           return 1n // swallow the raw Alt up; the synthetic one is clean
         }
+      } else if (state === 'pinned') {
+        // Pinned search mode: character keys pass through to the activated
+        // panel input (the search field). Only Alt-up is special — it must
+        // not execute the switch (that's the point of pinning). Touch the
+        // session on keydown so long typing sessions don't hit the 30s
+        // self-heal timeout. Control keys are handled above by the
+        // session-level block, not here — the session outlives this state.
+        if (isAlt && !isDown) {
+          state = 'idle'
+          // The real Alt-up is swallowed so no switch executes — but without
+          // a synthetic up the OS keeps Alt held, and every later letter is
+          // treated as an Alt-combo that never reaches the panel input. The
+          // foreground lock is gone once Alt is up — that's when the panel
+          // can finally be activated (see onPinReleased).
+          defer(() => {
+            sendSyntheticAltUp()
+            activeEvents?.onPinReleased()
+          })
+          return 1n
+        }
+        if (isDown) defer(() => activeEvents?.onTouch())
+      }
+    }
+  }
+  return callNextHookEx ? callNextHookEx(hookPtr, nCode, wParam, lParam) : 1n
+}, koffi.pointer(koffi.proto('intptr_t (int nCode, uintptr_t wParam, intptr_t lParam)')))
+
+/**
+ * Mouse hook: reports left-button clicks while a search session is pinned,
+ * so main can cancel on click-outside even when the panel never reached the
+ * OS foreground (Electron focus events are unreliable for programmatically
+ * activated windows — see switcher.ts). Same purity discipline as the
+ * keyboard callback: no FFI/Electron calls inside the dispatch; the screen
+ * point is decoded here (plain reads) and the event deferred.
+ */
+const mousePtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bigint => {
+  if (nCode >= 0 && hookPtr && callNextHookEx) {
+    if (pinnedSession && wParam === WM_LBUTTONDOWN) {
+      try {
+        const m = koffi.decode(lParam, MSLLHOOKSTRUCT)
+        defer(() => activeEvents?.onMouseDown({ x: m.pt_x, y: m.pt_y }))
+      } catch {
+        // ignore malformed structs — click-outside detection degrades
       }
     }
   }
@@ -264,6 +427,29 @@ function isShiftDown(): boolean {
   return getAsyncKeyState ? (getAsyncKeyState(VK_SHIFT) & 0x8000) !== 0 : false
 }
 
+// US-layout virtual-key → character mapping for the "type to search while
+// Alt+Tab is still held" entry (TabTab pattern). Letters and digits cover
+// every real-world case; symbol rows are a best-effort bonus.
+const SHIFTED_DIGITS: Record<number, string> = { 0x30: '!', 0x31: '@', 0x32: '#', 0x33: '$', 0x34: '%', 0x35: '^', 0x36: '&', 0x37: '*', 0x38: '(', 0x39: ')' }
+const SHIFTED_SYMBOLS: Record<number, string> = { 0xBA: ':', 0xBB: '+', 0xBC: '<', 0xBD: '_', 0xBE: '>', 0xBF: '?', 0xC0: '~', 0xDB: '{', 0xDC: '|', 0xDD: '}', 0xDE: '"' }
+const PLAIN_SYMBOLS: Record<number, string> = { 0xBA: ';', 0xBB: '=', 0xBC: ',', 0xBD: '-', 0xBE: '.', 0xBF: '/', 0xC0: '`', 0xDB: '[', 0xDC: '\\', 0xDD: ']', 0xDE: "'" }
+
+/** True for keys that should start search when pressed while armed. */
+function isPrintableVk(vk: number): boolean {
+  if (vk === 0x20) return true // space
+  if (vk >= 0x30 && vk <= 0x39) return true // digits
+  if (vk >= 0x41 && vk <= 0x5A) return true // letters
+  return vk in PLAIN_SYMBOLS
+}
+
+/** vkCode → display character (US layout), or null. */
+function vkToChar(vk: number, shift: boolean): string | null {
+  if (vk === 0x20) return ' '
+  if (vk >= 0x30 && vk <= 0x39) return shift ? SHIFTED_DIGITS[vk] : String.fromCharCode(vk)
+  if (vk >= 0x41 && vk <= 0x5A) return shift ? String.fromCharCode(vk) : String.fromCharCode(vk + 32)
+  return shift ? (SHIFTED_SYMBOLS[vk] ?? null) : (PLAIN_SYMBOLS[vk] ?? null)
+}
+
 const pumpMsg = { hwnd: null, message: 0, wParam: 0n, lParam: 0n, time: 0, pt_x: 0, pt_y: 0 }
 
 /** Start the hook and its message pump. Idempotent. */
@@ -274,6 +460,12 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
   if (!hookPtr) {
     console.error('[Hook] SetWindowsHookExW failed — Alt+Tab takeover disabled')
     return
+  }
+  // Same pump drives the mouse hook; failure only disables click-outside
+  // detection (keyboard takeover is unaffected).
+  mouseHookPtr = setWindowsHookExW(WH_MOUSE_LL, mousePtr, null, 0)
+  if (!mouseHookPtr) {
+    console.error('[Hook] mouse hook failed — click-outside detection disabled')
   }
   pumpTimer = setInterval(() => {
     if (peekMessageW) {
@@ -290,6 +482,22 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
   console.log('[Hook] ✓ WH_KEYBOARD_LL installed (Alt+Tab takeover active)')
 }
 
+/**
+ * Pin/unpin the hook state machine (TabTab-style search mode, driven from
+ * main via the hook host). Pinned: Alt-up does not execute; every key
+ * passes through to the focused panel. Unpinning returns to armed while Alt
+ * is still held (user can keep cycling), else idle.
+ */
+export function setPinned(pinned: boolean): void {
+  pinnedSession = pinned
+  if (pinned) {
+    clearTapTimer()
+    state = 'pinned'
+  } else if (state === 'pinned') {
+    state = getAsyncKeyState && (getAsyncKeyState(VK_MENU) & 0x8000) !== 0 ? 'armed' : 'idle'
+  }
+}
+
 /** Unhook and stop the pump. The OS Alt+Tab returns instantly. */
 export function stopKeyboardHook(): void {
   if (pumpTimer !== null) {
@@ -300,7 +508,12 @@ export function stopKeyboardHook(): void {
     unhookWindowsHookEx(hookPtr)
     hookPtr = null
   }
+  if (mouseHookPtr && unhookWindowsHookEx) {
+    unhookWindowsHookEx(mouseHookPtr)
+    mouseHookPtr = null
+  }
   activeEvents = null
   state = 'idle'
+  pinnedSession = false
   clearTapTimer()
 }

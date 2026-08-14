@@ -130,10 +130,18 @@ interface AppState {
   switcherActive: boolean
   switcherEntries: import('../../shared/types').SwitcherEntryDto[]
   switcherSelected: number
+  /** Search mode (Enter while armed, TabTab pattern): panel stays up on Alt-up. */
+  switcherPinned: boolean
+  /** First character that started search mode by typing (type-to-search), consumed by SwitcherView. */
+  switcherSeedQuery: string
+  /** Latest hook-delivered control key (panel often isn't the OS foreground); consumed by SwitcherView. */
+  switcherControlKey: 'enter' | 'up' | 'down' | 'left' | 'right' | null
   /** Panel open state before the switcher took over — restored on hide. */
   switcherPrevOpen: boolean
   showSwitcher: (data: { entries: import('../../shared/types').SwitcherEntryDto[]; selectedIndex: number }) => void
   setSwitcherSelected: (index: number) => void
+  setSwitcherPinned: (pinned: boolean, seedQuery?: string) => void
+  setSwitcherControlKey: (key: 'enter' | 'up' | 'down' | 'left' | 'right' | null) => void
   hideSwitcher: () => void
   setSettingsOpen: (open: boolean) => void
   setDragActive: (active: boolean) => void
@@ -220,14 +228,19 @@ export const useStore = create<AppState>((set, get) => ({
   switcherActive: false,
   switcherEntries: [],
   switcherSelected: 0,
+  switcherPinned: false,
+  switcherSeedQuery: '',
+  switcherControlKey: null,
   switcherPrevOpen: false,
   showSwitcher: ({ entries, selectedIndex }) => {
-    set({ switcherActive: true, switcherEntries: entries, switcherSelected: selectedIndex, switcherPrevOpen: get().open, open: true })
+    set({ switcherActive: true, switcherEntries: entries, switcherSelected: selectedIndex, switcherPinned: false, switcherSeedQuery: '', switcherControlKey: null, switcherPrevOpen: get().open, open: true })
   },
   setSwitcherSelected: (index) => set({ switcherSelected: index }),
+  setSwitcherPinned: (pinned, seedQuery) => set({ switcherPinned: pinned, switcherSeedQuery: seedQuery ?? '' }),
+  setSwitcherControlKey: (switcherControlKey) => set({ switcherControlKey }),
   hideSwitcher: () => {
     const prevOpen = get().switcherPrevOpen
-    const finish = () => set({ switcherActive: false, switcherEntries: [] })
+    const finish = () => set({ switcherActive: false, switcherEntries: [], switcherPinned: false, switcherSeedQuery: '', switcherControlKey: null })
     if (prevOpen) {
       // Panel was already open before the session: no collapse animation,
       // switch straight back to the previous page.

@@ -39,6 +39,10 @@ export function clampSettings(input: Settings): Settings {
   if (out.moveMode !== 'copy' && out.moveMode !== 'move') {
     out.moveMode = 'move'
   }
+  // Animation richness: enum only; anything else falls back to standard.
+  if (out.motionLevel !== 'standard' && out.motionLevel !== 'extended') {
+    out.motionLevel = 'standard'
+  }
   if (typeof out.language !== 'string' || !out.language.trim()) {
     out.language = 'system'
   }
@@ -128,5 +132,7 @@ export function clampSettings(input: Settings): Settings {
   out.restoreTime = restoreTime === 'instant' || restoreTime === 'relaxed' || restoreTime === 'delayed' || restoreTime === 'forever'
     ? restoreTime
     : 'relaxed'
+  // Alt+Tab window grouping: explicit true only (default off).
+  out.switcherGroupWindows = out.switcherGroupWindows === true
   return out
 }

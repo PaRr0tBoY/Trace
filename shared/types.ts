@@ -55,6 +55,9 @@ export type View = 'clipboard' | 'files' | 'tasks'
 /** Restore-time preset: how long the panel keeps its last page after closing. */
 export type RestoreTime = 'instant' | 'relaxed' | 'delayed' | 'forever'
 
+/** Animation richness levels — see Settings.motionLevel. */
+export type MotionLevel = 'standard' | 'extended'
+
 /**
  * Accent theme id (values in shared/themes.ts). Color names are not
  * translated; localized labels live in i18n under `appearance.theme*`.
@@ -155,6 +158,12 @@ export interface SwitcherEntryDto {
   title: string
   exePath: string
   isCurrent: boolean
+  /** Original position in the ungrouped z-order list — hover/click report this to main. */
+  index: number
+  /** Set when the same app's windows are grouped: window count for the badge. */
+  groupCount?: number
+  /** The grouped windows (z-order), present only on a group row — drives the drill-in view. */
+  windows?: SwitcherEntryDto[]
 }
 
 /* ------------------------------------------------------------------ */
@@ -567,8 +576,19 @@ export interface Settings {
   incognito: boolean
   /** Start minimized when the OS logs in. */
   launchAtLogin: boolean
-  /** Reduce motion for the panel animations. */
-  reduceMotion: boolean
+  /**
+   * Animation richness, the single source of truth for all motion in the
+   * app (CSS transitions + Framer Motion + GSAP):
+   * - 'standard' — crisp functional motion: blade reveal, card enter/exit,
+   *                flyouts, toasts, hover feedback. No overshoot bounces.
+   * - 'extended' — standard plus delight: blade open bounce, tab-capsule
+   *                spring, new-item highlight, empty-state entrance, badge
+   *                pops, press feedback, copy ripple.
+   * Deliberately NOT tied to the OS prefers-reduced-motion flag (see
+   * useOpenBounce): the OS "Show animations" setting silently killed every
+   * animation on the author's machine; the in-app setting is authoritative.
+   */
+  motionLevel: MotionLevel
   /** When true, automatically clears unpinned items on device/app restart. */
   /** When true, automatically clears unpinned items on device/app restart. */
   clearUnpinnedOnRestart: boolean
@@ -705,6 +725,11 @@ export interface Settings {
    * the landing page (ADR-0004). 'forever' disables restoring entirely.
    */
   restoreTime: RestoreTime
+  /**
+   * Alt+Tab switcher: group multiple windows of the same app into one row
+   * (drill-in on click). Default off — native behavior.
+   */
+  switcherGroupWindows: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -714,7 +739,7 @@ export const DEFAULT_SETTINGS: Settings = {
   panelHeight: 0.5,
   incognito: false,
   launchAtLogin: true,
-  reduceMotion: false,
+  motionLevel: 'standard',
   clearUnpinnedOnRestart: false,
   moveMode: 'move',
   autoDeleteHours: 0,
@@ -762,7 +787,8 @@ export const DEFAULT_SETTINGS: Settings = {
   localModelSource: 'auto',
   localModelManualPath: undefined,
   landing: { view: 'tasks', filter: 'existing' },
-  restoreTime: 'relaxed'
+  restoreTime: 'relaxed',
+  switcherGroupWindows: false
 }
 
 /* ------------------------------------------------------------------ */

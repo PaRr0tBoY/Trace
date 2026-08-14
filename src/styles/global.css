@@ -135,8 +135,3 @@ input {
   background: rgba(255, 255, 255, 0.22);
 }
 
-/* Respect OS reduced-motion when the user opts in via settings. */
-:root[data-motion='reduce'] * {
-  transition-duration: 0.01ms !important;
-  animation-duration: 0.01ms !important;
-}

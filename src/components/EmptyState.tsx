@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { useStore } from '../store/appStore'
 import { useTranslation } from '../i18n'
 
@@ -10,6 +11,8 @@ export function EmptyState({ filtered }: { filtered: boolean }) {
   const { t } = useTranslation()
   const view = useStore((s) => s.view)
   const clipboardFilter = useStore((s) => s.clipboardFilter)
+  // 'extended' motion level eases the empty state in (fade + 8px rise).
+  const extended = useStore((s) => s.settings.motionLevel) === 'extended'
 
   let title = filtered ? t('emptyState.noResultsFound') : t('emptyState.shelfEmpty')
   let hint = filtered ? t('emptyState.noResultsHint') : t('emptyState.shelfEmptyHint')
@@ -26,11 +29,16 @@ export function EmptyState({ filtered }: { filtered: boolean }) {
   }
 
   return (
-    <div className="empty">
+    <motion.div
+      className="empty"
+      initial={extended ? { opacity: 0, y: 8 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+    >
       <div className="empty-text">
         <div className="big">{title}</div>
         <div className="hint">{hint}</div>
       </div>
-    </div>
+    </motion.div>
   )
 }

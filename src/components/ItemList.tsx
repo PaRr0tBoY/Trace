@@ -3,7 +3,7 @@
  *
  * Renders Pinned (if any) and Recent sections, handles OS drag-in of files &
  * images onto the shelf, and shows the empty state when there's nothing.
- * AnimatePresence here gives items their staggered enter/exit.
+ * AnimatePresence here gives items their enter/exit.
  *
  * Drag-in awareness: sets `dragActive` on the store while OS files are being
  * dragged over the panel so the edge-hover hook knows not to close mid-drag.
@@ -38,7 +38,7 @@ export function ItemList() {
   
   const isDraggingAny = useStore((s) => !!s.dragActive || !!s.internalDragReq)
   const open = useStore((s) => s.open)
-  
+
   const clipboardFilter = useStore((s) => s.clipboardFilter) || 'all'
   // When the type filter or search query changes, newly-mounted cards skip
   // their enter animation — the list swaps in place instead of the old batch

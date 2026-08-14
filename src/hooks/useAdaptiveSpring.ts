@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { Transition } from 'framer-motion'
 
 /**
  * Returns Framer Motion spring presets calibrated to the current display.
@@ -15,11 +16,6 @@ import { useMemo } from 'react'
 export function useAdaptiveSpring() {
   return useMemo(() => {
     const dpr = window.devicePixelRatio || 1
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-    if (prefersReducedMotion) {
-      return { type: 'tween', duration: 0.01 } as const
-    }
 
     if (dpr >= 1.75) {
       // Hi-DPI (2×+): Apple fluid spring curve
@@ -46,14 +42,56 @@ export function useAdaptiveSpring() {
 }
 
 /**
+ * The blade's open transition — a Dynamic-Island-style settle on the
+ * background layer (.blade-bg in Panel.tsx): the black shape pokes ~2% of
+ * the blade width (5.4px at 270px) past the rest edge and settles back while
+ * the clip reveal opens. Content in .blade never scales — only the shape
+ * moves.
+ *
+ * Keyframe shape (times relative to the 0.42s total, keyframes [1, 1.02, 1]):
+ *   1 → 1.02  0–150ms  exceed, expo-out — starts the instant the panel opens,
+ *                      peaking exactly as the clip-path reveal reaches the
+ *                      blade's full width (the clip's right edge passes 270px
+ *                      at ~145ms of its 0.3s ease-out; the rest of the clip
+ *                      animation just extends the crop box past the element
+ *                      and does not affect visibility). No hold, no gap —
+ *                      the poke hands off from the reveal like a relay.
+ *   1.02 → 1  150–420ms pull-back, ease-in-out cubic — launches softly from
+ *                      the peak, fastest at the midpoint, settles gradually.
+ *
+ * Why keyframes and not a spring: a single under-damped spring overshoots at
+ * ~108ms — still inside the clip reveal, which keeps growing and masks the
+ * overshoot entirely (that was the first attempt). framer-motion does not
+ * support per-segment spring transitions (getValueTransition spreads a
+ * transition array into numbered keys), so the exceed and pull-back are
+ * beziers shaped like a spring's trajectory, not a spring itself.
+ *
+ * Deliberately NOT gated on the OS prefers-reduced-motion flag: the blade
+ * reveal is the app's core orientation feedback, and gating it on the OS
+ * setting silently disabled every animation on machines with "Show
+ * animations" off (the author's own setup — verified via Chromium
+ * matchMedia). Motion level is the user's in-app choice instead: the bounce
+ * plays only under 'extended'; 'standard' keeps the plain clip reveal.
+ */
+export function useOpenBounce(): Transition {
+  return useMemo<Transition>(() => {
+    return {
+      duration: 0.42,
+      times: [0, 0.357, 1],
+      ease: [
+        [0.22, 1, 0.36, 1],
+        [0.65, 0, 0.35, 1]
+      ]
+    }
+  }, [])
+}
+
+/**
  * A gentler spring for secondary surfaces (flyout content, settings panes).
  * Slightly slower stiffness so it doesn't feel abrupt against the blade motion.
  */
 export function useSubtleSpring() {
   return useMemo(() => {
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (prefersReducedMotion) return { type: 'tween', duration: 0.01 } as const
-
     return {
       type: 'spring',
       stiffness: 340,

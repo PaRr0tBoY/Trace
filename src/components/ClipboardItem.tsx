@@ -66,11 +66,20 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
   const open = useStore((s) => s.open)
   const [flashVisible, setFlashVisible] = useState(false)
   const lastFlashedAt = useRef(0)
+  // Button-copy ripples start at the button's position inside the card.
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [rippleOrigin, setRippleOrigin] = useState<{ x: number; y: number } | null>(null)
+  // A button copy already shows the ripple, so its shimmer is suppressed
+  // (but still counted as played — reopening the panel must not re-flash it).
+  const suppressFlashUntil = useRef(0)
   useEffect(() => {
     if (!open) return
-    if (motionLevel === 'extended' && item.capturedAt > Date.now() - 4000 && item.capturedAt !== lastFlashedAt.current) {
+    const now = Date.now()
+    if (motionLevel === 'extended' && item.capturedAt > now - 4000 && item.capturedAt !== lastFlashedAt.current) {
       lastFlashedAt.current = item.capturedAt
-      setFlashVisible(true)
+      if (now >= suppressFlashUntil.current) {
+        setFlashVisible(true)
+      }
     }
   }, [open, motionLevel, item.capturedAt])
 
@@ -84,6 +93,11 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
   const onCopy = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     playButtonClickSound()
+    const cardRect = cardRef.current?.getBoundingClientRect()
+    if (cardRect) {
+      setRippleOrigin({ x: e.clientX - cardRect.left, y: e.clientY - cardRect.top })
+    }
+    suppressFlashUntil.current = Date.now() + 800
     copy(item.id)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 900)
@@ -126,6 +140,7 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
 
   return (
     <motion.div
+      ref={cardRef}
       layout={animateLayout ? 'position' : false}
       initial={!instant && open ? { opacity: 0, scale: 0.96, y: 6 } : false}
       animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -143,37 +158,54 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
     >
       {flashVisible && (
         <motion.div
-          key="new-copy-highlight"
-          initial={{ opacity: 1 }}
-          animate={{ opacity: 0 }}
-          transition={{ duration: 1.8, ease: [0.16, 1, 0.3, 1] }}
+          key="new-copy-shimmer"
+          initial={{ x: '-120%' }}
+          animate={{ x: '250%' }}
+          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
           onAnimationComplete={() => setFlashVisible(false)}
           style={{
             position: 'absolute',
-            inset: 0,
-            borderRadius: 16,
-            background: 'linear-gradient(90deg, rgba(var(--accent-rgb), 0.5), rgba(var(--accent-rgb), 0.14) 32%, transparent 62%)',
-            boxShadow: 'inset 3px 0 0 var(--accent)',
+            top: 0,
+            bottom: 0,
+            left: 0,
+            width: '55%',
+            background:
+              'linear-gradient(90deg, transparent, rgba(var(--accent-rgb), 0.4) 40%, rgba(var(--accent-rgb), 0.75) 50%, rgba(var(--accent-rgb), 0.4) 60%, transparent)',
+            filter: 'blur(5px)',
             pointerEvents: 'none',
             zIndex: 14
           }}
         />
       )}
-      {copied && motionLevel === 'extended' && (
+      {copied && motionLevel === 'extended' && rippleOrigin && (
         <motion.div
-          key="copy-ripple"
-          initial={{ opacity: 0.9, scale: 0.2 }}
-          animate={{ opacity: 0, scale: 1.6 }}
-          transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
+          key="copy-ripple-clip"
           style={{
             position: 'absolute',
             inset: 0,
             borderRadius: 16,
-            background: 'radial-gradient(circle at center, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0.1) 45%, transparent 75%)',
+            overflow: 'hidden',
             pointerEvents: 'none',
             zIndex: 15
           }}
-        />
+        >
+          <motion.div
+            initial={{ opacity: 0.9, scale: 0 }}
+            animate={{ opacity: 0, scale: 15 }}
+            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              position: 'absolute',
+              left: rippleOrigin.x,
+              top: rippleOrigin.y,
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              background:
+                'radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.16) 55%, transparent 80%)',
+              transform: 'translate(-50%, -50%)'
+            }}
+          />
+        </motion.div>
       )}
       <div
         className={`item-main${isPreviewing ? ' force-actions previewing' : ''}`}

@@ -103,7 +103,7 @@ AI 管道通道（t42/t51/t54）：`trace:list-by-decision/list-by-task/get-by-i
 - `focus.ts` — 输入框焦点桥（见注意事项"输入框焦点（t21）"）。
 - `windowSwitch.ts` — ADR-0005：`app:open-linked-window` 的实现（pid 命中 → 激活窗口；应用存活 → 最新窗口；否则启动 exe）。`suggestionEngine.ts` 的 `latestSwitchFor` 提供链接窗口快照（linkedWindow）。`activateHwnd` 导出给切换器复用；**只有最小化窗口才 SW_RESTORE**（无脑 restore 会把最大化窗口切成普通窗口）。
 - `aiLog.ts` — JSONL 可观测日志（`ai-log.jsonl`）：聊天调用、引擎算法输出、记忆写入各留一条；`provider.ts` 的 `log` 钩子 + `MemoryStore`/`suggestionEngine` 的 `log` 均汇入。
-- `appIcons.ts` — APP 图标：`attachAppIcons`/`attachSuggestionIcons` 在 `pushState.tasks/suggestions` 推送前批量填充（`AppRef.iconUrl` / `TaskProposal.appIcons`），`app:icons` 通道按需补取（LRU 128 缓存）；`appIconCore.ts` 是纯逻辑（缓存/占位），可注入测试。
+- `appIcons.ts` — APP 图标：`attachAppIcons`/`attachSuggestionIcons` 在 `pushState.tasks/suggestions` 推送前批量填充（`AppRef.iconUrl` / `TaskProposal.appIcons`），`app:icons` 通道按需补取；**磁盘持久化**（`app-icons.json`，userData，7 天 TTL，防抖写盘，负缓存不落盘）+ 启动后台预取（`prewarmAppIcons`：持久化任务 apps ∪ 剪贴板 sourceApp ∪ 最近事件，idle 后 1.5s 跑）——重启后图标立即就绪，不暴露提取过程；`appIconCore.ts` 是纯逻辑（LRU 128 内存缓存含负缓存 30min TTL/seed/snapshot/占位），可注入测试。
 - `imageProtocol.ts` — `tracelocal://thumb` 缩略图协议（ADR-0004 性能项，图片预览 base64 移出 IPC DTO）。
 - `ocr.ts` — Windows.Media.Ocr（WinRT，经 PowerShell 单行脚本）识别前台窗口文字，作为 LLM 建议的 `ocrContext` 输入。**只作 AI 资料不进 UI、不持久化**；隐私三开关（incognito/L0/总开关）任一关闭即跳过；分析触发时才跑，超时放弃。
 - `suggestionDrop.ts` — 拖到备选卡"自动建任务并绑定"的纯逻辑组合（`acceptWithResource`），IPC 层薄封装。

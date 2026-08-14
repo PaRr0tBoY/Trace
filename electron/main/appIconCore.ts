@@ -17,9 +17,16 @@ export interface AppIconService {
   resolve(exePath: string): Promise<string | null>
   attachToTasks(tasks: TaskDto[]): Promise<TaskDto[]>
   attachToSuggestions(suggestions: TaskProposal[]): Promise<TaskProposal[]>
+  /** Restore disk cache entries (successful extractions only) before any resolve. */
+  seed(entries: Map<string, string>): void
+  /** Successful extractions keyed by normalized path — the disk-persist payload. */
+  snapshot(): Map<string, string>
 }
 
 export const APP_ICON_CACHE_MAX = 128
+
+/** Failed extractions are re-probed after this long instead of negative-caching forever. */
+export const APP_ICON_NEGATIVE_TTL_MS = 30 * 60_000
 
 /** Windows paths are case-insensitive; one cache entry per file, not per casing. */
 export function normalizeIconKey(exePath: string): string {
@@ -39,18 +46,23 @@ export function iconSourceOf(app: { exePath?: string; id: string }): string | nu
   return /[\\/]/.test(id) || /\.exe$/i.test(id) ? id : null
 }
 
-export function createAppIconService(fetcher: IconFetcher, max = APP_ICON_CACHE_MAX): AppIconService {
-  // exePath (normalized) -> dataURL, or null for a failed extraction (negative
-  // cache: a dead path must not be re-probed on every push).
-  const cache = new Map<string, string | null>()
+export function createAppIconService(fetcher: IconFetcher, max = APP_ICON_CACHE_MAX, onChange?: () => void): AppIconService {
+  // normalized path -> entry; value null = failed extraction (negative cache,
+  // re-probed after APP_ICON_NEGATIVE_TTL_MS so a re-installed app's icon is
+  // eventually picked up).
+  const cache = new Map<string, { value: string | null; ts: number }>()
 
   async function resolve(exePath: string): Promise<string | null> {
     const key = normalizeIconKey(exePath)
-    if (cache.has(key)) {
-      const hit = cache.get(key)!
-      cache.delete(key)
-      cache.set(key, hit) // refresh LRU recency
-      return hit
+    const hit = cache.get(key)
+    if (hit) {
+      const staleNegative = hit.value === null && Date.now() - hit.ts >= APP_ICON_NEGATIVE_TTL_MS
+      if (!staleNegative) {
+        cache.delete(key)
+        cache.set(key, hit) // refresh LRU recency
+        return hit.value
+      }
+      cache.delete(key) // expired negative entry: allow a re-probe
     }
     let value: string | null
     try {
@@ -58,12 +70,34 @@ export function createAppIconService(fetcher: IconFetcher, max = APP_ICON_CACHE_
     } catch {
       value = null
     }
-    cache.set(key, value)
+    cache.set(key, { value, ts: Date.now() })
     if (cache.size > max) {
       const oldest = cache.keys().next().value
       if (oldest !== undefined) cache.delete(oldest)
     }
+    if (value !== null) onChange?.()
     return value
+  }
+
+  /** Restore persisted entries; a live-fetched slot wins over the disk copy. */
+  function seed(entries: Map<string, string>): void {
+    for (const [key, value] of entries) {
+      if (!cache.has(key)) cache.set(key, { value, ts: Date.now() })
+    }
+    while (cache.size > max) {
+      const oldest = cache.keys().next().value
+      if (oldest === undefined) break
+      cache.delete(oldest)
+    }
+  }
+
+  /** Successful extractions only — negative entries never reach the disk. */
+  function snapshot(): Map<string, string> {
+    const out = new Map<string, string>()
+    for (const [key, entry] of cache) {
+      if (entry.value !== null) out.set(key, entry.value)
+    }
+    return out
   }
 
   /** Unique exePaths across a batch, normalized; returns original-cased path per key. */
@@ -124,5 +158,5 @@ export function createAppIconService(fetcher: IconFetcher, max = APP_ICON_CACHE_
     return suggestions
   }
 
-  return { resolve, attachToTasks, attachToSuggestions }
+  return { resolve, attachToTasks, attachToSuggestions, seed, snapshot }
 }

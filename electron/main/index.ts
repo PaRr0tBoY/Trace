@@ -16,7 +16,8 @@ import { createWindow, getMainWindow, setInteractive, setVisible, startCursorPol
 import { createTray, registerIncognitoApplier } from './tray'
 import { registerIpc, registerSendListeners, getProviderChain } from './ipc'
 import { prewarmDragIcons } from './drag'
-import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushState, stopStateTimers, setSuggestionChat, setSuggestionOcr } from './state'
+import { loadAppIconCacheFromDisk, prewarmAppIcons } from './appIcons'
+import { initState, getWatcher, getTaskStore, getStore, loadSettings, saveSettings, pushState, stopStateTimers, setSuggestionChat, setSuggestionOcr } from './state'
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
 import { startKeyboardHook, stopKeyboardHook } from './hookManager'
@@ -24,7 +25,7 @@ import { switcherShow, switcherAdvance, switcherExecute, switcherTapExecute } fr
 import { ForegroundWatcher } from './foreground'
 import { ocrFromForeground } from './ocr'
 import { createAttributor, type Attributor } from './attributor'
-import { subscribe as subscribeEvents } from './eventBus'
+import { subscribe as subscribeEvents, recentEvents } from './eventBus'
 import { extname, normalize } from 'node:path'
 import { existsSync, createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -129,8 +130,16 @@ app.whenReady().then(() => {
   }
   registerIpc()
   registerSendListeners()
+  // Restore the app-icon disk cache before the first push attaches icons.
+  loadAppIconCacheFromDisk()
   initState()
   prewarmDragIcons()
+  // Background icon prewarm: every path the UI can render (persisted tasks'
+  // apps, clipboard source apps, recent usage events) is fetched while idle,
+  // so icons are ready before the user opens the panel — no letter fallback.
+  setTimeout(() => {
+    prewarmAppIcons(getTaskStore().toDto(), getStore().list(), recentEvents()).catch(() => {})
+  }, 1500)
 
   // Wire the provider chain into the suggestion engine (after initState so the
   // engine's singletons exist; the 30s+ silence floor guarantees the chain is

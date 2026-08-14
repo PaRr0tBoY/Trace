@@ -69,6 +69,9 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
   // Button-copy ripples start at the button's position inside the card.
   const cardRef = useRef<HTMLDivElement>(null)
   const [rippleOrigin, setRippleOrigin] = useState<{ x: number; y: number } | null>(null)
+  // Epoch bumps on every button copy so the ripple replays even when clicks
+  // land while `copied` is still true (remount via key change).
+  const [rippleEpoch, setRippleEpoch] = useState(0)
   // A button copy already shows the ripple, so its shimmer is suppressed
   // (but still counted as played — reopening the panel must not re-flash it).
   const suppressFlashUntil = useRef(0)
@@ -100,7 +103,8 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
     suppressFlashUntil.current = Date.now() + 800
     copy(item.id)
     setCopied(true)
-    window.setTimeout(() => setCopied(false), 900)
+    setRippleEpoch((n) => n + 1)
+    window.setTimeout(() => setCopied(false), 1000)
   }, [copy, item.id])
 
   const onPaste = useCallback((e?: React.MouseEvent) => {
@@ -179,7 +183,7 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
       )}
       {copied && motionLevel === 'extended' && rippleOrigin && (
         <motion.div
-          key="copy-ripple-clip"
+          key={`copy-ripple-${rippleEpoch}`}
           style={{
             position: 'absolute',
             inset: 0,
@@ -192,7 +196,7 @@ function ClipboardItemBase({ item, instant, animateLayout }: Props) {
           <motion.div
             initial={{ opacity: 0.9, scale: 0 }}
             animate={{ opacity: 0, scale: 15 }}
-            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
             style={{
               position: 'absolute',
               left: rippleOrigin.x,

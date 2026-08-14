@@ -4,10 +4,28 @@
  * Feeds app.getFileIcon results into the shared cache and exposes the two
  * push-time batch attachment functions that pushState (state.ts) awaits
  * before broadcasting state:tasks / state:suggestions.
+ *
+ * Persistence: successful extractions are written to a debounced JSON file
+ * under userData and restored on startup, so icons survive restarts and the
+ * UI never shows the letter fallback while extraction catches up. Failed
+ * extractions are never persisted (the in-memory negative cache has its own
+ * TTL in appIconCore).
  */
 import { app } from 'electron'
-import type { TaskProposal, TaskDto } from '../../shared/types'
-import { createAppIconService } from './appIconCore'
+import { readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs'
+import type { TaskProposal, TaskDto, ClipboardItem, UsageEvent } from '../../shared/types'
+import { createAppIconService, normalizeIconKey, iconSourceOf } from './appIconCore'
+import { PATHS } from '../store/paths'
+
+/** Disk entries older than this are re-extracted in the background on startup. */
+const DISK_CACHE_TTL_MS = 7 * 24 * 60 * 60_000
+/** Debounce window for writing the snapshot to disk. */
+const PERSIST_DEBOUNCE_MS = 800
+
+interface DiskEntry {
+  url: string
+  ts: number
+}
 
 /** Resolve an exePath to a PNG dataURL, or null on any failure (missing file, empty icon). */
 async function fetchElectronIcon(exePath: string): Promise<string | null> {
@@ -20,7 +38,69 @@ async function fetchElectronIcon(exePath: string): Promise<string | null> {
   }
 }
 
-const service = createAppIconService({ fetchIcon: fetchElectronIcon })
+const service = createAppIconService({ fetchIcon: fetchElectronIcon }, undefined, schedulePersist)
+
+let persistTimer: NodeJS.Timeout | null = null
+function schedulePersist(): void {
+  if (persistTimer !== null) return
+  persistTimer = setTimeout(() => {
+    persistTimer = null
+    try {
+      const now = Date.now()
+      const payload: Record<string, DiskEntry> = {}
+      for (const [key, url] of service.snapshot()) payload[key] = { url, ts: now }
+      const file = PATHS.appIconsFile()
+      writeFileSync(file + '.tmp', JSON.stringify(payload), 'utf8')
+      renameSync(file + '.tmp', file)
+    } catch {
+      /* icon cache is cosmetic — a failed write is never fatal */
+    }
+  }, PERSIST_DEBOUNCE_MS)
+}
+
+/** Restore the disk cache before the first push attaches icons. */
+export function loadAppIconCacheFromDisk(): void {
+  try {
+    const file = PATHS.appIconsFile()
+    if (!existsSync(file)) return
+    const raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, DiskEntry>
+    const now = Date.now()
+    const entries = new Map<string, string>()
+    for (const [key, entry] of Object.entries(raw)) {
+      if (typeof entry?.url === 'string' && now - entry.ts < DISK_CACHE_TTL_MS) {
+        entries.set(key, entry.url)
+      }
+    }
+    service.seed(entries)
+  } catch {
+    /* corrupt or absent cache: start empty, the prewarm refetches */
+  }
+}
+
+/**
+ * Background prewarm: fetch every path the UI can render — persisted tasks'
+ * apps, clipboard source apps, recent usage events — while the user is
+ * elsewhere, so push-time attachment and the app:icons IPC hit the cache.
+ * Never rejects; failures just stay out of the cache until re-probed.
+ */
+export async function prewarmAppIcons(
+  tasks: TaskDto[],
+  items: readonly ClipboardItem[],
+  events: readonly UsageEvent[]
+): Promise<void> {
+  const paths = new Map<string, string>()
+  const add = (p: string | undefined | null): void => {
+    if (p && (/[\\/]/.test(p) || /\.exe$/i.test(p))) paths.set(normalizeIconKey(p), p)
+  }
+  for (const task of tasks) {
+    for (const appRef of task.apps) add(iconSourceOf(appRef))
+  }
+  for (const item of items) add(item.sourceApp?.exePath)
+  for (const event of events) {
+    if ('exePath' in event && typeof event.exePath === 'string') add(event.exePath)
+  }
+  await Promise.all([...paths.values()].map((p) => service.resolve(p)))
+}
 
 /** Fill TaskDto.apps[].iconUrl in place (fresh DTO objects only). */
 export function attachAppIcons(tasks: TaskDto[]): Promise<TaskDto[]> {

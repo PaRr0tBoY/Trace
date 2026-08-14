@@ -5,7 +5,7 @@
  * no Electron runtime needed (same pattern as geometry/power tests).
  */
 import { describe, it, expect, vi } from 'vitest'
-import { createAppIconService, type IconFetcher } from '../electron/main/appIconCore'
+import { createAppIconService, APP_ICON_NEGATIVE_TTL_MS, type IconFetcher } from '../electron/main/appIconCore'
 import type { TaskProposal, TaskDto } from '../shared/types'
 
 function makeFetcher(icons: Record<string, string>): { fetcher: IconFetcher; calls: string[] } {
@@ -193,5 +193,66 @@ describe('attachToSuggestions', () => {
     expect(calls).toEqual(['C:\\Code.exe'])
     expect(suggestions[0].appIcons?.[0].iconUrl).toBe(DATA_URL)
     expect(suggestions[1].appIcons?.[0].iconUrl).toBe(DATA_URL)
+  })
+})
+
+describe('disk cache bridge (seed / snapshot / negative TTL)', () => {
+  it('seed restores hits without refetching (case-insensitive)', async () => {
+    const { fetcher, calls } = makeFetcher({ 'C:\\Apps\\Code.exe': DATA_URL })
+    const svc = createAppIconService(fetcher)
+    svc.seed(new Map([['c:\\apps\\code.exe', DATA_URL]]))
+
+    expect(await svc.resolve('C:\\Apps\\Code.exe')).toBe(DATA_URL)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('snapshot excludes negative entries, keeping successful ones', async () => {
+    const { fetcher } = makeFetcher({ 'C:\\Apps\\Code.exe': DATA_URL })
+    const svc = createAppIconService(fetcher)
+    await svc.resolve('C:\\Apps\\Code.exe')
+    await svc.resolve('C:\\Apps\\Dead.exe') // extraction fails
+
+    const snap = svc.snapshot()
+    expect(snap.get('c:\\apps\\code.exe')).toBe(DATA_URL)
+    expect(snap.has('c:\\apps\\dead.exe')).toBe(false)
+    expect(snap.size).toBe(1)
+  })
+
+  it('re-probes failed extractions once the negative TTL elapses', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(1_000_000)
+    try {
+      const { fetcher } = makeFetcher({}) // nothing resolvable at first
+      const svc = createAppIconService(fetcher)
+      const probe = vi.mocked(fetcher.fetchIcon)
+
+      expect(await svc.resolve('C:\\Apps\\Code.exe')).toBeNull()
+      expect(await svc.resolve('C:\\Apps\\Code.exe')).toBeNull() // negative hit
+      expect(probe).toHaveBeenCalledTimes(1)
+
+      probe.mockImplementation(async (p: string) => (p === 'C:\\Apps\\Code.exe' ? DATA_URL : null))
+      vi.advanceTimersByTime(APP_ICON_NEGATIVE_TTL_MS + 1)
+
+      expect(await svc.resolve('C:\\Apps\\Code.exe')).toBe(DATA_URL)
+      expect(probe).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('seed respects the LRU cap', async () => {
+    const { fetcher } = makeFetcher({})
+    const svc = createAppIconService(fetcher, 2)
+    svc.seed(new Map([
+      ['c:\\a.exe', DATA_URL],
+      ['c:\\b.exe', DATA_URL],
+      ['c:\\c.exe', DATA_URL]
+    ]))
+
+    // Only the two newest survive seed-time eviction; resolving the evicted
+    // path refetches (fails here) and its negative entry pushes out 'b'.
+    expect(await svc.resolve('C:\\a.exe')).toBeNull()
+    expect(await svc.resolve('C:\\b.exe')).toBeNull()
+    expect(await svc.resolve('C:\\c.exe')).toBe(DATA_URL)
   })
 })

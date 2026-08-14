@@ -10,7 +10,7 @@
  * to paste it, copy button → copy-subitem (never creates a new entry),
  * pin button → pins the parent entry.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useStore } from '../store/appStore'
 import { useTranslation } from '../i18n'
 import { useFileMembers } from '../hooks/useFilteredItems'
@@ -19,7 +19,7 @@ import { FileMemberRow } from './FileMemberRow'
 import { PinnedTile } from './PinnedTile'
 import { EmptyState } from './EmptyState'
 import { IncognitoBanner } from './IncognitoBanner'
-import { ViewFooter } from './ViewFooter'
+import type { ViewFooterState } from './ViewFooter'
 import { isImageItem } from '../lib/fileTabs'
 import { basename } from '../lib/format'
 import { filterStationByRoute, countStale } from '../lib/stationRoute'
@@ -58,7 +58,13 @@ function stationToItem(entry: StationEntryDto): ClipboardItemDto {
   }
 }
 
-export function FileListView() {
+interface Props {
+  /** Report this view's footer state up to Panel (the toolbar lives outside
+   *  the view-transition animation and is rendered once, at Panel level). */
+  onFooterChange: (footer: ViewFooterState | null) => void
+}
+
+export function FileListView({ onFooterChange }: Props) {
   const { t } = useTranslation()
   const query = useStore((s) => s.query)
   const tutorialStep = useStore((s) => s.tutorialStep)
@@ -146,7 +152,7 @@ export function FileListView() {
    * 'clipboard' pseudo-tab clears only clipboard-captured station entries;
    * 'all' clears every unpinned file entry.
    */
-  const clearScopedFiles = (): void => {
+  const clearScopedFiles = useCallback((): void => {
     const state = useStore.getState()
     const filter = state.filesFilter || 'all'
     const routeEntries = filterStationByRoute(state.station, filter === 'clipboard' ? 'clipboard' : 'all')
@@ -163,7 +169,7 @@ export function FileListView() {
         await state.clear(unpinnedItems.map((it) => it.id))
       }
     })()
-  }
+  }, [])
 
   /**
    * Member-mode clear: remove every unpinned parent entry of the members
@@ -171,7 +177,7 @@ export function FileListView() {
    * content only). Station membership wins over item membership (same rule
    * as FileMemberRow).
    */
-  const clearScopedMembers = (): void => {
+  const clearScopedMembers = useCallback((): void => {
     const state = useStore.getState()
     const memberIds = [...new Set((files.tabMembers ?? []).map((m) => m.itemId))]
     const stationIds = memberIds.filter((id) => state.station.some((e) => e.id === id && !e.pinned))
@@ -184,79 +190,94 @@ export function FileListView() {
         await state.clear(itemIds)
       }
     })()
-  }
+  }, [files])
 
-  const footer = (count: number, onClear: () => void, clearDisabled = count === 0) => (
-    <ViewFooter
-      count={count}
-      noun="item"
-      clearLabel={t('item.clear')}
-      clearTitle={t('item.clearScoped')}
-      clearDisabled={clearDisabled}
-      onClear={onClear}
-    />
-  )
-
-  if (files.tabMembers === null) {
-    const total = groupedEntries.pinned.length + groupedEntries.recent.length
-    // Clear scope is the whole route view (ignores the search query, which
-    // only narrows the visible list).
-    const scopeCount =
-      (filesFilter === 'clipboard' ? [] : fileItems.filter((it) => it.data.kind === 'files' && !isImageItem(it) && !it.pinned)).length +
+  // Footer data, hoisted so the shared toolbar (rendered by Panel outside
+  // the view-transition animation) gets it before the browser paints.
+  const groupedMode = files.tabMembers === null
+  const members = files.tabMembers ?? []
+  const total = groupedMode ? groupedEntries.pinned.length + groupedEntries.recent.length : members.length
+  // Clear scope is the whole route view (ignores the search query, which
+  // only narrows the visible list).
+  const scopeCount = groupedMode
+    ? (filesFilter === 'clipboard' ? [] : fileItems.filter((it) => it.data.kind === 'files' && !isImageItem(it) && !it.pinned)).length +
       filterStationByRoute(station, filesFilter === 'clipboard' ? 'clipboard' : 'all').filter((e) => !e.pinned).length
+    : 0
+  const memberScopeClearable = groupedMode
+    ? false
+    : members.some((m) => {
+        const st = useStore.getState().station.find((e) => e.id === m.itemId)
+        if (st) return !st.pinned
+        const it = useStore.getState().items.find((i) => i.id === m.itemId)
+        return it ? !it.pinned : false
+      })
+
+  useLayoutEffect(() => {
+    onFooterChange(groupedMode
+      ? {
+          count: total,
+          noun: 'item',
+          clearLabel: t('item.clear'),
+          clearTitle: t('item.clearScoped'),
+          clearDisabled: scopeCount === 0,
+          onClear: clearScopedFiles
+        }
+      : {
+          count: total,
+          noun: 'item',
+          clearLabel: t('item.clear'),
+          clearTitle: t('item.clearScoped'),
+          clearDisabled: !memberScopeClearable,
+          onClear: clearScopedMembers
+        })
+  }, [groupedMode, total, scopeCount, memberScopeClearable, clearScopedFiles, clearScopedMembers, onFooterChange, t])
+
+  if (groupedMode) {
     if (total === 0) {
       return (
         <>
           <EmptyState filtered={query.trim().length > 0} />
-          {footer(0, clearScopedFiles, scopeCount === 0)}
         </>
       )
     }
     return (
-      <>
-        <div className="list">
-          {staleBanner}
-          {/* The clipboard pseudo-tab shows clipboard-captured files — the
-              incognito notice belongs here, next to the content it affects. */}
-          {filesFilter === 'clipboard' && <IncognitoBanner />}
-          {groupedEntries.pinned.length > 0 && (
-            <section className="pinned-section">
-              <div className="section-label">{t('item.pinned')}</div>
-              {expandedEntry && (
-                <ClipboardItemCard key={expandedEntry.id} item={stationToItem(expandedEntry)} stationEntry={expandedEntry} instant={false} />
-              )}
-              {gridEntries.length > 0 && (
-                <div className="pinned-grid">
-                  {gridEntries.map((e) => (
-                    <PinnedTile key={e.id} entry={e} onExpand={setExpandedGridId} />
-                  ))}
-                </div>
-              )}
-              {itemPinned.map((r) => (
-                <ClipboardItemCard key={r.item.id} item={r.item} instant={false} />
-              ))}
-            </section>
-          )}
-          {groupedEntries.recent.length > 0 && (
-            <section>
-              {groupedEntries.pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
-              {groupedEntries.recent.map(renderRow)}
-            </section>
-          )}
-        </div>
-        {footer(total, clearScopedFiles, scopeCount === 0)}
-      </>
+      <div className="list">
+        {staleBanner}
+        {/* The clipboard pseudo-tab shows clipboard-captured files — the
+            incognito notice belongs here, next to the content it affects. */}
+        {filesFilter === 'clipboard' && <IncognitoBanner />}
+        {groupedEntries.pinned.length > 0 && (
+          <section className="pinned-section">
+            <div className="section-label">{t('item.pinned')}</div>
+            {expandedEntry && (
+              <ClipboardItemCard key={expandedEntry.id} item={stationToItem(expandedEntry)} stationEntry={expandedEntry} instant={false} />
+            )}
+            {gridEntries.length > 0 && (
+              <div className="pinned-grid">
+                {gridEntries.map((e) => (
+                  <PinnedTile key={e.id} entry={e} onExpand={setExpandedGridId} />
+                ))}
+              </div>
+            )}
+            {itemPinned.map((r) => (
+              <ClipboardItemCard key={r.item.id} item={r.item} instant={false} />
+            ))}
+          </section>
+        )}
+        {groupedEntries.recent.length > 0 && (
+          <section>
+            {groupedEntries.pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
+            {groupedEntries.recent.map(renderRow)}
+          </section>
+        )}
+      </div>
     )
   }
 
   // Member mode: single rows under the active extension/'other' tab.
-  const members = files.tabMembers
   if (members.length === 0) {
     return (
-      <>
-        <EmptyState filtered={query.trim().length > 0} />
-        {footer(0, clearScopedMembers, true)}
-      </>
+      <EmptyState filtered={query.trim().length > 0} />
     )
   }
 
@@ -272,26 +293,16 @@ export function FileListView() {
     }
   }
 
-  const memberScopeClearable = members.some((m) => {
-    const st = useStore.getState().station.find((e) => e.id === m.itemId)
-    if (st) return !st.pinned
-    const it = useStore.getState().items.find((i) => i.id === m.itemId)
-    return it ? !it.pinned : false
-  })
-
   return (
-    <>
-      <div className="list">
-        {staleBanner}
-        {grouped.map((g) => (
-          <section key={g.itemId} style={{ marginBottom: 8 }}>
-            {g.members.map((m) => (
-              <FileMemberRow key={`${m.itemId}:${m.index}`} member={m} />
-            ))}
-          </section>
-        ))}
-      </div>
-      {footer(members.length, clearScopedMembers, !memberScopeClearable)}
-    </>
+    <div className="list">
+      {staleBanner}
+      {grouped.map((g) => (
+        <section key={g.itemId} style={{ marginBottom: 8 }}>
+          {g.members.map((m) => (
+            <FileMemberRow key={`${m.itemId}:${m.index}`} member={m} />
+          ))}
+        </section>
+      ))}
+    </div>
   )
 }

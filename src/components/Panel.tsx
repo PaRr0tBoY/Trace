@@ -10,7 +10,7 @@
  * transparent and click-through.
  */
 import { motion, AnimatePresence } from 'framer-motion'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/appStore'
 import { PANEL_LEAVE_EVENT, PANEL_ENTER_EVENT } from '../hooks/useEdgeHover'
 import { useFilteredItems, matchesClipboardFilter } from '../hooks/useFilteredItems'
@@ -24,12 +24,15 @@ import { FileListView } from './FileListView'
 import { TaskDropPanel } from './tasks/TaskDropPanel'
 import { linkDraggedItem, acceptSuggestionDrop, dropOnSaveZone } from './tasks/dropActions'
 import { ToastStack } from './Toast'
-import { ViewFooter } from './ViewFooter'
+import { ViewFooter, type ViewFooterState } from './ViewFooter'
 import { t } from '../i18n'
 
 export function Panel() {
   const open = useStore((s) => s.open)
   const switcherActive = useStore((s) => s.switcherActive)
+  // Files/tasks views report their footer data up here (the bar lives
+  // outside the view-transition animation); clipboard is derived locally.
+  const [reportedFooter, setReportedFooter] = useState<ViewFooterState | null>(null)
   const clear = useStore((s) => s.clear)
   const settings = useStore((s) => s.settings)
   const settingsOpen = useStore((s) => s.settingsOpen)
@@ -332,7 +335,7 @@ export function Panel() {
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
-                <TaskView />
+                <TaskView onFooterChange={setReportedFooter} />
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to top, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
               </motion.div>
             ) : view === 'files' ? (
@@ -345,7 +348,7 @@ export function Panel() {
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
-                <FileListView />
+                <FileListView onFooterChange={setReportedFooter} />
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to top, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
               </motion.div>
             ) : (
@@ -358,19 +361,27 @@ export function Panel() {
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
                 <ItemList />
-                <ViewFooter
-                  count={visibleTotal}
-                  noun="item"
-                  clearLabel={t('item.clear')}
-                  clearTitle={t('item.clearScoped')}
-                  clearDisabled={clipboardScopeCount === 0}
-                  onClear={clearScopedClipboard}
-                />
               </motion.div>
             )}
           </AnimatePresence>
+          {/* One toolbar for every content view, fixed below the animated
+              content area (user feedback 2026-08-14). Settings and switcher
+              sessions have no footer. */}
+          {!settingsOpen && !switcherActive && (
+            view === 'clipboard' ? (
+              <ViewFooter
+                count={visibleTotal}
+                noun="item"
+                clearLabel={t('item.clear')}
+                clearTitle={t('item.clearScoped')}
+                clearDisabled={clipboardScopeCount === 0}
+                onClear={clearScopedClipboard}
+              />
+            ) : reportedFooter ? (
+              <ViewFooter {...reportedFooter} />
+            ) : null
+          )}
           <TaskDropPanel />
             </>
           )}

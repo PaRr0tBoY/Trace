@@ -10,7 +10,7 @@
  * restore mechanism (ADR-0004) can remember/reset it and edit protection
  * can see it; the convert panel is a local edit session.
  */
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import type { TaskDto } from '../../../shared/types'
@@ -21,12 +21,18 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { ContentPicker } from './ContentPicker'
 import { TaskProposalCard } from './TaskProposalCard'
 import { TracePanel } from './TracePanel'
-import { ViewFooter } from '../ViewFooter'
+import type { ViewFooterState } from '../ViewFooter'
 
 /** Which "AI 依据" chain the shared TracePanel is showing (t42). */
 type TraceTarget = { kind: 'proposal'; id: string } | { kind: 'task'; id: string } | null
 
-export function TaskView() {
+interface Props {
+  /** Report this view's footer state up to Panel (the toolbar lives outside
+   *  the view-transition animation and is rendered once, at Panel level). */
+  onFooterChange: (footer: ViewFooterState | null) => void
+}
+
+export function TaskView({ onFooterChange }: Props) {
   const { t } = useTranslation()
   const tasks = useStore((s) => s.tasks)
   const suggestions = useStore((s) => s.suggestions)
@@ -82,7 +88,7 @@ export function TaskView() {
    * every task, the candidates tab dismisses every suggestion — never the
    * other tab's content.
    */
-  const clearCurrentTab = (): void => {
+  const clearCurrentTab = useCallback((): void => {
     const state = useStore.getState()
     if (tasksFilter === 'candidates') {
       void (async () => {
@@ -97,7 +103,19 @@ export function TaskView() {
         }
       })()
     }
-  }
+  }, [tasksFilter])
+
+  // Footer data, hoisted so the shared toolbar (rendered by Panel outside
+  // the view-transition animation) gets it before the browser paints.
+  useLayoutEffect(() => {
+    onFooterChange({
+      count: tasksFilter === 'candidates' ? suggestions.length : tasks.length,
+      noun: 'task',
+      clearLabel: t('item.clear'),
+      clearTitle: tasksFilter === 'candidates' ? t('tasks.dismissAll') : t('tasks.clearAll'),
+      onClear: clearCurrentTab
+    })
+  }, [tasksFilter, suggestions.length, tasks.length, clearCurrentTab, onFooterChange, t])
 
   return (
     <div className="task-view">
@@ -133,12 +151,34 @@ export function TaskView() {
           onTrace={() => setTraceTarget({ kind: 'task', id: selected.id })}
         />
       ) : (
-        <>
-          <div className="task-scroll">
-            {tasksFilter === 'candidates' ? (
-              suggestions.length > 0 ? (
-                <div className="task-suggest-list">
-                  {suggestions.map((s) => (
+        <div className="task-scroll">
+          {tasksFilter === 'candidates' ? (
+            suggestions.length > 0 ? (
+              <div className="task-suggest-list">
+                {suggestions.map((s) => (
+                  <TaskProposalCard
+                    key={s.id}
+                    suggestion={s}
+                    onOpen={setConvertId}
+                    onTrace={(id) => setTraceTarget({ kind: 'proposal', id })}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="task-empty">
+                <div className="title">{t('tasks.candidatesEmpty')}</div>
+                <div className="hint">{t('tasks.candidatesEmptyHint')}</div>
+              </div>
+            )
+          ) : (
+            <>
+              {l1Suggestions.length > 0 && (
+                <section className="task-group task-group-l1">
+                  <div className="task-group-label">
+                    <span>{t('tasks.activeSuggestions')}</span>
+                    <span className="task-group-count">{l1Suggestions.length}</span>
+                  </div>
+                  {l1Suggestions.map((s) => (
                     <TaskProposalCard
                       key={s.id}
                       suggestion={s}
@@ -146,48 +186,17 @@ export function TaskView() {
                       onTrace={(id) => setTraceTarget({ kind: 'proposal', id })}
                     />
                   ))}
-                </div>
-              ) : (
-                <div className="task-empty">
-                  <div className="title">{t('tasks.candidatesEmpty')}</div>
-                  <div className="hint">{t('tasks.candidatesEmptyHint')}</div>
-                </div>
-              )
-            ) : (
-              <>
-                {l1Suggestions.length > 0 && (
-                  <section className="task-group task-group-l1">
-                    <div className="task-group-label">
-                      <span>{t('tasks.activeSuggestions')}</span>
-                      <span className="task-group-count">{l1Suggestions.length}</span>
-                    </div>
-                    {l1Suggestions.map((s) => (
-                      <TaskProposalCard
-                        key={s.id}
-                        suggestion={s}
-                        onOpen={setConvertId}
-                        onTrace={(id) => setTraceTarget({ kind: 'proposal', id })}
-                      />
-                    ))}
-                  </section>
-                )}
-                <TaskList
-                  tasks={tasks}
-                  onOpen={(task) => setSelectedTaskId(task.id)}
-                  onCreate={() => setEditingTask('new')}
-                  onDeleteRequest={(task) => setConfirmDeleteTaskId(task.id)}
-                />
-              </>
-            )}
-          </div>
-          <ViewFooter
-            count={tasksFilter === 'candidates' ? suggestions.length : tasks.length}
-            noun="task"
-            clearLabel={t('item.clear')}
-            clearTitle={tasksFilter === 'candidates' ? t('tasks.dismissAll') : t('tasks.clearAll')}
-            onClear={clearCurrentTab}
-          />
-        </>
+                </section>
+              )}
+              <TaskList
+                tasks={tasks}
+                onOpen={(task) => setSelectedTaskId(task.id)}
+                onCreate={() => setEditingTask('new')}
+                onDeleteRequest={(task) => setConfirmDeleteTaskId(task.id)}
+              />
+            </>
+          )}
+        </div>
       )}
 
       {pickerTaskId && selected && (

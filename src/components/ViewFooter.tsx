@@ -4,13 +4,18 @@
  * the settings button, all on one row. The settings entry point moved
  * here from the header so every view offers it in the same place; the
  * settings sheet itself has no footer (nothing to clear there).
+ *
+ * The footer is rendered once by Panel, OUTSIDE the view-transition
+ * AnimatePresence — switching views must not animate the toolbar itself
+ * (user feedback 2026-08-14). Views report their footer data via
+ * onFooterChange so the bar stays put while only the content animates.
  */
 import { useStore } from '../store/appStore'
 import { useTranslation } from '../i18n'
 import { TrashIcon, GearIcon } from './icons'
 import { playButtonClickSound } from '../lib/soundEffects'
 
-interface Props {
+export interface ViewFooterState {
   /** Visible entries in the current view (drives count + clear disabled). */
   count: number
   /** Singular noun for the count, e.g. 'item' | 'task'. */
@@ -25,7 +30,7 @@ interface Props {
   clearDisabled?: boolean
 }
 
-export function ViewFooter({ count, noun, clearLabel, clearTitle, onClear, clearDisabled }: Props) {
+export function ViewFooter({ count, noun, clearLabel, clearTitle, onClear, clearDisabled }: ViewFooterState) {
   const { t } = useTranslation()
   const setSettingsOpen = useStore((s) => s.setSettingsOpen)
 

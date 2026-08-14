@@ -6,8 +6,8 @@
  *
  * - markdown + GFM parsing (@codemirror/lang-markdown)
  * - decorations style the syntax tree: bold/italic/strike/code/link/heading
- *   content, dimmed markers (like NotchNotes' headingMarker), fenced code
- *   and blockquote line backgrounds
+ *   content, heading/quote/list markers replaced by rendered widgets,
+ *   inline markers dimmed, fenced code and blockquote line backgrounds
  * - task lists render as clickable checkboxes (Joplin's approach: replace
  *   the `- [x]` marker with a widget) — clicking flips the checkbox state
  *   in the source text; the current line reveals its raw marker
@@ -41,20 +41,58 @@ const mark = (from: number, to: number, cls: string): Range<Decoration> =>
 const lineCls = (from: number, cls: string): Range<Decoration> =>
   Decoration.line({ attributes: { class: cls } }).range(from)
 
-/** Node names whose whole range is a "dimmed marker" (kept visible, like
- * NotchNotes' headingMarker color). The class resets inherited emphasis so
- * markers never render bold/italic/struck themselves. */
-const MARKER_NODES = new Set([
-  'HeaderMark',
-  'EmphasisMark',
-  'StrikethroughMark',
-  'CodeMark',
-  'CodeInfo',
-  'LinkMark',
-  'URL',
-  'ListMark',
-  'QuoteMark'
-])
+/** Node names whose whole range is a "marker". Block markers (headings,
+ * quotes, lists) are replaced by rendered widgets — the editor shows what
+ * the preview shows. Inline markers (emphasis, strike, code, link) stay
+ * visible-but-dimmed: hiding them would make the caret's position inside
+ * vs. outside the marked span invisible while editing (Obsidian reveals
+ * inline markers on the caret line — not worth that machinery yet). */
+const MARKER_NODES: Record<string, true> = {
+  HeaderMark: true,
+  EmphasisMark: true,
+  StrikethroughMark: true,
+  CodeMark: true,
+  CodeInfo: true,
+  LinkMark: true,
+  URL: true,
+  ListMark: true,
+  QuoteMark: true
+}
+
+/** Zero-width widget that hides a block marker (`#`, `>`) from view. */
+class HiddenMarkerWidget extends WidgetType {
+  eq(): boolean {
+    return true
+  }
+  toDOM(): HTMLElement {
+    return document.createElement('span')
+  }
+  ignoreEvent(): boolean {
+    return true
+  }
+}
+
+/** Renders a list marker: `•` for bullets, the original number for ordered
+ * items — the source `-`/`1.` is replaced by what the preview shows.
+ * Backspace at line start still deletes the whole marker (the widget is
+ * one replacement range), turning the line into plain text. */
+class ListMarkerWidget extends WidgetType {
+  constructor(private readonly text: string) {
+    super()
+  }
+  eq(other: ListMarkerWidget): boolean {
+    return other.text === this.text
+  }
+  toDOM(): HTMLElement {
+    const span = document.createElement('span')
+    span.className = 'cm-md-listmark'
+    span.textContent = /^[-*•]/.test(this.text) ? '•' : this.text
+    return span
+  }
+  ignoreEvent(): boolean {
+    return true
+  }
+}
 
 /** Task checkbox widget: replaces `- [x]` with a clickable box. The widget
  * carries its source line's start position, so toggling never depends on
@@ -108,8 +146,19 @@ export function buildDecorations(view: EditorView): DecorationSet {
   tree.iterate({
     enter: (node) => {
       const { name, from, to } = node
-      if (MARKER_NODES.has(name)) {
-        decos.push(mark(from, to, 'cm-md-marker'))
+      if (MARKER_NODES[name]) {
+        if (name === 'HeaderMark' || name === 'QuoteMark') {
+          // Hide `#` / `>` — the heading size and quote background/edge
+          // already carry the visual.
+          decos.push(Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to))
+        } else if (name === 'ListMark') {
+          // Show the rendered bullet / number instead of the raw marker.
+          decos.push(
+            Decoration.replace({ widget: new ListMarkerWidget(view.state.doc.sliceString(from, to)) }).range(from, to)
+          )
+        } else {
+          decos.push(mark(from, to, 'cm-md-marker'))
+        }
         return
       }
       const line = view.state.doc.lineAt(from)

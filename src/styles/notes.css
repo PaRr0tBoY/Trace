@@ -235,12 +235,19 @@
   border-color: var(--edge-strong);
 }
 
-/* Inline markdown decorations (live rendering, markers stay visible). */
+/* Inline markdown decorations (live rendering; block markers are replaced
+ * by rendered widgets, inline markers stay visible-but-dimmed). */
 .cm-md-marker {
   color: rgba(255, 255, 255, 0.45);
   font-style: normal !important;
   font-weight: normal !important;
   text-decoration: none !important;
+}
+
+/* Rendered list bullet/number replacing the raw `-`/`1.` marker. */
+.cm-md-listmark {
+  color: rgba(255, 255, 255, 0.45);
+  user-select: none;
 }
 
 .cm-md-strong {

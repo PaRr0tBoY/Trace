@@ -3,19 +3,18 @@
  *
  * 'all' renders the grouped entries — transfer station cards (ADR-0006)
  * first, then legacy stack file entries (reusing ClipboardItemCard).
- * Station entries split by member count (feedback): bundles (>1 path) show
- * as group cards, single files as the clipboard card style with station
- * routing. An extension tab or 'other' renders single file *members* as
- * rows with the same interactions as the expanded stack: drag out the
- * single path, click to paste it, copy button → copy-subitem (never
- * creates a new entry), pin button → pins the parent entry.
+ * Station entries are single-file since the grouping removal (2026-08-14)
+ * and render as the clipboard card style with station routing. An
+ * extension tab or 'other' renders single file *members* as rows with the
+ * same interactions as the expanded stack: drag out the single path, click
+ * to paste it, copy button → copy-subitem (never creates a new entry),
+ * pin button → pins the parent entry.
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store/appStore'
 import { useTranslation } from '../i18n'
 import { useFileMembers } from '../hooks/useFilteredItems'
 import { ClipboardItemCard } from './ClipboardItem'
-import { StationEntryCard } from './StationEntryCard'
 import { FileMemberRow } from './FileMemberRow'
 import { PinnedTile } from './PinnedTile'
 import { EmptyState } from './EmptyState'
@@ -28,9 +27,10 @@ import type { FileMember } from '../lib/fileTabs'
 import type { StationEntryDto } from '../../shared/station'
 import type { ClipboardItemDto } from '../../shared/types'
 
-/** Display conversion of a single-file station entry into a clipboard item
- *  (feedback: 单个文件用剪贴板卡片样式，不显示为组卡片). `id` stays the
- *  entry's id so the card can route actions back to the station. */
+/** Display conversion of a station entry into a clipboard item (station
+ *  entries are single-file since the grouping removal — feedback 2026-08-14).
+ *  `id` stays the entry's id so the card can route actions back to the
+ *  station. */
 function stationToItem(entry: StationEntryDto): ClipboardItemDto {
   const member = entry.members[0]
   const isImage = !!member?.isImage
@@ -106,8 +106,7 @@ export function FileListView() {
     [groupedEntries]
   )
   // The expanded card leaves the grid; a stale id (entry unpinned meanwhile)
-  // simply renders nothing. Single-file entries expand into the clipboard
-  // card style — the group anatomy is reserved for bundles.
+  // simply renders nothing.
   const gridEntries = stationPinned.filter((r) => r.entry.id !== expandedGridId).map((r) => r.entry)
   const expandedEntry = stationPinned.find((r) => r.entry.id === expandedGridId)?.entry ?? null
   const itemPinned = groupedEntries.pinned.filter((r): r is { kind: 'item'; item: ClipboardItemDto } => r.kind === 'item')
@@ -136,9 +135,7 @@ export function FileListView() {
 
   const renderRow = (row: { kind: 'station'; entry: StationEntryDto } | { kind: 'item'; item: ClipboardItemDto }) =>
     row.kind === 'station'
-      ? row.entry.paths.length > 1
-        ? <StationEntryCard key={row.entry.id} entry={row.entry} />
-        : <ClipboardItemCard key={row.entry.id} item={stationToItem(row.entry)} stationEntry={row.entry} instant={false} />
+      ? <ClipboardItemCard key={row.entry.id} item={stationToItem(row.entry)} stationEntry={row.entry} instant={false} />
       : <ClipboardItemCard key={row.item.id} item={row.item} instant={false} />
 
   if (files.tabMembers === null) {
@@ -156,9 +153,7 @@ export function FileListView() {
           <section className="pinned-section">
             <div className="section-label">{t('item.pinned')}</div>
             {expandedEntry && (
-              expandedEntry.paths.length > 1
-                ? <StationEntryCard key={expandedEntry.id} entry={expandedEntry} defaultExpanded />
-                : <ClipboardItemCard key={expandedEntry.id} item={stationToItem(expandedEntry)} stationEntry={expandedEntry} instant={false} />
+              <ClipboardItemCard key={expandedEntry.id} item={stationToItem(expandedEntry)} stationEntry={expandedEntry} instant={false} />
             )}
             {gridEntries.length > 0 && (
               <div className="pinned-grid">

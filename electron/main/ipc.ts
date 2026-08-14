@@ -32,7 +32,7 @@ import { acceptWithResource } from './suggestionDrop'
 import { ProviderChain, testProvider } from './provider'
 import { logAi } from './aiLog'
 import { applyIncognito } from './tray'
-import type { ItemData, MergeResult, MemoryFactDto, MemoryFactPanelPayload, MemoryListPayload, ResourceRef, Task } from '../../shared/types'
+import type { ItemData, MemoryFactDto, MemoryFactPanelPayload, MemoryListPayload, ResourceRef, Task } from '../../shared/types'
 
 /**
  * Returns true if the current system clipboard content matches the given item data.
@@ -237,17 +237,6 @@ export function registerIpc(): void {
     // re-enter on the next watcher tick (same contract as item:delete).
     getWatcher().resyncSignature()
     return getStationStore().toDto()
-  })
-
-  handle('station:split', (req) => {
-    if (!req || typeof req.id !== 'string' || !Array.isArray(req.paths)) {
-      return { ok: false as const, reason: 'notfound' as const }
-    }
-    return getStationStore().split(req.id, req.paths)
-  })
-
-  handle('station:merge', (sourceId, targetId) => {
-    return getStationStore().merge(sourceId, targetId)
   })
 
   handle('station:copy-member', async (req) => {
@@ -828,27 +817,6 @@ export function registerIpc(): void {
 
   handle('item:remove-subitem', (req) => {
     const success = getStore().removeSubitem(req)
-    if (success) pushState.items()
-    return success
-  })
-
-  handle('item:merge', (sourceId, targetId) => {
-    const result: MergeResult = getStore().merge(sourceId, targetId)
-    if (result.ok) {
-      pushState.items()
-    } else if (result.reason === 'full') {
-      toast(result.message || 'Collection is full (10 max)', 'info')
-    } else if (result.reason === 'incompatible') {
-      toast(result.message || 'Cannot combine different item types', 'info')
-    }
-    // 'notfound' fails silently
-    return result
-  })
-
-  handle('item:split', (req) => {
-    console.log('[IPC] item:split called with req=', JSON.stringify(req))
-    const success = getStore().split(req)
-    console.log('[IPC] item:split success=', success)
     if (success) pushState.items()
     return success
   })

@@ -144,17 +144,6 @@ export interface DragRequest {
   id: string
   paths?: string[]
   imageId?: string
-  splitPlacement?: 'before' | 'after'
-}
-
-/**
- * Outcome of a merge attempt. `reason` tells the renderer *why* it failed so it
- * can show a precise message (e.g. "collection full" vs "can't mix types").
- */
-export interface MergeResult {
-  ok: boolean
-  reason?: 'full' | 'incompatible' | 'notfound'
-  message?: string
 }
 
 /* ------------------------------------------------------------------ */

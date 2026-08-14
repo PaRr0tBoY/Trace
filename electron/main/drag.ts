@@ -28,7 +28,6 @@ import { THEME_ACCENTS } from '../../shared/themes'
 import { getStore, getStationStore, loadSettings } from './state'
 import { disposeToRecycleBin } from './recycleBin'
 import { decideDragEnd, DEFAULT_DRAG_TIMEOUT_MS, planDragOut, type DragEndVerdict } from '../store/stagedMove'
-import type { StationStore } from '../store/stationStore'
 import { getFileKind } from '../../src/lib/fileType'
 
 /**
@@ -258,35 +257,21 @@ function stagePathsToDir(paths: string[]): { staged: string[]; rollback: () => v
 }
 
 /**
- * Locate the entry the domain's split just created: it sits right after the
- * source and holds exactly the split-out paths (split() does not return the
- * new id, so it is identified by its path set — enter() dedupes exact path
- * sets, so the match is unambiguous).
- */
-function findSplitEntryId(station: StationStore, sourceId: string, splitPaths: string[]): string | undefined {
-  const wanted = [...splitPaths].sort().join('\n')
-  return station
-    .list()
-    .filter((e) => e.id !== sourceId)
-    .find((e) => [...e.paths].sort().join('\n') === wanted)?.id
-}
-
-/**
  * Move-mode staging seam, called from the item:start-drag handler for
  * station file drags. Executes the takeover (originals → staging area),
  * retargets the entry and marks it in-transit, then returns the staged
  * paths to hand to startDrag. 'skip' = missing files, the drag must not
  * start; 'pass-through' = not a stageable drag, use the data as-is.
+ *
+ * Entries are single-file since the 2026-08-14 grouping removal, so a
+ * member drag is always the whole entry — there is no split step.
  */
 export function stageMoveDrag(req: DragRequest, data: ItemData): StageMoveResult {
   if (data.kind !== 'files') return { ok: false, reason: 'pass-through' }
   const station = getStationStore()
   const entry = station.get(req.id)
   if (!entry) return { ok: false, reason: 'pass-through' }
-  // In-transit entries are re-dragged whole: the held bundle is one unit
-  // (ADR-0007), member selection is moot — every path is staged already.
-  const wanted =
-    entry.inTransit || !req.paths || req.paths.length === 0 ? [...entry.paths] : [...req.paths]
+  const wanted = [...entry.paths]
   const plan = planDragOut({
     moveMode: loadSettings().moveMode,
     kind: data.kind,
@@ -299,18 +284,7 @@ export function stageMoveDrag(req: DragRequest, data: ItemData): StageMoveResult
   const stagedResult = stagePathsToDir(plan.paths)
   if (!stagedResult) return { ok: false, reason: 'pass-through' }
 
-  let entryId = entry.id
-  if (!entry.inTransit && wanted.length < entry.paths.length) {
-    // Member drag: split the member into its own entry so the staged subset
-    // becomes an in-transit unit while the source keeps the rest (ADR-0006).
-    const split = station.split(entry.id, wanted)
-    const splitId = split.ok ? findSplitEntryId(station, entry.id, wanted) : undefined
-    if (!split.ok || !splitId) {
-      stagedResult.rollback()
-      return { ok: false, reason: 'pass-through' }
-    }
-    entryId = splitId
-  }
+  const entryId = entry.id
   if (!entry.inTransit) {
     station.retarget(entryId, stagedResult.staged)
     station.setInTransit(entryId, true)

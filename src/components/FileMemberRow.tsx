@@ -19,7 +19,7 @@ import { useDragOut } from '../hooks/useDragOut'
 import { formatBytes } from '../lib/format'
 import { getFileKind } from '../lib/fileType'
 import { playButtonClickSound, playToggleSound } from '../lib/soundEffects'
-import { CopyIcon, FileKindIcon, PinIcon, PinFillIcon, MinusIcon } from './icons'
+import { CopyIcon, FileKindIcon, PinIcon, PinFillIcon } from './icons'
 import { tryPaste } from '../lib/tryPaste'
 import { t } from '../i18n'
 import type { FileMember } from '../lib/fileTabs'
@@ -29,11 +29,9 @@ interface Props {
   member: FileMember
   /** Hide the entry-level pin button (station cards pin from the card header). */
   showPin?: boolean
-  /** Render a split-out (ungroup) button; the caller decides the split target. */
-  onSplit?: (e: React.MouseEvent) => void
 }
 
-export function FileMemberRow({ member, showPin = true, onSplit }: Props) {
+export function FileMemberRow({ member, showPin = true }: Props) {
   const stationEntry = useStore((s) => s.station.find((e) => e.id === member.itemId) ?? null)
   const item = useStore((s) => s.items.find((it) => it.id === member.itemId) ?? null)
   const entry = stationEntry ?? item
@@ -126,20 +124,6 @@ export function FileMemberRow({ member, showPin = true, onSplit }: Props) {
       >
         <CopyIcon width={12} height={12} />
       </button>
-      {onSplit && (
-        <button
-          className="act subitem-delete-btn"
-          title={t('item.ungroup')}
-          onClick={(e) => {
-            e.stopPropagation()
-            e.currentTarget.blur()
-            onSplit(e)
-          }}
-          style={{ width: 24, height: 24 }}
-        >
-          <MinusIcon width={12} height={12} />
-        </button>
-      )}
     </motion.div>
   )
 }

@@ -1,9 +1,10 @@
 /**
  * Transfer Station domain module tests (ticket #3 / ADR-0006 / ADR-0007).
  *
- * Pure-module tests: lifecycle, chunking, retention, staleness/revive and
- * the legacy migration transform. Real-filesystem fixtures (temp dirs) cover
- * the stat cache behaviour; an injectable clock covers retention timing.
+ * Pure-module tests: lifecycle (one entry per path since the 2026-08-14
+ * grouping removal), retention, staleness/revive and the legacy migration
+ * transform. Real-filesystem fixtures (temp dirs) cover the stat cache
+ * behaviour; an injectable clock covers retention timing.
  */
 import { describe, expect, it } from 'vitest'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
@@ -23,59 +24,57 @@ let seq = 0
 
 
 describe('enter', () => {
-  it('creates an entry with the station fields and puts it first (newest first)', () => {
+  it('creates one entry per path with station fields, newest first', () => {
     const station = makeStation({ now: () => 1000, createId: () => `id-${++seq}` })
     const created = station.enter(['c:\\a\\one.pdf', 'c:\\b\\two.txt'], 'drag-in')
-    expect(created).toHaveLength(1)
+    expect(created).toHaveLength(2)
+    expect(created.map((e) => e.paths)).toEqual([['c:\\a\\one.pdf'], ['c:\\b\\two.txt']])
     expect(station.list()[0]).toMatchObject({
-      id: created[0].id,
-      paths: ['c:\\a\\one.pdf', 'c:\\b\\two.txt'],
+      id: created[1].id,
+      paths: ['c:\\b\\two.txt'],
       route: 'drag-in',
       pinned: false,
       inTransit: false,
       capturedAt: 1000
     })
     station.enter(['c:\\c\\three.zip'], 'clipboard')
-    expect(station.list().map((e) => e.id)).toEqual([station.list()[0].id, created[0].id])
+    expect(station.list().map((e) => e.id)).toEqual([station.list()[0].id, created[1].id, created[0].id])
   })
 
-  it('chunks a batch of more than 10 paths into multiple entries', () => {
+  it('keeps every path of a batch as its own entry (no grouping)', () => {
     const station = makeStation({ createId: () => `id-${++seq}` })
     const paths = Array.from({ length: 15 }, (_, i) => `c:\\files\\f${String(i).padStart(2, '0')}.bin`)
     const created = station.enter(paths, 'drag-in')
-    expect(created).toHaveLength(2)
-    expect(created[0].paths).toHaveLength(10)
-    expect(created[1].paths).toHaveLength(5)
-    // relative order preserved across chunks
-    expect([...created[0].paths, ...created[1].paths]).toEqual(paths)
+    expect(created).toHaveLength(15)
+    // newest first: last path is at the top
+    expect(station.list().map((e) => e.paths[0])).toEqual([...paths].reverse())
   })
 
-  it('chunks 21 paths into three entries of 10/10/1', () => {
-    const station = makeStation({ createId: () => `id-${++seq}` })
-    const paths = Array.from({ length: 21 }, (_, i) => `c:\\f\\f${i}.bin`)
-    const created = station.enter(paths, 'clipboard')
-    expect(created.map((e) => e.paths.length)).toEqual([10, 10, 1])
-  })
-
-  it('dedups an exact path list (order-insensitive): bumps, refreshes, creates nothing', () => {
+  it('re-entering an existing path bumps it, refreshes route, creates nothing', () => {
     const station = makeStation({ now: () => 1000, createId: () => `id-${++seq}` })
-    const [first] = station.enter(['a\\x', 'b\\y'], 'drag-in')
+    const [x] = station.enter(['a\\x'], 'drag-in')
     station.enter(['c\\z'], 'clipboard')
-    const created = station.enter(['b\\y', 'a\\x'], 'drag-in')
+    const created = station.enter(['a\\x'], 'drag-in')
     expect(created).toHaveLength(0)
     expect(station.list()).toHaveLength(2)
     const bumped = station.list()[0]
-    expect(bumped.id).toBe(first.id)
+    expect(bumped.id).toBe(x.id)
     expect(bumped.capturedAt).toBe(1000)
     expect(bumped.route).toBe('drag-in')
   })
 
-  it('treats different path lists as distinct entries even when overlapping', () => {
+  it('dedups per path inside a re-entered batch', () => {
     const station = makeStation({ createId: () => `id-${++seq}` })
-    station.enter(['a\\x', 'b\\y'], 'drag-in')
-    const created = station.enter(['a\\x'], 'drag-in')
-    expect(created).toHaveLength(1)
-    expect(station.list()).toHaveLength(2)
+    const [a] = station.enter(['a\\x', 'b\\y'], 'drag-in')
+    station.enter(['c\\z'], 'clipboard')
+    const created = station.enter(['b\\y', 'a\\x'], 'clipboard')
+    expect(created).toHaveLength(0)
+    expect(station.list()).toHaveLength(3)
+    // both bumped, refreshed route; last processed path ends up on top
+    expect(station.list().map((e) => e.paths[0])).toEqual(['a\\x', 'b\\y', 'c\\z'])
+    expect(station.list()[0].route).toBe('clipboard')
+    expect(station.list()[1].route).toBe('clipboard')
+    expect(station.get(a.id)!.route).toBe('clipboard')
   })
 
   it('returns nothing for an empty batch', () => {
@@ -91,7 +90,9 @@ describe('enter', () => {
     })
     station.enter(['a\\x', 'b\\y'], 'drag-in')
     expect(seen).toEqual(['a\\x', 'b\\y'])
-    expect(station.list()[0].stats).toEqual({ 'a\\x': { exists: true, size: 42 }, 'b\\y': { exists: true, size: 42 } })
+    for (const e of station.list()) {
+      expect(e.stats).toEqual({ [e.paths[0]]: { exists: true, size: 42 } })
+    }
   })
 })
 
@@ -149,93 +150,6 @@ describe('pin / unpin / in-transit', () => {
     expect(updated.stats['c:\\stage\\x']).toEqual({ exists: true, size: 7 })
     expect(updated.stats['c:\\orig\\x']).toBeUndefined()
     expect(station.retarget('nope', ['x'])).toBe(false)
-  })
-})
-
-describe('split', () => {
-  function stationWithMembers(): { station: TransferStation; entry: StationEntry } {
-    const station = makeStation({ createId: () => `id-${++seq}` })
-    const [entry] = station.enter(['a\\1.pdf', 'b\\2.txt', 'c\\3.png', 'd\\4.docx', 'e\\5.zip'], 'drag-in')
-    return { station, entry }
-  }
-
-  it('splits members into a new entry right after the source, inheriting route/pinned/capturedAt', () => {
-    const { station, entry } = stationWithMembers()
-    station.pin(entry.id, true)
-    const before = entry.capturedAt
-    const res = station.split(entry.id, ['b\\2.txt', 'e\\5.zip'])
-    expect(res).toEqual({ ok: true })
-    const list = station.list()
-    expect(list).toHaveLength(2)
-    expect(list[0].id).toBe(entry.id)
-    expect(list[0].paths).toEqual(['a\\1.pdf', 'c\\3.png', 'd\\4.docx'])
-    expect(list[1]).toMatchObject({
-      paths: ['b\\2.txt', 'e\\5.zip'],
-      route: 'drag-in',
-      pinned: true,
-      inTransit: false,
-      capturedAt: before
-    })
-  })
-
-  it('removes the source when everything is split out (new entry takes its slot)', () => {
-    const { station, entry } = stationWithMembers()
-    station.enter(['z\\other'], 'clipboard')
-    const res = station.split(entry.id, entry.paths)
-    expect(res).toEqual({ ok: true })
-    expect(station.list()).toHaveLength(2)
-    expect(station.get(entry.id)).toBeUndefined()
-    expect(station.list().map((e) => e.paths)).toEqual([['z\\other'], entry.paths])
-  })
-
-  it('rejects unknown ids, empty target lists and in-transit sources', () => {
-    const { station, entry } = stationWithMembers()
-    expect(station.split('nope', ['x'])).toEqual({ ok: false, reason: 'notfound' })
-    expect(station.split(entry.id, ['never-present.pdf'])).toEqual({ ok: false, reason: 'no-paths' })
-    station.setInTransit(entry.id, true)
-    expect(station.split(entry.id, ['a\\1.pdf'])).toEqual({ ok: false, reason: 'in-transit' })
-  })
-})
-
-describe('merge', () => {
-  it('merges source paths into the target (deduped), removing the source', () => {
-    const station = makeStation({ createId: () => `id-${++seq}` })
-    const [tgt] = station.enter(['a\\1.pdf', 'b\\2.txt'], 'drag-in')
-    const [src] = station.enter(['b\\2.txt', 'c\\3.png'], 'clipboard')
-    expect(station.merge(src.id, tgt.id)).toEqual({ ok: true })
-    expect(station.list()).toHaveLength(1)
-    expect(station.list()[0].paths).toEqual(['a\\1.pdf', 'b\\2.txt', 'c\\3.png'])
-    expect(station.list()[0].route).toBe('drag-in')
-  })
-
-  it('keeps the target pinned when either side was pinned', () => {
-    const station = makeStation({ createId: () => `id-${++seq}` })
-    const [tgt] = station.enter(['a\\1'], 'drag-in')
-    const [src] = station.enter(['b\\2'], 'clipboard')
-    station.pin(src.id, true)
-    station.merge(src.id, tgt.id)
-    expect(station.list()[0].pinned).toBe(true)
-  })
-
-  it('rejects merges that exceed MAX_STACK (10) paths', () => {
-    const station = makeStation({ createId: () => `id-${++seq}` })
-    const [tgt] = station.enter(Array.from({ length: 10 }, (_, i) => `a\\${i}.bin`), 'drag-in')
-    const [src] = station.enter(['b\\x'], 'clipboard')
-    expect(station.merge(src.id, tgt.id)).toEqual({ ok: false, reason: 'full' })
-    expect(station.list()).toHaveLength(2)
-  })
-
-  it('rejects self-merge, unknown ids and in-transit participants', () => {
-    const station = makeStation({ createId: () => `id-${++seq}` })
-    const [a] = station.enter(['a\\1'], 'drag-in')
-    const [b] = station.enter(['b\\2'], 'drag-in')
-    const [c] = station.enter(['c\\3'], 'drag-in')
-    expect(station.merge(a.id, a.id)).toEqual({ ok: false, reason: 'self' })
-    expect(station.merge('nope', a.id)).toEqual({ ok: false, reason: 'notfound' })
-    expect(station.merge(a.id, 'nope')).toEqual({ ok: false, reason: 'notfound' })
-    station.setInTransit(c.id, true)
-    expect(station.merge(c.id, a.id)).toEqual({ ok: false, reason: 'in-transit' })
-    expect(station.merge(a.id, c.id)).toEqual({ ok: false, reason: 'in-transit' })
   })
 })
 
@@ -350,24 +264,6 @@ describe('staleness and revive (real filesystem fixture)', () => {
     }
   })
 
-  it('entry-level staleness: one missing path marks the whole entry stale', () => {
-    const dir = fixture()
-    const a = join(dir, 'a.bin')
-    const b = join(dir, 'b.bin')
-    writeFileSync(a, 'x')
-    writeFileSync(b, 'x')
-    try {
-      const station = makeStation({ createId: () => `id-${++seq}` })
-      const [e] = station.enter([a, b], 'drag-in')
-      rmSync(a)
-      station.revive(e.id)
-      expect(station.isStale(e.id)).toBe(true)
-      expect(station.list()[0].stats[b].exists).toBe(true) // healthy member keeps its size
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  })
-
   it('a stat that throws (unreadable) counts as missing', () => {
     const station = makeStation({
       createId: () => `id-${++seq}`,
@@ -424,21 +320,28 @@ describe('toDto', () => {
     writeFileSync(g, 'y')
     try {
       const station = makeStation({ createId: () => `id-${++seq}` })
-      const [e] = station.enter([f, g], 'drag-in')
-      station.pin(e.id, true)
+      const [fEntry, gEntry] = station.enter([f, g], 'drag-in')
+      station.pin(gEntry.id, true)
       const dto = station.toDto()
-      expect(dto).toHaveLength(1)
+      expect(dto).toHaveLength(2)
       expect(dto[0]).toMatchObject({
-        id: e.id,
+        id: gEntry.id,
         route: 'drag-in',
         pinned: true,
         inTransit: false,
         stale: false,
-        paths: [f, g]
+        paths: [g]
       })
       expect(dto[0].members).toEqual([
-        { name: 'report.PDF', ext: 'pdf', size: 1, isImage: false, exists: true },
         { name: 'photo.png', ext: 'png', size: 1, isImage: true, exists: true }
+      ])
+      expect(dto[1]).toMatchObject({
+        id: fEntry.id,
+        paths: [f],
+        pinned: false
+      })
+      expect(dto[1].members).toEqual([
+        { name: 'report.PDF', ext: 'pdf', size: 1, isImage: false, exists: true }
       ])
     } finally {
       rmSync(dir, { recursive: true, force: true })

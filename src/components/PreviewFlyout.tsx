@@ -91,11 +91,9 @@ export function PreviewFlyout({ isRight }: { isRight: boolean }) {
     e.preventDefault()
     e.stopPropagation()
     setDragOver(false)
-    const activeDrag = useStore.getState().internalDragReq
-    if (item && activeDrag && activeDrag.id !== item.id) {
-      await window.edge.mergeItems(activeDrag.id, item.id)
-      useStore.getState().setInternalDragReq(null)
-    }
+    // Drop-on-another-item merging was removed with the grouping feature
+    // (user feedback 2026-08-14) — items stay standalone.
+    useStore.getState().setInternalDragReq(null)
   }
 
   // ── Multi-selection state (Option 1: Tap-to-toggle) ────────────────────────

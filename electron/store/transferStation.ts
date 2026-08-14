@@ -3,17 +3,16 @@
  *
  * Pure logic, zero Electron imports, vitest-tested. Owns the station entry
  * model — paths, route (drag-in | clipboard), pinned, inTransit, capturedAt —
- * and every lifecycle operation: enter (with batch chunking), remove,
- * pin/unpin, member split/merge, revive, retention pruning and the
- * first-launch migration of legacy clipboard-stack file items. Persistence,
- * OS file handling and the staging-area move (M-a) live in the main-process
- * layer that consumes this module.
+ * and every lifecycle operation: enter (one entry per path since the
+ * 2026-08-14 grouping removal), remove, pin/unpin, revive, retention pruning
+ * and the first-launch migration of legacy clipboard-stack file items.
+ * Persistence, OS file handling and the staging-area move (M-a) live in the
+ * main-process layer that consumes this module.
  *
  * Terminology (CONTEXT.md): 文件中转站 / 途径 / 在途 / 文件成员.
  */
 import { statSync } from 'node:fs'
 import { extname, basename } from 'node:path'
-import { MAX_STACK } from '../../shared/types'
 
 /** How an entry entered the station (ADR-0006): 拖入 or 剪贴板捕获. */
 export type StationRoute = 'drag-in' | 'clipboard'
@@ -64,14 +63,6 @@ export interface StationEntryDto {
   paths: string[]
   members: StationMember[]
 }
-
-export type StationMergeResult =
-  | { ok: true }
-  | { ok: false; reason: 'notfound' | 'self' | 'full' | 'in-transit' }
-
-export type StationSplitResult =
-  | { ok: true }
-  | { ok: false; reason: 'notfound' | 'in-transit' | 'no-paths' }
 
 /** Minimal legacy clipboard-stack item shape the migration consumes. */
 export interface StationMigrationInput {
@@ -167,19 +158,17 @@ export class TransferStation {
   }
 
   /**
-   * Enter paths into the station (most recent first). A batch of more than
-   * MAX_STACK paths chunks into multiple entries of at most MAX_STACK paths,
-   * preserving relative order. Re-entering the exact same path list (order
-   * insensitive) bumps the existing entry to the top, refreshes its
-   * capturedAt and route, and creates nothing.
+   * Enter paths into the station (most recent first). Every path becomes its
+   * own single-file entry — batched drag-ins no longer group into a bundle
+   * (user feedback 2026-08-14). Re-entering an existing path bumps the
+   * entry to the top and refreshes capturedAt/route.
    */
   enter(paths: string[], route: StationRoute): StationEntry[] {
     if (paths.length === 0) return []
     const created: StationEntry[] = []
     const now = this.now()
-    for (const chunk of this.chunks(paths)) {
-      const sig = [...chunk].sort().join('\n')
-      const existing = this.entries.find((e) => [...e.paths].sort().join('\n') === sig)
+    for (const p of paths) {
+      const existing = this.entries.find((e) => e.paths.length === 1 && e.paths[0] === p)
       if (existing) {
         this.entries.splice(this.indexOf(existing.id), 1)
         this.entries.unshift({ ...existing, route, capturedAt: now })
@@ -187,25 +176,17 @@ export class TransferStation {
       }
       const entry: StationEntry = {
         id: this.createId(),
-        paths: chunk,
+        paths: [p],
         route,
         pinned: false,
         inTransit: false,
         capturedAt: now,
-        stats: this.statPaths(chunk)
+        stats: this.statPaths([p])
       }
       this.entries.unshift(entry)
       created.push(entry)
     }
     return created
-  }
-
-  private chunks(paths: string[]): string[][] {
-    const out: string[][] = []
-    for (let i = 0; i < paths.length; i += MAX_STACK) {
-      out.push(paths.slice(i, i + MAX_STACK))
-    }
-    return out
   }
 
   /** Remove an entry (any state, including in-transit) and return it so the
@@ -241,76 +222,7 @@ export class TransferStation {
     return true
   }
 
-  /**
-   * Split the given members out of an entry into a new entry placed right
-   * after it. The new entry inherits route, pinned and capturedAt from the
-   * source; splitting an in-transit entry is rejected (those can only be
-   * dragged out again or deleted, ADR-0007). An emptied source is removed.
-   */
-  split(id: string, paths: string[]): StationSplitResult {
-    const idx = this.indexOf(id)
-    if (idx < 0) return { ok: false, reason: 'notfound' }
-    const src = this.entries[idx]
-    if (src.inTransit) return { ok: false, reason: 'in-transit' }
-    const wanted = new Set(paths)
-    const targetPaths = src.paths.filter((p) => wanted.has(p))
-    if (targetPaths.length === 0) return { ok: false, reason: 'no-paths' }
-    const kept = src.paths.filter((p) => !wanted.has(p))
-    if (kept.length === 0) {
-      // Source dissolves entirely; the split still yields a standalone entry.
-      this.entries.splice(idx, 1)
-      this.entries.splice(idx, 0, {
-        ...src,
-        id: this.createId(),
-        paths: targetPaths,
-        stats: this.statPaths(targetPaths)
-      })
-      return { ok: true }
-    }
-    const splitEntry: StationEntry = {
-      id: this.createId(),
-      paths: targetPaths,
-      route: src.route,
-      pinned: src.pinned,
-      inTransit: false,
-      capturedAt: src.capturedAt,
-      stats: this.statPaths(targetPaths)
-    }
-    this.entries[idx] = { ...src, paths: kept, stats: this.statPaths(kept) }
-    this.entries.splice(idx + 1, 0, splitEntry)
-    return { ok: true }
-  }
-
-  /**
-   * Merge the source entry's paths into the target (deduplicated) and remove
-   * the source. The target keeps its own flags; it becomes pinned when either
-   * side was pinned. Merging in-transit entries is rejected, and the combined
-   * entry may not exceed MAX_STACK paths.
-   */
-  merge(sourceId: string, targetId: string): StationMergeResult {
-    if (sourceId === targetId) return { ok: false, reason: 'self' }
-    const srcIdx = this.indexOf(sourceId)
-    const tgtIdx = this.indexOf(targetId)
-    if (srcIdx < 0 || tgtIdx < 0) return { ok: false, reason: 'notfound' }
-    const src = this.entries[srcIdx]
-    const tgt = this.entries[tgtIdx]
-    if (src.inTransit || tgt.inTransit) return { ok: false, reason: 'in-transit' }
-    const seen = new Set(tgt.paths)
-    const combined = [...tgt.paths, ...src.paths.filter((p) => !seen.has(p))]
-    if (combined.length > MAX_STACK) return { ok: false, reason: 'full' }
-    this.entries[tgtIdx] = {
-      ...tgt,
-      paths: combined,
-      pinned: tgt.pinned || src.pinned,
-      capturedAt: this.now(),
-      stats: this.statPaths(combined)
-    }
-    this.entries.splice(srcIdx, 1)
-    return { ok: true }
-  }
-
-  /**
-   * Re-stat every path of an entry. Returns true when the entry flipped from
+  /** Re-stat every path of an entry; returns true when the entry flipped from
    * stale to live (a missing file came back), so callers can push state.
    */
   revive(id: string): boolean {

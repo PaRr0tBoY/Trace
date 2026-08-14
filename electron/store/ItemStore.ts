@@ -17,9 +17,7 @@ import {
   type ClipboardItemDto,
   type DragRequest,
   type ItemData,
-  type MergeResult,
-  type SourceApp,
-  MAX_STACK
+  type SourceApp
 } from '../../shared/types'
 import { PATHS } from './paths'
 import { createId } from './ids'
@@ -233,58 +231,6 @@ export class ItemStore {
     this.persist()
   }
 
-  merge(sourceId: string, targetId: string): MergeResult {
-    if (sourceId === targetId) return { ok: false }
-    const srcIdx = this.items.findIndex(x => x.id === sourceId)
-    const tgtIdx = this.items.findIndex(x => x.id === targetId)
-    if (srcIdx < 0 || tgtIdx < 0) return { ok: false, reason: 'notfound' }
-
-    const src = this.items[srcIdx]
-    const tgt = this.items[tgtIdx]
-
-    // Determine how to merge based on kinds:
-    // Image(s) + Image(s) -> Image Collection. Stack items never hold files —
-    // files live in the transfer station (ADR-0006), which has its own merge.
-
-    let newData: ItemData | null = null
-
-    const srcIsImage = src.data.kind === 'image' || src.data.kind === 'image-collection'
-    const tgtIsImage = tgt.data.kind === 'image' || tgt.data.kind === 'image-collection'
-
-    if (srcIsImage && tgtIsImage) {
-      const srcData = src.data
-      const tgtData = tgt.data
-      const srcImages = srcData.kind === 'image-collection' ? srcData.images : srcData.kind === 'image' ? [{ imageId: srcData.imageId, width: srcData.width, height: srcData.height, bytes: srcData.bytes, ext: srcData.ext }] : []
-      const tgtImages = tgtData.kind === 'image-collection' ? tgtData.images : tgtData.kind === 'image' ? [{ imageId: tgtData.imageId, width: tgtData.width, height: tgtData.height, bytes: tgtData.bytes, ext: tgtData.ext }] : []
-      const seen = new Set(tgtImages.map((i) => i.imageId))
-      const combined = [...tgtImages, ...srcImages.filter((i) => !seen.has(i.imageId))]
-
-      if (combined.length > MAX_STACK) return { ok: false, reason: 'full', message: 'An image collection can hold a maximum of 10 items' }
-      newData = { kind: 'image-collection', images: combined }
-    }
-
-    if (!newData) {
-      if (srcIsImage || tgtIsImage) {
-        return { ok: false, reason: 'incompatible', message: 'Images can only be grouped with other images' }
-      }
-      return { ok: false, reason: 'incompatible', message: 'Text and links cannot be grouped together' }
-    }
-
-    // Update target item
-    this.sigToId.delete(signature(tgt.data))
-    tgt.data = newData
-    this.sigToId.set(signature(newData), tgt.id)
-    tgt.capturedAt = Date.now() // bump time
-
-    // Remove source item completely but DO NOT delete its underlying files/images
-    // because they are now owned by the target!
-    const [removed] = this.items.splice(srcIdx, 1)
-    this.sigToId.delete(signature(removed.data))
-
-    this.persist()
-    return { ok: true }
-  }
-
   public removeSubitem(req: DragRequest): boolean {
     const sourceItem = this.get(req.id)
     if (!sourceItem) return false
@@ -302,42 +248,6 @@ export class ItemStore {
       } else if (sourceItem.data.images.length === 0) {
         this.items.splice(sourceIndex, 1)
       }
-      this.rebuildIndex()
-      this.persist()
-      return true
-    }
-
-    return false
-  }
-
-  public split(req: DragRequest): boolean {
-    const sourceItem = this.get(req.id)
-    if (!sourceItem) return false
-    const sourceIndex = this.items.findIndex(i => i.id === req.id)
-    if (sourceIndex === -1) return false
-
-    // Splitting from an image collection
-    if (sourceItem.data.kind === 'image-collection' && req.imageId) {
-      const imgIdx = sourceItem.data.images.findIndex(i => i.imageId === req.imageId)
-      if (imgIdx === -1) return false
-      
-      const targetImg = sourceItem.data.images[imgIdx]
-      sourceItem.data.images.splice(imgIdx, 1)
-      
-      if (sourceItem.data.images.length === 1) {
-        sourceItem.data = { kind: 'image', ...sourceItem.data.images[0] }
-      } else if (sourceItem.data.images.length === 0) {
-        this.items.splice(sourceIndex, 1)
-      }
-
-      const newItem: ClipboardItem = {
-        id: createId(),
-        capturedAt: Date.now(),
-        hitCount: 1,
-        pinned: false,
-        data: { kind: 'image', imageId: targetImg.imageId, width: targetImg.width, height: targetImg.height, bytes: targetImg.bytes }
-      }
-      this.items.splice(req.splitPlacement === 'after' ? sourceIndex + 1 : sourceIndex, 0, newItem)
       this.rebuildIndex()
       this.persist()
       return true

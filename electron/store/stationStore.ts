@@ -14,10 +14,8 @@ import {
   type FileStat,
   type StationEntry,
   type StationEntryDto,
-  type StationMergeResult,
   type StationMigrationInput,
-  type StationRoute,
-  type StationSplitResult
+  type StationRoute
 } from './transferStation'
 
 export interface StationIndex {
@@ -101,18 +99,6 @@ export class StationStore {
     const ok = this.station.retarget(id, paths)
     if (ok) this.persist()
     return ok
-  }
-
-  split(id: string, paths: string[]): StationSplitResult {
-    const result = this.station.split(id, paths)
-    if (result.ok) this.persist()
-    return result
-  }
-
-  merge(sourceId: string, targetId: string): StationMergeResult {
-    const result = this.station.merge(sourceId, targetId)
-    if (result.ok) this.persist()
-    return result
   }
 
   /** Re-stat one entry; returns whether it flipped stale -> live. */

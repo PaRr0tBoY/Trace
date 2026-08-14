@@ -26,8 +26,6 @@ export interface EdgeApi {
    * from the DOM `dragstart` event, and main calls `event.sender.startDrag`.
    */
   startDrag: (req: DragRequest) => void
-  mergeItems: (sourceId: string, targetId: string) => Promise<import('./types').MergeResult>
-  splitItem: (req: import('./types').DragRequest) => Promise<boolean>
 
   /* Transfer station (ADR-0006) */
   /** Full current station entry list (also included in loadState). */
@@ -40,10 +38,6 @@ export interface EdgeApi {
   stationPin: (id: string, pinned: boolean) => Promise<import('./station').StationEntryDto[]>
   /** Remove an entry. */
   stationDelete: (id: string) => Promise<import('./station').StationEntryDto[]>
-  /** Split members out of an entry into a new standalone entry. */
-  stationSplit: (req: import('./types').DragRequest) => Promise<import('./station').StationSplitResult>
-  /** Merge source entry into target (deduplicated). */
-  stationMerge: (sourceId: string, targetId: string) => Promise<import('./station').StationMergeResult>
   /** Copy one file member onto the system clipboard. */
   stationCopyMember: (req: import('./types').DragRequest) => Promise<boolean>
   /** Copy one file member and paste it into the active application. */
@@ -150,6 +144,8 @@ export interface EdgeApi {
   onToggle: (cb: (open?: boolean) => void) => () => void
   /** OS drag session started/ended (T4b) — blocks panel collapse mid-drag. */
   onDragActive: (cb: (active: boolean) => void) => () => void
+  /** Drag indicator visibility (T4b feedback): show while a drag waits for the detection zone. */
+  onDragIndicator: (cb: (show: boolean) => void) => () => void
   onOpenSettings: (cb: () => void) => () => void
   onDragEnd: (cb: () => void) => () => void
   onInternalDrop: (cb: (pos: { x: number; y: number }) => void) => () => void

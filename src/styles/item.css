@@ -681,25 +681,6 @@
   box-shadow: 0 0 6px var(--accent-glow);
 }
 
-/* Bundle counter: bottom-right. */
-.pinned-tile-count {
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  min-width: 12px;
-  height: 12px;
-  padding: 0 3px;
-  border-radius: 6px;
-  background: var(--bg-3);
-  border: 1px solid var(--edge-light);
-  font-size: calc(8.5px * var(--font-scale, 1));
-  font-weight: 600;
-  line-height: 10px;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.75);
-  z-index: 2;
-}
-
 /* Hover unpin shortcut. */
 .pinned-tile-unpin {
   position: absolute;
@@ -786,4 +767,56 @@
   background: rgba(var(--accent-rgb), 0.32);
   border-color: rgba(var(--accent-rgb), 0.7);
   color: #fff;
+}
+
+/* ── Drag indicator (T4b feedback) ─────────────────────────────────────
+   A compact pill on the stick edge, shown while a file drag waits for the
+   detection zone. The window is click-through while collapsed, so this is
+   purely visual. */
+.drag-indicator {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 14px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), 0.22);
+  border: 1px solid rgba(var(--accent-rgb), 0.55);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #fff;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+  animation: drag-indicator-pulse 1.4s ease-in-out infinite;
+}
+
+.drag-indicator-right {
+  left: auto;
+  right: 14px;
+}
+
+.drag-indicator-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(var(--accent-rgb), 0.3);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.drag-indicator-text {
+  font-size: calc(12px * var(--font-scale, 1));
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+@keyframes drag-indicator-pulse {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
 }

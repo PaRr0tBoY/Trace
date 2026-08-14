@@ -177,8 +177,6 @@ const api = {
   quitApp: () => invoke('app:quit'),
   startDrag: (req: DragRequest) => send('item:start-drag', req),
   removeSubitem: (req: import('../../shared/types').DragRequest) => invoke('item:remove-subitem', req),
-  mergeItems: (sourceId: string, targetId: string) => invoke('item:merge', sourceId, targetId),
-  splitItem: (req: import('../../shared/types').DragRequest) => invoke('item:split', req),
 
   /* Transfer station (ADR-0006) */
   stationList: () => invoke('station:list'),
@@ -186,8 +184,6 @@ const api = {
   stationEnterContent: (input: StationContentInput) => invoke('station:enter-content', input),
   stationPin: (id: string, pinned: boolean) => invoke('station:pin', id, pinned),
   stationDelete: (id: string) => invoke('station:delete', id),
-  stationSplit: (req: import('../../shared/types').DragRequest) => invoke('station:split', req),
-  stationMerge: (sourceId: string, targetId: string) => invoke('station:merge', sourceId, targetId),
   stationCopyMember: (req: import('../../shared/types').DragRequest) => invoke('station:copy-member', req),
   stationPasteMember: (req: import('../../shared/types').DragRequest) => invoke('station:paste-member', req),
   getDisplays: () => invoke('displays:list'),
@@ -263,6 +259,7 @@ const api = {
   onLocalModelStatus: (cb: (status: EventArgs<'local-model:status'>[0]) => void) => on('local-model:status', cb),
   onToggle: (cb: (open?: boolean) => void) => on('window:toggle', cb),
   onDragActive: (cb: (active: boolean) => void) => on('drag:active', cb),
+  onDragIndicator: (cb: (show: boolean) => void) => on('drag:indicator', cb),
   onOpenSettings: (cb: () => void) => on('window:open-settings', cb),
   onDragEnd: (cb: () => void) => on('item:drag-end', cb),
   onInternalDrop: (cb: (pos: { x: number; y: number }) => void) => on('item:internal-drop', cb),

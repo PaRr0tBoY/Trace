@@ -9,8 +9,8 @@
  *   - `Renderer -> Main` calls (invoke/handle) are listed in `InvokeMap`.
  *   - `Main -> Renderer` events (send/on) are listed in `EventMap`.
  */
-import type { AppRef, ClipboardItemDto, DragRequest, IgnoreReason, LocalModelSource, LocalModelStatus, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, MergeResult, ProviderConfig, Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
-import type { StationContentInput, StationEntryDto, StationMergeResult, StationSplitResult } from './station'
+import type { AppRef, ClipboardItemDto, DragRequest, IgnoreReason, LocalModelSource, LocalModelStatus, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, ProviderConfig, Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
+import type { StationContentInput, StationEntryDto } from './station'
 
 /** Result of a connection test against one provider (ai:test-provider). */
 export interface ProviderTestResult {
@@ -92,12 +92,6 @@ export interface InvokeMap {
   /** Copy a sub-item and paste it directly into the active application. */
   'item:paste-subitem': { args: [req: DragRequest]; result: boolean }
 
-  /** Merge an item into another. Returns why it failed (full / incompatible). */
-  'item:merge': { args: [sourceId: string, targetId: string]; result: MergeResult }
-
-  /** Split a sub-item out of a bundle into a new standalone item. */
-  'item:split': { args: [req: DragRequest]; result: boolean }
-
   /* --------------------------- transfer station (ADR-0006) --------------------------- */
 
   /** Full current station entry list (also included in state:load). */
@@ -115,12 +109,6 @@ export interface InvokeMap {
 
   /** Remove an entry (and, for in-transit entries, dispose of the staged copy). */
   'station:delete': { args: [id: string]; result: StationEntryDto[] }
-
-  /** Split the given members out of an entry into a new standalone entry. */
-  'station:split': { args: [req: DragRequest]; result: StationSplitResult }
-
-  /** Merge the source entry's paths into the target (deduplicated). */
-  'station:merge': { args: [sourceId: string, targetId: string]; result: StationMergeResult }
 
   /** Copy one file member (path) onto the system clipboard. */
   'station:copy-member': { args: [req: DragRequest]; result: boolean }
@@ -347,6 +335,8 @@ export interface EventMap {
   'window:toggle': [open?: boolean]
   /** OS drag session started/ended (T4b): renderer must not collapse the panel mid-drag. */
   'drag:active': [active: boolean]
+  /** Drag indicator visibility: a file drag waits for the detection zone. */
+  'drag:indicator': [show: boolean]
   /** Open the panel directly to settings from the main process (e.g. tray). */
   'window:open-settings': []
   /** Fired when an OS drag initiated by the app has completed. */

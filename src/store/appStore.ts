@@ -36,8 +36,6 @@ interface AppState {
   stationEnter: (paths: string[]) => Promise<void>
   stationPin: (id: string, pinned: boolean) => Promise<void>
   stationDelete: (id: string) => Promise<void>
-  stationSplit: (req: DragRequest) => Promise<void>
-  stationMerge: (sourceId: string, targetId: string) => Promise<import('../../shared/station').StationMergeResult>
   stationCopyMember: (req: DragRequest) => Promise<void>
   stationPasteMember: (req: DragRequest) => Promise<void>
   /** Delete every stale entry (T6 cleanup banner). */
@@ -97,6 +95,9 @@ interface AppState {
   setPickerTaskId: (id: string | null) => void
   /** True while an OS file drag is hovering the panel (prevents premature close). */
   dragActive: boolean
+  /** Drag indicator visibility (T4b feedback): a file drag waits for the detection zone. */
+  dragIndicator: boolean
+  setDragIndicator: (show: boolean) => void
   /** True if the active drag originated from within the app itself. Stores the drag request (which item/sub-item). */
   internalDragReq: import('../../shared/types').DragRequest | null
   /** Active toasts (auto-dismissed after a short delay). */
@@ -259,6 +260,8 @@ export const useStore = create<AppState>((set, get) => ({
   pickerTaskId: null,
   setPickerTaskId: (pickerTaskId) => set({ pickerTaskId }),
   dragActive: false,
+  dragIndicator: false,
+  setDragIndicator: (dragIndicator) => set({ dragIndicator }),
   internalDragReq: null,
   toasts: [],
   tutorialStep: 0,
@@ -312,12 +315,6 @@ export const useStore = create<AppState>((set, get) => ({
   async stationDelete(id) {
     set({ station: await edge.stationDelete(id) })
   },
-  async stationSplit(req) {
-    await edge.stationSplit(req)
-  },
-  async stationMerge(sourceId, targetId) {
-    return edge.stationMerge(sourceId, targetId)
-  },
   async stationCopyMember(req) {
     await edge.stationCopyMember(req)
   },
@@ -366,6 +363,22 @@ export const useStore = create<AppState>((set, get) => ({
     // Already open (e.g. tray "Open Settings"): this is not a close→open
     // transition, so the restore anchor semantics (ADR-0004) don't apply.
     if (s.open) {
+      set(patch)
+      return
+    }
+    // A drag expand always lands on the transfer station view (the drop
+    // surface); the restore anchor must never leak another view into a
+    // drag session (user feedback 2026-08-14).
+    if (s.dragActive) {
+      patch.view = 'files'
+      patch.filesFilter = 'all'
+      patch.settingsOpen = false
+      patch.settingsSubView = 'main'
+      patch.query = ''
+      patch.selectedTaskId = null
+      patch.editingTask = null
+      patch.confirmDeleteTaskId = null
+      patch.pickerTaskId = null
       set(patch)
       return
     }

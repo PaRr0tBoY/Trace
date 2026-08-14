@@ -33,14 +33,6 @@ export interface StationEntryDto {
   members: StationMember[]
 }
 
-export type StationMergeResult =
-  | { ok: true }
-  | { ok: false; reason: 'notfound' | 'self' | 'full' | 'in-transit' }
-
-export type StationSplitResult =
-  | { ok: true }
-  | { ok: false; reason: 'notfound' | 'in-transit' | 'no-paths' }
-
 /** Non-file drag-in content (T7): selected text and/or image data without a
  *  disk path. Images carry raw bytes (Uint8Array survives the bridge as a
  *  copy); main stages both as real files, then enters them via station:enter. */

@@ -26,7 +26,7 @@ import { edge } from '../lib/edge'
 import { basename, formatBytes, previewText, relativeTime, formatImageDisplayName } from '../lib/format'
 import { getFileKind } from '../lib/fileType'
 import { playButtonClickSound, playToggleSound, playDeleteSound, playCardExpandSound } from '../lib/soundEffects'
-import { CopyIcon, FileKindIcon, ImageIcon, LinkIcon, PinIcon, PinFillIcon, TrashIcon, MinusIcon, ChevronUpIcon, ExpandIcon, ContractIcon, ExternalLinkIcon } from './icons'
+import { CopyIcon, FileKindIcon, ImageIcon, LinkIcon, PinIcon, PinFillIcon, TrashIcon, ChevronUpIcon, ExpandIcon, ContractIcon, ExternalLinkIcon } from './icons'
 import '../styles/item.css'
 
 import { tryPaste } from '../lib/tryPaste'
@@ -178,14 +178,9 @@ function ClipboardItemBase({ item, instant, animateLayout, stationEntry }: Props
           if (activeDrag && activeDrag.id !== item.id) {
             e.preventDefault()
             e.stopPropagation()
-            // If they drop an entire item or a subitem onto another item, we merge them.
-            // Currently our merge logic merges the entire source item. 
-            // In the future we might want to merge just the subitem.
-            if (stationEntry) {
-              void useStore.getState().stationMerge(activeDrag.id, stationEntry.id)
-            } else {
-              window.edge.mergeItems(activeDrag.id, item.id)
-            }
+            // Drop-on-another-item merging was removed with the grouping
+            // feature (user feedback 2026-08-14) — every entry stays
+            // standalone.
             setInternalDragReq(null)
           } else if (activeDrag && activeDrag.id === item.id) {
             e.preventDefault()
@@ -447,14 +442,6 @@ function BundleFluidPreview({
                       {formatBytes(img.bytes)}
                     </span>
                   </div>
-                  <button
-                    className="act subitem-delete-btn"
-                    title={t('item.ungroup')}
-                    onClick={(e) => { e.stopPropagation(); window.edge.splitItem({ id: item.id, imageId: img.imageId, splitPlacement: 'after' }); }}
-                    style={{ width: 24, height: 24 }}
-                  >
-                    <MinusIcon width={12} height={12} />
-                  </button>
                 </motion.div>
               ))}
             </motion.div>
@@ -576,14 +563,6 @@ function BundleFluidPreview({
                       style={{ width: 24, height: 24 }}
                     >
                       <CopyIcon width={12} height={12} />
-                    </button>
-                    <button
-                      className="act subitem-delete-btn"
-                      title={t('item.ungroup')}
-                      onClick={(e) => { e.stopPropagation(); window.edge.splitItem({ id: item.id, paths: [filePath], splitPlacement: 'after' }); }}
-                      style={{ width: 24, height: 24 }}
-                    >
-                      <MinusIcon width={12} height={12} />
                     </button>
                   </motion.div>
                 )

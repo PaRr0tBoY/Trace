@@ -23,11 +23,8 @@ import { FileListView } from './FileListView'
 import { TaskDropPanel } from './tasks/TaskDropPanel'
 import { linkDraggedItem, acceptSuggestionDrop, dropOnSaveZone } from './tasks/dropActions'
 import { ToastStack } from './Toast'
-import { TrashIcon } from './icons'
+import { TrashIcon, DropIcon } from './icons'
 import { t } from '../i18n'
-
-/** True when the id names a transfer station entry (ADR-0006). */
-const isStationId = (id: string): boolean => useStore.getState().station.some((e) => e.id === id)
 
 export function Panel() {
   const open = useStore((s) => s.open)
@@ -37,6 +34,7 @@ const switcherActive = useStore((s) => s.switcherActive)
   const settings = useStore((s) => s.settings)
   const settingsOpen = useStore((s) => s.settingsOpen)
   const view = useStore((s) => s.view)
+  const dragIndicator = useStore((s) => s.dragIndicator)
 
   // NOTE: closing the panel intentionally keeps the settings sheet, its sub
   // view, and the search query — the restore mechanism (ADR-0004) decides
@@ -125,19 +123,13 @@ const switcherActive = useStore((s) => s.switcherActive)
       if (itemEl) {
         const targetId = itemEl.getAttribute('data-id')
         if (targetId && targetId !== req.id) {
-          // Dropped on a DIFFERENT item: merge (station entries merge inside
-          // the station domain, ADR-0006).
-          if (isStationId(req.id)) {
-            window.edge.stationMerge(req.id, targetId)
-          } else {
-            window.edge.mergeItems(req.id, targetId)
-          }
+          // Drop-on-another-item merging was removed with the grouping
+          // feature (user feedback 2026-08-14) — entries stay standalone.
         } else if (targetId === req.id) {
           // Dropped on the SAME item: do nothing, keep it in the collection
         }
       }
-      // Dropped on empty space: no-op. Batch-member split lives on the card
-      // button only (T5).
+      // Dropped on empty space: no-op.
     })
 
     /**
@@ -228,6 +220,16 @@ const switcherActive = useStore((s) => s.switcherActive)
 
   return (
     <div className="root">
+      {/* Drag indicator (T4b feedback): shown while a file drag waits for
+          the detection zone — the panel itself stays collapsed. */}
+      {dragIndicator && !open && (
+        <div className={`drag-indicator${settings.stickPosition === 'right' ? ' drag-indicator-right' : ''}`}>
+          <span className="drag-indicator-icon">
+            <DropIcon width={18} height={18} />
+          </span>
+          <span className="drag-indicator-text">{t('tasks.dragIndicatorHint')}</span>
+        </div>
+      )}
       <motion.div
         className={`blade-container${open ? '' : ' closing'}${settings.stickPosition === 'right' ? ' blade-right' : ''}${switcherActive ? ' switcher-session' : ''}`}
         initial={false}

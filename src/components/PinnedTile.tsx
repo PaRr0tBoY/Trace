@@ -2,10 +2,10 @@
  * PinnedTile — one transfer station entry in the pinned badge grid (T6).
  *
  * Compact 4-per-row launch tiles for pinned station entries: file-type icon
- * + name, a bundle counter, and minimal status dots (missing = red,
- * in-transit = accent). Clicking expands the entry to a full StationEntryCard
- * (rendered by the caller above the grid); hover reveals an unpin shortcut.
- * The tile keeps whole-entry drag-out like the card does.
+ * + name and minimal status dots (missing = red, in-transit = accent).
+ * Clicking expands the entry to a full card (rendered by the caller above
+ * the grid); hover reveals an unpin shortcut. The tile keeps whole-entry
+ * drag-out like the card does.
  */
 import { useCallback } from 'react'
 import { motion } from 'framer-motion'
@@ -36,7 +36,6 @@ export function PinnedTile({ entry, onExpand }: Props) {
   const first = entry.paths[0]
   const info = getFileKind(first)
   const name = entry.members[0]?.name ?? basename(first)
-  const isBundle = entry.paths.length > 1
 
   return (
     <motion.div
@@ -62,7 +61,6 @@ export function PinnedTile({ entry, onExpand }: Props) {
         <FileKindIcon path={first} width={18} height={18} />
       </div>
       <div className="pinned-tile-name">{name}</div>
-      {isBundle && <span className="pinned-tile-count">{entry.paths.length}</span>}
       <button
         className="pinned-tile-unpin"
         title={t('item.unpin')}

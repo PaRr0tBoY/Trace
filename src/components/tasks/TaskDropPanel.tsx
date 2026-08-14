@@ -85,8 +85,14 @@ export function TaskDropPanel() {
                 }}
               >
                 <span className={`task-status-dot ${task.status}`} />
-                <span className="task-drop-row-title">{task.title}</span>
-                {task.apps[0] && <AppIcon app={task.apps[0]} size={16} />}
+                {overTaskId === task.id ? (
+                  <span className="task-drop-row-hint">{t('tasks.taskDropHint')}</span>
+                ) : (
+                  <>
+                    <span className="task-drop-row-title">{task.title}</span>
+                    {task.apps[0] && <AppIcon app={task.apps[0]} size={16} />}
+                  </>
+                )}
               </div>
             ))}
             {suggestions.map((s) => (

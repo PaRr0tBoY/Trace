@@ -90,12 +90,12 @@ describe('StationStore', () => {
   it('enter persists the index and fires onChange', () => {
     const h = makeHarness()
     const created = h.store.enter(['c:\\a\\one.pdf', 'c:\\b\\two.txt'], 'drag-in')
-    expect(created).toHaveLength(1)
+    expect(created).toHaveLength(2)
     expect(h.saves()).toHaveLength(1)
     expect(h.saved()?.version).toBe(STATION_STORAGE_VERSION)
     expect(h.saved()?.entries[0]).toMatchObject({
-      id: created[0].id,
-      paths: ['c:\\a\\one.pdf', 'c:\\b\\two.txt'],
+      id: created[1].id,
+      paths: ['c:\\b\\two.txt'],
       route: 'drag-in'
     })
     expect(h.changes()).toBe(1)
@@ -138,39 +138,17 @@ describe('StationStore', () => {
     expect(h.saves().length).toBe(savesAfterEnter + 1)
   })
 
-  it('split forwards to the domain and persists on success', () => {
+  it('retarget forwards to the domain and persists on success', () => {
     const h = makeHarness()
-    h.store.enter(['c:\\a\\one.pdf', 'c:\\b\\two.txt'], 'drag-in')
+    h.store.enter(['c:\\a\\one.pdf'], 'drag-in')
     const id = h.saved()!.entries[0].id
     const savesAfterEnter = h.saves().length
 
-    const miss = h.store.split('missing-id', ['c:\\a\\one.pdf'])
-    expect(miss).toEqual({ ok: false, reason: 'notfound' })
+    expect(h.store.retarget('missing-id', ['c:\\stage\\one.pdf'])).toBe(false)
     expect(h.saves().length).toBe(savesAfterEnter)
 
-    const ok = h.store.split(id, ['c:\\a\\one.pdf'])
-    expect(ok).toEqual({ ok: true })
-    expect(h.saved()?.entries).toHaveLength(2)
-    expect(h.saved()?.entries[1].paths).toEqual(['c:\\a\\one.pdf'])
-  })
-
-  it('merge forwards to the domain and persists on success', () => {
-    const h = makeHarness()
-    h.store.enter(['c:\\a\\one.pdf'], 'drag-in')
-    h.store.enter(['c:\\b\\two.txt'], 'clipboard')
-    const saved = h.saved()!.entries
-    const srcId = saved[1].id
-    const tgtId = saved[0].id
-    const savesAfterEnter = h.saves().length
-
-    const ok = h.store.merge(srcId, tgtId)
-    expect(ok).toEqual({ ok: true })
-    expect(h.saved()?.entries).toHaveLength(1)
-    expect(h.saved()?.entries[0].paths).toEqual(['c:\\b\\two.txt', 'c:\\a\\one.pdf'])
-    expect(h.saves().length).toBe(savesAfterEnter + 1)
-
-    const miss = h.store.merge(srcId, 'missing-id')
-    expect(miss).toEqual({ ok: false, reason: 'notfound' })
+    expect(h.store.retarget(id, ['c:\\stage\\one.pdf'])).toBe(true)
+    expect(h.saved()?.entries[0].paths).toEqual(['c:\\stage\\one.pdf'])
     expect(h.saves().length).toBe(savesAfterEnter + 1)
   })
 
@@ -248,15 +226,16 @@ describe('StationStore', () => {
     const h = makeHarness({ stat: (p) => ({ exists: true, size: p.endsWith('.pdf') ? 5 : 7 }) })
     h.store.enter(['c:\\a\\doc.pdf', 'c:\\a\\img.PNG'], 'clipboard')
     const dto = h.store.toDto()
-    expect(dto).toHaveLength(1)
+    expect(dto).toHaveLength(2)
     expect(dto[0]).toMatchObject({
       route: 'clipboard',
       pinned: false,
       inTransit: false,
       stale: false,
-      paths: ['c:\\a\\doc.pdf', 'c:\\a\\img.PNG']
+      paths: ['c:\\a\\img.PNG']
     })
-    expect(dto[0].members[0]).toEqual({ name: 'doc.pdf', ext: 'pdf', size: 5, isImage: false, exists: true })
-    expect(dto[0].members[1]).toEqual({ name: 'img.PNG', ext: 'png', size: 7, isImage: true, exists: true })
+    expect(dto[0].members).toEqual([{ name: 'img.PNG', ext: 'png', size: 7, isImage: true, exists: true }])
+    expect(dto[1]).toMatchObject({ paths: ['c:\\a\\doc.pdf'] })
+    expect(dto[1].members).toEqual([{ name: 'doc.pdf', ext: 'pdf', size: 5, isImage: false, exists: true }])
   })
 })

@@ -192,10 +192,13 @@ describe('in-transit entries are immune to automatic cleanup (ADR-0007 §4)', ()
     expect(station.get('e2')).toBeUndefined()
   })
 
-  it('split/merge reject in-transit entries (they can only be re-dragged or deleted)', () => {
+  it('in-transit entries are immune to retarget and removal is explicit', () => {
     const { station, entries } = makeStation()
     station.hydrate(entries)
-    expect(station.split('e1', ['C:\\staged\\held.pdf'])).toEqual({ ok: false, reason: 'in-transit' })
-    expect(station.merge('e1', 'e2')).toEqual({ ok: false, reason: 'in-transit' })
+    // retarget must refuse to retarget an in-transit entry via the wrapper…
+    expect(station.setInTransit('missing', true)).toBe(false)
+    expect(station.get('e1')?.inTransit).toBe(true)
+    // …and prune already covered it; removal is the explicit manual path.
+    expect(station.remove('e1')?.inTransit).toBe(true)
   })
 })

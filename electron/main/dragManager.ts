@@ -88,6 +88,67 @@ function pushDragActive(active: boolean): void {
   }
 }
 
+function pushDragIndicator(show: boolean): void {
+  const win = getMainWindow()
+  if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+    win.webContents.send('drag:indicator', show)
+  }
+}
+
+// Detection-zone poll: while an armed drag is in flight, sample the cursor
+// against the panel window rect (the screen space the expanded panel covers).
+// Entering it expands the panel; leaving it again never retracts (the state
+// machine locks the expand until end).
+const ZONE_POLL_MS = 16
+let zoneTimer: ReturnType<typeof setInterval> | null = null
+
+function stopZonePoll(): void {
+  if (zoneTimer !== null) {
+    clearInterval(zoneTimer)
+    zoneTimer = null
+  }
+}
+
+function startZonePoll(): void {
+  stopZonePoll()
+  zoneTimer = setInterval(() => {
+    if (session.phase !== 'drag') {
+      stopZonePoll()
+      return
+    }
+    const pt = screen.getCursorScreenPoint()
+    const inZone = cursorInPanelAt(pt)
+    const { state, commands } = dragSessionTransition(
+      session,
+      { type: 'cursor', inDropZone: inZone, cursorInPanel: inZone },
+      Date.now()
+    )
+    session = state
+    if (commands.length > 0) applyCommands(commands)
+  }, ZONE_POLL_MS)
+}
+
+// End-of-drag retract is deferred: a rapid re-drag right after the drop must
+// not fight the collapse animation (double-panel ghost). A new start cancels
+// the pending retract and the panel simply stays open.
+const RETRACT_DELAY_MS = 250
+let retractTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearRetractTimer(): void {
+  if (retractTimer !== null) {
+    clearTimeout(retractTimer)
+    retractTimer = null
+  }
+}
+
+function scheduleRetract(): void {
+  clearRetractTimer()
+  retractTimer = setTimeout(() => {
+    retractTimer = null
+    pushState.togglePanel(false)
+  }, RETRACT_DELAY_MS)
+}
+
 function applyCommands(commands: DragCommand[]): void {
   for (const cmd of commands) {
     switch (cmd) {
@@ -100,9 +161,15 @@ function applyCommands(commands: DragCommand[]): void {
         pushState.togglePanel(true)
         break
       case 'retract':
-        // The renderer's onToggle(false) runs the normal close sequence
-        // (preview/flyout exit springs included).
-        pushState.togglePanel(false)
+        // Deferred so a re-drag within RETRACT_DELAY_MS cancels it (no
+        // collapse/expand animation overlap → no ghost panel).
+        scheduleRetract()
+        break
+      case 'show-indicator':
+        pushDragIndicator(true)
+        break
+      case 'hide-indicator':
+        pushDragIndicator(false)
         break
       case 'pause-heartbeat':
         setHeartbeatPaused(true)
@@ -132,6 +199,7 @@ function armTimeout(): void {
       Date.now()
     )
     session = state
+    stopZonePoll()
     pushDragActive(false)
     applyCommands(commands)
     // T3 seam: no end signal ever arrived — decideDragEnd's elapsedMs branch
@@ -159,8 +227,10 @@ function handleStart(msg: HostStartMsg): void {
     Date.now()
   )
   session = state
+  clearRetractTimer() // a re-drag cancels the pending end-of-drag retract
   pushDragActive(true)
   applyCommands(commands)
+  if (state.armed) startZonePoll()
   armTimeout()
 }
 
@@ -183,6 +253,7 @@ function handleEnd(msg: HostEndMsg): void {
   )
   session = state
   clearTimeoutTimer()
+  stopZonePoll()
   pushDragActive(false)
   applyCommands(commands)
   // T3 seam: settle every in-flight staged drag with this end's facts
@@ -208,6 +279,8 @@ export function startDragDetect(): void {
     child.on('exit', () => {
       child = null
       clearTimeoutTimer()
+      stopZonePoll()
+      clearRetractTimer()
       session = initialDragSession()
       // Release the renderer's drag-lock too: if the host died mid-drag the
       // panel would otherwise never collapse (useEdgeHover refuses to close
@@ -228,5 +301,7 @@ export function stopDragDetect(): void {
     child = null
   }
   clearTimeoutTimer()
+  stopZonePoll()
+  clearRetractTimer()
   session = initialDragSession()
 }

@@ -927,7 +927,7 @@
 }
 .drop-save-zone.over {
   border-color: var(--accent);
-  border-style: solid;
+  border-style: dashed;
   background: rgba(var(--accent-rgb), 0.12);
 }
 .drop-save-zone-icon {
@@ -991,6 +991,7 @@
 }
 .task-drop-row.over {
   border-color: var(--accent);
+  border-style: dashed;
   background: rgba(var(--accent-rgb), 0.12);
 }
 .task-drop-row-title {
@@ -999,6 +1000,18 @@
   font-size: calc(12px * var(--font-scale, 1));
   font-weight: 600;
   color: rgba(255, 255, 255, 0.88);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Hover hint replaces the row content while the drag is over the task
+   (user feedback: the card turns into an operation hint). */
+.task-drop-row-hint {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(11.5px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--accent);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

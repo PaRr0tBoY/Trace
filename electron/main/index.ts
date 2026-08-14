@@ -22,7 +22,7 @@ import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushSt
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
 import { startKeyboardHook, stopKeyboardHook } from './hookManager'
-import { switcherShow, switcherAdvance, switcherExecute, switcherTapExecute } from './switcher'
+import { switcherShow, switcherAdvance, switcherExecute, switcherTapExecute, switcherPin, switcherTouch } from './switcher'
 import { ForegroundWatcher } from './foreground'
 import { ocrFromForeground } from './ocr'
 import { createAttributor, type Attributor } from './attributor'
@@ -112,7 +112,9 @@ app.whenReady().then(() => {
     onShow: switcherShow,
     onAdvance: switcherAdvance,
     onExecute: switcherExecute,
-    onTapExecute: switcherTapExecute
+    onTapExecute: switcherTapExecute,
+    onPin: switcherPin,
+    onTouch: switcherTouch
   })
 
   // Register Alt+C global shortcut to toggle panel

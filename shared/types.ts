@@ -159,6 +159,12 @@ export interface SwitcherEntryDto {
   title: string
   exePath: string
   isCurrent: boolean
+  /** Original position in the ungrouped z-order list — hover/click report this to main. */
+  index: number
+  /** Set when the same app's windows are grouped: window count for the badge. */
+  groupCount?: number
+  /** The grouped windows (z-order), present only on a group row — drives the drill-in view. */
+  windows?: SwitcherEntryDto[]
 }
 
 /* ------------------------------------------------------------------ */
@@ -714,6 +720,11 @@ export interface Settings {
    * the landing page (ADR-0004). 'forever' disables restoring entirely.
    */
   restoreTime: RestoreTime
+  /**
+   * Alt+Tab switcher: group multiple windows of the same app into one row
+   * (drill-in on click). Default off — native behavior.
+   */
+  switcherGroupWindows: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -770,7 +781,8 @@ export const DEFAULT_SETTINGS: Settings = {
   localModelSource: 'auto',
   localModelManualPath: undefined,
   landing: { view: 'tasks', filter: 'existing' },
-  restoreTime: 'relaxed'
+  restoreTime: 'relaxed',
+  switcherGroupWindows: false
 }
 
 /* ------------------------------------------------------------------ */

@@ -129,5 +129,7 @@ export function clampSettings(input: Settings): Settings {
   out.restoreTime = restoreTime === 'instant' || restoreTime === 'relaxed' || restoreTime === 'delayed' || restoreTime === 'forever'
     ? restoreTime
     : 'relaxed'
+  // Alt+Tab window grouping: explicit true only (default off).
+  out.switcherGroupWindows = out.switcherGroupWindows === true
   return out
 }

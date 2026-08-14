@@ -249,10 +249,11 @@ describe('disk cache bridge (seed / snapshot / negative TTL)', () => {
       ['c:\\c.exe', DATA_URL]
     ]))
 
-    // Only the two newest survive seed-time eviction; resolving the evicted
-    // path refetches (fails here) and its negative entry pushes out 'b'.
+    // Only the two newest survive seed-time eviction. Resolving the evicted
+    // 'a' refetches (fails here) and its negative entry pushes out 'b'; 'c'
+    // stays cached, and the later 'b' resolve finds it evicted (negative).
     expect(await svc.resolve('C:\\a.exe')).toBeNull()
-    expect(await svc.resolve('C:\\b.exe')).toBeNull()
     expect(await svc.resolve('C:\\c.exe')).toBe(DATA_URL)
+    expect(await svc.resolve('C:\\b.exe')).toBeNull()
   })
 })

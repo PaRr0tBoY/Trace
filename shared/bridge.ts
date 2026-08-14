@@ -5,7 +5,7 @@
  * contract lives in one place. The actual implementation lives in the preload;
  * the renderer only ever sees `window.edge` typed as this interface.
  */
-import type { Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget, LocalModelSource, LocalModelStatus } from './types'
+import type { Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget, LocalModelSource, LocalModelStatus, SwitcherEntryDto } from './types'
 import type { DragRequest, ProviderConfig } from './types'
 import type { ProviderTestResult, SuggestTitleContext, SuggestionAcceptOptions, DropResource } from './ipc'
 
@@ -145,7 +145,9 @@ export interface EdgeApi {
   /* Alt+Tab switcher (ADR-0005) */
   switcherHover: (index: number) => void
   switcherClick: (index: number) => void
-  onSwitcherShow: (cb: (data: { entries: import('./types').SwitcherEntryDto[]; selectedIndex: number }) => void) => () => void
+  switcherCancel: () => void
+  onSwitcherShow: (cb: (data: { entries: SwitcherEntryDto[]; selectedIndex: number }) => void) => () => void
   onSwitcherSelect: (cb: (index: number) => void) => () => void
+  onSwitcherPin: (cb: () => void) => () => void
   onSwitcherHide: (cb: () => void) => () => void
 }

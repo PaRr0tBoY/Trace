@@ -115,10 +115,13 @@ interface AppState {
   switcherActive: boolean
   switcherEntries: import('../../shared/types').SwitcherEntryDto[]
   switcherSelected: number
+  /** Search mode (Enter while armed, TabTab pattern): panel stays up on Alt-up. */
+  switcherPinned: boolean
   /** Panel open state before the switcher took over — restored on hide. */
   switcherPrevOpen: boolean
   showSwitcher: (data: { entries: import('../../shared/types').SwitcherEntryDto[]; selectedIndex: number }) => void
   setSwitcherSelected: (index: number) => void
+  setSwitcherPinned: (pinned: boolean) => void
   hideSwitcher: () => void
   setSettingsOpen: (open: boolean) => void
   setDragActive: (active: boolean) => void
@@ -204,14 +207,16 @@ export const useStore = create<AppState>((set, get) => ({
   switcherActive: false,
   switcherEntries: [],
   switcherSelected: 0,
+  switcherPinned: false,
   switcherPrevOpen: false,
   showSwitcher: ({ entries, selectedIndex }) => {
-    set({ switcherActive: true, switcherEntries: entries, switcherSelected: selectedIndex, switcherPrevOpen: get().open, open: true })
+    set({ switcherActive: true, switcherEntries: entries, switcherSelected: selectedIndex, switcherPinned: false, switcherPrevOpen: get().open, open: true })
   },
   setSwitcherSelected: (index) => set({ switcherSelected: index }),
+  setSwitcherPinned: (pinned) => set({ switcherPinned: pinned }),
   hideSwitcher: () => {
     const prevOpen = get().switcherPrevOpen
-    const finish = () => set({ switcherActive: false, switcherEntries: [] })
+    const finish = () => set({ switcherActive: false, switcherEntries: [], switcherPinned: false })
     if (prevOpen) {
       // Panel was already open before the session: no collapse animation,
       // switch straight back to the previous page.

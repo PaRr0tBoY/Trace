@@ -29,6 +29,8 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
       else if (m.type === 'advance') events.onAdvance(m.delta === -1 ? -1 : 1)
       else if (m.type === 'execute') events.onExecute()
       else if (m.type === 'tap') events.onTapExecute({ shiftDown: m.shiftDown ?? false })
+      else if (m.type === 'pin') events.onPin()
+      else if (m.type === 'touch') events.onTouch()
     })
     child.on('exit', () => {
       child = null
@@ -46,4 +48,9 @@ export function stopKeyboardHook(): void {
     child.kill()
     child = null
   }
+}
+
+/** Push the pinned (search-mode) flag into the hook state machine. */
+export function setHookPinned(pinned: boolean): void {
+  child?.postMessage({ type: 'pin-state', pinned })
 }

@@ -566,6 +566,19 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
 
                   <div className="setting-divider" />
 
+                  <div className="setting-row vertical">
+                    <div className="setting-info">
+                      <div className="setting-title">{t('behaviour.switcherGroupTitle')}</div>
+                      <div className="setting-desc">{t('behaviour.switcherGroupDesc')}</div>
+                    </div>
+                    <Toggle
+                      checked={settings.switcherGroupWindows}
+                      onChange={(v) => patch({ switcherGroupWindows: v })}
+                    />
+                  </div>
+
+                  <div className="setting-divider" />
+
                   {PersistentFooter}
                 </motion.div>
               )}

@@ -317,10 +317,26 @@ const switcherActive = useStore((s) => s.switcherActive)
           className="blade"
           style={{ height: panelHeightStr }}
         >
-          {switcherActive ? (
-            <SwitcherView />
-          ) : (
-            <>
+          <AnimatePresence initial={false}>
+            {switcherActive ? (
+              <motion.div
+                key="switcher"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.1 }}
+                style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+              >
+                <SwitcherView />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="main"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.1 }}
+                style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+              >
           <Header />
 
           {!settingsOpen && view !== 'tasks' && <SearchBar />}
@@ -400,8 +416,9 @@ const switcherActive = useStore((s) => s.switcherActive)
           </AnimatePresence>
           <TaskDropPanel />
           <SplitDropZone />
-            </>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
     </div>

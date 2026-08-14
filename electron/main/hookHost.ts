@@ -16,15 +16,18 @@
  * Events flow out via process.parentPort; main drives it with
  * utilityProcess.fork('hookHost.js').
  */
-import { startKeyboardHook, stopKeyboardHook } from './keyboardHook'
+import { startKeyboardHook, stopKeyboardHook, setPinned } from './keyboardHook'
 
 startKeyboardHook({
   onShow: ({ shiftDown }) => process.parentPort?.postMessage({ type: 'show', shiftDown }),
   onAdvance: (delta) => process.parentPort?.postMessage({ type: 'advance', delta }),
   onExecute: () => process.parentPort?.postMessage({ type: 'execute' }),
-  onTapExecute: ({ shiftDown }) => process.parentPort?.postMessage({ type: 'tap', shiftDown })
+  onTapExecute: ({ shiftDown }) => process.parentPort?.postMessage({ type: 'tap', shiftDown }),
+  onPin: () => process.parentPort?.postMessage({ type: 'pin' }),
+  onTouch: () => process.parentPort?.postMessage({ type: 'touch' })
 })
 
-process.parentPort?.on('message', (e: { data?: { type?: string } }) => {
+process.parentPort?.on('message', (e: { data?: { type?: string; pinned?: boolean } }) => {
   if (e.data?.type === 'stop') stopKeyboardHook()
+  else if (e.data?.type === 'pin-state' && typeof e.data.pinned === 'boolean') setPinned(e.data.pinned)
 })

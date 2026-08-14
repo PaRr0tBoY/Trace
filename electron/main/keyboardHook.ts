@@ -43,6 +43,7 @@ const VK_MENU = 0x12
 const VK_LMENU = 0xA4
 const VK_RMENU = 0xA5
 const VK_SHIFT = 0x10
+const VK_RETURN = 0x0D
 const KEYEVENTF_KEYUP = 0x0002
 const PM_REMOVE = 0x0001
 const INPUT_KEYBOARD = 0x0001
@@ -123,9 +124,13 @@ export interface KeyboardHookEvents {
   onExecute: () => void
   /** Quick Alt+Tab tap (Tab released inside the threshold): switch directly, no UI. */
   onTapExecute: (opts: { shiftDown: boolean }) => void
+  /** Enter while the switcher is armed: pin it open and enter search mode (TabTab-style). */
+  onPin: () => void
+  /** Any keydown while pinned — keeps the session's safety timeout alive during typing. */
+  onTouch: () => void
 }
 
-type HookState = 'idle' | 'altDown' | 'pending' | 'tap' | 'armed'
+type HookState = 'idle' | 'altDown' | 'pending' | 'tap' | 'armed' | 'pinned'
 
 // Tab held this long (before key-repeat kicks in at ~500ms) counts as "hold"
 // → show the switcher. Released sooner = a quick tap → switch directly, like
@@ -158,6 +163,7 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
       const isDown = wParam === WM_KEYDOWN || wParam === WM_SYSKEYDOWN
       const isAlt = vk === VK_MENU || vk === VK_LMENU || vk === VK_RMENU
       const isTab = vk === VK_TAB
+      const isReturn = vk === VK_RETURN
       if (DEBUG) console.log('[Hook]', 'wParam=' + wParam, 'vk=' + vk.toString(16), 'state=' + state)
 
       if (state === 'idle') {
@@ -224,6 +230,13 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
           return 1n
         }
         if (isTab && !isDown) return 1n // swallow Tab up — no ghost Tab for the OS
+        if (isReturn && isDown) {
+          // Enter pins the switcher open and enters search mode (TabTab
+          // pattern): Alt-up must NOT execute, keyboard passes to the panel.
+          state = 'pinned'
+          defer(() => activeEvents?.onPin())
+          return 1n
+        }
         if (isAlt && !isDown) {
           state = 'idle'
           defer(() => {
@@ -232,6 +245,17 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
           })
           return 1n // swallow the raw Alt up; the synthetic one is clean
         }
+      } else if (state === 'pinned') {
+        // Pinned search mode: everything passes through to the focused panel
+        // input (search field handles Enter/Esc/arrows itself). Only Alt-up
+        // is special — it must not execute the switch (that's the point of
+        // pinning). Touch the session on keydown so long typing sessions
+        // don't hit the 30s self-heal timeout.
+        if (isAlt && !isDown) {
+          state = 'idle'
+          return 1n
+        }
+        if (isDown) defer(() => activeEvents?.onTouch())
       }
     }
   }
@@ -288,6 +312,21 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
     }
   }, 4)
   console.log('[Hook] ✓ WH_KEYBOARD_LL installed (Alt+Tab takeover active)')
+}
+
+/**
+ * Pin/unpin the hook state machine (TabTab-style search mode, driven from
+ * main via the hook host). Pinned: Alt-up does not execute; every key
+ * passes through to the focused panel. Unpinning returns to armed while Alt
+ * is still held (user can keep cycling), else idle.
+ */
+export function setPinned(pinned: boolean): void {
+  if (pinned) {
+    clearTapTimer()
+    state = 'pinned'
+  } else if (state === 'pinned') {
+    state = getAsyncKeyState && (getAsyncKeyState(VK_MENU) & 0x8000) !== 0 ? 'armed' : 'idle'
+  }
 }
 
 /** Unhook and stop the pump. The OS Alt+Tab returns instantly. */

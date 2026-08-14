@@ -765,7 +765,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hoverActivation: true,
   fontSizeScale: 1.0,
   language: 'system',
-  noteViewMode: 'list',
+  noteViewMode: 'single',
   taskCaptureEnabled: true,
   l0CaptureEnabled: true,
   evidenceRetentionDays: 30,

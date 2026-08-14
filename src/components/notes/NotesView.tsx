@@ -18,9 +18,10 @@ import type { LucideIcon } from 'lucide-react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import type { NoteDto } from '../../../shared/types'
-import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ExpandIcon, ContractIcon, BundleIcon, CloseIcon } from '../icons'
+import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ExpandIcon, ContractIcon, BundleIcon, CloseIcon, PenLineIcon, EyeIcon } from '../icons'
 import { playButtonClickSound } from '../../lib/soundEffects'
 import { MarkdownPreview } from './markdown'
+import { continueOnEnter } from './editorInput'
 
 /** How long a keystroke sits locally before the main-process update. */
 const SAVE_DEBOUNCE_MS = 180
@@ -122,29 +123,83 @@ function NoteEditor({
   const pendingValue = useRef(note.content)
   const initialContent = useRef(note.content)
   const saveTimer = useRef<number | null>(null)
+  // edit = plain textarea, preview = rendered Markdown (see MarkdownPreview).
+  const [mode, setMode] = useState<'edit' | 'preview'>('edit')
 
   const schedulePush = (value: string) => {
     pendingValue.current = value
     if (saveTimer.current !== null) clearTimeout(saveTimer.current)
     saveTimer.current = window.setTimeout(() => {
+      saveTimer.current = null
       void updateNote(note.id, { content: pendingValue.current })
     }, SAVE_DEBOUNCE_MS)
+  }
+
+  /** Push any pending edit now (mode switches, unmount). */
+  const flush = () => {
+    if (saveTimer.current !== null) {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
+    if (pendingValue.current !== initialContent.current) {
+      void updateNote(note.id, { content: pendingValue.current })
+      initialContent.current = pendingValue.current
+    }
   }
 
   // Flush the debounced edit when leaving the editor (back / delete / view switch).
   useEffect(() => {
     return () => {
-      if (saveTimer.current !== null) clearTimeout(saveTimer.current)
-      if (pendingValue.current !== initialContent.current) {
-        void updateNote(note.id, { content: pendingValue.current })
-      }
+      flush()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note.id])
 
-  const handleDelete = () => {
-    void deleteNote(note.id)
-    onBack()
+  // Switching notes / creating a note lands straight in the editor, ready to
+  // type; the panel re-opening after a collapse does the same (see NotesView).
+  useEffect(() => {
+    if (mode !== 'edit') return
+    const raf = requestAnimationFrame(() => taRef.current?.focus())
+    return () => cancelAnimationFrame(raf)
+  }, [mode, note.id])
+
+  const handleDelete = async () => {
+    // Await the deletion so the list is already consistent when we return to
+    // it — otherwise the deleted note flashes back for one frame.
+    await deleteNote(note.id)
+    onBack?.()
+  }
+
+  const switchMode = (next: 'edit' | 'preview') => {
+    if (next === mode) return
+    playButtonClickSound()
+    flush()
+    setMode(next)
+  }
+
+  /** Programmatic edit on the (uncontrolled) textarea + schedule the save. */
+  const applyEdit = (next: string, caret: number) => {
+    const ta = taRef.current
+    if (!ta) return
+    ta.value = next
+    ta.setSelectionRange(caret, caret)
+    schedulePush(next)
+  }
+
+  // Enter continuation, mirroring NotchNotes' input behavior (see
+  // continueOnEnter): list / quote markers carry to the next line, an empty
+  // item drops its marker, and an opening ``` fence auto-closes.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return
+    const ta = taRef.current
+    if (!ta) return
+    const { selectionStart, selectionEnd, value } = ta
+    if (selectionStart !== selectionEnd) return
+    const edit = continueOnEnter(value, selectionStart)
+    if (edit) {
+      e.preventDefault()
+      applyEdit(edit.next, edit.caret)
+    }
   }
 
   return (
@@ -153,6 +208,22 @@ function NoteEditor({
         {variant === 'single' ? (
           <>
             <span className="notes-editor-title">{note.title || t('notes.untitled')}</span>
+            <button
+              type="button"
+              className={`notes-bar-btn${mode === 'edit' ? ' active' : ''}`}
+              title={t('notes.editMode')}
+              onClick={() => switchMode('edit')}
+            >
+              <PenLineIcon width={13} height={13} />
+            </button>
+            <button
+              type="button"
+              className={`notes-bar-btn${mode === 'preview' ? ' active' : ''}`}
+              title={t('notes.previewMode')}
+              onClick={() => switchMode('preview')}
+            >
+              <EyeIcon width={13} height={13} />
+            </button>
             <button
               type="button"
               className="notes-bar-btn"
@@ -184,12 +255,28 @@ function NoteEditor({
               title={t('notes.back')}
               onClick={() => {
                 playButtonClickSound()
-                onBack()
+                onBack?.()
               }}
             >
               <ChevronLeftIcon width={14} height={14} />
             </button>
             <span className="notes-editor-title">{note.title || t('notes.untitled')}</span>
+            <button
+              type="button"
+              className={`notes-bar-btn${mode === 'edit' ? ' active' : ''}`}
+              title={t('notes.editMode')}
+              onClick={() => switchMode('edit')}
+            >
+              <PenLineIcon width={13} height={13} />
+            </button>
+            <button
+              type="button"
+              className={`notes-bar-btn${mode === 'preview' ? ' active' : ''}`}
+              title={t('notes.previewMode')}
+              onClick={() => switchMode('preview')}
+            >
+              <EyeIcon width={13} height={13} />
+            </button>
             <button
               type="button"
               className="notes-bar-btn"
@@ -208,14 +295,21 @@ function NoteEditor({
         )}
       </div>
 
-      <textarea
-        ref={taRef}
-        className="notes-textarea"
-        defaultValue={note.content}
-        placeholder={t('notes.placeholder')}
-        spellCheck={false}
-        onChange={(e) => schedulePush(e.target.value)}
-      />
+      {mode === 'edit' ? (
+        <textarea
+          ref={taRef}
+          className="notes-textarea"
+          defaultValue={note.content}
+          placeholder={t('notes.placeholder')}
+          spellCheck={false}
+          onChange={(e) => schedulePush(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+      ) : (
+        <div className="notes-preview">
+          <MarkdownPreview text={note.content} />
+        </div>
+      )}
 
       <div className="notes-toolbar">
         {CMD_TOOLS.map(({ id, Icon, i18n }) => (
@@ -255,7 +349,7 @@ const NoteCard = forwardRef<HTMLDivElement, { note: NoteDto; onEdit: () => void 
     const rest = lines.length > 1 ? lines.slice(1) : lines
     const joined = rest.join('\n')
     // Cut to 220 chars at a line boundary so no markdown block is left
-    // half-open (a lone '>' or '**' renders as stray text).
+    // half-open (a lone '**' or '```' renders as stray text).
     if (joined.length <= 220) return joined
     const cut = joined.slice(0, 220)
     const breakAt = cut.lastIndexOf('\n')
@@ -382,8 +476,10 @@ export function NotesView() {
   const { t } = useTranslation()
   const notes = useStore((s) => s.notes)
   const query = useStore((s) => s.query)
+  const open = useStore((s) => s.open)
   const createNote = useStore((s) => s.createNote)
-  const noteViewMode = useStore((s) => s.settings.noteViewMode ?? 'list')
+  const pushToast = useStore((s) => s.pushToast)
+  const noteViewMode = useStore((s) => s.settings.noteViewMode ?? 'single')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [currentId, setCurrentId] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -396,46 +492,85 @@ export function NotesView() {
 
   const editing = editingId !== null ? notes.find((n) => n.id === editingId) : undefined
   const current = currentId !== null ? notes.find((n) => n.id === currentId) : undefined
+  // When the open note is deleted the editor must not flash a blank frame:
+  // render the next note immediately and let the effect below sync currentId.
+  const effectiveCurrent = current ?? (notes.length > 0 ? notes[0] : undefined)
 
-  // Single-note mode: always keep a note open — the first in list order, or
-  // a fresh one when the shelf is empty. Also recovers when the open note is
-  // deleted from the modal (or elsewhere).
+  // Single-note mode: keep currentId pointing at a live note. An empty shelf
+  // shows the empty state — deleting the last note never fabricates a new one.
   useEffect(() => {
     if (noteViewMode !== 'single') return
     if (currentId !== null && notes.some((n) => n.id === currentId)) return
-    if (notes.length > 0) {
-      setCurrentId(notes[0].id)
-    } else {
-      void createNote('').then((id) => setCurrentId(id))
+    if (notes.length > 0) setCurrentId(notes[0].id)
+    else setCurrentId(null)
+  }, [noteViewMode, notes, currentId])
+
+  // Single-note mode: typing while the editor is open calls up the all-notes
+  // modal (the management list lives there) instead of the clipboard search.
+  useEffect(() => {
+    if (noteViewMode !== 'single') return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.key === 'Process' || e.isComposing) return
+      if (e.key.length !== 1 || e.key === ' ') return
+      const el = document.activeElement
+      if (el instanceof HTMLElement && el.matches('input, textarea, [contenteditable]')) return
+      e.preventDefault()
+      setModalOpen(true)
     }
-  }, [noteViewMode, notes, currentId, createNote])
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [noteViewMode])
+
+  // Panel re-opening after a collapse lands straight back in the editor.
+  useEffect(() => {
+    if (noteViewMode !== 'single' || !open || !effectiveCurrent) return
+    const ta = document.querySelector<HTMLTextAreaElement>('.notes-editor textarea')
+    if (ta) {
+      const raf = requestAnimationFrame(() => ta.focus())
+      return () => cancelAnimationFrame(raf)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, noteViewMode])
 
   const handleNew = () => {
     playButtonClickSound()
     // main returns the created id — the note may sort below pinned notes,
     // so index 0 is not a safe assumption
-    void createNote('').then((id) => setEditingId(id))
+    void createNote('').then((id) => {
+      setEditingId(id)
+      pushToast({ id: crypto.randomUUID(), message: t('notes.created'), tone: 'info' })
+    })
   }
 
   const handleNewSingle = () => {
     playButtonClickSound()
-    void createNote('').then((id) => setCurrentId(id))
+    void createNote('').then((id) => {
+      setCurrentId(id)
+      pushToast({ id: crypto.randomUUID(), message: t('notes.created'), tone: 'info' })
+    })
   }
 
   if (noteViewMode === 'single') {
-    if (!current) {
-      // The effect above is still creating/selecting a note — keep the frame.
-      return <div className="notes-list" />
-    }
     return (
       <div className="notes-single">
-        <NoteEditor
-          key={current.id}
-          note={current}
-          variant="single"
-          onOpenModal={() => setModalOpen(true)}
-          onNew={handleNewSingle}
-        />
+        {effectiveCurrent ? (
+          <NoteEditor
+            key={effectiveCurrent.id}
+            note={effectiveCurrent}
+            variant="single"
+            onOpenModal={() => setModalOpen(true)}
+            onNew={handleNewSingle}
+          />
+        ) : (
+          <div className="notes-single-empty">
+            <p>{t('notes.empty')}</p>
+            <button type="button" className="notes-new-btn" onClick={handleNewSingle}>
+              <PlusIcon width={12} height={12} />
+              <span>{t('notes.new')}</span>
+            </button>
+          </div>
+        )}
         <NotesModal
           open={modalOpen}
           notes={notes}

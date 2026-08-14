@@ -139,11 +139,22 @@ export function useEdgeHover(): void {
     let graceTimer: number | undefined
     let interactiveTimer: number | undefined
 
+    // True while the notes editor holds input focus. Editing keeps the panel
+    // open: leaving the blade with the cursor (or Alt+Tabbing away) must not
+    // retract the panel out from under an active keystroke.
+    const notesEditorActive = () => {
+      const el = document.activeElement
+      return el instanceof HTMLElement && !!el.closest('.notes-editor')
+    }
+
     const closePanelNow = () => {
       const s = useStore.getState()
       // Switcher session (ADR-0005): the panel is pinned open — the switcher
       // owns the page until Alt is released or an entry is clicked.
       if (s.switcherActive) return
+      // An active note edit holds the panel open — moving the cursor off the
+      // blade must not yank the editor away mid-keystroke.
+      if (notesEditorActive()) return
       if (s.styleFlyoutOpen) s.setStyleFlyoutOpen(false)
       // NOTE: the settings sheet stays open — the restore mechanism
       // (ADR-0004) remembers it within the restore time and resets it when
@@ -163,6 +174,7 @@ export function useEdgeHover(): void {
       if (state.debugHoldOpen) return
       if (state.sliderActive) return
       if (state.dragActive && !state.internalDragReq) return
+      if (notesEditorActive()) return
 
       // If the indicator style flyout is open, let it play its exit spring first.
       // The Electron window resize (inside setOpen) would cut the flyout animation
@@ -200,6 +212,7 @@ export function useEdgeHover(): void {
       if (state.debugHoldOpen) return
       if (state.sliderActive) return
       if (state.dragActive && !state.internalDragReq) return
+      if (notesEditorActive()) return // editing a note holds the panel open
       if (graceTimer !== undefined) return // already closing
 
       // If position/display/slider was recently changed (< 1.75s ago), wait out remaining preview stay window
@@ -487,6 +500,7 @@ export function useEdgeHover(): void {
       // window deactivation and replays a focusin when the window regains
       // interactivity, which the App.tsx bridge would misread as a fresh
       // input click and re-activate the window (stealing the foreground).
+      const editing = notesEditorActive()
       const active = document.activeElement
       if (active instanceof HTMLElement && active.matches('input, textarea, [contenteditable]')) {
         active.blur()
@@ -496,6 +510,9 @@ export function useEdgeHover(): void {
       // Don't close during an external OS file drag — the drag surface may
       // temporarily shift focus to the OS drag-ghost or file manager.
       if (state.dragActive && !state.internalDragReq) return
+      // A note editor in progress holds the panel open across focus loss;
+      // the user is coming back to keep typing.
+      if (editing) return
       scheduleClose(400)
     }
 

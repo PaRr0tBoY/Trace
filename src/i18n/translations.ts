@@ -553,6 +553,9 @@ export interface TranslationKeys {
     list: string
     orderedList: string
     todo: string
+    created: string
+    editMode: string
+    previewMode: string
   }
 
 }
@@ -1277,6 +1280,9 @@ export const en: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -1833,6 +1839,9 @@ export const es: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -2389,6 +2398,9 @@ export const fr: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -2945,6 +2957,9 @@ export const de: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -3501,6 +3516,9 @@ export const it: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -4057,6 +4075,9 @@ export const pt: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -4613,6 +4634,9 @@ export const ru: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -5169,6 +5193,9 @@ export const ja: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -5725,6 +5752,9 @@ export const ko: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -6281,6 +6311,9 @@ export const zhCN: TranslationKeys = {
     list: '列表',
     orderedList: '有序列表',
     todo: '待办',
+    created: '新建成功',
+    editMode: '编辑模式',
+    previewMode: '预览模式',
   },
 }
 
@@ -6837,6 +6870,9 @@ export const zhTW: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -7393,6 +7429,9 @@ export const hi: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -7949,6 +7988,9 @@ export const ar: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -8505,6 +8547,9 @@ export const bn: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -9061,6 +9106,9 @@ export const tr: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -9617,6 +9665,9 @@ export const vi: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -10173,6 +10224,9 @@ export const pl: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -10729,6 +10783,9 @@ export const nl: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -11285,6 +11342,9 @@ export const sv: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -11841,6 +11901,9 @@ export const id: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -12397,6 +12460,9 @@ export const uk: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -12953,6 +13019,9 @@ export const el: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -13509,6 +13578,9 @@ export const cs: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -14065,6 +14137,9 @@ export const ro: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -14621,6 +14696,9 @@ export const hu: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -15177,6 +15255,9 @@ export const da: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -15733,6 +15814,9 @@ export const fi: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -16289,6 +16373,9 @@ export const th: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -16845,6 +16932,9 @@ export const he: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 
@@ -17401,6 +17491,9 @@ export const no: TranslationKeys = {
     list: 'List',
     orderedList: 'Ordered list',
     todo: 'Todo',
+    created: 'Note created',
+    editMode: 'Edit mode',
+    previewMode: 'Preview mode',
   },
 }
 

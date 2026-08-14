@@ -1,22 +1,29 @@
 /**
- * MarkdownPreview — minimal Markdown → React renderer for note-card previews.
+ * MarkdownPreview — Markdown → React renderer for note previews, scoped to
+ * the NotchNotes MarkdownEngine feature set.
  *
- * Block level: headings, quotes, bullet / numbered / todo lists, fenced code,
- * paragraphs. Inline: **bold**, *italic*, ~~strike~~, `code`, [label](url).
+ * Inline: **bold**, *italic*, ***bold italic***, `code`, [label](url),
+ * [[wiki link]], bare http(s) URLs. Block: #..###### headings, fenced code,
+ * bullet (-/•) / numbered / todo lists, `---` horizontal rules, paragraphs.
  *
- * Output is plain React elements — note content is never injected as HTML.
- * Links render without href so a click inside a preview opens the editor
- * instead of navigating the panel. Intentional gaps vs full CommonMark:
- * no images, tables, nesting, or escape sequences.
+ * Matches NotchNotes exactly where it draws the line: blockquotes and
+ * strike-through (`~~`) are NOT rendered (they are plain text), and there
+ * are no tables, images, or LaTeX. Output is plain React elements — note
+ * content is never injected as HTML. Links render without href so a click
+ * inside a preview opens the editor instead of navigating the panel.
  */
 import { useMemo } from 'react'
 import type { JSX, ReactNode } from 'react'
 
 type InlinePart =
-  | { kind: 'text' | 'bold' | 'italic' | 'strike' | 'code'; text: string }
+  | { kind: 'text' | 'bold' | 'italic' | 'boldItalic' | 'code'; text: string }
   | { kind: 'link'; text: string; href: string }
+  | { kind: 'wiki' | 'auto'; text: string }
 
-const INLINE_RE = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|~~[^~\n]+~~|`[^`\n]+`|\[[^\]\n]+\]\([^)\s]+\))/g
+// Longest markers first (`***` before `**` before `*`); `~~strike~~` is
+// deliberately absent — NotchNotes does not render it either.
+const INLINE_RE =
+  /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`|\[[^\]\n]+\]\([^)\s]+\)|\[\[[^\]\n]+\]\]|https?:\/\/[^\s<]+?(?=[\s<),;:!?。，；：！？]|$))/g
 
 function parseInline(text: string): InlinePart[] {
   const parts: InlinePart[] = []
@@ -25,13 +32,16 @@ function parseInline(text: string): InlinePart[] {
     const index = m.index
     if (index > last) parts.push({ kind: 'text', text: text.slice(last, index) })
     const token = m[0]
-    if (token.startsWith('**')) parts.push({ kind: 'bold', text: token.slice(2, -2) })
-    else if (token.startsWith('~~')) parts.push({ kind: 'strike', text: token.slice(2, -2) })
+    if (token.startsWith('***')) parts.push({ kind: 'boldItalic', text: token.slice(3, -3) })
+    else if (token.startsWith('**')) parts.push({ kind: 'bold', text: token.slice(2, -2) })
     else if (token.startsWith('*')) parts.push({ kind: 'italic', text: token.slice(1, -1) })
     else if (token.startsWith('`')) parts.push({ kind: 'code', text: token.slice(1, -1) })
-    else {
+    else if (token.startsWith('[[')) parts.push({ kind: 'wiki', text: token.slice(2, -2) })
+    else if (token.startsWith('[')) {
       const close = token.indexOf('](')
       parts.push({ kind: 'link', text: token.slice(1, close), href: token.slice(close + 2, -1) })
+    } else {
+      parts.push({ kind: 'auto', text: token })
     }
     last = index + token.length
   }
@@ -47,11 +57,17 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
         return <strong key={key}>{part.text}</strong>
       case 'italic':
         return <em key={key}>{part.text}</em>
-      case 'strike':
-        return <s key={key}>{part.text}</s>
+      case 'boldItalic':
+        return (
+          <strong key={key}>
+            <em>{part.text}</em>
+          </strong>
+        )
       case 'code':
         return <code key={key}>{part.text}</code>
       case 'link':
+      case 'wiki':
+      case 'auto':
         return (
           <a key={key} className="md-link">
             {part.text}
@@ -75,7 +91,7 @@ function collectList(start: number, lines: string[], re: RegExp): RegExpExecArra
 }
 
 /** Block-starting prefixes — a paragraph ends where a new block begins. */
-const BLOCK_START = /^(```|#{1,6}\s|>\s?|[-*]\s|\d+\.\s)/
+const BLOCK_START = /^(```|#{1,6}\s|[-*•]\s|\d+\.\s)/
 
 function renderBlocks(text: string): ReactNode[] {
   const lines = text.split('\n')
@@ -116,26 +132,18 @@ function renderBlocks(text: string): ReactNode[] {
       continue
     }
 
-    // Quote — consecutive quoted lines merge into one blockquote.
-    if (/^>\s?/.test(line)) {
-      const buf: string[] = []
-      while (i < lines.length && /^>\s?/.test(lines[i])) {
-        buf.push(lines[i].replace(/^>\s?/, ''))
-        i++
-      }
-      blocks.push(
-        <blockquote key={blockIndex++} className="md-quote">
-          {renderInline(buf.join(' '), `q${blockIndex}`)}
-        </blockquote>
-      )
+    // Horizontal rule — a full line of 3+ dashes (NotchNotes HR).
+    if (/^\s*-{3,}\s*$/.test(line)) {
+      blocks.push(<hr key={blockIndex++} className="md-hr" />)
+      i++
       continue
     }
 
     // Bullet / todo list — a todo marker anywhere in the block makes it a
     // todo list (checked items render with a checkbox glyph).
-    const bullet = /^[-*]\s+(.+)$/.exec(line)
+    const bullet = /^[-*•]\s+(.+)$/.exec(line)
     if (bullet) {
-      const items = collectList(i, lines, /^[-*]\s+(.+)$/)
+      const items = collectList(i, lines, /^[-*•]\s+(.+)$/)
       const todos = items.map((m) => /^\[([ xX])\]\s+(.+)$/.exec(m[1]))
       const isTodo = todos.some((t) => t !== null)
       blocks.push(

@@ -35,6 +35,9 @@ const switcherActive = useStore((s) => s.switcherActive)
   const settings = useStore((s) => s.settings)
   const settingsOpen = useStore((s) => s.settingsOpen)
   const view = useStore((s) => s.view)
+  // Single-note mode owns the typing gesture (it opens the all-notes modal),
+  // so the clipboard search bar must not mount there.
+  const noteViewMode = useStore((s) => s.settings.noteViewMode ?? 'single')
 
   // NOTE: closing the panel intentionally keeps the settings sheet, its sub
   // view, and the search query — the restore mechanism (ADR-0004) decides
@@ -298,7 +301,7 @@ const switcherActive = useStore((s) => s.switcherActive)
             <>
           <Header />
 
-          {!settingsOpen && view !== 'tasks' && <SearchBar />}
+          {!settingsOpen && view !== 'tasks' && !(view === 'notes' && noteViewMode === 'single') && <SearchBar />}
 
           <ToastStack />
           <AnimatePresence mode="wait">

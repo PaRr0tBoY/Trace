@@ -279,6 +279,9 @@
     "quote": "引用",
     "list": "列表",
     "orderedList": "有序列表",
-    "todo": "待办"
+    "todo": "待办",
+    "created": "新建成功",
+    "editMode": "编辑模式",
+    "previewMode": "预览模式"
   }
 }

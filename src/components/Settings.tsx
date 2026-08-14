@@ -1133,7 +1133,7 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                       ].map((opt) => (
                         <button
                           key={opt.val}
-                          className={`pill ${(settings.noteViewMode ?? 'list') === opt.val ? 'active' : ''}`}
+                          className={`pill ${(settings.noteViewMode ?? 'single') === opt.val ? 'active' : ''}`}
                           onClick={() => {
                             playButtonClickSound()
                             patch({ noteViewMode: opt.val })

@@ -46,7 +46,9 @@ import {
   CircleCheck,
   RotateCcw,
   Plus,
-  SquarePen
+  SquarePen,
+  PenLine,
+  Eye
 } from 'lucide-react'
 import { getFileKindByExt } from '../lib/fileType'
 
@@ -105,6 +107,8 @@ export const RestoreIcon = (p: P) => <RotateCcw size={p.width ?? 14} strokeWidth
 export const ArchiveIcon = (p: P) => <Archive size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
 export const PlusIcon = (p: P) => <Plus size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
 export const EditIcon = (p: P) => <SquarePen size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
+export const PenLineIcon = (p: P) => <PenLine size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
+export const EyeIcon = (p: P) => <Eye size={p.width ?? 14} strokeWidth={2.2} {...(p as any)} />
 
 const PdfGlyph = (p: P) => <FileText size={p.width ?? 16} {...(p as any)} />
 const ArchiveGlyph = (p: P) => <FileArchive size={p.width ?? 16} {...(p as any)} />

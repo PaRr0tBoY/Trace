@@ -23,10 +23,16 @@ import type { SwitcherEntryDto } from '../../shared/types'
 
 /** Fast slide-in, pure fade-out — TabTab's motion language. */
 const ROW_MOTION = {
-  initial: { opacity: 0, x: 28 },
-  animate: { opacity: 1, x: 0 },
+  initial: { opacity: 0, x: 28, y: 0 },
+  animate: { opacity: 1, x: 0, y: 0 },
   transition: { duration: 0.16, ease: [0.16, 1, 0.3, 1] as const }
 }
+
+/** Search-mode impact (TabTab): the field lands ~0.18s in with a spring
+ * overshoot; the light sweep and the row ripple cascade start from that
+ * impact moment, so the three read as one causal chain. */
+const IMPACT_SECONDS = 0.18
+const RIPPLE_STAGGER_SECONDS = 0.045
 
 function appNameOf(entry: SwitcherEntryDto): string {
   // UWP app hosts carry the real app title on the window ("Settings",
@@ -45,6 +51,20 @@ export function SwitcherView() {
   const [drill, setDrill] = useState<SwitcherEntryDto | null>(null)
   const [icons, setIcons] = useState<Record<string, string | null>>({})
   const listRef = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  // Focus the search field once the panel window is truly active. main's
+  // switcherPin calls requestPanelFocus, but activation is async and
+  // Chromium silently drops element.focus() in an inactive document (no
+  // focusin fires, so the t21 focusin->activate chain never starts).
+  // autoFocus lands too early; re-arm the bridge and retry after the
+  // activation settles.
+  useEffect(() => {
+    if (!pinned) return
+    edge.requestInputFocus()
+    const t = setTimeout(() => searchRef.current?.focus(), 40)
+    return () => clearTimeout(t)
+  }, [pinned])
 
   // Resolve app icons in one batch (existing app:icons pipeline, cached main-side).
   // Grouped rows carry their sub-windows — those exePaths need icons too.
@@ -140,9 +160,15 @@ export function SwitcherView() {
   return (
     <div className="switcher" onMouseLeave={handleMouseLeaveList}>
       {(pinned || drill) && (
-        <div className="switcher-search">
+        <motion.div
+          className="switcher-search"
+          initial={{ y: -52, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 620, damping: 16, mass: 0.9 }}
+        >
           {pinned && !drill && (
             <input
+              ref={searchRef}
               autoFocus
               type="text"
               placeholder="Search windows…"
@@ -157,7 +183,18 @@ export function SwitcherView() {
               ← Back
             </button>
           )}
-        </div>
+        </motion.div>
+      )}
+      {pinned && (
+        <motion.div
+          className="switcher-sweep"
+          initial={{ scaleY: 0, opacity: 0 }}
+          animate={{ scaleY: 1, opacity: [0, 0.5, 0] }}
+          transition={{
+            scaleY: { duration: 0.55, delay: IMPACT_SECONDS, ease: [0.16, 1, 0.3, 1] },
+            opacity: { duration: 0.55, delay: IMPACT_SECONDS, ease: 'easeOut' }
+          }}
+        />
       )}
       <div className="switcher-list" ref={listRef}>
         {drill ? (
@@ -191,8 +228,17 @@ export function SwitcherView() {
               key={entry.index}
               className={`switcher-row${i === displayIndex ? ' selected' : ''}`}
               initial={ROW_MOTION.initial}
-              animate={ROW_MOTION.animate}
-              transition={{ ...ROW_MOTION.transition, delay: i * 0.02 }}
+              animate={pinned ? { x: 0, y: [0, -6, 0], opacity: 1 } : ROW_MOTION.animate}
+              transition={{
+                x: { ...ROW_MOTION.transition, delay: i * 0.02 },
+                opacity: { ...ROW_MOTION.transition, delay: i * 0.02 },
+                y: {
+                  type: 'spring',
+                  stiffness: 420,
+                  damping: 18,
+                  delay: IMPACT_SECONDS + i * RIPPLE_STAGGER_SECONDS
+                }
+              }}
               onMouseEnter={() => syncHover(i)}
               onClick={() => (entry.groupCount ? setDrill(entry) : executeRow(i))}
               onFocus={() => syncHover(i)}

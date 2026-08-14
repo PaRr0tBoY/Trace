@@ -208,6 +208,12 @@ export function switcherPin(): void {
   if (!active) return
   setHookPinned(true)
   broadcast('switcher:pin')
+  // The panel has been a non-activated NOACTIVATE window all session; the OS
+  // only routes keystrokes to the foreground window and Chromium drops
+  // element.focus() in an inactive document, so the search input would never
+  // receive input. Activate now (idempotent, focus.ts) — the renderer's
+  // autoFocus then lands and typing reaches the field.
+  requestPanelFocus()
   touchSession()
 }
 

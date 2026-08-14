@@ -92,9 +92,6 @@ export interface InvokeMap {
   /** Copy a sub-item and paste it directly into the active application. */
   'item:paste-subitem': { args: [req: DragRequest]; result: boolean }
 
-  /** Add local file paths dragged into the transfer station (ADR-0006). */
-  'item:add-files': { args: [paths: string[]]; result: StationEntryDto[] }
-
   /** Merge an item into another. Returns why it failed (full / incompatible). */
   'item:merge': { args: [sourceId: string, targetId: string]; result: MergeResult }
 

@@ -101,7 +101,7 @@ win.addEventListener('drop', (e: any) => {
         detail: { paths, x: e.clientX, y: e.clientY }
       }))
       if (docEl && !docEl.hasAttribute('data-trace-drop-claimed')) {
-        invoke('item:add-files', paths).catch(console.error)
+        invoke('station:enter', paths).catch(console.error)
       }
       return
     }
@@ -176,7 +176,6 @@ const api = {
   pasteSubitem: (req: import('../../shared/types').DragRequest) => invoke('item:paste-subitem', req),
   quitApp: () => invoke('app:quit'),
   startDrag: (req: DragRequest) => send('item:start-drag', req),
-  addFiles: (paths: string[]) => invoke('item:add-files', paths),
   removeSubitem: (req: import('../../shared/types').DragRequest) => invoke('item:remove-subitem', req),
   mergeItems: (sourceId: string, targetId: string) => invoke('item:merge', sourceId, targetId),
   splitItem: (req: import('../../shared/types').DragRequest) => invoke('item:split', req),

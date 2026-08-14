@@ -45,10 +45,6 @@ export function resolveDragData(req: DragRequest): ItemData | null {
   const item = getStore().get(req.id)
   if (!item) return null
   
-  if (item.data.kind === 'files') {
-    prefetchFileIcons(item.data.paths)
-  }
-  
   if (req.imageId && item.data.kind === 'image-collection') {
     const img = item.data.images.find((i) => i.imageId === req.imageId)
     if (img) return { kind: 'image', ...img }
@@ -104,6 +100,9 @@ function stageDragFile(data: ItemData): Staged | null {
   const temp = PATHS.tempDir()
   switch (data.kind) {
     case 'files': {
+      // Station drags (copy-mode originals and move-mode staged paths alike)
+      // reach startDragOut as a files bundle — this case is their carrier
+      // (ADR-0006), not a stack leftover.
       const real = data.paths.filter((p) => existsSync(p))
       if (!real.length) return null
       return { file: real[0], files: real }

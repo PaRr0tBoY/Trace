@@ -414,11 +414,6 @@ export function initState(): void {
   store.pruneExpired(loadSettings().autoDeleteHours)
   stationStore.prune(loadSettings().autoDeleteHours)
 
-  for (const item of store.toDto()) {
-    if (item.data.kind === 'files' && item.data.paths) {
-      prefetchFileIcons(item.data.paths)
-    }
-  }
   watcher.start((data, png) => {
     if (loadSettings().incognito) return
     store.pruneExpired(loadSettings().autoDeleteHours)

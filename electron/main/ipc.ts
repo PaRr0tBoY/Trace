@@ -44,7 +44,6 @@ import type { ItemData, MergeResult, MemoryFactDto, MemoryFactPanelPayload, Memo
 function clipboardMatchesItem(data: ItemData): boolean {
   const sig = clipboardSignature()
   if (data.kind === 'text') return sig === `text:${data.text}`
-  if (data.kind === 'files') return sig === `files:${data.paths.join('\n')}`
   if (data.kind === 'image') {
     // sig format: "image:<W>x<H>:<hash>" — check the dimension prefix to avoid a full pixel read.
     // If another image with the same dimensions is on the clipboard, we over-clear, which is
@@ -688,18 +687,14 @@ export function registerIpc(): void {
   })
 
   handle('item:copy-subitem', async (req) => {
-    // Resolve a single sub-item (one file of a bundle, or one image of a
-    // collection) and write just that onto the clipboard — not the whole item.
+    // Resolve a single image of a collection and write just that onto the
+    // clipboard — not the whole item. (File members live in the station and
+    // use station:copy-member.)
     const dto = getStore().toDto().find((d) => d.id === req.id)
     if (!dto) return false
 
     let wrote = false
-    if (dto.data.kind === 'files' && req.paths && req.paths.length > 0) {
-      // Write real file references so pasting into Explorer copies the file,
-      // not a path string.
-      await writeFileListToClipboard(req.paths)
-      wrote = true
-    } else if (dto.data.kind === 'image-collection' && req.imageId) {
+    if (dto.data.kind === 'image-collection' && req.imageId) {
       const img = dto.data.images.find((i) => i.imageId === req.imageId)
       if (img) {
         // Single image from a collection: write full bitmap + file reference atomically.
@@ -797,10 +792,7 @@ export function registerIpc(): void {
 
     try {
       let wrote = false
-      if (dto.data.kind === 'files' && req.paths && req.paths.length > 0) {
-        await writeFileListToClipboard(req.paths)
-        wrote = true
-      } else if (dto.data.kind === 'image-collection' && req.imageId) {
+      if (dto.data.kind === 'image-collection' && req.imageId) {
         const img = dto.data.images.find((i) => i.imageId === req.imageId)
         if (img) {
           // Single image from a collection: write full bitmap + file reference atomically.
@@ -831,16 +823,6 @@ export function registerIpc(): void {
     }
 
     return true
-  })
-
-  handle('item:add-files', (paths) => {
-    // Legacy drag-in entry point (kept until T8 removes the channel): drops
-    // land in the transfer station now (ADR-0006).
-    const result = addFiles(paths)
-    if (result.stacksCreated > 1) {
-      toast(`Split into ${result.stacksCreated} station entries (max 10 each)`, 'info')
-    }
-    return getStationStore().toDto()
   })
 
   handle('item:remove-subitem', (req) => {
@@ -1162,12 +1144,6 @@ export async function writeItemToClipboard(data: ItemData): Promise<void> {
       }
       break
     }
-
-    case 'files':
-      // Write real file references so pasting into Explorer copies the files,
-      // not path strings.
-      await writeFileListToClipboard(data.paths)
-      break
   }
 }
 /** Parses raw GitHub markdown release notes into clean plain text highlights (stripping image/video/HTML tags). */

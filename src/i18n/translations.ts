@@ -57,6 +57,12 @@ export interface TranslationKeys {
     restoreDelayedDesc: string
     restoreForever: string
     restoreForeverDesc: string
+    moveModeTitle: string
+    moveModeDesc: string
+    moveModeCopy: string
+    moveModeMove: string
+    moveModeCopyDesc: string
+    moveModeMoveDesc: string
   }
   position: {
     edgePlacementTitle: string
@@ -753,7 +759,13 @@ export const en: TranslationKeys = {
     "restoreDelayed": "Delayed",
     "restoreDelayedDesc": "Keeps the last page for 10 minutes",
     "restoreForever": "Forever",
-    "restoreForeverDesc": "Always keeps the last page; landing page is ignored"
+    "restoreForeverDesc": "Always keeps the last page; landing page is ignored",
+    "moveModeTitle": "Drag-out mode",
+    "moveModeDesc": "What dragging a file out of the station does to the original",
+    "moveModeCopy": "Copy",
+    "moveModeMove": "Move",
+    "moveModeCopyDesc": "The original stays put; the destination receives a copy",
+    "moveModeMoveDesc": "The file is taken into the station, then moved to the destination; a cancelled drag keeps it safe in the station"
   },
   "position": {
     "edgePlacementTitle": "Edge Placement",
@@ -1280,7 +1292,13 @@ export const es: TranslationKeys = {
     "restoreDelayed": "Retrasado",
     "restoreDelayedDesc": "Conserva la última página durante 10 minutos",
     "restoreForever": "Permanente",
-    "restoreForeverDesc": "Conserva siempre la última página; la página inicial se ignora"
+    "restoreForeverDesc": "Conserva siempre la última página; la página inicial se ignora",
+    "moveModeTitle": "Modo de arrastre hacia fuera",
+    "moveModeDesc": "Qué hace con el original al arrastrar un archivo fuera de la estación",
+    "moveModeCopy": "Copiar",
+    "moveModeMove": "Mover",
+    "moveModeCopyDesc": "El original permanece en su sitio; el destino recibe una copia",
+    "moveModeMoveDesc": "El archivo pasa a la estación y luego se mueve al destino; un arrastre cancelado lo mantiene a salvo en la estación"
   },
   "position": {
     "edgePlacementTitle": "Borde de la pantalla",
@@ -1806,7 +1824,13 @@ export const fr: TranslationKeys = {
     "restoreDelayed": "Retardé",
     "restoreDelayedDesc": "Garde la dernière page pendant 10 minutes",
     "restoreForever": "Permanent",
-    "restoreForeverDesc": "Garde toujours la dernière page ; la page de départ est ignorée"
+    "restoreForeverDesc": "Garde toujours la dernière page ; la page de départ est ignorée",
+    "moveModeTitle": "Mode d'extraction par glisser",
+    "moveModeDesc": "Ce que fait le glisser d'un fichier hors de la station au fichier d'origine",
+    "moveModeCopy": "Copier",
+    "moveModeMove": "Déplacer",
+    "moveModeCopyDesc": "L'original reste en place ; la destination reçoit une copie",
+    "moveModeMoveDesc": "Le fichier est pris en charge par la station, puis déplacé vers la destination ; un glisser annulé le garde en sécurité dans la station"
   },
   "position": {
     "edgePlacementTitle": "Bord de l'écran",
@@ -2332,7 +2356,13 @@ export const de: TranslationKeys = {
     "restoreDelayed": "Verzögert",
     "restoreDelayedDesc": "Behält die letzte Seite 10 Minuten lang",
     "restoreForever": "Dauerhaft",
-    "restoreForeverDesc": "Behält immer die letzte Seite; die Startseite wird ignoriert"
+    "restoreForeverDesc": "Behält immer die letzte Seite; die Startseite wird ignoriert",
+    "moveModeTitle": "Drag-out-Modus",
+    "moveModeDesc": "Was das Herausziehen einer Datei aus der Station mit dem Original macht",
+    "moveModeCopy": "Kopieren",
+    "moveModeMove": "Verschieben",
+    "moveModeCopyDesc": "Das Original bleibt am Platz; das Ziel erhält eine Kopie",
+    "moveModeMoveDesc": "Die Datei wird in die Station übernommen und dann zum Ziel verschoben; ein abgebrochenes Ziehen hält sie sicher in der Station"
   },
   "position": {
     "edgePlacementTitle": "Randplatzierung",
@@ -2858,7 +2888,13 @@ export const it: TranslationKeys = {
     "restoreDelayed": "Ritardato",
     "restoreDelayedDesc": "Conserva l’ultima pagina per 10 minuti",
     "restoreForever": "Permanente",
-    "restoreForeverDesc": "Conserva sempre l’ultima pagina; la pagina iniziale viene ignorata"
+    "restoreForeverDesc": "Conserva sempre l’ultima pagina; la pagina iniziale viene ignorata",
+    "moveModeTitle": "Modalità di trascinamento",
+    "moveModeDesc": "Cosa fa il trascinamento di un file fuori dalla stazione all'originale",
+    "moveModeCopy": "Copia",
+    "moveModeMove": "Sposta",
+    "moveModeCopyDesc": "L'originale resta al suo posto; la destinazione riceve una copia",
+    "moveModeMoveDesc": "Il file viene preso in carico dalla stazione, poi spostato a destinazione; un trascinamento annullato lo mantiene al sicuro nella stazione"
   },
   "position": {
     "edgePlacementTitle": "Posizionamento bordo",
@@ -3384,7 +3420,13 @@ export const pt: TranslationKeys = {
     "restoreDelayed": "Atrasado",
     "restoreDelayedDesc": "Mantém a última página por 10 minutos",
     "restoreForever": "Permanente",
-    "restoreForeverDesc": "Sempre mantém a última página; a página inicial é ignorada"
+    "restoreForeverDesc": "Sempre mantém a última página; a página inicial é ignorada",
+    "moveModeTitle": "Modo de arrastar para fora",
+    "moveModeDesc": "O que arrastar um arquivo para fora da estação faz com o original",
+    "moveModeCopy": "Copiar",
+    "moveModeMove": "Mover",
+    "moveModeCopyDesc": "O original permanece no lugar; o destino recebe uma cópia",
+    "moveModeMoveDesc": "O arquivo é levado para a estação e depois movido para o destino; um arrasto cancelado o mantém seguro na estação"
   },
   "position": {
     "edgePlacementTitle": "Posicionamento da borda",
@@ -3910,7 +3952,13 @@ export const ru: TranslationKeys = {
     "restoreDelayed": "Отложенно",
     "restoreDelayedDesc": "Хранит последнюю страницу 10 минут",
     "restoreForever": "Постоянно",
-    "restoreForeverDesc": "Всегда хранит последнюю страницу; начальная страница игнорируется"
+    "restoreForeverDesc": "Всегда хранит последнюю страницу; начальная страница игнорируется",
+    "moveModeTitle": "Режим перетаскивания",
+    "moveModeDesc": "Что происходит с оригиналом при перетаскивании файла из станции",
+    "moveModeCopy": "Копировать",
+    "moveModeMove": "Переместить",
+    "moveModeCopyDesc": "Оригинал остаётся на месте; получатель получает копию",
+    "moveModeMoveDesc": "Файл забирается в станцию, затем перемещается в место назначения; отменённое перетаскивание оставляет его в безопасности в станции"
   },
   "position": {
     "edgePlacementTitle": "Размещение у края",
@@ -4436,7 +4484,13 @@ export const ja: TranslationKeys = {
     "restoreDelayed": "遅延",
     "restoreDelayedDesc": "最後のページを10分間保持します",
     "restoreForever": "永続",
-    "restoreForeverDesc": "常に最後のページを保持します。初期ページは無視されます"
+    "restoreForeverDesc": "常に最後のページを保持します。初期ページは無視されます",
+    "moveModeTitle": "ドラッグアウトモード",
+    "moveModeDesc": "ステーションからファイルをドラッグしたとき、元のファイルに何が起きるか",
+    "moveModeCopy": "コピー",
+    "moveModeMove": "移動",
+    "moveModeCopyDesc": "元のファイルはそのまま残り、コピーが作成されます",
+    "moveModeMoveDesc": "ファイルはステーションに取り込まれ、ドロップ先へ移動します。キャンセルした場合もファイルはステーションに安全に残ります"
   },
   "position": {
     "edgePlacementTitle": "エッジ配置",
@@ -4962,7 +5016,13 @@ export const ko: TranslationKeys = {
     "restoreDelayed": "지연",
     "restoreDelayedDesc": "마지막 페이지를 10분간 유지합니다",
     "restoreForever": "영구",
-    "restoreForeverDesc": "항상 마지막 페이지를 유지합니다. 시작 페이지는 무시됩니다"
+    "restoreForeverDesc": "항상 마지막 페이지를 유지합니다. 시작 페이지는 무시됩니다",
+    "moveModeTitle": "드래그 아웃 모드",
+    "moveModeDesc": "스테이션에서 파일을 끌어낼 때 원본 파일에 일어나는 일",
+    "moveModeCopy": "복사",
+    "moveModeMove": "이동",
+    "moveModeCopyDesc": "원본은 그 자리에 유지되고 대상에 복사본이 생깁니다",
+    "moveModeMoveDesc": "파일은 스테이션에 보관되었다가 대상으로 이동합니다. 취소된 드래그는 파일을 스테이션에 안전하게 유지합니다"
   },
   "position": {
     "edgePlacementTitle": "가장자리 배치",
@@ -5488,7 +5548,13 @@ export const zhCN: TranslationKeys = {
     "restoreDelayed": "延时",
     "restoreDelayedDesc": "10 分钟内重新展开则保留上次页面",
     "restoreForever": "持久",
-    "restoreForeverDesc": "一直保持上次收回时的页面，初始页面不生效"
+    "restoreForeverDesc": "一直保持上次收回时的页面，初始页面不生效",
+    "moveModeTitle": "拖出模式",
+    "moveModeDesc": "从文件中转站拖出文件时，对原文件所做的处理",
+    "moveModeCopy": "复制",
+    "moveModeMove": "移动",
+    "moveModeCopyDesc": "原文件留在原地，目标位置得到一份副本",
+    "moveModeMoveDesc": "文件先被收进中转站，再移动到目标位置；取消拖拽时文件安全留在站内"
   },
   "position": {
     "edgePlacementTitle": "边缘位置",
@@ -6014,7 +6080,13 @@ export const zhTW: TranslationKeys = {
     "restoreDelayed": "延時",
     "restoreDelayedDesc": "10 分鐘內重新展開則保留上次頁面",
     "restoreForever": "永久",
-    "restoreForeverDesc": "一直保留上次收回時的頁面，初始頁面不生效"
+    "restoreForeverDesc": "一直保留上次收回時的頁面，初始頁面不生效",
+    "moveModeTitle": "拖出模式",
+    "moveModeDesc": "從檔案中轉站拖出檔案時，對原始檔案所做的處理",
+    "moveModeCopy": "複製",
+    "moveModeMove": "移動",
+    "moveModeCopyDesc": "原始檔案留在原地，目標位置得到一份副本",
+    "moveModeMoveDesc": "檔案先被收進中轉站，再移動到目標位置；取消拖曳時檔案安全留在站內"
   },
   "position": {
     "edgePlacementTitle": "邊緣位置",
@@ -6540,7 +6612,13 @@ export const hi: TranslationKeys = {
     "restoreDelayed": "विलंबित",
     "restoreDelayedDesc": "अंतिम पेज को 10 मिनट तक रखता है",
     "restoreForever": "स्थायी",
-    "restoreForeverDesc": "हमेशा अंतिम पेज रखता है; लैंडिंग पेज अनदेखा किया जाता है"
+    "restoreForeverDesc": "हमेशा अंतिम पेज रखता है; लैंडिंग पेज अनदेखा किया जाता है",
+    "moveModeTitle": "ड्रैग-आउट मोड",
+    "moveModeDesc": "स्टेशन से फ़ाइल खींचने पर मूल फ़ाइल का क्या होता है",
+    "moveModeCopy": "कॉपी करें",
+    "moveModeMove": "स्थानांतरित करें",
+    "moveModeCopyDesc": "मूल फ़ाइल अपनी जगह पर रहती है; गंतव्य को एक प्रति मिलती है",
+    "moveModeMoveDesc": "फ़ाइल स्टेशन में ले ली जाती है, फिर गंतव्य पर ले जाई जाती है; रद्द किया गया ड्रैग उसे स्टेशन में सुरक्षित रखता है"
   },
   "position": {
     "edgePlacementTitle": "किनारा प्लेसमेंट",
@@ -7066,7 +7144,13 @@ export const ar: TranslationKeys = {
     "restoreDelayed": "متأخر",
     "restoreDelayedDesc": "يحتفظ بآخر صفحة لمدة 10 دقائق",
     "restoreForever": "دائم",
-    "restoreForeverDesc": "يحتفظ دائمًا بآخر صفحة؛ تُتجاهل الصفحة الافتتاحية"
+    "restoreForeverDesc": "يحتفظ دائمًا بآخر صفحة؛ تُتجاهل الصفحة الافتتاحية",
+    "moveModeTitle": "وضع السحب للخارج",
+    "moveModeDesc": "ما يحدث للملف الأصلي عند سحب ملف خارج المحطة",
+    "moveModeCopy": "نسخ",
+    "moveModeMove": "نقل",
+    "moveModeCopyDesc": "يبقى الملف الأصلي في مكانه؛ ويحصل الوجهة على نسخة",
+    "moveModeMoveDesc": "يتم أخذ الملف إلى المحطة ثم نقله إلى الوجهة؛ السحب الملغى يبقيه آمنًا في المحطة"
   },
   "position": {
     "edgePlacementTitle": "موضع الحافة",
@@ -7592,7 +7676,13 @@ export const bn: TranslationKeys = {
     "restoreDelayed": "বিলম্বিত",
     "restoreDelayedDesc": "শেষ পৃষ্ঠাটি ১০ মিনিট রাখে",
     "restoreForever": "স্থায়ী",
-    "restoreForeverDesc": "সবসময় শেষ পৃষ্ঠাটি রাখে; ল্যান্ডিং পৃষ্ঠা উপেক্ষিত হয়"
+    "restoreForeverDesc": "সবসময় শেষ পৃষ্ঠাটি রাখে; ল্যান্ডিং পৃষ্ঠা উপেক্ষিত হয়",
+    "moveModeTitle": "ড্র্যাগ-আউট মোড",
+    "moveModeDesc": "স্টেশন থেকে ফাইল টেনে বের করলে মূল ফাইলের কী হয়",
+    "moveModeCopy": "কপি করুন",
+    "moveModeMove": "সরান",
+    "moveModeCopyDesc": "মূল ফাইল জায়গায় থাকে; গন্তব্যে একটি কপি যায়",
+    "moveModeMoveDesc": "ফাইলটি স্টেশনে নেওয়া হয়, তারপর গন্তব্যে সরানো হয়; বাতিল ড্র্যাগে ফাইলটি স্টেশনে নিরাপদ থাকে"
   },
   "position": {
     "edgePlacementTitle": "প্রান্ত স্থাপনা",
@@ -8118,7 +8208,13 @@ export const tr: TranslationKeys = {
     "restoreDelayed": "Gecikmeli",
     "restoreDelayedDesc": "Son sayfayı 10 dakika tutar",
     "restoreForever": "Kalıcı",
-    "restoreForeverDesc": "Her zaman son sayfayı tutar; açılış sayfası yok sayılır"
+    "restoreForeverDesc": "Her zaman son sayfayı tutar; açılış sayfası yok sayılır",
+    "moveModeTitle": "Dışa sürükleme modu",
+    "moveModeDesc": "Bir dosyayı istasyondan sürükleyip çıkarmanın orijinale yaptığı işlem",
+    "moveModeCopy": "Kopyala",
+    "moveModeMove": "Taşı",
+    "moveModeCopyDesc": "Orijinal yerinde kalır; hedef bir kopya alır",
+    "moveModeMoveDesc": "Dosya istasyona alınır, ardından hedefe taşınır; iptal edilen sürükleme onu istasyonda güvende tutar"
   },
   "position": {
     "edgePlacementTitle": "Kenar Yerleşimi",
@@ -8644,7 +8740,13 @@ export const vi: TranslationKeys = {
     "restoreDelayed": "Trì hoãn",
     "restoreDelayedDesc": "Giữ trang cuối trong 10 phút",
     "restoreForever": "Vĩnh viễn",
-    "restoreForeverDesc": "Luôn giữ trang cuối; trang khởi đầu bị bỏ qua"
+    "restoreForeverDesc": "Luôn giữ trang cuối; trang khởi đầu bị bỏ qua",
+    "moveModeTitle": "Chế độ kéo ra",
+    "moveModeDesc": "Điều gì xảy ra với tệp gốc khi kéo tệp ra khỏi trạm",
+    "moveModeCopy": "Sao chép",
+    "moveModeMove": "Di chuyển",
+    "moveModeCopyDesc": "Tệp gốc giữ nguyên vị trí; đích nhận được một bản sao",
+    "moveModeMoveDesc": "Tệp được đưa vào trạm, sau đó di chuyển đến đích; thao tác kéo bị hủy giữ tệp an toàn trong trạm"
   },
   "position": {
     "edgePlacementTitle": "Vị trí mép",
@@ -9170,7 +9272,13 @@ export const pl: TranslationKeys = {
     "restoreDelayed": "Z opóźnieniem",
     "restoreDelayedDesc": "Przechowuje ostatnią stronę przez 10 minut",
     "restoreForever": "Stale",
-    "restoreForeverDesc": "Zawsze przechowuje ostatnią stronę; strona startowa jest ignorowana"
+    "restoreForeverDesc": "Zawsze przechowuje ostatnią stronę; strona startowa jest ignorowana",
+    "moveModeTitle": "Tryb wyciągania",
+    "moveModeDesc": "Co wyciągnięcie pliku ze stacji robi z oryginałem",
+    "moveModeCopy": "Kopiuj",
+    "moveModeMove": "Przenieś",
+    "moveModeCopyDesc": "Oryginał pozostaje na miejscu; miejsce docelowe otrzymuje kopię",
+    "moveModeMoveDesc": "Plik trafia do stacji, a następnie jest przenoszony do miejsca docelowego; anulowane przeciągnięcie utrzymuje go bezpiecznie w stacji"
   },
   "position": {
     "edgePlacementTitle": "Położenie krawędzi",
@@ -9696,7 +9804,13 @@ export const nl: TranslationKeys = {
     "restoreDelayed": "Uitgesteld",
     "restoreDelayedDesc": "Bewaart de laatste pagina 10 minuten",
     "restoreForever": "Altijd",
-    "restoreForeverDesc": "Bewaart altijd de laatste pagina; de startpagina wordt genegeerd"
+    "restoreForeverDesc": "Bewaart altijd de laatste pagina; de startpagina wordt genegeerd",
+    "moveModeTitle": "Drag-out-modus",
+    "moveModeDesc": "Wat het slepen van een bestand uit het station met het origineel doet",
+    "moveModeCopy": "Kopiëren",
+    "moveModeMove": "Verplaatsen",
+    "moveModeCopyDesc": "Het origineel blijft op zijn plaats; de bestemming ontvangt een kopie",
+    "moveModeMoveDesc": "Het bestand wordt in het station opgenomen en vervolgens naar de bestemming verplaatst; een geannuleerde sleepbeweging houdt het veilig in het station"
   },
   "position": {
     "edgePlacementTitle": "Randplaatsing",
@@ -10222,7 +10336,13 @@ export const sv: TranslationKeys = {
     "restoreDelayed": "Fördröjd",
     "restoreDelayedDesc": "Behåller den senaste sidan i 10 minuter",
     "restoreForever": "Alltid",
-    "restoreForeverDesc": "Behåller alltid den senaste sidan; startsidan ignoreras"
+    "restoreForeverDesc": "Behåller alltid den senaste sidan; startsidan ignoreras",
+    "moveModeTitle": "Drag-out-läge",
+    "moveModeDesc": "Vad som händer med originalet när du drar ut en fil från stationen",
+    "moveModeCopy": "Kopiera",
+    "moveModeMove": "Flytta",
+    "moveModeCopyDesc": "Originalet ligger kvar; destinationen får en kopia",
+    "moveModeMoveDesc": "Filen tas in i stationen och flyttas sedan till destinationen; ett avbrutet drag håller den säker i stationen"
   },
   "position": {
     "edgePlacementTitle": "Kantplacering",
@@ -10748,7 +10868,13 @@ export const id: TranslationKeys = {
     "restoreDelayed": "Tertunda",
     "restoreDelayedDesc": "Menyimpan halaman terakhir selama 10 menit",
     "restoreForever": "Selamanya",
-    "restoreForeverDesc": "Selalu menyimpan halaman terakhir; halaman awal diabaikan"
+    "restoreForeverDesc": "Selalu menyimpan halaman terakhir; halaman awal diabaikan",
+    "moveModeTitle": "Mode tarik keluar",
+    "moveModeDesc": "Apa yang dilakukan penarikan file keluar dari stasiun terhadap file asli",
+    "moveModeCopy": "Salin",
+    "moveModeMove": "Pindahkan",
+    "moveModeCopyDesc": "File asli tetap di tempatnya; tujuan menerima salinan",
+    "moveModeMoveDesc": "File diambil ke stasiun, lalu dipindahkan ke tujuan; tarikan yang dibatalkan membuatnya tetap aman di stasiun"
   },
   "position": {
     "edgePlacementTitle": "Penempatan Tepi",
@@ -11274,7 +11400,13 @@ export const uk: TranslationKeys = {
     "restoreDelayed": "Із затримкою",
     "restoreDelayedDesc": "Зберігає останню сторінку 10 хвилин",
     "restoreForever": "Постійно",
-    "restoreForeverDesc": "Завжди зберігає останню сторінку; початкова сторінка ігнорується"
+    "restoreForeverDesc": "Завжди зберігає останню сторінку; початкова сторінка ігнорується",
+    "moveModeTitle": "Режим перетягування назовні",
+    "moveModeDesc": "Що відбувається з оригіналом, коли ви перетягуєте файл зі станції",
+    "moveModeCopy": "Копіювати",
+    "moveModeMove": "Перемістити",
+    "moveModeCopyDesc": "Оригінал залишається на місці; призначення отримує копію",
+    "moveModeMoveDesc": "Файл забирається до станції, а потім переміщується до призначення; скасоване перетягування залишає його в безпеці в станції"
   },
   "position": {
     "edgePlacementTitle": "Розміщення краю",
@@ -11800,7 +11932,13 @@ export const el: TranslationKeys = {
     "restoreDelayed": "Με καθυστέρηση",
     "restoreDelayedDesc": "Διατηρεί την τελευταία σελίδα για 10 λεπτά",
     "restoreForever": "Μόνιμα",
-    "restoreForeverDesc": "Διατηρεί πάντα την τελευταία σελίδα· η αρχική σελίδα αγνοείται"
+    "restoreForeverDesc": "Διατηρεί πάντα την τελευταία σελίδα· η αρχική σελίδα αγνοείται",
+    "moveModeTitle": "Λειτουργία μεταφοράς προς τα έξω",
+    "moveModeDesc": "Τι κάνει στο πρωτότυπο η μεταφορά ενός αρχείου έξω από τον σταθμό",
+    "moveModeCopy": "Αντιγραφή",
+    "moveModeMove": "Μετακίνηση",
+    "moveModeCopyDesc": "Το πρωτότυπο παραμένει στη θέση του· ο προορισμός λαμβάνει ένα αντίγραφο",
+    "moveModeMoveDesc": "Το αρχείο μεταφέρεται στον σταθμό και στη συνέχεια στον προορισμό· μια ακυρωμένη μεταφορά το κρατά ασφαλές στον σταθμό"
   },
   "position": {
     "edgePlacementTitle": "Τοποθέτηση άκρης",
@@ -12326,7 +12464,13 @@ export const cs: TranslationKeys = {
     "restoreDelayed": "Se zpožděním",
     "restoreDelayedDesc": "Ponechá poslední stránku po dobu 10 minut",
     "restoreForever": "Trvale",
-    "restoreForeverDesc": "Vždy ponechá poslední stránku; vstupní stránka se ignoruje"
+    "restoreForeverDesc": "Vždy ponechá poslední stránku; vstupní stránka se ignoruje",
+    "moveModeTitle": "Režim vytažení",
+    "moveModeDesc": "Co udělá vytažení souboru ze stanice s originálem",
+    "moveModeCopy": "Kopírovat",
+    "moveModeMove": "Přesunout",
+    "moveModeCopyDesc": "Originál zůstává na místě; cíl obdrží kopii",
+    "moveModeMoveDesc": "Soubor je převzat do stanice a poté přesunut do cíle; zrušené přetažení jej bezpečně ponechá ve stanici"
   },
   "position": {
     "edgePlacementTitle": "Umístění na okraji",
@@ -12852,7 +12996,13 @@ export const ro: TranslationKeys = {
     "restoreDelayed": "Întârziat",
     "restoreDelayedDesc": "Păstrează ultima pagină timp de 10 minute",
     "restoreForever": "Permanent",
-    "restoreForeverDesc": "Păstrează întotdeauna ultima pagină; pagina de start este ignorată"
+    "restoreForeverDesc": "Păstrează întotdeauna ultima pagină; pagina de start este ignorată",
+    "moveModeTitle": "Mod de extragere",
+    "moveModeDesc": "Ce face tragea unui fișier din stație asupra originalului",
+    "moveModeCopy": "Copiere",
+    "moveModeMove": "Mutare",
+    "moveModeCopyDesc": "Originalul rămâne pe loc; destinația primește o copie",
+    "moveModeMoveDesc": "Fișierul este preluat în stație, apoi mutat la destinație; o tragere anulată îl păstrează în siguranță în stație"
   },
   "position": {
     "edgePlacementTitle": "Plasare margine",
@@ -13378,7 +13528,13 @@ export const hu: TranslationKeys = {
     "restoreDelayed": "Késleltetett",
     "restoreDelayedDesc": "10 percig őrzi az utolsó oldalt",
     "restoreForever": "Végleges",
-    "restoreForeverDesc": "Mindig az utolsó oldalt őrzi; a kezdőlap figyelmen kívül marad"
+    "restoreForeverDesc": "Mindig az utolsó oldalt őrzi; a kezdőlap figyelmen kívül marad",
+    "moveModeTitle": "Kihúzási mód",
+    "moveModeDesc": "Mit tesz az állomásról történő fájl kihúzás az eredetivel",
+    "moveModeCopy": "Másolás",
+    "moveModeMove": "Áthelyezés",
+    "moveModeCopyDesc": "Az eredeti a helyén marad; a célhely egy másolatot kap",
+    "moveModeMoveDesc": "A fájl az állomásra kerül, majd a célhelyre mozog; a megszakított húzás biztonságban tartja az állomáson"
   },
   "position": {
     "edgePlacementTitle": "Szél-elhelyezés",
@@ -13904,7 +14060,13 @@ export const da: TranslationKeys = {
     "restoreDelayed": "Forsinket",
     "restoreDelayedDesc": "Beholder den sidste side i 10 minutter",
     "restoreForever": "Altid",
-    "restoreForeverDesc": "Beholder altid den sidste side; startsiden ignoreres"
+    "restoreForeverDesc": "Beholder altid den sidste side; startsiden ignoreres",
+    "moveModeTitle": "Træk-ud-tilstand",
+    "moveModeDesc": "Hvad det gør ved originalen at trække en fil ud af stationen",
+    "moveModeCopy": "Kopier",
+    "moveModeMove": "Flyt",
+    "moveModeCopyDesc": "Originalen bliver på plads; destinationen modtager en kopi",
+    "moveModeMoveDesc": "Filen tages ind i stationen og flyttes derefter til destinationen; et afbrudt træk holder den sikkert i stationen"
   },
   "position": {
     "edgePlacementTitle": "Kantplacering",
@@ -14430,7 +14592,13 @@ export const fi: TranslationKeys = {
     "restoreDelayed": "Viivästetty",
     "restoreDelayedDesc": "Säilyttää viimeisimmän sivun 10 minuuttia",
     "restoreForever": "Aina",
-    "restoreForeverDesc": "Säilyttää aina viimeisimmän sivun; aloitussivua ei käytetä"
+    "restoreForeverDesc": "Säilyttää aina viimeisimmän sivun; aloitussivua ei käytetä",
+    "moveModeTitle": "Vedä-ulos-tila",
+    "moveModeDesc": "Mitä tiedoston vetäminen ulos asemasta tekee alkuperäiselle tiedostolle",
+    "moveModeCopy": "Kopioi",
+    "moveModeMove": "Siirrä",
+    "moveModeCopyDesc": "Alkuperäinen jää paikalleen; kohde saa kopion",
+    "moveModeMoveDesc": "Tiedosto otetaan asemaan ja siirretään sitten kohteeseen; peruutettu veto pitää sen turvassa asemassa"
   },
   "position": {
     "edgePlacementTitle": "Reunan sijoitus",
@@ -14956,7 +15124,13 @@ export const th: TranslationKeys = {
     "restoreDelayed": "หน่วงเวลา",
     "restoreDelayedDesc": "เก็บหน้าสุดท้ายไว้ 10 นาที",
     "restoreForever": "ถาวร",
-    "restoreForeverDesc": "เก็บหน้าสุดท้ายเสมอ ไม่ใช้หน้าเริ่มต้น"
+    "restoreForeverDesc": "เก็บหน้าสุดท้ายเสมอ ไม่ใช้หน้าเริ่มต้น",
+    "moveModeTitle": "โหมดลากออก",
+    "moveModeDesc": "การลากไฟล์ออกจากสถานีจะทำอะไรกับไฟล์ต้นฉบับ",
+    "moveModeCopy": "คัดลอก",
+    "moveModeMove": "ย้าย",
+    "moveModeCopyDesc": "ไฟล์ต้นฉบับยังอยู่ที่เดิม ปลายทางจะได้รับสำเนา",
+    "moveModeMoveDesc": "ไฟล์จะถูกเก็บเข้าสถานี จากนั้นย้ายไปยังปลายทาง หากยกเลิกการลาก ไฟล์จะปลอดภัยในสถานี"
   },
   "position": {
     "edgePlacementTitle": "ตำแหน่งขอบ",
@@ -15482,7 +15656,13 @@ export const he: TranslationKeys = {
     "restoreDelayed": "מושהה",
     "restoreDelayedDesc": "שומר את העמוד האחרון למשך 10 דקות",
     "restoreForever": "קבוע",
-    "restoreForeverDesc": "תמיד שומר את העמוד האחרון; עמוד הפתיחה מתעלם"
+    "restoreForeverDesc": "תמיד שומר את העמוד האחרון; עמוד הפתיחה מתעלם",
+    "moveModeTitle": "מצב גרירה החוצה",
+    "moveModeDesc": "מה גרירת קובץ החוצה מהתחנה עושה למקור",
+    "moveModeCopy": "העתקה",
+    "moveModeMove": "העברה",
+    "moveModeCopyDesc": "המקור נשאר במקומו; היעד מקבל עותק",
+    "moveModeMoveDesc": "הקובץ נלקח לתחנה, ואז מועבר ליעד; גרירה שבוטלה שומרת אותו בבטחה בתחנה"
   },
   "position": {
     "edgePlacementTitle": "מיקום קצה",
@@ -16008,7 +16188,13 @@ export const no: TranslationKeys = {
     "restoreDelayed": "Forsinket",
     "restoreDelayedDesc": "Beholder den siste siden i 10 minutter",
     "restoreForever": "Alltid",
-    "restoreForeverDesc": "Beholder alltid den siste siden; startsiden ignoreres"
+    "restoreForeverDesc": "Beholder alltid den siste siden; startsiden ignoreres",
+    "moveModeTitle": "Dra-ut-modus",
+    "moveModeDesc": "Hva det gjør med originalen å dra en fil ut av stasjonen",
+    "moveModeCopy": "Kopier",
+    "moveModeMove": "Flytt",
+    "moveModeCopyDesc": "Originalen blir liggende; destinasjonen mottar en kopi",
+    "moveModeMoveDesc": "Filen tas inn i stasjonen og flyttes deretter til destinasjonen; et avbrutt drag holder den trygt i stasjonen"
   },
   "position": {
     "edgePlacementTitle": "Kant-plassering",

@@ -59,6 +59,13 @@ export type RestoreTime = 'instant' | 'relaxed' | 'delayed' | 'forever'
 export type ThemeColor = 'graphite' | 'cobalt' | 'verdigris' | 'amber' | 'violet'
 
 /**
+ * Drag-out semantics (ADR-0007): 'copy' drags the original paths and leaves
+ * entry and source untouched; 'move' stages the originals into the station
+ * staging area at drag start (接管式移动) and completes on a successful drop.
+ */
+export type MoveMode = 'copy' | 'move'
+
+/**
  * Landing page applied on first launch and after the restore time expires
  * (ADR-0004). The files view has no second level — it always lands on 'all'
  * because dynamic extension tabs may not exist.
@@ -573,6 +580,12 @@ export interface Settings {
   /** When true, automatically clears unpinned items on device/app restart. */
   /** When true, automatically clears unpinned items on device/app restart. */
   clearUnpinnedOnRestart: boolean
+  /**
+   * Drag-out semantics (ADR-0007): 'copy' = destination gets a copy, entry
+   * and source untouched; 'move' (default) = staged takeover move, the
+   * original is taken into the station at drag start.
+   */
+  moveMode: MoveMode
   /** Hours after which unpinned items are automatically purged (0 = Never). */
   autoDeleteHours: number
   /** UI visual style density ('modern' | 'compact'). */
@@ -711,6 +724,7 @@ export const DEFAULT_SETTINGS: Settings = {
   launchAtLogin: true,
   reduceMotion: false,
   clearUnpinnedOnRestart: false,
+  moveMode: 'move',
   autoDeleteHours: 0,
   uiStyle: 'modern',
   themeColor: 'graphite',

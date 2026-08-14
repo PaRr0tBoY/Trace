@@ -1267,8 +1267,12 @@ export interface AddFilesResult {
  */
 export function addFiles(paths: string[]): AddFilesResult {
   // Prevent duplicating entries when a user accidentally drops our own staged
-  // temp files back into the app (real files dedupe by path anyway).
-  const clean = paths.filter((p) => !p.startsWith(PATHS.tempDir()))
+  // temp files back into the app (real files dedupe by path anyway). The
+  // takeover area is excluded too: in-transit files belong to their entry
+  // (ADR-0007), re-entering them would fork the held bundle.
+  const clean = paths.filter(
+    (p) => !p.startsWith(PATHS.tempDir()) && !p.startsWith(PATHS.stationStageDir())
+  )
   if (clean.length === 0) return { stacksCreated: 0 }
 
   prefetchFileIcons(clean)

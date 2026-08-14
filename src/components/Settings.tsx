@@ -429,6 +429,33 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
 
                   <div className="setting-divider" />
 
+                  {/* ── Drag-out mode (ADR-0007): copy vs staged move ── */}
+                  <div className="setting-row vertical" style={{ gap: 8 }}>
+                    <div className="setting-info">
+                      <div className="setting-title">{t('behaviour.moveModeTitle')}</div>
+                      <div className="setting-desc">{t('behaviour.moveModeDesc')}</div>
+                    </div>
+                    <div className="setting-pills">
+                      {([
+                        { id: 'copy' as const, label: t('behaviour.moveModeCopy') },
+                        { id: 'move' as const, label: t('behaviour.moveModeMove') }
+                      ]).map((opt) => (
+                        <button
+                          key={opt.id}
+                          className={`pill ${settings.moveMode === opt.id ? 'active' : ''}`}
+                          onClick={() => { playButtonClickSound(); patch({ moveMode: opt.id }) }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="setting-desc" style={{ fontSize: 11 }}>
+                      {settings.moveMode === 'copy' ? t('behaviour.moveModeCopyDesc') : t('behaviour.moveModeMoveDesc')}
+                    </div>
+                  </div>
+
+                  <div className="setting-divider" />
+
                   {/* ── Language Selector ── */}
                   <div style={{
                     display: 'flex',

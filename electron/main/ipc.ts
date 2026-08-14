@@ -18,7 +18,8 @@ import { isTraceRecordDto, renderTraceReportHtml } from './traceReport'
 import { getMainWindow } from './window'
 import { setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
-import { startDragOut, resolveDragData, prefetchFileIcons } from './drag'
+import { startDragOut, resolveDragData, prefetchFileIcons, stageMoveDrag } from './drag'
+import { disposeToRecycleBin } from './recycleBin'
 import { enterContentToStation } from './contentToFile'
 import { activateAppWindow } from './windowSwitch'
 import { switcherHover, switcherClick } from './switcher'
@@ -223,6 +224,14 @@ export function registerIpc(): void {
   })
 
   handle('station:delete', (id) => {
+    const entry = getStationStore().get(id)
+    // An in-transit entry holds its files in the staging area: deleting it
+    // sends them to the Recycle Bin (ADR-0007). A failed disposal keeps the
+    // entry so the user can retry — nothing is ever permanently deleted.
+    if (entry?.inTransit && entry.paths.length > 0 && !disposeToRecycleBin(entry.paths)) {
+      toast('Held files could not be sent to the Recycle Bin; entry kept for retry', 'error')
+      return getStationStore().toDto()
+    }
     getStationStore().remove(id)
     // A deleted entry that is still on the clipboard must not zombie
     // re-enter on the next watcher tick (same contract as item:delete).
@@ -1025,6 +1034,20 @@ export function registerSendListeners(): void {
       return
     }
     console.log('[IPC] start-drag: kind=', data.kind)
+
+    // ADR-0007 M-a: in move mode a station file drag stages the originals
+    // into the takeover area before the OS drag sources them; the entry is
+    // retargeted and marked in-transit. 'skip' means a file is missing — the
+    // drag must not start at all.
+    if (data.kind === 'files' && loadSettings().moveMode === 'move') {
+      const staged = stageMoveDrag(req, data)
+      if (staged.ok) {
+        data = staged.data
+      } else if (staged.reason === 'skip') {
+        console.log('[IPC] start-drag: skipped — entry has missing files')
+        return
+      }
+    }
 
     // Pause the always-on-top heartbeat for the duration of the drag.
     // The heartbeat fires SetWindowPos(HWND_TOPMOST) every 500 ms, which

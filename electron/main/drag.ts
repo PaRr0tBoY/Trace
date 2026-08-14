@@ -20,12 +20,15 @@
  */
 import { app, nativeImage, type WebContents } from 'electron'
 import { Resvg } from '@resvg/resvg-js'
-import { copyFileSync, existsSync, writeFileSync } from 'node:fs'
-import { join, extname } from 'node:path'
+import { copyFileSync, cpSync, existsSync, rmSync, renameSync, writeFileSync } from 'node:fs'
+import { join, extname, basename } from 'node:path'
 import { PATHS } from '../store/paths'
 import type { DragRequest, ItemData } from '../../shared/types'
 import { THEME_ACCENTS } from '../../shared/themes'
-import { getStore, loadSettings } from './state'
+import { getStore, getStationStore, loadSettings } from './state'
+import { disposeToRecycleBin } from './recycleBin'
+import { decideDragEnd, DEFAULT_DRAG_TIMEOUT_MS, planDragOut, type DragEndVerdict } from '../store/stagedMove'
+import type { StationStore } from '../store/stationStore'
 import { getFileKind } from '../../src/lib/fileType'
 
 /**
@@ -157,6 +160,226 @@ function stageDragFile(data: ItemData): Staged | null {
     default:
       return null
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Staged takeover move (ADR-0007 M-a)                                  */
+/* ------------------------------------------------------------------ */
+
+/** Facts the drag-session state machine (T4b) reports when a drag ends. */
+export interface DragEndSignal {
+  /** EVENT_SYSTEM_DRAGDROPEND (0x10) was seen. */
+  dragEndSeen: boolean
+  /** WindowFromPoint class under the cursor at drag end. */
+  cursorClass?: string
+  /** Process exe of the window under the cursor at drag end. */
+  cursorExe?: string
+  /** DragWindow class window vanished without 0x10. */
+  dragWindowGone?: boolean
+}
+
+interface StagedDragRecord {
+  /** The in-transit entry holding the staged files. */
+  entryId: string
+  /** Paths handed to startDrag (inside the staging area). */
+  stagedPaths: string[]
+  startedAt: number
+  watchdog?: ReturnType<typeof setTimeout>
+}
+
+/** In-flight staged drags, keyed by the in-transit entry id. */
+const inFlightDrags = new Map<string, StagedDragRecord>()
+
+export type StageMoveResult =
+  | { ok: true; data: ItemData; entryId: string }
+  | { ok: false; reason: 'skip' | 'pass-through' }
+
+/**
+ * Target path inside the staging area. Preserves the original basename so
+ * the drop target receives a sensible file name; a name collision (two
+ * entries holding same-named files) gets a short random suffix.
+ */
+function stagedPathFor(original: string, stageDir: string): string {
+  let candidate = join(stageDir, basename(original))
+  if (candidate === original || !existsSync(candidate)) return candidate
+  const ext = extname(original)
+  const stem = basename(original, ext)
+  return join(stageDir, `${stem}-${Math.random().toString(36).slice(2, 7)}${ext}`)
+}
+
+/**
+ * Take the paths into the staging area: same-volume rename is atomic;
+ * cross-volume (EXDEV) falls back to copy+delete (ADR-0007 M-a). On any
+ * failure every already-staged path is rolled back so the caller can degrade
+ * to a pass-through drag with the originals intact.
+ */
+function stagePathsToDir(paths: string[]): { staged: string[]; rollback: () => void } | null {
+  const stageDir = PATHS.stationStageDir()
+  const pairs: { from: string; to: string }[] = []
+  try {
+    for (const p of paths) {
+      const to = stagedPathFor(p, stageDir)
+      if (to !== p) {
+        try {
+          renameSync(p, to)
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err
+          // Cross-volume: copy first, then remove the original. A copy that
+          // succeeded but a delete that failed leaves both intact — the
+          // rollback below keeps the original and drops the staged copy.
+          cpSync(p, to, { recursive: true })
+          rmSync(p, { recursive: true, force: true })
+        }
+      }
+      pairs.push({ from: p, to })
+    }
+    return {
+      staged: pairs.map((pair) => pair.to),
+      rollback: () => {
+        for (const { from, to } of pairs) {
+          try {
+            if (to === from) continue
+            if (existsSync(from)) {
+              // Original survived (cross-volume delete failed): drop the copy.
+              rmSync(to, { recursive: true, force: true })
+            } else {
+              cpSync(to, from, { recursive: true })
+              rmSync(to, { recursive: true, force: true })
+            }
+          } catch {
+            /* best-effort rollback */
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Drag] staging failed, rolling back:', err)
+    return null
+  }
+}
+
+/**
+ * Locate the entry the domain's split just created: it sits right after the
+ * source and holds exactly the split-out paths (split() does not return the
+ * new id, so it is identified by its path set — enter() dedupes exact path
+ * sets, so the match is unambiguous).
+ */
+function findSplitEntryId(station: StationStore, sourceId: string, splitPaths: string[]): string | undefined {
+  const wanted = [...splitPaths].sort().join('\n')
+  return station
+    .list()
+    .filter((e) => e.id !== sourceId)
+    .find((e) => [...e.paths].sort().join('\n') === wanted)?.id
+}
+
+/**
+ * Move-mode staging seam, called from the item:start-drag handler for
+ * station file drags. Executes the takeover (originals → staging area),
+ * retargets the entry and marks it in-transit, then returns the staged
+ * paths to hand to startDrag. 'skip' = missing files, the drag must not
+ * start; 'pass-through' = not a stageable drag, use the data as-is.
+ */
+export function stageMoveDrag(req: DragRequest, data: ItemData): StageMoveResult {
+  if (data.kind !== 'files') return { ok: false, reason: 'pass-through' }
+  const station = getStationStore()
+  const entry = station.get(req.id)
+  if (!entry) return { ok: false, reason: 'pass-through' }
+  // In-transit entries are re-dragged whole: the held bundle is one unit
+  // (ADR-0007), member selection is moot — every path is staged already.
+  const wanted =
+    entry.inTransit || !req.paths || req.paths.length === 0 ? [...entry.paths] : [...req.paths]
+  const plan = planDragOut({
+    moveMode: loadSettings().moveMode,
+    kind: data.kind,
+    paths: wanted,
+    exists: (p) => existsSync(p)
+  })
+  if (plan.action === 'skip') return { ok: false, reason: 'skip' }
+  if (plan.action === 'pass-through') return { ok: false, reason: 'pass-through' }
+
+  const stagedResult = stagePathsToDir(plan.paths)
+  if (!stagedResult) return { ok: false, reason: 'pass-through' }
+
+  let entryId = entry.id
+  if (!entry.inTransit && wanted.length < entry.paths.length) {
+    // Member drag: split the member into its own entry so the staged subset
+    // becomes an in-transit unit while the source keeps the rest (ADR-0006).
+    const split = station.split(entry.id, wanted)
+    const splitId = split.ok ? findSplitEntryId(station, entry.id, wanted) : undefined
+    if (!split.ok || !splitId) {
+      stagedResult.rollback()
+      return { ok: false, reason: 'pass-through' }
+    }
+    entryId = splitId
+  }
+  if (!entry.inTransit) {
+    station.retarget(entryId, stagedResult.staged)
+    station.setInTransit(entryId, true)
+  }
+  registerStagedDrag(entryId, stagedResult.staged)
+  return { ok: true, data: { kind: 'files', paths: stagedResult.staged }, entryId }
+}
+
+function registerStagedDrag(entryId: string, stagedPaths: string[]): void {
+  const existing = inFlightDrags.get(entryId)
+  if (existing?.watchdog) clearTimeout(existing.watchdog)
+  const record: StagedDragRecord = { entryId, stagedPaths, startedAt: Date.now() }
+  // Defense-in-depth watchdog: if no drag-end signal ever arrives (session
+  // down / never landed), force the cancel verdict so the record cannot
+  // leak. The session's own timeout fires the same signal; both are
+  // idempotent (a cancelled drag keeps the entry in-transit, a later real
+  // signal still completes it).
+  record.watchdog = setTimeout(() => {
+    handleDragEndSignal(entryId, { dragEndSeen: false, dragWindowGone: false })
+  }, DEFAULT_DRAG_TIMEOUT_MS)
+  inFlightDrags.set(entryId, record)
+}
+
+/**
+ * Drag-end seam, called by the drag-session state machine (T4b) when a drag
+ * that sourced staged files ends. Verdict per decideDragEnd: on success the
+ * staged copies go to the Recycle Bin and the in-transit entry is removed;
+ * on cancel the entry stays in-transit (re-drag to complete, or delete).
+ * No-op for unknown entry ids (already completed / never staged).
+ */
+export function handleDragEndSignal(entryId: string, signal: DragEndSignal): DragEndVerdict | null {
+  const record = inFlightDrags.get(entryId)
+  if (!record) return null
+  const verdict = decideDragEnd({
+    dragEndSeen: signal.dragEndSeen,
+    cursorClass: signal.cursorClass,
+    cursorExe: signal.cursorExe,
+    dragWindowGone: signal.dragWindowGone,
+    elapsedMs: Date.now() - record.startedAt
+  })
+  finalizeStagedDrag(record, verdict)
+  return verdict
+}
+
+/**
+ * Apply one drag-end signal to every in-flight staged drag. The session
+ * cannot correlate drags to entries (it watches OS-level events), and only
+ * one mouse drag can be in flight at a time, so this is the integration
+ * seam T4b calls at drag end.
+ */
+export function completeAllInFlightDrags(signal: DragEndSignal): void {
+  for (const entryId of [...inFlightDrags.keys()]) {
+    handleDragEndSignal(entryId, signal)
+  }
+}
+
+function finalizeStagedDrag(record: StagedDragRecord, verdict: DragEndVerdict): void {
+  if (record.watchdog) clearTimeout(record.watchdog)
+  inFlightDrags.delete(record.entryId)
+  if (verdict !== 'success') return
+  // Recycle Bin first: the entry is removed only once the held files are
+  // actually gone, so a failed disposal keeps the in-transit entry for a
+  // retry (ADR-0007: the worst case is a Recycle Bin copy, never loss).
+  if (!disposeToRecycleBin(record.stagedPaths)) {
+    console.error(`[Drag] recycle-bin disposal failed for entry ${record.entryId}; keeping it in-transit`)
+    return
+  }
+  getStationStore().remove(record.entryId)
 }
 
 /* ------------------------------------------------------------------ */

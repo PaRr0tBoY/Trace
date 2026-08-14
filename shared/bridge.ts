@@ -149,6 +149,8 @@ export interface EdgeApi {
   onSettings: (cb: (settings: Settings) => void) => () => void
   onSuggestions: (cb: (suggestions: TaskProposal[]) => void) => () => void
   onToggle: (cb: (open?: boolean) => void) => () => void
+  /** OS drag session started/ended (T4b) — blocks panel collapse mid-drag. */
+  onDragActive: (cb: (active: boolean) => void) => () => void
   onOpenSettings: (cb: () => void) => () => void
   onDragEnd: (cb: () => void) => () => void
   onInternalDrop: (cb: (pos: { x: number; y: number }) => void) => () => void

@@ -348,6 +348,8 @@ export interface EventMap {
   'local-model:status': [status: LocalModelStatus]
   /** Toggle the panel open/closed from the main process (e.g. tray). */
   'window:toggle': [open?: boolean]
+  /** OS drag session started/ended (T4b): renderer must not collapse the panel mid-drag. */
+  'drag:active': [active: boolean]
   /** Open the panel directly to settings from the main process (e.g. tray). */
   'window:open-settings': []
   /** Fired when an OS drag initiated by the app has completed. */

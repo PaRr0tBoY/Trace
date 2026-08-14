@@ -263,6 +263,7 @@ const api = {
   onSettings: (cb: (settings: EventArgs<'state:settings'>[0]) => void) => on('state:settings', cb),
   onLocalModelStatus: (cb: (status: EventArgs<'local-model:status'>[0]) => void) => on('local-model:status', cb),
   onToggle: (cb: (open?: boolean) => void) => on('window:toggle', cb),
+  onDragActive: (cb: (active: boolean) => void) => on('drag:active', cb),
   onOpenSettings: (cb: () => void) => on('window:open-settings', cb),
   onDragEnd: (cb: () => void) => on('item:drag-end', cb),
   onInternalDrop: (cb: (pos: { x: number; y: number }) => void) => on('item:internal-drop', cb),

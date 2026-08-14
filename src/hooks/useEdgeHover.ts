@@ -500,6 +500,15 @@ export function useEdgeHover(): void {
     }
 
     // ── OS file drag awareness ─────────────────────────────────────────────
+    // T4b: the main-process drag detector pushes the global OS drag session
+    // state — while a drag is in flight the panel must not collapse (the
+    // cursor poll would close it the moment the cursor crosses the blade
+    // edge, mid-drag). The renderer's own HTML5 events below cover drags
+    // inside the window; this covers everything else.
+    const unsubDragActive = window.edge.onDragActive((active) => {
+      useStore.getState().setDragActive(active)
+    })
+
     const onDocDragEnter = (e: DragEvent) => {
       if (e.dataTransfer?.types.includes('Files')) {
         e.preventDefault()
@@ -544,6 +553,7 @@ export function useEdgeHover(): void {
 
     return () => {
       unsubCursorEdge()
+      unsubDragActive()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('blur', onWindowBlur)
       window.removeEventListener(PANEL_LEAVE_EVENT, onPanelLeave)

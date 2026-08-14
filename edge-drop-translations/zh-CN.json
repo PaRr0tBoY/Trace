@@ -267,10 +267,12 @@
     "expand": "展开",
     "bold": "加粗",
     "italic": "斜体",
+    "strike": "删除线",
     "code": "行内代码",
     "link": "链接",
     "quote": "引用",
     "list": "列表",
+    "orderedList": "有序列表",
     "todo": "待办"
   }
 }

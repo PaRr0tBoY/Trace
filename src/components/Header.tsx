@@ -1,7 +1,7 @@
 /**
  * Panel header: two-row navigation (ADR-0004).
  *
- * Row 1: three top-level chips (clipboard / files / tasks) + right buttons.
+ * Row 1: four top-level chips (clipboard / files / notes / tasks) + right buttons.
  * Row 2: the active view's second level — clipboard (all/text/links/images),
  * files (all + dynamic extension tabs + other; hidden entirely when no file
  * entries exist), tasks (existing / candidates).
@@ -126,7 +126,7 @@ export function Header() {
     state.setStyleFlyoutOpen(false)
   }
 
-  const primaryViewIndex = view === 'clipboard' ? 0 : view === 'files' ? 1 : view === 'tasks' ? 2 : 3
+  const primaryViewIndex = view === 'clipboard' ? 0 : view === 'files' ? 1 : view === 'notes' ? 2 : 3
 
   // Dynamic chip font: longest label across the row drives the size (the
   // 270px panel caps every row at ~200px; long labels ellipsize).
@@ -305,8 +305,8 @@ export function Header() {
             {[
               { id: 'clipboard' as const, label: t('filters.clipboard') },
               { id: 'files' as const, label: t('filters.files') },
-              { id: 'tasks' as const, label: t('filters.tasks') },
-              { id: 'notes' as const, label: t('filters.notes') }
+              { id: 'notes' as const, label: t('filters.notes') },
+              { id: 'tasks' as const, label: t('filters.tasks') }
             ].map((f) => {
               const active = view === f.id
               return (

@@ -13,26 +13,32 @@
  */
 import { AnimatePresence, motion } from 'framer-motion'
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
+import { Bold, Italic, Strikethrough, Code, Link, Quote, List, ListOrdered, ListChecks } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import type { NoteDto } from '../../../shared/types'
 import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ExpandIcon, ContractIcon } from '../icons'
 import { playButtonClickSound } from '../../lib/soundEffects'
+import { MarkdownPreview } from './markdown'
 
 /** How long a keystroke sits locally before the main-process update. */
 const SAVE_DEBOUNCE_MS = 180
 
-/** Markdown toolbar commands (Same set NotchNotes ships). */
-type MdCommand = 'bold' | 'italic' | 'code' | 'link' | 'quote' | 'ul' | 'todo'
+/** Markdown toolbar commands — the full NotchNotes set (bold / italic /
+ * strikethrough / inline code / link / quote / bulleted / numbered / todo). */
+type MdCommand = 'bold' | 'italic' | 'strike' | 'code' | 'link' | 'quote' | 'ul' | 'ol' | 'todo'
 
-const CMD_LABELS: Array<{ id: MdCommand; label: string; i18n: string }> = [
-  { id: 'bold', label: 'B', i18n: 'notes.bold' },
-  { id: 'italic', label: 'I', i18n: 'notes.italic' },
-  { id: 'code', label: '`', i18n: 'notes.code' },
-  { id: 'link', label: '🔗', i18n: 'notes.link' },
-  { id: 'quote', label: '❝', i18n: 'notes.quote' },
-  { id: 'ul', label: '•', i18n: 'notes.list' },
-  { id: 'todo', label: '☑', i18n: 'notes.todo' }
+const CMD_TOOLS: Array<{ id: MdCommand; Icon: LucideIcon; i18n: string }> = [
+  { id: 'bold', Icon: Bold, i18n: 'notes.bold' },
+  { id: 'italic', Icon: Italic, i18n: 'notes.italic' },
+  { id: 'strike', Icon: Strikethrough, i18n: 'notes.strike' },
+  { id: 'code', Icon: Code, i18n: 'notes.code' },
+  { id: 'link', Icon: Link, i18n: 'notes.link' },
+  { id: 'quote', Icon: Quote, i18n: 'notes.quote' },
+  { id: 'ul', Icon: List, i18n: 'notes.list' },
+  { id: 'ol', Icon: ListOrdered, i18n: 'notes.orderedList' },
+  { id: 'todo', Icon: ListChecks, i18n: 'notes.todo' }
 ]
 
 /** Replace [start,end) with the given text, keeping the cursor after it. */
@@ -40,42 +46,54 @@ function splice(value: string, start: number, end: number, next: string): string
   return value.slice(0, start) + next + value.slice(end)
 }
 
-/** Apply a Markdown command to the textarea's selection (or current line). */
+/** Apply a Markdown command to the textarea's selection (or current line).
+ * Selection behavior mirrors NotchNotes: wrap commands select the inner
+ * content (placeholder when nothing was selected), link selects the URL
+ * when wrapping a label, and line commands select the whole block. */
 function applyCommand(ta: HTMLTextAreaElement, cmd: MdCommand): void {
   const value = ta.value
   const start = ta.selectionStart ?? 0
   const end = ta.selectionEnd ?? 0
   const selected = value.slice(start, end)
-  let next: string
-  let caret = start
+  const lineStart = value.lastIndexOf('\n', start - 1) + 1
+  const lineEnd = value.indexOf('\n', end) === -1 ? value.length : value.indexOf('\n', end)
 
-  if (cmd === 'quote' || cmd === 'ul' || cmd === 'todo') {
+  if (cmd === 'quote' || cmd === 'ul' || cmd === 'ol' || cmd === 'todo') {
     // Prefix every selected line (empty selection → the current line).
-    const lineStart = value.lastIndexOf('\n', start - 1) + 1
-    const lineEnd = value.indexOf('\n', end) === -1 ? value.length : value.indexOf('\n', end)
     const block = value.slice(lineStart, lineEnd)
-    const prefix = cmd === 'quote' ? '> ' : cmd === 'ul' ? '- ' : '- [ ] '
+    const prefix = cmd === 'quote' ? '> ' : cmd === 'ul' ? '- ' : cmd === 'todo' ? '- [ ] ' : ''
     const prefixed = block
       .split('\n')
-      .map((l) => (l.startsWith(prefix) ? l.slice(prefix.length) : `${prefix}${l}`))
+      .map((line, i) => {
+        if (cmd === 'ol') {
+          // Renumber: strip any existing number prefix instead of stacking.
+          return `${i + 1}. ${line.replace(/^\d+\.\s+/, '')}`
+        }
+        return line.startsWith(prefix) ? line.slice(prefix.length) : `${prefix}${line}`
+      })
       .join('\n')
-    next = splice(value, lineStart, lineEnd, prefixed)
-    caret = lineStart + prefixed.length
+    ta.value = splice(value, lineStart, lineEnd, prefixed)
+    ta.setSelectionRange(lineStart, lineStart + prefixed.length)
   } else {
-    const wrap: Record<Exclude<MdCommand, 'quote' | 'ul' | 'todo'>, [string, string, string]> = {
+    const wrap: Record<'bold' | 'italic' | 'strike' | 'code' | 'link', [string, string, string]> = {
       bold: ['**', '**', 'bold'],
       italic: ['*', '*', 'italic'],
+      strike: ['~~', '~~', 'strikethrough'],
       code: ['`', '`', 'code'],
       link: ['[', '](url)', 'text']
     }
     const [pre, post, placeholder] = wrap[cmd]
     const inner = selected || placeholder
-    next = splice(value, start, end, `${pre}${inner}${post}`)
-    caret = start + pre.length + inner.length + post.length
+    ta.value = splice(value, start, end, `${pre}${inner}${post}`)
+    if (cmd === 'link') {
+      // Empty selection → select the label; wrapped label → select the URL.
+      const selStart = selected ? start + inner.length + 3 : start + 1
+      ta.setSelectionRange(selStart, selStart + (selected ? 3 : inner.length))
+    } else {
+      ta.setSelectionRange(start + pre.length, start + pre.length + inner.length)
+    }
   }
 
-  ta.value = next
-  ta.setSelectionRange(caret, caret)
   ta.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
@@ -154,21 +172,21 @@ function NoteEditor({ note, onBack }: { note: NoteDto; onBack: () => void }) {
       />
 
       <div className="notes-toolbar">
-        {CMD_LABELS.map((cmd) => (
+        {CMD_TOOLS.map(({ id, Icon, i18n }) => (
           <button
-            key={cmd.id}
+            key={id}
             type="button"
             className="notes-toolbar-btn"
-            title={t(cmd.i18n)}
+            title={t(i18n)}
             onClick={() => {
               const ta = taRef.current
               if (!ta) return
-              applyCommand(ta, cmd.id)
+              applyCommand(ta, id)
               schedulePush(ta.value)
               ta.focus()
             }}
           >
-            {cmd.label}
+            <Icon size={14} strokeWidth={2} />
           </button>
         ))}
       </div>
@@ -189,7 +207,13 @@ const NoteCard = forwardRef<HTMLDivElement, { note: NoteDto; onEdit: () => void 
     const lines = note.content.split('\n').filter((l) => l.trim().length > 0)
     // The first meaningful line is the title; preview shows what follows.
     const rest = lines.length > 1 ? lines.slice(1) : lines
-    return rest.join('\n').slice(0, 220)
+    const joined = rest.join('\n')
+    // Cut to 220 chars at a line boundary so no markdown block is left
+    // half-open (a lone '>' or '**' renders as stray text).
+    if (joined.length <= 220) return joined
+    const cut = joined.slice(0, 220)
+    const breakAt = cut.lastIndexOf('\n')
+    return breakAt > 0 ? cut.slice(0, breakAt) : cut
   }, [note.content])
 
   return (
@@ -243,7 +267,11 @@ const NoteCard = forwardRef<HTMLDivElement, { note: NoteDto; onEdit: () => void 
           <TrashIcon width={12} height={12} />
         </button>
       </div>
-      {!note.folded && preview.length > 0 && <div className="notes-card-preview">{preview}</div>}
+      {!note.folded && preview.length > 0 && (
+        <div className="notes-card-preview">
+          <MarkdownPreview text={preview} />
+        </div>
+      )}
     </motion.div>
   )
 })
@@ -297,12 +325,6 @@ export function NotesView() {
         {filtered.length === 0 && (
           <div className="notes-empty">
             <p>{notes.length === 0 ? t('notes.empty') : t('notes.noMatches')}</p>
-            {notes.length === 0 && (
-              <button type="button" className="notes-new-btn" onClick={handleNew}>
-                <PlusIcon width={12} height={12} />
-                <span>{t('notes.new')}</span>
-              </button>
-            )}
           </div>
         )}
       </div>

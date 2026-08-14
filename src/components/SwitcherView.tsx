@@ -28,12 +28,7 @@ const ROW_MOTION = {
   transition: { duration: 0.16, ease: [0.16, 1, 0.3, 1] as const }
 }
 
-/** Search-mode impact (TabTab): the field slams down ~0.16s in with a hard
- * spring overshoot; at that impact moment a light flash sweeps out from the
- * field and the rows bounce in a wave, so the three read as one causal
- * chain. */
-const IMPACT_SECONDS = 0.16
-const RIPPLE_STAGGER_SECONDS = 0.055
+
 
 function appNameOf(entry: SwitcherEntryDto): string {
   // UWP app hosts carry the real app title on the window ("Settings",
@@ -55,16 +50,28 @@ export function SwitcherView() {
   const searchRef = useRef<HTMLInputElement>(null)
 
   // Focus the search field once the panel window is truly active. main's
-  // switcherPin calls requestPanelFocus, but activation is async and
-  // Chromium silently drops element.focus() in an inactive document (no
-  // focusin fires, so the t21 focusin->activate chain never starts).
-  // autoFocus lands too early; re-arm the bridge and retry after the
-  // activation settles.
+  // switcherPin calls requestPanelFocus + activateHwnd, but activation is
+  // async and Chromium silently drops element.focus() in an inactive
+  // document (no focusin fires, so the t21 focusin->activate chain never
+  // starts). autoFocus lands too early, so keep re-arming the bridge and
+  // retrying until the field actually owns focus.
   useEffect(() => {
     if (!pinned) return
     edge.requestInputFocus()
-    const t = setTimeout(() => searchRef.current?.focus(), 40)
-    return () => clearTimeout(t)
+    let tries = 0
+    const t = setInterval(() => {
+      if (document.activeElement === searchRef.current) {
+        clearInterval(t)
+        return
+      }
+      if (++tries > 10) {
+        clearInterval(t)
+        return
+      }
+      edge.requestInputFocus()
+      searchRef.current?.focus()
+    }, 40)
+    return () => clearInterval(t)
   }, [pinned])
 
   // Resolve app icons in one batch (existing app:icons pipeline, cached main-side).
@@ -163,9 +170,9 @@ export function SwitcherView() {
       {(pinned || drill) && (
         <motion.div
           className="switcher-search"
-          initial={{ y: -72, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 760, damping: 13.5, mass: 0.9 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
         >
           {pinned && !drill && (
             <input
@@ -185,16 +192,6 @@ export function SwitcherView() {
             </button>
           )}
         </motion.div>
-      )}
-      {pinned && (
-        <div className="switcher-flash">
-          <motion.div
-            className="switcher-flash-beam"
-            initial={{ x: 50, opacity: 0 }}
-            animate={{ x: 320, opacity: [0, 0.85, 0] }}
-            transition={{ duration: 0.42, delay: IMPACT_SECONDS, ease: [0.16, 1, 0.3, 1] }}
-          />
-        </div>
       )}
       <div className="switcher-list" ref={listRef}>
         {drill ? (
@@ -228,17 +225,8 @@ export function SwitcherView() {
               key={entry.index}
               className={`switcher-row${i === displayIndex ? ' selected' : ''}`}
               initial={ROW_MOTION.initial}
-              animate={pinned ? { x: 0, y: [0, -11, 0], opacity: 1 } : ROW_MOTION.animate}
-              transition={{
-                x: { ...ROW_MOTION.transition, delay: i * 0.02 },
-                opacity: { ...ROW_MOTION.transition, delay: i * 0.02 },
-                y: {
-                  type: 'spring',
-                  stiffness: 340,
-                  damping: 12.5,
-                  delay: IMPACT_SECONDS + i * RIPPLE_STAGGER_SECONDS
-                }
-              }}
+              animate={ROW_MOTION.animate}
+              transition={{ ...ROW_MOTION.transition, delay: i * 0.02 }}
               onMouseEnter={() => syncHover(i)}
               onClick={() => (entry.groupCount ? setDrill(entry) : executeRow(i))}
               onFocus={() => syncHover(i)}

@@ -185,14 +185,17 @@ export function buildDecorations(view: EditorView): DecorationSet {
         // revealed (raw text) while the caret is anywhere inside the
         // marked content (both opening and closing markers come back, so
         // editing mid-content shows where the syntax is), at the marker
-        // edge, inside the marker itself, or when the selection spans it.
-        // Once the caret leaves the construct it renders hidden again.
+        // edge on the same line, inside the marker itself, or when the
+        // selection spans it. A caret on another line is never "at the
+        // edge" — pressing Enter past a trailing marker must not reveal
+        // half of it. Once the caret leaves the construct it renders
+        // hidden again.
         const parent = node.node.parent
         const inContent = parent !== null && selFrom >= parent.from && selFrom <= parent.to
         const near =
           inContent ||
-          (selFrom >= from - 1 && selFrom <= to + 1) ||
-          (selTo >= from - 1 && selTo <= to + 1) ||
+          (caretOnLine &&
+            ((selFrom >= from - 1 && selFrom <= to + 1) || (selTo >= from - 1 && selTo <= to + 1))) ||
           (selSpan && selFrom <= to && selTo >= from)
         decos.push(
           near ? mark(from, to, 'cm-md-marker') : Decoration.replace({ widget: new HiddenMarkerWidget() }).range(from, to)

@@ -178,8 +178,14 @@ describe('markdown decoration builder', () => {
     // Caret at a marker edge / inside the marker → revealed.
     expect(replaceCount('**bold**', 0)).toBe(0)
     expect(replaceCount('**bold**', 2)).toBe(0)
+    // Caret right after a trailing marker on the same line → in content.
+    expect(replaceCount('**bold**\nplain', 8)).toBe(0)
     // A selection spanning the marker reveals it too.
     expect(replaceCount('**bold**', 0, 4)).toBe(0)
+    // A newline is not an edge: caret on the next line (to + 1 of the
+    // trailing marker) must not reveal half the syntax.
+    expect(replaceCount('**bold**\nplain', 9)).toBe(2)
+    expect(replaceCount('123**bold**\nplain', 12)).toBe(2)
     // Caret outside the construct → rendered hidden again.
     expect(replaceCount('**bold**\n\nplain', 11)).toBe(2)
     expect(replaceCount('*italic*\n\nplain', 11)).toBe(2)

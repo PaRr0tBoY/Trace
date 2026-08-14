@@ -155,7 +155,7 @@ export interface TranslationKeys {
     fileMissing: string
     missingFilesBanner: string
     clearMissing: string
-    clearUnpinned: string
+    clearScoped: string
     scrollToTop: string
   }
   fileKinds: {
@@ -354,6 +354,8 @@ export interface TranslationKeys {
     taskDropHint: string
     suggestionDropHint: string
     suggestionCreated: string
+    clearAll: string
+    dismissAll: string
     candidatesEmpty: string
     candidatesEmptyHint: string
   }
@@ -858,7 +860,7 @@ export const en: TranslationKeys = {
     "fileMissing": "File missing",
     "missingFilesBanner": "{count} entries lost their files",
     "clearMissing": "Clean up",
-    "clearUnpinned": "Clear unpinned files",
+    "clearScoped": "Clear this view's items",
     "routeClipboard": "Clipboard",
     "scrollToTop": "Scroll to top"
   },
@@ -1056,6 +1058,8 @@ export const en: TranslationKeys = {
   "taskDropHint": "File will be attached to this task",
   "suggestionDropHint": "A task will be created from this",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Clear all tasks",
+    "dismissAll": "Dismiss all suggestions",
     "candidatesEmpty": "No candidate tasks right now",
     "candidatesEmptyHint": "Candidates appear when Trace notices patterns in your apps and clipboard"
   },
@@ -1393,7 +1397,7 @@ export const es: TranslationKeys = {
     "fileMissing": "Archivo desaparecido",
     "missingFilesBanner": "{count} entradas perdieron sus archivos",
     "clearMissing": "Limpiar",
-    "clearUnpinned": "Borrar archivos no fijados",
+    "clearScoped": "Borrar los elementos de esta vista",
     "scrollToTop": "Volver arriba"
   },
   "fileKinds": {
@@ -1590,6 +1594,8 @@ export const es: TranslationKeys = {
   "taskDropHint": "El archivo se adjuntará a esta tarea",
   "suggestionDropHint": "Se creará una tarea a partir de esto",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Borrar todas las tareas",
+    "dismissAll": "Descartar todas las sugerencias",
     "candidatesEmpty": "No hay tareas candidatas ahora mismo",
     "candidatesEmptyHint": "Aparecen candidatas cuando Trace detecta patrones en tus apps y el portapapeles"
   },
@@ -1927,7 +1933,7 @@ export const fr: TranslationKeys = {
     "fileMissing": "Fichier introuvable",
     "missingFilesBanner": "{count} entrées ont perdu leurs fichiers",
     "clearMissing": "Nettoyer",
-    "clearUnpinned": "Effacer les fichiers non épinglés",
+    "clearScoped": "Effacer les éléments de cette vue",
     "scrollToTop": "Remonter en haut"
   },
   "fileKinds": {
@@ -2124,6 +2130,8 @@ export const fr: TranslationKeys = {
   "taskDropHint": "Le fichier sera rattaché à cette tâche",
   "suggestionDropHint": "Une tâche sera créée à partir de cela",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Effacer toutes les tâches",
+    "dismissAll": "Ignorer toutes les suggestions",
     "candidatesEmpty": "Aucune tâche candidate pour le moment",
     "candidatesEmptyHint": "Des candidates apparaissent quand Trace repère des schémas dans vos applications et le presse-papiers"
   },
@@ -2461,7 +2469,7 @@ export const de: TranslationKeys = {
     "fileMissing": "Datei fehlt",
     "missingFilesBanner": "{count} Einträge haben ihre Dateien verloren",
     "clearMissing": "Aufräumen",
-    "clearUnpinned": "Unangepinnte Dateien löschen",
+    "clearScoped": "Elemente dieser Ansicht löschen",
     "scrollToTop": "Nach oben scrollen"
   },
   "fileKinds": {
@@ -2658,6 +2666,8 @@ export const de: TranslationKeys = {
   "taskDropHint": "Datei wird dieser Aufgabe zugeordnet",
   "suggestionDropHint": "Daraus wird eine Aufgabe erstellt",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Alle Aufgaben löschen",
+    "dismissAll": "Alle Vorschläge verwerfen",
     "candidatesEmpty": "Derzeit keine Kandidaten-Aufgaben",
     "candidatesEmptyHint": "Kandidaten erscheinen, wenn Trace Muster in Ihren Apps und der Zwischenablage erkennt"
   },
@@ -2995,7 +3005,7 @@ export const it: TranslationKeys = {
     "fileMissing": "File mancante",
     "missingFilesBanner": "{count} voci hanno perso i file",
     "clearMissing": "Pulisci",
-    "clearUnpinned": "Cancella file non bloccati",
+    "clearScoped": "Cancella gli elementi di questa vista",
     "scrollToTop": "Torna in cima"
   },
   "fileKinds": {
@@ -3192,6 +3202,8 @@ export const it: TranslationKeys = {
   "taskDropHint": "Il file verrà associato a questa attività",
   "suggestionDropHint": "Verrà creata un'attività da questo",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Cancella tutte le attività",
+    "dismissAll": "Ignora tutti i suggerimenti",
     "candidatesEmpty": "Nessuna attività candidata al momento",
     "candidatesEmptyHint": "Le candidate compaiono quando Trace nota schemi nelle tue app e negli appunti"
   },
@@ -3529,7 +3541,7 @@ export const pt: TranslationKeys = {
     "fileMissing": "Arquivo sumiu",
     "missingFilesBanner": "{count} entradas perderam seus arquivos",
     "clearMissing": "Limpar",
-    "clearUnpinned": "Limpar arquivos não fixados",
+    "clearScoped": "Limpar os itens desta visualização",
     "scrollToTop": "Voltar ao topo"
   },
   "fileKinds": {
@@ -3726,6 +3738,8 @@ export const pt: TranslationKeys = {
   "taskDropHint": "O arquivo será anexado a esta tarefa",
   "suggestionDropHint": "Uma tarefa será criada a partir disso",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Limpar todas as tarefas",
+    "dismissAll": "Dispensar todas as sugestões",
     "candidatesEmpty": "Nenhuma tarefa candidata no momento",
     "candidatesEmptyHint": "Candidatas aparecem quando o Trace nota padrões nos seus apps e na área de transferência"
   },
@@ -4063,7 +4077,7 @@ export const ru: TranslationKeys = {
     "fileMissing": "Файл пропал",
     "missingFilesBanner": "{count} записей потеряли файлы",
     "clearMissing": "Очистить",
-    "clearUnpinned": "Очистить незакреплённые файлы",
+    "clearScoped": "Очистить элементы этого вида",
     "scrollToTop": "Прокрутить наверх"
   },
   "fileKinds": {
@@ -4260,6 +4274,8 @@ export const ru: TranslationKeys = {
   "taskDropHint": "Файл будет прикреплён к этой задаче",
   "suggestionDropHint": "На основе этого будет создана задача",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Очистить все задачи",
+    "dismissAll": "Отклонить все предложения",
     "candidatesEmpty": "Сейчас нет задач-кандидатов",
     "candidatesEmptyHint": "Кандидаты появляются, когда Trace замечает закономерности в ваших приложениях и буфере обмена"
   },
@@ -4597,7 +4613,7 @@ export const ja: TranslationKeys = {
     "fileMissing": "ファイルが見つかりません",
     "missingFilesBanner": "{count} 件のファイルが見つかりません",
     "clearMissing": "整理",
-    "clearUnpinned": "ピン留めされていないファイルをクリア",
+    "clearScoped": "このビューの項目をクリア",
     "scrollToTop": "先頭へスクロール"
   },
   "fileKinds": {
@@ -4794,6 +4810,8 @@ export const ja: TranslationKeys = {
   "taskDropHint": "ファイルがこのタスクに添付されます",
   "suggestionDropHint": "これからタスクが作成されます",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "すべてのタスクをクリア",
+    "dismissAll": "すべての提案を破棄",
     "candidatesEmpty": "現在候補タスクはありません",
     "candidatesEmptyHint": "Trace がアプリやクリップボードのパターンに気づくと候補が表示されます"
   },
@@ -5131,7 +5149,7 @@ export const ko: TranslationKeys = {
     "fileMissing": "파일 없음",
     "missingFilesBanner": "{count}개 항목의 파일이 사라졌습니다",
     "clearMissing": "정리",
-    "clearUnpinned": "고정되지 않은 파일 지우기",
+    "clearScoped": "이 보기의 항목 지우기",
     "scrollToTop": "맨 위로 스크롤"
   },
   "fileKinds": {
@@ -5328,6 +5346,8 @@ export const ko: TranslationKeys = {
   "taskDropHint": "파일이 이 작업에 첨부됩니다",
   "suggestionDropHint": "이것으로 작업이 생성됩니다",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "모든 작업 지우기",
+    "dismissAll": "모든 제안 닫기",
     "candidatesEmpty": "현재 후보 작업이 없습니다",
     "candidatesEmptyHint": "Trace가 앱과 클립보드의 패턴을 감지하면 후보가 나타납니다"
   },
@@ -5665,7 +5685,7 @@ export const zhCN: TranslationKeys = {
     "fileMissing": "文件已消失",
     "missingFilesBanner": "{count} 个条目的文件已消失",
     "clearMissing": "清理",
-    "clearUnpinned": "清除未固定文件",
+    "clearScoped": "清空当前视图的条目",
     "scrollToTop": "滚动到顶部"
   },
   "fileKinds": {
@@ -5862,6 +5882,8 @@ export const zhCN: TranslationKeys = {
   "taskDropHint": "文件将被归属到该任务",
   "suggestionDropHint": "将基于此创建任务并归属",
     "suggestionCreated": "已创建任务并绑定",
+    "clearAll": "清空所有任务",
+    "dismissAll": "忽略所有建议",
     "candidatesEmpty": "当前没有候选任务",
     "candidatesEmptyHint": "Trace 注意到应用与剪贴板中的模式时会出现候选任务"
   },
@@ -6199,7 +6221,7 @@ export const zhTW: TranslationKeys = {
     "fileMissing": "檔案已消失",
     "missingFilesBanner": "{count} 個條目的檔案已消失",
     "clearMissing": "清理",
-    "clearUnpinned": "清除未固定檔案",
+    "clearScoped": "清空目前檢視的項目",
     "scrollToTop": "捲動到頂部"
   },
   "fileKinds": {
@@ -6396,6 +6418,8 @@ export const zhTW: TranslationKeys = {
   "taskDropHint": "檔案將被歸屬到該任務",
   "suggestionDropHint": "將基於此建立任務並歸屬",
     "suggestionCreated": "已建立任務並繫結",
+    "clearAll": "清空所有任務",
+    "dismissAll": "忽略所有建議",
     "candidatesEmpty": "目前沒有候選任務",
     "candidatesEmptyHint": "Trace 注意到應用程式與剪貼簿中的模式時會出現候選任務"
   },
@@ -6733,7 +6757,7 @@ export const hi: TranslationKeys = {
     "fileMissing": "फ़ाइल गायब है",
     "missingFilesBanner": "{count} प्रविष्टियों की फ़ाइलें गायब हैं",
     "clearMissing": "साफ़ करें",
-    "clearUnpinned": "अनपिन की गई फ़ाइलें साफ़ करें",
+    "clearScoped": "इस दृश्य की वस्तुएँ साफ़ करें",
     "scrollToTop": "शीर्ष पर स्क्रॉल करें"
   },
   "fileKinds": {
@@ -6930,6 +6954,8 @@ export const hi: TranslationKeys = {
   "taskDropHint": "फ़ाइल इस कार्य से जुड़ जाएगी",
   "suggestionDropHint": "इससे एक कार्य बनाया जाएगा",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "सभी कार्य साफ़ करें",
+    "dismissAll": "सभी सुझाव हटाएँ",
     "candidatesEmpty": "अभी कोई उम्मीदवार कार्य नहीं",
     "candidatesEmptyHint": "जब Trace आपके ऐप्स और क्लिपबोर्ड में पैटर्न देखता है तो उम्मीदवार दिखते हैं"
   },
@@ -7267,7 +7293,7 @@ export const ar: TranslationKeys = {
     "fileMissing": "الملف مفقود",
     "missingFilesBanner": "{count} عناصر فقدت ملفاتها",
     "clearMissing": "تنظيف",
-    "clearUnpinned": "مسح الملفات غير المثبّتة",
+    "clearScoped": "مسح عناصر هذه الشاشة",
     "scrollToTop": "التمرير للأعلى"
   },
   "fileKinds": {
@@ -7464,6 +7490,8 @@ export const ar: TranslationKeys = {
   "taskDropHint": "سيتم إرفاق الملف بهذه المهمة",
   "suggestionDropHint": "سيتم إنشاء مهمة من هذا",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "مسح جميع المهام",
+    "dismissAll": "تجاهل جميع الاقتراحات",
     "candidatesEmpty": "لا توجد مهام مرشحة الآن",
     "candidatesEmptyHint": "تظهر المرشحات عندما يلاحظ Trace أنماطًا في تطبيقاتك والحافظة"
   },
@@ -7801,7 +7829,7 @@ export const bn: TranslationKeys = {
     "fileMissing": "ফাইল হারিয়ে গেছে",
     "missingFilesBanner": "{count}টি এন্ট্রির ফাইল হারিয়ে গেছে",
     "clearMissing": "পরিষ্কার করুন",
-    "clearUnpinned": "পিন করা নেই এমন ফাইল মুছুন",
+    "clearScoped": "এই ভিউর আইটেম মুছুন",
     "scrollToTop": "শীর্ষে স্ক্রোল করুন"
   },
   "fileKinds": {
@@ -7998,6 +8026,8 @@ export const bn: TranslationKeys = {
   "taskDropHint": "ফাইলটি এই কাজের সাথে যুক্ত হবে",
   "suggestionDropHint": "এটি থেকে একটি কাজ তৈরি হবে",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "সব টাস্ক মুছুন",
+    "dismissAll": "সব পরামর্শ বাতিল করুন",
     "candidatesEmpty": "এখন কোনো প্রার্থী কাজ নেই",
     "candidatesEmptyHint": "Trace আপনার অ্যাপ ও ক্লিপবোর্ডে নিদর্শন দেখলে প্রার্থী দেখা যায়"
   },
@@ -8335,7 +8365,7 @@ export const tr: TranslationKeys = {
     "fileMissing": "Dosya kayboldu",
     "missingFilesBanner": "{count} öğenin dosyası kayboldu",
     "clearMissing": "Temizle",
-    "clearUnpinned": "Sabitlenmemiş dosyaları temizle",
+    "clearScoped": "Bu görünümdeki öğeleri temizle",
     "scrollToTop": "Başa kaydır"
   },
   "fileKinds": {
@@ -8532,6 +8562,8 @@ export const tr: TranslationKeys = {
   "taskDropHint": "Dosya bu göreve eklenecek",
   "suggestionDropHint": "Bundan bir görev oluşturulacak",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Tüm görevleri temizle",
+    "dismissAll": "Tüm önerileri kapat",
     "candidatesEmpty": "Şu anda aday görev yok",
     "candidatesEmptyHint": "Trace uygulamalarınızda ve panoda örüntüler fark ettiğinde adaylar görünür"
   },
@@ -8869,7 +8901,7 @@ export const vi: TranslationKeys = {
     "fileMissing": "Tệp đã biến mất",
     "missingFilesBanner": "{count} mục đã mất tệp",
     "clearMissing": "Dọn dẹp",
-    "clearUnpinned": "Xóa các tệp chưa ghim",
+    "clearScoped": "Xóa các mục trong chế độ xem này",
     "scrollToTop": "Cuộn lên đầu"
   },
   "fileKinds": {
@@ -9066,6 +9098,8 @@ export const vi: TranslationKeys = {
   "taskDropHint": "Tệp sẽ được đính kèm vào nhiệm vụ này",
   "suggestionDropHint": "Một nhiệm vụ sẽ được tạo từ đây",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Xóa tất cả nhiệm vụ",
+    "dismissAll": "Bỏ qua tất cả gợi ý",
     "candidatesEmpty": "Hiện không có nhiệm vụ ứng viên",
     "candidatesEmptyHint": "Ứng viên xuất hiện khi Trace nhận thấy các mẫu trong ứng dụng và bảng nhớ tạm của bạn"
   },
@@ -9403,7 +9437,7 @@ export const pl: TranslationKeys = {
     "fileMissing": "Plik zniknął",
     "missingFilesBanner": "{count} wpisów straciło pliki",
     "clearMissing": "Posprzątaj",
-    "clearUnpinned": "Wyczyść odpięte pliki",
+    "clearScoped": "Wyczyść elementy tego widoku",
     "scrollToTop": "Przewiń na górę"
   },
   "fileKinds": {
@@ -9600,6 +9634,8 @@ export const pl: TranslationKeys = {
   "taskDropHint": "Plik zostanie dołączony do tego zadania",
   "suggestionDropHint": "Na tej podstawie zostanie utworzone zadanie",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Wyczyść wszystkie zadania",
+    "dismissAll": "Odrzuć wszystkie sugestie",
     "candidatesEmpty": "Brak zadań kandydujących",
     "candidatesEmptyHint": "Kandydaci pojawiają się, gdy Trace zauważy wzorce w Twoich aplikacjach i schowku"
   },
@@ -9937,7 +9973,7 @@ export const nl: TranslationKeys = {
     "fileMissing": "Bestand verdwenen",
     "missingFilesBanner": "{count} items verloren hun bestanden",
     "clearMissing": "Opruimen",
-    "clearUnpinned": "Niet-vastgezette bestanden wissen",
+    "clearScoped": "Items van deze weergave wissen",
     "scrollToTop": "Naar boven scrollen"
   },
   "fileKinds": {
@@ -10134,6 +10170,8 @@ export const nl: TranslationKeys = {
   "taskDropHint": "Bestand wordt aan deze taak gekoppeld",
   "suggestionDropHint": "Hieruit wordt een taak gemaakt",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Alle taken wissen",
+    "dismissAll": "Alle suggesties negeren",
     "candidatesEmpty": "Momenteel geen kandidaat-taken",
     "candidatesEmptyHint": "Kandidaten verschijnen wanneer Trace patronen in uw apps en klembord opmerkt"
   },
@@ -10471,7 +10509,7 @@ export const sv: TranslationKeys = {
     "fileMissing": "Fil saknas",
     "missingFilesBanner": "{count} poster förlorade sina filer",
     "clearMissing": "Rensa",
-    "clearUnpinned": "Rensa ofästa filer",
+    "clearScoped": "Rensa objekt i den här vyn",
     "scrollToTop": "Scrolla till toppen"
   },
   "fileKinds": {
@@ -10668,6 +10706,8 @@ export const sv: TranslationKeys = {
   "taskDropHint": "Filen bifogas till denna uppgift",
   "suggestionDropHint": "En uppgift kommer att skapas från detta",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Rensa alla uppgifter",
+    "dismissAll": "Avfärda alla förslag",
     "candidatesEmpty": "Inga kandidatuppgifter just nu",
     "candidatesEmptyHint": "Kandidater visas när Trace upptäcker mönster i dina appar och urklipp"
   },
@@ -11005,7 +11045,7 @@ export const id: TranslationKeys = {
     "fileMissing": "Berkas hilang",
     "missingFilesBanner": "{count} entri kehilangan berkas",
     "clearMissing": "Bersihkan",
-    "clearUnpinned": "Bersihkan berkas yang tidak disematkan",
+    "clearScoped": "Bersihkan item di tampilan ini",
     "scrollToTop": "Gulir ke atas"
   },
   "fileKinds": {
@@ -11202,6 +11242,8 @@ export const id: TranslationKeys = {
   "taskDropHint": "File akan dilampirkan ke tugas ini",
   "suggestionDropHint": "Sebuah tugas akan dibuat dari ini",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Bersihkan semua tugas",
+    "dismissAll": "Tutup semua saran",
     "candidatesEmpty": "Belum ada tugas kandidat",
     "candidatesEmptyHint": "Kandidat muncul saat Trace melihat pola di aplikasi dan papan klip Anda"
   },
@@ -11539,7 +11581,7 @@ export const uk: TranslationKeys = {
     "fileMissing": "Файл зник",
     "missingFilesBanner": "{count} записів втратили файли",
     "clearMissing": "Прибрати",
-    "clearUnpinned": "Очистити незакріплені файли",
+    "clearScoped": "Очистити елементи цього виду",
     "scrollToTop": "Прокрутити вгору"
   },
   "fileKinds": {
@@ -11736,6 +11778,8 @@ export const uk: TranslationKeys = {
   "taskDropHint": "Файл буде прикріплено до цього завдання",
   "suggestionDropHint": "На основі цього буде створено завдання",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Очистити всі завдання",
+    "dismissAll": "Відхилити всі пропозиції",
     "candidatesEmpty": "Зараз немає завдань-кандидатів",
     "candidatesEmptyHint": "Кандидати з’являються, коли Trace помічає закономірності у ваших застосунках і буфері обміну"
   },
@@ -12073,7 +12117,7 @@ export const el: TranslationKeys = {
     "fileMissing": "Το αρχείο εξαφανίστηκε",
     "missingFilesBanner": "{count} καταχωρήσεις έχασαν τα αρχεία τους",
     "clearMissing": "Καθαρισμός",
-    "clearUnpinned": "Εκκαθάριση μη καρφιτσωμένων αρχείων",
+    "clearScoped": "Εκκαθάριση στοιχείων αυτής της προβολής",
     "scrollToTop": "Κύλιση στην κορυφή"
   },
   "fileKinds": {
@@ -12270,6 +12314,8 @@ export const el: TranslationKeys = {
   "taskDropHint": "Το αρχείο θα επισυναφθεί σε αυτή την εργασία",
   "suggestionDropHint": "Θα δημιουργηθεί μια εργασία από αυτό",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Εκκαθάριση όλων των εργασιών",
+    "dismissAll": "Απόρριψη όλων των προτάσεων",
     "candidatesEmpty": "Δεν υπάρχουν υποψήφιες εργασίες αυτή τη στιγμή",
     "candidatesEmptyHint": "Οι υποψήφιες εμφανίζονται όταν το Trace εντοπίζει μοτίβα στις εφαρμογές και το πρόχειρό σας"
   },
@@ -12607,7 +12653,7 @@ export const cs: TranslationKeys = {
     "fileMissing": "Soubor zmizel",
     "missingFilesBanner": "{count} položek ztratilo soubory",
     "clearMissing": "Uklidit",
-    "clearUnpinned": "Vymazat nepřipnuté soubory",
+    "clearScoped": "Vymazat položky tohoto zobrazení",
     "scrollToTop": "Přejít nahoru"
   },
   "fileKinds": {
@@ -12804,6 +12850,8 @@ export const cs: TranslationKeys = {
   "taskDropHint": "Soubor bude připojen k tomuto úkolu",
   "suggestionDropHint": "Na základě toho se vytvoří úkol",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Vymazat všechny úkoly",
+    "dismissAll": "Zavřít všechny návrhy",
     "candidatesEmpty": "Zatím žádné kandidátské úkoly",
     "candidatesEmptyHint": "Kandidáti se objeví, když Trace zaznamená vzorce ve vašich aplikacích a schránce"
   },
@@ -13141,7 +13189,7 @@ export const ro: TranslationKeys = {
     "fileMissing": "Fișierul a dispărut",
     "missingFilesBanner": "{count} intrări și-au pierdut fișierele",
     "clearMissing": "Curăță",
-    "clearUnpinned": "Șterge fișierele nefixate",
+    "clearScoped": "Ștergeți elementele acestei vizualizări",
     "scrollToTop": "Derulează sus"
   },
   "fileKinds": {
@@ -13338,6 +13386,8 @@ export const ro: TranslationKeys = {
   "taskDropHint": "Fișierul va fi atașat acestei sarcini",
   "suggestionDropHint": "Se va crea o sarcină din aceasta",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Ștergeți toate sarcinile",
+    "dismissAll": "Respingeți toate sugestiile",
     "candidatesEmpty": "Nicio sarcină candidată momentan",
     "candidatesEmptyHint": "Candidatele apar când Trace observă tipare în aplicațiile și clipboardul tău"
   },
@@ -13675,7 +13725,7 @@ export const hu: TranslationKeys = {
     "fileMissing": "Fájl eltűnt",
     "missingFilesBanner": "{count} elem elvesztette a fájljait",
     "clearMissing": "Takarítás",
-    "clearUnpinned": "Nem rögzített fájlok törlése",
+    "clearScoped": "A nézet elemeinek törlése",
     "scrollToTop": "Görgetés a tetejére"
   },
   "fileKinds": {
@@ -13872,6 +13922,8 @@ export const hu: TranslationKeys = {
   "taskDropHint": "A fájl ehhez a feladathoz lesz csatolva",
   "suggestionDropHint": "Ebből egy feladat jön létre",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Összes feladat törlése",
+    "dismissAll": "Összes javaslat elvetése",
     "candidatesEmpty": "Jelenleg nincs jelölt feladat",
     "candidatesEmptyHint": "A jelöltek akkor jelennek meg, amikor a Trace mintákat észlel az alkalmazásaiban és a vágólapon"
   },
@@ -14209,7 +14261,7 @@ export const da: TranslationKeys = {
     "fileMissing": "Fil forsvundet",
     "missingFilesBanner": "{count} poster mistede deres filer",
     "clearMissing": "Ryd op",
-    "clearUnpinned": "Ryd ikke-fastgjorte filer",
+    "clearScoped": "Ryd elementer i denne visning",
     "scrollToTop": "Rul til toppen"
   },
   "fileKinds": {
@@ -14406,6 +14458,8 @@ export const da: TranslationKeys = {
   "taskDropHint": "Filen vedhæftes til denne opgave",
   "suggestionDropHint": "Der oprettes en opgave ud fra dette",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Ryd alle opgaver",
+    "dismissAll": "Afvis alle forslag",
     "candidatesEmpty": "Ingen kandidatopgaver lige nu",
     "candidatesEmptyHint": "Kandidater vises, når Trace opdager mønstre i dine apps og udklipsholder"
   },
@@ -14743,7 +14797,7 @@ export const fi: TranslationKeys = {
     "fileMissing": "Tiedosto kadonnut",
     "missingFilesBanner": "{count} kohdetta menetti tiedostonsa",
     "clearMissing": "Siivoa",
-    "clearUnpinned": "Poista kiinnittämättömät tiedostot",
+    "clearScoped": "Tyhjennä tämän näkymän kohteet",
     "scrollToTop": "Vieritä ylös"
   },
   "fileKinds": {
@@ -14940,6 +14994,8 @@ export const fi: TranslationKeys = {
   "taskDropHint": "Tiedosto liitetään tähän tehtävään",
   "suggestionDropHint": "Tästä luodaan tehtävä",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Tyhjennä kaikki tehtävät",
+    "dismissAll": "Hylkää kaikki ehdotukset",
     "candidatesEmpty": "Ei ehdokastehtäviä juuri nyt",
     "candidatesEmptyHint": "Ehdokkaat ilmestyvät, kun Trace huomaa kaavoja sovelluksissasi ja leikepöydällä"
   },
@@ -15277,7 +15333,7 @@ export const th: TranslationKeys = {
     "fileMissing": "ไฟล์หายไป",
     "missingFilesBanner": "{count} รายการสูญเสียไฟล์",
     "clearMissing": "ทำความสะอาด",
-    "clearUnpinned": "ล้างไฟล์ที่ไม่ได้ปักหมุด",
+    "clearScoped": "ล้างรายการในมุมมองนี้",
     "scrollToTop": "เลื่อนไปที่ด้านบน"
   },
   "fileKinds": {
@@ -15474,6 +15530,8 @@ export const th: TranslationKeys = {
   "taskDropHint": "ไฟล์จะถูกแนบไปกับงานนี้",
   "suggestionDropHint": "จะสร้างงานจากสิ่งนี้",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "ล้างงานทั้งหมด",
+    "dismissAll": "ปิดคำแนะนำทั้งหมด",
     "candidatesEmpty": "ยังไม่มีงานผู้สมัครในตอนนี้",
     "candidatesEmptyHint": "ผู้สมัครจะปรากฏเมื่อ Trace เห็นรูปแบบในแอปและคลิปบอร์ดของคุณ"
   },
@@ -15811,7 +15869,7 @@ export const he: TranslationKeys = {
     "fileMissing": "הקובץ נעלם",
     "missingFilesBanner": "{count} פריטים איבדו את הקבצים שלהם",
     "clearMissing": "נקה",
-    "clearUnpinned": "נקה קבצים לא מוצמדים",
+    "clearScoped": "נקה את הפריטים בתצוגה זו",
     "scrollToTop": "גלול לראש"
   },
   "fileKinds": {
@@ -16008,6 +16066,8 @@ export const he: TranslationKeys = {
   "taskDropHint": "הקובץ יצורף למשימה זו",
   "suggestionDropHint": "תיווצר משימה מזה",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "נקה את כל המשימות",
+    "dismissAll": "דחה את כל ההצעות",
     "candidatesEmpty": "אין כרגע משימות מועמדות",
     "candidatesEmptyHint": "מועמדות מופיעות כשטרייס מזהה דפוסים באפליקציות ובלוח שלך"
   },
@@ -16345,7 +16405,7 @@ export const no: TranslationKeys = {
     "fileMissing": "Fil forsvunnet",
     "missingFilesBanner": "{count} oppføringer mistet filene sine",
     "clearMissing": "Rydd opp",
-    "clearUnpinned": "Tøm ikke-festede filer",
+    "clearScoped": "Tøm elementer i denne visningen",
     "scrollToTop": "Rull til toppen"
   },
   "fileKinds": {
@@ -16542,6 +16602,8 @@ export const no: TranslationKeys = {
   "taskDropHint": "Filen blir knyttet til denne oppgaven",
   "suggestionDropHint": "Det opprettes en oppgave fra dette",
     "suggestionCreated": "Task created and linked",
+    "clearAll": "Tøm alle oppgaver",
+    "dismissAll": "Avvis alle forslag",
     "candidatesEmpty": "Ingen kandidatoppgaver akkurat nå",
     "candidatesEmptyHint": "Kandidater vises når Trace oppdager mønstre i appene og utklippstavlen din"
   },

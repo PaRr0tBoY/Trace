@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useRef } from 'react'
 import { useStore } from '../store/appStore'
 import { PANEL_LEAVE_EVENT, PANEL_ENTER_EVENT } from '../hooks/useEdgeHover'
+import { useFilteredItems, matchesClipboardFilter } from '../hooks/useFilteredItems'
 import { Header } from './Header'
 import { ItemList } from './ItemList'
 import { SearchBar } from './SearchBar'
@@ -23,17 +24,34 @@ import { FileListView } from './FileListView'
 import { TaskDropPanel } from './tasks/TaskDropPanel'
 import { linkDraggedItem, acceptSuggestionDrop, dropOnSaveZone } from './tasks/dropActions'
 import { ToastStack } from './Toast'
-import { TrashIcon } from './icons'
+import { ViewFooter } from './ViewFooter'
 import { t } from '../i18n'
 
 export function Panel() {
   const open = useStore((s) => s.open)
-const switcherActive = useStore((s) => s.switcherActive)
-  const total = useStore((s) => s.items.length)
+  const switcherActive = useStore((s) => s.switcherActive)
   const clear = useStore((s) => s.clear)
   const settings = useStore((s) => s.settings)
   const settingsOpen = useStore((s) => s.settingsOpen)
   const view = useStore((s) => s.view)
+
+  // Clipboard-view footer: count + clear are scoped to the active type
+  // filter (user feedback 2026-08-14: clear only the current view, e.g.
+  // the image filter clears images only). The count shows what the user
+  // sees (query-filtered); clear removes every unpinned item matching the
+  // type filter regardless of the search query.
+  const { pinned: visiblePinned, recent: visibleRecent } = useFilteredItems()
+  const visibleTotal = visiblePinned.length + visibleRecent.length
+  const clipboardFilter = useStore((s) => s.clipboardFilter)
+  const clearScopedClipboard = (): void => {
+    const state = useStore.getState()
+    const filter = state.clipboardFilter || 'all'
+    const ids = state.items.filter((it) => !it.pinned && matchesClipboardFilter(it, filter)).map((it) => it.id)
+    if (ids.length > 0) void clear(ids)
+  }
+  const clipboardScopeCount = useStore((s) => s.items).filter(
+    (it) => !it.pinned && matchesClipboardFilter(it, clipboardFilter || 'all')
+  ).length
 
   // NOTE: closing the panel intentionally keeps the settings sheet, its sub
   // view, and the search query — the restore mechanism (ADR-0004) decides
@@ -342,23 +360,14 @@ const switcherActive = useStore((s) => s.switcherActive)
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
                 <ItemList />
-                <div className="footer" style={{ position: 'relative' }}>
-                  <div style={{ position: 'absolute', top: -18, left: 0, right: 0, height: 18, background: 'linear-gradient(to top, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
-                  <span className="count">
-                    {total} item{total === 1 ? '' : 's'}
-                  </span>
-                  <div className="spacer" />
-                  <button 
-                    className="text-btn danger"
-                    onClick={() => clear()} 
-                    disabled={total === 0} 
-                    title="Clear shelf" 
-                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                  >
-                    <TrashIcon width={14} height={14} />
-                    <span>Clear</span>
-                  </button>
-                </div>
+                <ViewFooter
+                  count={visibleTotal}
+                  noun="item"
+                  clearLabel={t('item.clear')}
+                  clearTitle={t('item.clearScoped')}
+                  clearDisabled={clipboardScopeCount === 0}
+                  onClear={clearScopedClipboard}
+                />
               </motion.div>
             )}
           </AnimatePresence>

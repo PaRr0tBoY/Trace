@@ -31,7 +31,7 @@ function matches(it: ClipboardItemDto, q: string): boolean {
   }
 }
 
-function matchesClipboardFilter(it: ClipboardItemDto, filter: ClipboardFilter): boolean {
+export function matchesClipboardFilter(it: ClipboardItemDto, filter: ClipboardFilter): boolean {
   switch (filter) {
     case 'all':
       // 'all' never includes file entries (ADR-0004).

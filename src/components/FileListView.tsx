@@ -19,7 +19,7 @@ import { FileMemberRow } from './FileMemberRow'
 import { PinnedTile } from './PinnedTile'
 import { EmptyState } from './EmptyState'
 import { IncognitoBanner } from './IncognitoBanner'
-import { TrashIcon } from './icons'
+import { ViewFooter } from './ViewFooter'
 import { isImageItem } from '../lib/fileTabs'
 import { basename } from '../lib/format'
 import { filterStationByRoute, countStale } from '../lib/stationRoute'
@@ -141,53 +141,74 @@ export function FileListView() {
 
   /**
    * One-click clear (mirrors the clipboard view's footer): remove every
-   * unpinned file — station entries and legacy file items alike. Pinned
-   * files stay (user feedback 2026-08-14).
+   * unpinned file in the current route view — station entries and legacy
+   * file items alike, pinned files stay (user feedback 2026-08-14). The
+   * 'clipboard' pseudo-tab clears only clipboard-captured station entries;
+   * 'all' clears every unpinned file entry.
    */
-  const clearUnpinnedFiles = (): void => {
-    const unpinnedStation = useStore.getState().station.filter((e) => !e.pinned)
-    const unpinnedItems = useStore
-      .getState()
-      .items.filter((it) => it.data.kind === 'files' && !isImageItem(it) && !it.pinned)
+  const clearScopedFiles = (): void => {
+    const state = useStore.getState()
+    const filter = state.filesFilter || 'all'
+    const routeEntries = filterStationByRoute(state.station, filter === 'clipboard' ? 'clipboard' : 'all')
+    const unpinnedStation = routeEntries.filter((e) => !e.pinned)
+    // Legacy file items hide under the clipboard pseudo-tab — only 'all' clears them.
+    const unpinnedItems = filter === 'clipboard'
+      ? []
+      : state.items.filter((it) => it.data.kind === 'files' && !isImageItem(it) && !it.pinned)
     void (async () => {
       for (const e of unpinnedStation) {
-        await useStore.getState().stationDelete(e.id)
+        await state.stationDelete(e.id)
       }
       if (unpinnedItems.length > 0) {
-        await useStore.getState().clear(unpinnedItems.map((it) => it.id))
+        await state.clear(unpinnedItems.map((it) => it.id))
       }
     })()
   }
 
-  const footer = (total: number) => (
-    <div className="footer">
-      <span className="count">
-        {total} item{total === 1 ? '' : 's'}
-      </span>
-      <div className="spacer" />
-      <button
-        className="text-btn danger"
-        onClick={() => {
-          playDeleteSound()
-          clearUnpinnedFiles()
-        }}
-        disabled={total === 0}
-        title={t('item.clearUnpinned')}
-        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-      >
-        <TrashIcon width={14} height={14} />
-        <span>{t('item.clear')}</span>
-      </button>
-    </div>
+  /**
+   * Member-mode clear: remove every unpinned parent entry of the members
+   * shown under the active extension/'other' tab (the current view's
+   * content only). Station membership wins over item membership (same rule
+   * as FileMemberRow).
+   */
+  const clearScopedMembers = (): void => {
+    const state = useStore.getState()
+    const memberIds = [...new Set((files.tabMembers ?? []).map((m) => m.itemId))]
+    const stationIds = memberIds.filter((id) => state.station.some((e) => e.id === id && !e.pinned))
+    const itemIds = memberIds.filter((id) => state.items.some((it) => it.id === id && !it.pinned) && !state.station.some((e) => e.id === id))
+    void (async () => {
+      for (const id of stationIds) {
+        await state.stationDelete(id)
+      }
+      if (itemIds.length > 0) {
+        await state.clear(itemIds)
+      }
+    })()
+  }
+
+  const footer = (count: number, onClear: () => void, clearDisabled = count === 0) => (
+    <ViewFooter
+      count={count}
+      noun="item"
+      clearLabel={t('item.clear')}
+      clearTitle={t('item.clearScoped')}
+      clearDisabled={clearDisabled}
+      onClear={onClear}
+    />
   )
 
   if (files.tabMembers === null) {
     const total = groupedEntries.pinned.length + groupedEntries.recent.length
+    // Clear scope is the whole route view (ignores the search query, which
+    // only narrows the visible list).
+    const scopeCount =
+      (filesFilter === 'clipboard' ? [] : fileItems.filter((it) => it.data.kind === 'files' && !isImageItem(it) && !it.pinned)).length +
+      filterStationByRoute(station, filesFilter === 'clipboard' ? 'clipboard' : 'all').filter((e) => !e.pinned).length
     if (total === 0) {
       return (
         <>
           <EmptyState filtered={query.trim().length > 0} />
-          {footer(0)}
+          {footer(0, clearScopedFiles, scopeCount === 0)}
         </>
       )
     }
@@ -223,7 +244,7 @@ export function FileListView() {
             </section>
           )}
         </div>
-        {footer(total)}
+        {footer(total, clearScopedFiles, scopeCount === 0)}
       </>
     )
   }
@@ -231,7 +252,12 @@ export function FileListView() {
   // Member mode: single rows under the active extension/'other' tab.
   const members = files.tabMembers
   if (members.length === 0) {
-    return <EmptyState filtered={query.trim().length > 0} />
+    return (
+      <>
+        <EmptyState filtered={query.trim().length > 0} />
+        {footer(0, clearScopedMembers, true)}
+      </>
+    )
   }
 
   // Keep members of the same parent entry contiguous (the parent's order in
@@ -246,16 +272,26 @@ export function FileListView() {
     }
   }
 
+  const memberScopeClearable = members.some((m) => {
+    const st = useStore.getState().station.find((e) => e.id === m.itemId)
+    if (st) return !st.pinned
+    const it = useStore.getState().items.find((i) => i.id === m.itemId)
+    return it ? !it.pinned : false
+  })
+
   return (
-    <div className="list">
-      {staleBanner}
-      {grouped.map((g) => (
-        <section key={g.itemId} style={{ marginBottom: 8 }}>
-          {g.members.map((m) => (
-            <FileMemberRow key={`${m.itemId}:${m.index}`} member={m} />
-          ))}
-        </section>
-      ))}
-    </div>
+    <>
+      <div className="list">
+        {staleBanner}
+        {grouped.map((g) => (
+          <section key={g.itemId} style={{ marginBottom: 8 }}>
+            {g.members.map((m) => (
+              <FileMemberRow key={`${m.itemId}:${m.index}`} member={m} />
+            ))}
+          </section>
+        ))}
+      </div>
+      {footer(members.length, clearScopedMembers, !memberScopeClearable)}
+    </>
   )
 }

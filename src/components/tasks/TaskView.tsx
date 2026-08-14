@@ -21,6 +21,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { ContentPicker } from './ContentPicker'
 import { TaskProposalCard } from './TaskProposalCard'
 import { TracePanel } from './TracePanel'
+import { ViewFooter } from '../ViewFooter'
 
 /** Which "AI 依据" chain the shared TracePanel is showing (t42). */
 type TraceTarget = { kind: 'proposal'; id: string } | { kind: 'task'; id: string } | null
@@ -76,6 +77,28 @@ export function TaskView() {
     setConfirmDeleteTaskId(null)
   }
 
+  /**
+   * Per-tab clear (user feedback 2026-08-14): the existing-tasks tab wipes
+   * every task, the candidates tab dismisses every suggestion — never the
+   * other tab's content.
+   */
+  const clearCurrentTab = (): void => {
+    const state = useStore.getState()
+    if (tasksFilter === 'candidates') {
+      void (async () => {
+        for (const s of state.suggestions) {
+          await state.ignoreSuggestion(s.id)
+        }
+      })()
+    } else {
+      void (async () => {
+        for (const task of state.tasks) {
+          await state.deleteTask(task.id)
+        }
+      })()
+    }
+  }
+
   return (
     <div className="task-view">
       {editing !== null ? (
@@ -110,34 +133,12 @@ export function TaskView() {
           onTrace={() => setTraceTarget({ kind: 'task', id: selected.id })}
         />
       ) : (
-        <div className="task-scroll">
-          {tasksFilter === 'candidates' ? (
-            suggestions.length > 0 ? (
-              <div className="task-suggest-list">
-                {suggestions.map((s) => (
-                  <TaskProposalCard
-                    key={s.id}
-                    suggestion={s}
-                    onOpen={setConvertId}
-                    onTrace={(id) => setTraceTarget({ kind: 'proposal', id })}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="task-empty">
-                <div className="title">{t('tasks.candidatesEmpty')}</div>
-                <div className="hint">{t('tasks.candidatesEmptyHint')}</div>
-              </div>
-            )
-          ) : (
-            <>
-              {l1Suggestions.length > 0 && (
-                <section className="task-group task-group-l1">
-                  <div className="task-group-label">
-                    <span>{t('tasks.activeSuggestions')}</span>
-                    <span className="task-group-count">{l1Suggestions.length}</span>
-                  </div>
-                  {l1Suggestions.map((s) => (
+        <>
+          <div className="task-scroll">
+            {tasksFilter === 'candidates' ? (
+              suggestions.length > 0 ? (
+                <div className="task-suggest-list">
+                  {suggestions.map((s) => (
                     <TaskProposalCard
                       key={s.id}
                       suggestion={s}
@@ -145,17 +146,48 @@ export function TaskView() {
                       onTrace={(id) => setTraceTarget({ kind: 'proposal', id })}
                     />
                   ))}
-                </section>
-              )}
-              <TaskList
-                tasks={tasks}
-                onOpen={(task) => setSelectedTaskId(task.id)}
-                onCreate={() => setEditingTask('new')}
-                onDeleteRequest={(task) => setConfirmDeleteTaskId(task.id)}
-              />
-            </>
-          )}
-        </div>
+                </div>
+              ) : (
+                <div className="task-empty">
+                  <div className="title">{t('tasks.candidatesEmpty')}</div>
+                  <div className="hint">{t('tasks.candidatesEmptyHint')}</div>
+                </div>
+              )
+            ) : (
+              <>
+                {l1Suggestions.length > 0 && (
+                  <section className="task-group task-group-l1">
+                    <div className="task-group-label">
+                      <span>{t('tasks.activeSuggestions')}</span>
+                      <span className="task-group-count">{l1Suggestions.length}</span>
+                    </div>
+                    {l1Suggestions.map((s) => (
+                      <TaskProposalCard
+                        key={s.id}
+                        suggestion={s}
+                        onOpen={setConvertId}
+                        onTrace={(id) => setTraceTarget({ kind: 'proposal', id })}
+                      />
+                    ))}
+                  </section>
+                )}
+                <TaskList
+                  tasks={tasks}
+                  onOpen={(task) => setSelectedTaskId(task.id)}
+                  onCreate={() => setEditingTask('new')}
+                  onDeleteRequest={(task) => setConfirmDeleteTaskId(task.id)}
+                />
+              </>
+            )}
+          </div>
+          <ViewFooter
+            count={tasksFilter === 'candidates' ? suggestions.length : tasks.length}
+            noun="task"
+            clearLabel={t('item.clear')}
+            clearTitle={tasksFilter === 'candidates' ? t('tasks.dismissAll') : t('tasks.clearAll')}
+            onClear={clearCurrentTab}
+          />
+        </>
       )}
 
       {pickerTaskId && selected && (

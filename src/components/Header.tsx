@@ -13,7 +13,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from '../store/appStore'
-import { GearIcon, CloseIcon, InfoIcon } from './icons'
+import { CloseIcon, InfoIcon } from './icons'
 import { playButtonClickSound } from '../lib/soundEffects'
 import { taskBadgeCount } from '../lib/taskGroups'
 import { useFileMembers } from '../hooks/useFilteredItems'
@@ -340,17 +340,14 @@ export function Header() {
           </div>
         )}
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          flexShrink: 0,
-          paddingRight: 2,
-          // When the chips are centered the buttons float at the right edge
-          // (they'd otherwise push the row's center off by half their width).
-          ...(settingsOpen ? {} : { position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' })
-        }}>
-          {settingsOpen && (
+        {settingsOpen && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            flexShrink: 0,
+            paddingRight: 2
+          }}>
             <button
               type="button"
               className={`icon-btn${settingsSubView === 'changelog' ? ' active' : ''}`}
@@ -393,48 +390,36 @@ export function Header() {
                 />
               )}
             </button>
-          )}
 
-          <button
-            type="button"
-            className={`icon-btn${settingsOpen ? ' active' : ''}`}
-            title={settingsOpen ? t('header.close') : t('header.settings')}
-            onClick={() => {
-              playButtonClickSound()
-              if (settingsOpen) {
+            {/* The settings entry point lives in the shared footer
+                (ViewFooter); this button only closes the sheet. */}
+            <button
+              type="button"
+              className="icon-btn active"
+              title={t('header.close')}
+              onClick={() => {
+                playButtonClickSound()
                 setSettingsOpen(false)
                 setSettingsSubView('main')
-                return
-              }
-              const state = useStore.getState()
-              const hasActiveFlyout = !!(state.previewItemId || state.styleFlyoutOpen)
-              if (hasActiveFlyout) {
-                state.setPreviewItemId(null)
-                state.setStyleFlyoutOpen(false)
-                setTimeout(() => {
-                  useStore.getState().setSettingsOpen(true)
-                }, 220)
-              } else {
-                setSettingsOpen(true)
-              }
-            }}
-            style={{
-              color: '#ffffff',
-              background: 'transparent',
-              border: 'none',
-              boxShadow: 'none',
-              flexShrink: 0,
-              cursor: 'pointer',
-              width: 32,
-              height: 32,
-              display: 'grid',
-              placeItems: 'center',
-              position: 'relative'
-            }}
-          >
-            {settingsOpen ? <CloseIcon /> : <GearIcon />}
-          </button>
-        </div>
+              }}
+              style={{
+                color: '#ffffff',
+                background: 'transparent',
+                border: 'none',
+                boxShadow: 'none',
+                flexShrink: 0,
+                cursor: 'pointer',
+                width: 32,
+                height: 32,
+                display: 'grid',
+                placeItems: 'center',
+                position: 'relative'
+              }}
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Row 2: second-level chips — hidden entirely when the files view

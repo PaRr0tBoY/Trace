@@ -10,7 +10,7 @@
  * transparent and click-through.
  */
 import { motion, AnimatePresence } from 'framer-motion'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useStore } from '../store/appStore'
 import { PANEL_LEAVE_EVENT, PANEL_ENTER_EVENT } from '../hooks/useEdgeHover'
 import { Header } from './Header'
@@ -21,7 +21,7 @@ import { TaskView } from './tasks/TaskView'
 import { SwitcherView } from './SwitcherView'
 import { FileListView } from './FileListView'
 import { TaskDropPanel } from './tasks/TaskDropPanel'
-import { linkDraggedItem, acceptSuggestionDrop } from './tasks/dropActions'
+import { linkDraggedItem, acceptSuggestionDrop, dropOnSaveZone } from './tasks/dropActions'
 import { ToastStack } from './Toast'
 import { TrashIcon } from './icons'
 import { t } from '../i18n'
@@ -89,21 +89,8 @@ const switcherActive = useStore((s) => s.switcherActive)
       setInternalDragReq(null)
       setDragActive(false)
 
-      const splitSubitem = (): void => {
-        if (req.imageId || (req.paths && req.paths.length > 0)) {
-          if (isStationId(req.id)) {
-            window.edge.stationSplit(req)
-          } else {
-            window.edge.splitItem(req)
-          }
-        }
-      }
-
       const el = document.elementFromPoint(pos.x, pos.y)
-      if (!el) {
-        splitSubitem()
-        return
-      }
+      if (!el) return
 
       // Drop-binding panel targets (t25).
       const taskRow = el.closest('[data-drop-task-id]')
@@ -120,9 +107,11 @@ const switcherActive = useStore((s) => s.switcherActive)
         return
       }
 
-      // Save zone = shelf-level drop: split sub-items out.
-      if (el.closest('.drop-save-zone, .split-dropzone')) {
-        splitSubitem()
+      // Save zone (T5): a labelled landing surface. Internal drags are
+      // no-ops (the item already lives in the panel), external content is
+      // routed here by handleOsFileDrop.
+      if (el.closest('.drop-save-zone')) {
+        void dropOnSaveZone(req)
         return
       }
 
@@ -146,10 +135,9 @@ const switcherActive = useStore((s) => s.switcherActive)
         } else if (targetId === req.id) {
           // Dropped on the SAME item: do nothing, keep it in the collection
         }
-      } else {
-        // Dropped on empty space (e.g. padding): split
-        splitSubitem()
       }
+      // Dropped on empty space: no-op. Batch-member split lives on the card
+      // button only (T5).
     })
 
     /**
@@ -170,7 +158,7 @@ const switcherActive = useStore((s) => s.switcherActive)
 
   /**
    * Route an OS file drop by its coordinates: task row -> link files,
-   * suggestion card -> accept + bind, anywhere else -> save into the shelf.
+   * suggestion card -> accept + bind, anywhere else -> station entry.
    */
   const handleOsFileDrop = (e: Event): void => {
     const detail = (e as CustomEvent<{ paths: string[]; x: number; y: number }>).detail
@@ -205,7 +193,7 @@ const switcherActive = useStore((s) => s.switcherActive)
       return
     }
 
-    void useStore.getState().stationEnter(detail.paths)
+    void dropOnSaveZone(null, detail.paths)
   }
 
   const onDragEnter = (e: React.DragEvent) => {
@@ -228,23 +216,9 @@ const switcherActive = useStore((s) => s.switcherActive)
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    console.log('[Panel] onDrop internalDragReq=', internalDragReq)
     if (internalDragReq) {
-      e.preventDefault()
-      // If it reaches here, it means it was dropped on the general panel background
-      // (not on another item, which would have called stopPropagation).
-      // Check if it's a subitem that should be split out:
-      if (internalDragReq.imageId || (internalDragReq.paths && internalDragReq.paths.length > 0)) {
-        if (isStationId(internalDragReq.id)) {
-          console.log('[Panel] calling stationSplit')
-          window.edge.stationSplit(internalDragReq)
-        } else {
-          console.log('[Panel] calling splitItem')
-          window.edge.splitItem(internalDragReq)
-        }
-      } else {
-        console.log('[Panel] internalDragReq has no subitem, not splitting')
-      }
+      // Dropped on the general panel background: no-op. Batch-member split
+      // lives on the card button only (T5).
       setInternalDragReq(null)
     } else if (hasFiles(e)) {
       e.preventDefault()
@@ -392,69 +366,10 @@ const switcherActive = useStore((s) => s.switcherActive)
             )}
           </AnimatePresence>
           <TaskDropPanel />
-          <SplitDropZone />
             </>
           )}
         </div>
       </motion.div>
     </div>
-  )
-}
-
-/*
-function getTutorialText(step: number): string {
-  switch (step) {
-    case 1:
-      return 'Click the trash icon on the pinned card below to delete it.'
-    case 2:
-      return 'Copy any text or image (Ctrl + C) from another application to capture it.'
-    case 3:
-      return 'Drag the image card below and drop it onto your desktop.'
-    case 4:
-      return 'Click the files card below to expand the stack and view its contents.'
-    case 5:
-      return 'Click the Clear button at the bottom of the panel to finish.'
-    default:
-      return ''
-  }
-}
-*/
-
-function SplitDropZone() {
-  const internalDragReq = useStore((s) => s.internalDragReq)
-  const isSubitemDragging = !!(
-    internalDragReq &&
-    (internalDragReq.imageId || (internalDragReq.paths && internalDragReq.paths.length > 0))
-  )
-
-  const [isOver, setIsOver] = useState(false)
-
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsOver(true)
-  }
-
-  const handleDragLeave = () => {
-    setIsOver(false)
-  }
-
-  return (
-    <AnimatePresence>
-      {isSubitemDragging && (
-        <motion.div
-          className={`split-dropzone${isOver ? ' active' : ''}`}
-          onDragOver={(e) => e.preventDefault()}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          initial={{ opacity: 0, x: -15 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -15 }}
-          transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-          style={{ y: '-50%' }}
-        >
-          <div className="glow-line" />
-        </motion.div>
-      )}
-    </AnimatePresence>
   )
 }

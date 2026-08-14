@@ -13,6 +13,7 @@
  * space so hover/click map straight back to the snapshot.
  */
 import { getMainWindow, setInteractive, isInteractive } from './window'
+import koffi from 'koffi'
 import { runtime } from './config'
 import { snapshotWindows, type SwitcherWindow } from './windowSnapshot'
 import { activateHwnd } from './windowSwitch'
@@ -124,6 +125,7 @@ function broadcast(channel: 'switcher:show' | 'switcher:select' | 'switcher:pin'
 /** First Tab press after Alt (keyboardHook onShow). Runs synchronously inside the hook callback. */
 export function switcherShow(opts: { shiftDown: boolean }): void {
   if (active) return
+  ensureBlurWatch()
   try {
     const entries = snapshotWindows()
     console.log('[Switcher] show: entries=' + entries.length, 'shift=' + opts.shiftDown)
@@ -161,6 +163,28 @@ export function switcherShow(opts: { shiftDown: boolean }): void {
     console.error('[Switcher] show failed:', err)
     resetSession()
   }
+}
+
+/**
+ * Clicking any other window while the switcher owns the foreground (pinned
+ * search mode) means the user gave up on the switcher — drop the session
+ * like Esc. Bound once; the panel only has the foreground during a session
+ * (NOACTIVATE otherwise), so blur only fires on real abandonment. execute
+ * clears `active` first, so the deferred activation of the target window
+ * can't trip it.
+ */
+let blurWatchBound = false
+function ensureBlurWatch(): void {
+  if (blurWatchBound) return
+  blurWatchBound = true
+  const win = getMainWindow()
+  if (!win) return
+  win.on('blur', () => {
+    if (!active) return
+    console.log('[Switcher] panel blurred — cancel session')
+    setHookPinned(false)
+    resetSession()
+  })
 }
 
 /** Force-end a session (timeout / error path) — never leave the panel pinned. */
@@ -211,15 +235,37 @@ export function switcherPin(): void {
   // The panel has been a non-activated NOACTIVATE window all session; the OS
   // only routes keystrokes to the foreground window and Chromium drops
   // element.focus() in an inactive document, so the search input would never
-  // receive input. Activate now (idempotent, focus.ts) — the renderer's
-  // autoFocus then lands and typing reaches the field.
+  // receive input. requestPanelFocus strips NOACTIVATE and calls win.focus(),
+  // but that plain SetForegroundWindow can't bypass the foreground lock here
+  // (no click granted this process input rights — keys went to the hook
+  // host). activateHwnd is the same AttachThreadInput + SwitchToThisWindow
+  // path the switcher's own execute uses, so it forces the panel active and
+  // the renderer's focus retry then lands.
   requestPanelFocus()
+  const win = getMainWindow()
+  if (win && !win.isDestroyed()) {
+    try {
+      activateHwnd(koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void')))
+    } catch {
+      // fail silent — requestPanelFocus already tried the plain path
+    }
+  }
   touchSession()
 }
 
 /** Any keydown while pinned: keep the safety timeout alive during typing. */
 export function switcherTouch(): void {
   touchSession()
+  // Keydown reached the hook, so the user is typing — if the keystroke
+  // isn't landing in the panel (activation failed at pin time), pull the
+  // foreground back so the very next key reaches the search field.
+  const win = getMainWindow()
+  if (!win || win.isDestroyed() || win.isFocused()) return
+  try {
+    activateHwnd(koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void')))
+  } catch {
+    // fail silent — best effort
+  }
 }
 
 /** Esc in search mode (renderer): drop the session — TabTab's cancel. */

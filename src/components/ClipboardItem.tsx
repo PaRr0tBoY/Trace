@@ -59,20 +59,25 @@ function ClipboardItemBase({ item, instant, animateLayout, enterDelay = 0 }: Pro
   const startDrag = useDragOut()
   const [copied, setCopied] = useState(false)
   const [expanded, setExpanded] = useState(false)
-  // 'extended' motion level: freshly captured items flash the accent once on
-  // mount (≤4s old — the moment the copy lands in the shelf).
+  // 'extended' motion level: items captured within the last 4s flash the
+  // accent once when the panel opens. It fires on `open` (not on mount) —
+  // copies happen while the panel is closed, and a mount-time flash would
+  // play out invisibly in the background.
   const motionLevel = useStore((s) => s.settings.motionLevel)
-  const [flashVisible, setFlashVisible] = useState(
-    () => motionLevel === 'extended' && item.capturedAt > Date.now() - 4000
-  )
+  const open = useStore((s) => s.open)
+  const [flashVisible, setFlashVisible] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    if (motionLevel === 'extended' && item.capturedAt > Date.now() - 4000) {
+      setFlashVisible(true)
+    }
+  }, [open, motionLevel, item.capturedAt])
 
   
-  const open = useStore((s) => s.open)
+  const isPreviewing = useStore((s) => s.previewItemId) === item.id
   useEffect(() => {
     if (!open) setExpanded(false)
   }, [open])
-
-  const isPreviewing = useStore((s) => s.previewItemId) === item.id
   const isBundle = (item.data.kind === 'files' && item.data.paths.length > 1) || item.data.kind === 'image-collection'
 
   const onCopy = useCallback((e: React.MouseEvent) => {
@@ -139,15 +144,16 @@ function ClipboardItemBase({ item, instant, animateLayout, enterDelay = 0 }: Pro
       {flashVisible && (
         <motion.div
           key="new-copy-highlight"
-          initial={{ opacity: 0.26 }}
+          initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
-          transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
           onAnimationComplete={() => setFlashVisible(false)}
           style={{
             position: 'absolute',
             inset: 0,
             borderRadius: 16,
-            background: 'rgba(var(--accent-rgb), 0.28)',
+            background: 'linear-gradient(90deg, rgba(var(--accent-rgb), 0.5), rgba(var(--accent-rgb), 0.14) 32%, transparent 62%)',
+            boxShadow: 'inset 3px 0 0 var(--accent)',
             pointerEvents: 'none',
             zIndex: 14
           }}
@@ -156,14 +162,14 @@ function ClipboardItemBase({ item, instant, animateLayout, enterDelay = 0 }: Pro
       {copied && motionLevel === 'extended' && (
         <motion.div
           key="copy-ripple"
-          initial={{ opacity: 0.75, scale: 0.2 }}
+          initial={{ opacity: 0.9, scale: 0.2 }}
           animate={{ opacity: 0, scale: 1.6 }}
           transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
           style={{
             position: 'absolute',
             inset: 0,
             borderRadius: 16,
-            background: 'radial-gradient(circle at center, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 45%, transparent 75%)',
+            background: 'radial-gradient(circle at center, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0.1) 45%, transparent 75%)',
             pointerEvents: 'none',
             zIndex: 15
           }}

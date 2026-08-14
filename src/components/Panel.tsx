@@ -47,6 +47,10 @@ const switcherActive = useStore((s) => s.switcherActive)
   // exceed-and-settle timed to the clip reveal's end; 'standard' stays flat.
   const openBounce = useOpenBounce()
   const extended = settings.motionLevel === 'extended'
+  // View/settings transitions: 'extended' slides with direction (x ±10);
+  // 'standard' cross-fades — the slide is directional delight, not navigation.
+  const viewSlide = extended ? 10 : 0
+  const viewSlideOut = extended ? -10 : 0
 
   // NOTE: closing the panel intentionally keeps the settings sheet, its sub
   // view, and the search query — the restore mechanism (ADR-0004) decides
@@ -326,9 +330,9 @@ const switcherActive = useStore((s) => s.switcherActive)
             {settingsOpen ? (
               <motion.div
                 key="settings"
-                initial={{ opacity: 0, x: 10 }}
+                initial={{ opacity: 0, x: viewSlide }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
+                exit={{ opacity: 0, x: viewSlideOut }}
                 transition={{ duration: 0.15 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
@@ -339,9 +343,9 @@ const switcherActive = useStore((s) => s.switcherActive)
             ) : view === 'tasks' ? (
               <motion.div
                 key="tasks"
-                initial={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, x: viewSlide }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
+                exit={{ opacity: 0, x: viewSlideOut }}
                 transition={{ duration: 0.15 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
@@ -352,9 +356,9 @@ const switcherActive = useStore((s) => s.switcherActive)
             ) : view === 'files' ? (
               <motion.div
                 key="files"
-                initial={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, x: viewSlide }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
+                exit={{ opacity: 0, x: viewSlideOut }}
                 transition={{ duration: 0.15 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
@@ -365,9 +369,9 @@ const switcherActive = useStore((s) => s.switcherActive)
             ) : (
               <motion.div
                 key="list"
-                initial={{ opacity: 0, x: -10 }}
+                initial={{ opacity: 0, x: viewSlide }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
+                exit={{ opacity: 0, x: viewSlideOut }}
                 transition={{ duration: 0.15 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >

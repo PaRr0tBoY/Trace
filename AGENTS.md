@@ -19,6 +19,7 @@
 | `npm run preview`        | 预览构建产物                                                               |
 
 - 没有 lint 脚本。验收 = `npm run typecheck` + `npm test`；UI 改动按 `docs/ui-verification.md` 走无头渲染器预览，`npm run dev` 只作最终抽查。
+- `npm run dev` 会自动把本机 Chrome/Edge 里的 React DevTools 加载进 dev session（`electron/main/devtools.ts`，零依赖、仅非打包模式、失败静默降级）。**调试 renderer 优先用 F12 → React 面板**（组件树 props 直读、Hooks/Zustand 检查、Profiler 找无谓重渲染），别全靠 console.log。启动日志出现 `[DevTools] React DevTools loaded from ...` 即已加载；面板不出现 → 先确认 Chrome 装了 React DevTools 扩展。
 - npm ≥ 11 默认拦截 postinstall 脚本：装完依赖先 `npm approve-scripts electron esbuild koffi`，否则 esbuild/electron 二进制缺失。
 - 打包 `EBUSY` → `taskkill /F /IM electron.exe /T` 后重试。
 - `npm run package` = `build:github`：无 `GH_TOKEN` 时 dist/ 产物照常生成、upload 阶段报错退出；本地验收看 dist/ 即可。

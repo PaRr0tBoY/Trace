@@ -23,6 +23,7 @@ import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ExpandIcon,
 import { playButtonClickSound } from '../../lib/soundEffects'
 import { edge } from '../../lib/edge'
 import { MarkdownPreview } from './markdown'
+import { flipTaskLine } from './editorInput'
 import { MarkdownEditor, applyCommandToView } from './markdownEditor'
 import type { MdCommand } from './markdownEditor'
 import type { EditorView } from '@codemirror/view'
@@ -126,10 +127,9 @@ function NoteEditor({
       if (!current) return
       const lines = current.content.split('\n')
       if (line < 0 || line >= lines.length) return
-      const m = /^(\s*[-*•]\s+)\[([ xX])\](.*)$/.exec(lines[line])
-      if (!m) return
-      const [, prefix, mark, rest] = m
-      lines[line] = `${prefix}[${mark.toLowerCase() === 'x' ? ' ' : 'x'}${rest}`
+      const flipped = flipTaskLine(lines[line])
+      if (flipped === null) return
+      lines[line] = flipped
       void updateNote(note.id, { content: lines.join('\n') })
     },
     [note.id, updateNote]

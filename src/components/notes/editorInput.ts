@@ -15,6 +15,17 @@ function splice(value: string, start: number, end: number, next: string): string
   return value.slice(0, start) + next + value.slice(end)
 }
 
+/** Flip a task-line marker (`- [x] …` ↔ `- [ ] …`). Returns the flipped line,
+ * or null when the line is not a task. Shared by the live editor's checkbox
+ * widget and the preview-mode toggle, so both always produce the same well-
+ * formed `[ ]` / `[x]` bracket pair. */
+export function flipTaskLine(line: string): string | null {
+  const m = /^(\s*[-*•]\s+)\[([ xX])\](.*)$/.exec(line)
+  if (!m) return null
+  const [, prefix, mark, rest] = m
+  return `${prefix}[${mark.toLowerCase() === 'x' ? ' ' : 'x'}]${rest}`
+}
+
 export function continueOnEnter(value: string, caret: number): { next: string; caret: number } | null {
   const lineStart = value.lastIndexOf('\n', caret - 1) + 1
   const nlAt = value.indexOf('\n', caret)

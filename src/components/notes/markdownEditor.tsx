@@ -30,7 +30,7 @@ import type { DecorationSet, ViewUpdate } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import { continueOnEnter } from './editorInput'
+import { continueOnEnter, flipTaskLine } from './editorInput'
 
 export type MdCommand = 'bold' | 'italic' | 'strike' | 'code' | 'link' | 'quote' | 'ul' | 'ol' | 'todo'
 
@@ -95,14 +95,12 @@ class TaskCheckboxWidget extends WidgetType {
 /** Flip the `- [x]` / `- [ ]` marker on the line containing `pos`. */
 function toggleTaskAt(view: EditorView, pos: number): void {
   const line = view.state.doc.lineAt(pos)
-  const m = /^(\s*[-*•]\s+)\[([ xX])\](.*)$/.exec(line.text)
-  if (!m) return
-  const [, prefix, markText, rest] = m
-  const insert = `${prefix}[${markText.toLowerCase() === 'x' ? ' ' : 'x'}${rest}`
-  view.dispatch({ changes: { from: line.from, to: line.to, insert } })
+  const flipped = flipTaskLine(line.text)
+  if (flipped === null) return
+  view.dispatch({ changes: { from: line.from, to: line.to, insert: flipped } })
 }
 
-function buildDecorations(view: EditorView): DecorationSet {
+export function buildDecorations(view: EditorView): DecorationSet {
   const decos: Range<Decoration>[] = []
   const tree = syntaxTree(view.state)
   const { from: selFrom, to: selTo } = view.state.selection.main
@@ -165,7 +163,11 @@ function buildDecorations(view: EditorView): DecorationSet {
     }
   })
 
-  return Decoration.set(decos)
+  // sort=true: tree.iterate emits parent-first depth-first order, which is
+  // not sorted by `from` (a multi-line FencedCode/Blockquote pushes several
+  // line decorations before inner nodes on earlier lines). RangeSet.of
+  // without sorting throws "Ranges must be added sorted".
+  return Decoration.set(decos, true)
 }
 
 const markdownDeco = ViewPlugin.fromClass(

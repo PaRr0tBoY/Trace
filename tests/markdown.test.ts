@@ -24,8 +24,8 @@ describe('MarkdownPreview inline scope', () => {
     expect(html('run `npm test` now')).toContain('<code>npm test</code>')
   })
 
-  it('renders links without href', () => {
-    expect(html('[label](https://a.b)')).toContain('<a class="md-link">label</a>')
+  it('renders links with an href', () => {
+    expect(html('[label](https://a.b)')).toContain('<a class="md-link" href="https://a.b"')
   })
 
   it('renders wiki links as links', () => {
@@ -33,11 +33,32 @@ describe('MarkdownPreview inline scope', () => {
   })
 
   it('links bare URLs, leaving trailing punctuation as text', () => {
-    expect(html('see https://a.b/c, ok')).toContain('<a class="md-link">https://a.b/c</a>, ok')
+    expect(html('see https://a.b/c, ok')).toContain('<a class="md-link" href="https://a.b/c" title="https://a.b/c">https://a.b/c</a>, ok')
   })
 
   it('renders strike-through as a deletion line', () => {
     expect(html('~~gone~~')).toBe('<p class="md-para"><s>gone</s></p>')
+  })
+  it('keeps consecutive paragraph lines on separate lines (<br/>)', () => {
+    expect(html('line1\nline2')).toBe('<p class="md-para">line1<br/>line2</p>')
+  })
+
+  it('keeps a strike, a link and inline code on three lines separate', () => {
+    const md = '~~gone~~\n[label](https://a.b)\n`code`'
+    const out = html(md)
+    expect(out).toContain('<s>gone</s>')
+    expect(out).toContain('href="https://a.b"')
+    expect(out).toContain('<code>code</code>')
+    expect(out.match(/<br\/>/g)?.length).toBe(2)
+  })
+
+  it('renders multi-line backtick code as one code block', () => {
+    expect(html('`line1\nline2`')).toBe('<p class="md-para"><code>line1\nline2</code></p>')
+  })
+
+  it('gives links an href and leaves wiki links inert', () => {
+    expect(html('[label](https://a.b)')).toContain('href="https://a.b"')
+    expect(html('[[wiki]]')).not.toContain('href=')
   })
 })
 

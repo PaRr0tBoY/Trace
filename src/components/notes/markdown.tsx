@@ -13,7 +13,7 @@
  * never injected as HTML. Links render without href so a click inside a
  * preview opens the editor instead of navigating the panel.
  */
-import { useMemo } from 'react'
+import { Fragment, useMemo } from 'react'
 import type { JSX, ReactNode } from 'react'
 
 type InlinePart =
@@ -23,8 +23,10 @@ type InlinePart =
 
 // Longest markers first (`***` before `**` before `*`); `~~strike~~` renders
 // as a deletion line (product request — NotchNotes keeps it plain text).
+// Inline code allows newlines so a backtick-wrapped multi-line snippet stays
+// a code block instead of collapsing into one line.
 const INLINE_RE =
-  /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*|~~[^~\n]+~~|`[^`\n]+`|\[[^\]\n]+\]\([^)\s]+\)|\[\[[^\]\n]+\]\]|https?:\/\/[^\s<]+?(?=[\s<),;:!?。，；：！？]|$))/g
+  /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*|~~[^~\n]+~~|`[^`]+`|\[[^\]\n]+\]\([^)\s]+\)|\[\[[^\]\n]+\]\]|https?:\/\/[^\s<]+?(?=[\s<),;:!?。，；：！？]|$))/g
 
 function parseInline(text: string): InlinePart[] {
   const parts: InlinePart[] = []
@@ -70,15 +72,43 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       case 'code':
         return <code key={key}>{part.text}</code>
       case 'link':
-      case 'wiki':
       case 'auto':
         return (
-          <a key={key} className="md-link">
+          <a
+            key={key}
+            className="md-link"
+            href={part.kind === 'link' ? part.href : part.text}
+            title={part.kind === 'link' ? part.href : part.text}
+            // The main process routes window.open to the system browser
+            // (window.ts setWindowOpenHandler → shell.openExternal).
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              window.open(part.kind === 'link' ? part.href : part.text, '_blank')
+            }}
+          >
             {part.text}
           </a>
         )
-      default:
-        return part.text
+      case 'wiki':
+        // Wiki links have no target in Trace (no note graph) — visible, inert.
+        return <a key={key} className="md-link">
+          {part.text}
+        </a>
+      default: {
+        // Raw text may contain newlines from multi-line paragraphs — render
+        // them as <br/> so consecutive lines never merge into one.
+        const segs = part.text.split('\n')
+        if (segs.length === 1) return part.text
+        return segs.map((seg, j) =>
+          j === 0 ? seg : (
+            <Fragment key={j}>
+              <br />
+              {seg}
+            </Fragment>
+          )
+        )
+      }
     }
   })
 }
@@ -228,7 +258,10 @@ function renderBlocks(text: string, onToggleTodo?: (line: number) => void): Reac
       continue
     }
 
-    // Paragraph — accumulate plain lines until a blank or a new block.
+    // Paragraph — accumulate plain lines until a blank or a new block. Lines
+    // are joined with real newlines (not spaces) and rendered with <br/>, so
+    // consecutive elements never get squashed onto one line — a strike, a
+    // link and a code snippet on three lines stay on three lines.
     const buf = [line]
     i++
     while (i < lines.length && lines[i].trim() !== '' && !BLOCK_START.test(lines[i])) {
@@ -237,7 +270,7 @@ function renderBlocks(text: string, onToggleTodo?: (line: number) => void): Reac
     }
     blocks.push(
       <p key={blockIndex++} className="md-para">
-        {renderInline(buf.join(' '), `p${blockIndex}`)}
+        {renderInline(buf.join('\n'), `p${blockIndex}`)}
       </p>
     )
   }

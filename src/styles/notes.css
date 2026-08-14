@@ -285,10 +285,16 @@
 }
 
 .notes-preview .md-link {
-  color: var(--edge-strong);
+  color: #7dd3fc;
   text-decoration: underline;
-  text-decoration-color: rgba(255, 255, 255, 0.25);
+  text-decoration-color: rgba(125, 211, 252, 0.45);
   text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.notes-preview .md-link:hover {
+  color: #a5e3fd;
+  text-decoration-color: #7dd3fc;
 }
 
 .notes-preview .md-hr {
@@ -451,9 +457,11 @@
 }
 
 .notes-card-preview .md-link {
-  color: var(--accent);
+  color: #7dd3fc;
   text-decoration: underline;
-  text-decoration-color: rgba(156, 163, 175, 0.45);
+  text-decoration-color: rgba(125, 211, 252, 0.45);
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 .notes-card-preview .md-hr {

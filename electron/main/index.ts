@@ -29,6 +29,7 @@ import { extname, normalize } from 'node:path'
 import { existsSync, createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { resolveStoredImage, resolveThumbnail } from './imageProtocol'
+import { loadReactDevTools } from './devtools'
 
 // Trace renders a small, mostly static transparent panel. Chromium's GPU
 // process costs substantially more memory (~150–250 MB) than the iGPU compositing
@@ -85,7 +86,7 @@ app.on('before-quit', () => {
   } catch { /* ignore */ }
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Set App User Model ID so native notifications are branded as "Trace" on Windows
   app.setAppUserModelId('com.edgedrop.app')
 
@@ -99,6 +100,9 @@ app.whenReady().then(() => {
 
   // Register the image protocol: tracelocal://<imageId> -> the staged image file.
   registerImageProtocol()
+
+  // Dev-only: make the React tab available in the F12 DevTools (no-op when packaged).
+  await loadReactDevTools(ses)
 
   createWindow()
   startCursorPoll()

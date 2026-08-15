@@ -1,0 +1,37 @@
+{
+  "name": "@parrotboy/trace",
+  "version": "1.0.0",
+  "description": "One-command installer for Trace — a Windows clipboard manager. Downloads the latest release from GitHub and installs it silently (SHA-512 verified).",
+  "license": "MIT",
+  "author": "PaRr0tBoY",
+  "type": "commonjs",
+  "main": "install.js",
+  "bin": {
+    "trace-install": "install.js"
+  },
+  "files": [
+    "install.js",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "trace",
+    "clipboard",
+    "clipboard-manager",
+    "windows",
+    "installer"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PaRr0tBoY/Trace.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PaRr0tBoY/Trace/issues"
+  },
+  "homepage": "https://github.com/PaRr0tBoY/Trace#readme"
+}

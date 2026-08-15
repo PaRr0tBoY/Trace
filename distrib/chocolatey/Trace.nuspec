@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>trace</id>
+    <version>2026.8.15</version>
+    <title>Trace</title>
+    <authors>PaRr0tBoY</authors>
+    <owners>PaRr0tBoY</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectUrl>https://github.com/PaRr0tBoY/Trace</projectUrl>
+    <packageSourceUrl>https://github.com/PaRr0tBoY/Trace/tree/main/distrib/chocolatey</packageSourceUrl>
+    <licenseUrl>https://github.com/PaRr0tBoY/Trace/blob/main/LICENSE</licenseUrl>
+    <description>Trace — a clipboard manager that lives on the left edge of your screen and expands on hover.
+
+Features:
+* Zero-click panel: hover the left screen edge to expand
+* Native OLE drag &amp; drop to any desktop application
+* Task layer and AI suggestion pipeline
+* Windows 10/11 (x64) only
+
+Installed via the official NSIS installer (silent, per-user). The application updates itself from GitHub Releases via electron-updater.
+</description>
+    <summary>Zero-click clipboard manager for Windows</summary>
+    <tags>clipboard clipboard-manager windows electron productivity</tags>
+    <releaseNotes>https://github.com/PaRr0tBoY/Trace/releases</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

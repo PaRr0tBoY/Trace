@@ -1,0 +1,102 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build:
+    name: Build & publish GitHub release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # npm >= 11 blocks dependency postinstall scripts unless approved.
+      # package.json `allowScripts` covers the pinned versions; this config is a
+      # belt-and-suspenders fallback for any resolved version drift.
+      - name: Allow required postinstall scripts
+        run: npm config set allow-scripts "electron,esbuild,koffi,better-sqlite3,node-llama-cpp"
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify
+        run: |
+          npm run typecheck
+          npm test
+      - name: Build & upload release assets
+        run: npm run build:github
+      - name: Attach sha256 checksum asset
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem 'dist\Trace-Setup-*.exe' | Select-Object -First 1
+          $hash = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path "$($exe.Name).sha256" -Value $hash -NoNewline
+          gh release upload "$env:GITHUB_REF_NAME" "$($exe.Name).sha256" --clobber
+
+  scoop:
+    name: Update scoop bucket manifests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Update manifests
+        run: node scripts/update-scoop-manifest.mjs
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bucket/trace.json distrib/scoop/trace.json
+          if git diff --cached --quiet; then
+            echo "no manifest changes"
+          else
+            git commit -m "chore(scoop): update trace to $GITHUB_REF_NAME"
+            git push
+          fi
+
+  choco:
+    name: Publish chocolatey package
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Update package metadata
+        run: node scripts/update-choco-package.mjs
+      - name: Pack
+        shell: pwsh
+        run: choco pack distrib\chocolatey\Trace.nuspec --output-directory distrib\chocolatey
+      - name: Push to chocolatey.org
+        shell: pwsh
+        env:
+          CHOCO_API_KEY: ${{ secrets.CHOCO_API_KEY }}
+        run: |
+          $ver = "$env:GITHUB_REF_NAME" -replace '^v', ''
+          choco push "distrib\chocolatey\trace.$ver.nupkg" --source https://community.chocolatey.org/api/v2/ --key $env:CHOCO_API_KEY
+
+  winget:
+    name: Update winget manifest
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: WinGet Releaser
+        uses: vedantmgoyal9/winget-releaser@main
+        with:
+          identifier: PaRr0tBoY.Trace
+          installers-regex: '^Trace-Setup-.*\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}
+          fork-user: PaRr0tBoY

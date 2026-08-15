@@ -9,7 +9,7 @@
  *   - `Renderer -> Main` calls (invoke/handle) are listed in `InvokeMap`.
  *   - `Main -> Renderer` events (send/on) are listed in `EventMap`.
  */
-import type { AppRef, ClipboardItemDto, DragRequest, IgnoreReason, LocalModelSource, LocalModelStatus, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, ProviderConfig, Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget } from './types'
+import type { AppRef, ClipboardItemDto, DragRequest, IgnoreReason, LocalModelSource, LocalModelStatus, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, ProviderConfig, Settings, TaskProposal, TaskDto, TaskPatch, UnlinkTarget, Note, NoteDto, NotePatch } from './types'
 import type { StationContentInput, StationEntryDto } from './station'
 
 /** Result of a connection test against one provider (ai:test-provider). */
@@ -64,8 +64,8 @@ export interface SuggestionAcceptOptions {
 /* ------------------------------------------------------------------ */
 
 export interface InvokeMap {
-  /** Returns the full current item list + station entries + settings + tasks on startup. */
-  'state:load': { args: []; result: { items: ClipboardItemDto[]; station: StationEntryDto[]; settings: Settings; version: string; tasks: TaskDto[]; isStoreBuild: boolean } }
+  /** Returns the full current item list + station entries + settings + tasks + notes on startup. */
+  'state:load': { args: []; result: { items: ClipboardItemDto[]; station: StationEntryDto[]; settings: Settings; version: string; tasks: TaskDto[]; notes: NoteDto[]; isStoreBuild: boolean } }
 
   /** Set an item's pinned state. */
   'item:set-pinned': { args: [id: string, pinned: boolean]; result: ClipboardItemDto[] }
@@ -216,6 +216,20 @@ export interface InvokeMap {
   /** Switch to the app's linked window (ADR-0005): pid hit → activate; app alive → its newest window; else launch exe. */
   'app:open-linked-window': { args: [app: import('./types').AppRef]; result: { ok: boolean; method: 'window' | 'launch' } }
 
+  /* --------------------------- notes domain --------------------------- */
+
+  /** Load the full note list (also included in state:load). */
+  'note:load': { args: []; result: NoteDto[] }
+
+  /** Create a note, optionally seeded with Markdown text. Returns the full list + the new id. */
+  'note:create': { args: [content?: string]; result: { notes: NoteDto[]; createdId: string } }
+
+  /** Edit a note (title/content/flags). Returns the full note list. */
+  'note:update': { args: [id: string, patch: NotePatch]; result: NoteDto[] }
+
+  /** Hard-delete a note. Returns the full note list. */
+  'note:delete': { args: [id: string]; result: NoteDto[] }
+
   /* --------------------------- ai provider --------------------------- */
 
   /** Test a provider connection (one 1-token chat completion). */
@@ -344,6 +358,8 @@ export interface EventMap {
   'state:tasks': [tasks: TaskDto[]]
   /** Pending suggestion cards (transient, replaced on each analysis). */
   'state:suggestions': [suggestions: TaskProposal[]]
+  /** Full note list whenever the notes domain changes. */
+  'state:notes': [notes: Note[]]
   /** Settings changed (e.g. from the tray menu). */
   'state:settings': [settings: Settings]
   /** Local model manager status changed (state / download progress / error). */

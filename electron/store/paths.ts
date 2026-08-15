@@ -32,6 +32,8 @@ export const PATHS = {
    *  (unlike tempDir) — in-transit entries own these files until the move
    *  completes or the entry is deleted. */
   stationStageDir: () => join(root(), 'station-stage'),
+  /** Path to the notes index JSON. */
+  notesFile: () => join(root(), 'notes.json'),
   /** Path to the long-term memory index JSON. */
   memoriesFile: () => join(root(), 'memories.json'),
   /**

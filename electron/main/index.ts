@@ -8,11 +8,11 @@
  *   3. On 'window-all-closed' we DON'T quit (the panel is hidden, not closed).
  *   4. Quit from the tray menu tears everything down cleanly.
  */
-import { app, BrowserWindow, protocol, session } from 'electron'
+import { app, BrowserWindow, protocol, session, screen } from 'electron'
 import { APP_CONFIG, runtime } from './config'
 import { ensureDirs, cleanTemp, PATHS } from '../store/paths'
 import { configureAiLog } from './aiLog'
-import { createWindow, getMainWindow, setInteractive, setVisible, startCursorPoll, stopCursorPoll, stopHeartbeat, setHotZoneWidth } from './window'
+import { createWindow, getMainWindow, isInteractive, setInteractive, setVisible, startCursorPoll, stopCursorPoll, stopHeartbeat, setHotZoneWidth } from './window'
 import { createTray, registerIncognitoApplier } from './tray'
 import { registerIpc, registerSendListeners, getProviderChain, syncLoginItemSettings } from './ipc'
 import { initAutoUpdater } from './updater'
@@ -24,6 +24,7 @@ import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
 import { startKeyboardHook, stopKeyboardHook } from './hookManager'
 import { startDragDetect, stopDragDetect } from './dragManager'
+import { releasePanelFocusNow } from './focus'
 import { switcherShow, switcherAdvance, switcherExecute, switcherTapExecute, switcherPin, switcherPinReleased, switcherTouch, switcherControlKey, switcherMouseDown } from './switcher'
 import { ForegroundWatcher } from './foreground'
 import { ocrFromForeground } from './ocr'
@@ -125,6 +126,7 @@ app.whenReady().then(async () => {
   createTray()
 
   // Alt+Tab takeover (ADR-0005): the hook state machine feeds the switcher.
+  // onMouseDown feeds click-outside collapse (see panelMouseDown).
   startKeyboardHook({
     onShow: switcherShow,
     onAdvance: switcherAdvance,
@@ -134,7 +136,12 @@ app.whenReady().then(async () => {
     onTouch: switcherTouch,
     onPinReleased: switcherPinReleased,
     onControlKey: switcherControlKey,
-    onMouseDown: switcherMouseDown
+    // Click-outside: the switcher owns the event during a session (pinned
+    // search mode); otherwise the panel collapses on outside clicks.
+    onMouseDown: (pt) => {
+      switcherMouseDown(pt)
+      panelMouseDown(pt)
+    }
   })
 
   // OS drag detection (T4b, ADR-0007): SetWinEventHook 0x0F/0x10 in a
@@ -331,6 +338,31 @@ function registerImageProtocol(): void {
   })
 }
 
-// Silence unused import in environments where setVisible isn't referenced
-// after the refactor (kept for second-instance wiring above).
-void setInteractive
+/**
+ * Left-button down while the panel is interactive (mouse hook). The panel
+ * is WS_EX_NOACTIVATE and often never reaches the OS foreground, so focus
+ * events can't detect click-outside (blur never fires for a window that
+ * never had focus) — the hook reports the physical screen point and we
+ * collapse when it lands outside the panel's bounds. Clicks inside the
+ * panel pass through untouched (the hook never swallows).
+ */
+function panelMouseDown(pt: { x: number; y: number }): void {
+  if (runtime.switcherActive) return // the switcher owns click-outside
+  const win = getMainWindow()
+  if (!win || win.isDestroyed() || !win.isVisible() || !isInteractive()) return
+  try {
+    // Physical screen point vs the panel's screen rect (DIP → physical).
+    const b = win.getBounds()
+    const sr = screen.dipToScreenRect(win, b)
+    if (pt.x >= sr.x && pt.x <= sr.x + sr.width && pt.y >= sr.y && pt.y <= sr.y + sr.height) return
+    console.log('[Panel] click outside panel — collapse')
+    setInteractive(false)
+    // Restore WS_EX_NOACTIVATE so the next hover-open starts from a clean
+    // non-activatable state (a window left activatable re-activates oddly
+    // and its next focus request can be refused).
+    releasePanelFocusNow()
+    pushState.togglePanel(false)
+  } catch (err) {
+    console.error('[Panel] click-outside check failed:', err)
+  }
+}

@@ -246,6 +246,12 @@ const api = {
   getTaskAppOptions: () => invoke('task:app-options'),
   getAppIcons: (exePaths: string[]) => invoke('app:icons', exePaths),
 
+  /* Notes domain */
+  loadNotes: () => invoke('note:load'),
+  createNote: (content?: string) => invoke('note:create', content),
+  updateNote: (id: string, patch: import('../../shared/types').NotePatch) => invoke('note:update', id, patch),
+  deleteNote: (id: string) => invoke('note:delete', id),
+
   /* AI provider */
   testProvider: (config: import('../../shared/types').ProviderConfig) => invoke('ai:test-provider', config),
 
@@ -284,6 +290,7 @@ const api = {
   onItems: (cb: (items: EventArgs<'state:items'>[0]) => void) => on('state:items', cb),
   onStation: (cb: (entries: EventArgs<'state:station'>[0]) => void) => on('state:station', cb),
   onTasks: (cb: (tasks: EventArgs<'state:tasks'>[0]) => void) => on('state:tasks', cb),
+  onNotes: (cb: (notes: EventArgs<'state:notes'>[0]) => void) => on('state:notes', cb),
   onSuggestions: (cb: (suggestions: EventArgs<'state:suggestions'>[0]) => void) => on('state:suggestions', cb),
   onSettings: (cb: (settings: EventArgs<'state:settings'>[0]) => void) => on('state:settings', cb),
   onLocalModelStatus: (cb: (status: EventArgs<'local-model:status'>[0]) => void) => on('local-model:status', cb),

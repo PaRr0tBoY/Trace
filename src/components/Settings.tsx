@@ -1402,6 +1402,33 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                     </div>
                   </div>
 
+                  {/* ── GROUP: Notes view ───────────────────────────────── */}
+                  <div className="setting-group-label" style={{ marginTop: 20 }}>{t('appearance.noteViewModeTitle')}</div>
+
+                  <div className="setting-row vertical">
+                    <div className="setting-info">
+                      <div className="setting-title">{t('appearance.noteViewModeTitle')}</div>
+                      <div className="setting-desc">{t('appearance.noteViewModeDesc')}</div>
+                    </div>
+                    <div className="setting-pills">
+                      {[
+                        { label: t('appearance.noteViewList'), val: 'list' as const },
+                        { label: t('appearance.noteViewSingle'), val: 'single' as const }
+                      ].map((opt) => (
+                        <button
+                          key={opt.val}
+                          className={`pill ${(settings.noteViewMode ?? 'single') === opt.val ? 'active' : ''}`}
+                          onClick={() => {
+                            playButtonClickSound()
+                            patch({ noteViewMode: opt.val })
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="setting-divider" />
 
                   {/* ── GROUP: Audio & Feedback ──────────────────────────── */}

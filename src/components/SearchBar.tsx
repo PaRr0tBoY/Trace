@@ -6,8 +6,9 @@
  * it visible so the user can return and keep typing). The panel being
  * collapsed hides it unconditionally.
  *
- * The component only mounts for the clipboard and files views (Panel), so
- * keystrokes in the tasks view or the settings sheet never trigger it.
+ * The component mounts for the clipboard, files, and (list-mode) notes
+ * views; the single-note mode owns the typing gesture and mounts its own
+ * handler instead, so the bar is suppressed there (Panel).
  */
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'

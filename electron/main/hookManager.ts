@@ -57,3 +57,16 @@ export function stopKeyboardHook(): void {
 export function setHookPinned(pinned: boolean): void {
   child?.postMessage({ type: 'pin-state', pinned })
 }
+
+/**
+ * Gate the mouse hook's click reporting on panel interactivity (see
+ * keyboardHook.setMouseTracking). Idempotent; no-op before the host forks.
+ */
+export function setPanelInteractive(interactive: boolean): void {
+  if (!child) return
+  try {
+    child.postMessage({ type: interactive ? 'panel-open' : 'panel-close' })
+  } catch {
+    // fail silent — click-outside detection degrades, panel behavior unchanged
+  }
+}

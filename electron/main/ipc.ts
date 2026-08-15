@@ -12,7 +12,7 @@ import { psHost } from './powershell'
 import { requestPanelFocus, releasePanelFocus, releasePanelFocusNow } from './focus'
 import { type InvokeMap, type InvokeChannel, type SendMap, type SendChannel, type SuggestTitleContext } from '../../shared/ipc'
 import { rehomeTraceAfterMerge } from '../store/traceStore'
-import { getStore, getStationStore, stationClipboardItem, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getTitleSuggester, getMemoryStore, getMemoryGraph, getTraceStore, getLocalModelManager, getLocalModelRuntime, resetLocalModelRuntime, ensureLocalModelLoaded } from './state'
+import { getStore, getStationStore, stationClipboardItem, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getNoteStore, getSuggestionEngine, getTitleSuggester, getMemoryStore, getMemoryGraph, getTraceStore, getLocalModelManager, getLocalModelRuntime, resetLocalModelRuntime, ensureLocalModelLoaded } from './state'
 import type { FactRecord } from '../store/memoryGraph'
 import { isTraceRecordDto, renderTraceReportHtml } from './traceReport'
 import { sendToMainWindow, setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
@@ -223,7 +223,8 @@ export function registerIpc(): void {
       settings: loadSettings(),
       version: app.getVersion(),
       tasks: getTaskStore().toDto(),
-      isStoreBuild: isStoreBuild()
+      isStoreBuild: isStoreBuild(),
+      notes: getNoteStore().toDto()
     }
   })
 
@@ -435,6 +436,28 @@ export function registerIpc(): void {
     // L0-tracked apps (event bus) ∪ clipboard sourceApps (persisted) — same
     // foreground tracker, two views (ADR-0002).
     return mergeAppOptions(recentEvents(), getStore().list())
+  })
+
+  /* --------------------------- notes domain --------------------------- */
+
+  handle('note:load', () => getNoteStore().toDto())
+
+  handle('note:create', (content) => {
+    const createdId = getNoteStore().create(content)
+    pushState.notes()
+    return { notes: getNoteStore().toDto(), createdId }
+  })
+
+  handle('note:update', (id, patch) => {
+    getNoteStore().update(id, patch)
+    pushState.notes()
+    return getNoteStore().toDto()
+  })
+
+  handle('note:delete', (id) => {
+    getNoteStore().delete(id)
+    pushState.notes()
+    return getNoteStore().toDto()
   })
 
   handle('app:icons', (exePaths) => {

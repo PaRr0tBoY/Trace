@@ -29,6 +29,7 @@ import { Settings } from './Settings'
 import { TaskView } from './tasks/TaskView'
 import { SwitcherView } from './SwitcherView'
 import { FileListView } from './FileListView'
+import { NotesView } from './notes/NotesView'
 import { TaskDropPanel } from './tasks/TaskDropPanel'
 import { linkDraggedItem, acceptSuggestionDrop, dropOnSaveZone } from './tasks/dropActions'
 import { ToastStack } from './Toast'
@@ -47,6 +48,9 @@ export function Panel() {
   const isRight = settings.stickPosition === 'right'
   const settingsOpen = useStore((s) => s.settingsOpen)
   const view = useStore((s) => s.view)
+  // Single-note mode owns the typing gesture (it opens the all-notes modal),
+  // so the clipboard search bar must not mount there.
+  const noteViewMode = useStore((s) => s.settings.noteViewMode ?? 'single')
 
   // Clipboard-view footer: count + clear are scoped to the active type
   // filter (user feedback 2026-08-14: clear only the current view, e.g.
@@ -391,7 +395,7 @@ export function Panel() {
               >
           <Header />
 
-          {!settingsOpen && view !== 'tasks' && <SearchBar />}
+          {!settingsOpen && view !== 'tasks' && !(view === 'notes' && noteViewMode === 'single') && <SearchBar />}
 
           <ToastStack />
           <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
@@ -433,6 +437,19 @@ export function Panel() {
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
                 <FileListView onFooterChange={setReportedFooter} />
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to top, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
+              </motion.div>
+            ) : view === 'notes' ? (
+              <motion.div
+                key="notes"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                transition={{ duration: 0.15 }}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
+              >
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
+                <NotesView />
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to top, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
               </motion.div>
             ) : (

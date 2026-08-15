@@ -161,11 +161,11 @@ export interface KeyboardHookEvents {
    */
   onPinReleased: () => void
   /**
-   * Left-button mouse-down while pinned, in physical screen pixels. The
-   * panel often never reaches the OS foreground (activation is
-   * best-effort), so click-outside can't be detected via the window's
-   * focus events — the mouse hook reports the click position and main
-   * decides whether it landed outside the panel.
+   * Left-button mouse-down while the panel is interactive, in physical
+   * screen pixels. The panel often never reaches the OS foreground, so
+   * click-outside can't be detected via the window's focus events — the
+   * mouse hook reports the click position and main decides whether it
+   * landed outside the panel (switcher session or collapsed panel).
    */
   onMouseDown: (pt: { x: number; y: number }) => void
 }
@@ -189,6 +189,15 @@ let tapTimer: ReturnType<typeof setTimeout> | null = null
 // keys and Tab must keep belonging to the panel for the whole session, or
 // they fall through to the foreground window the moment Alt comes up.
 let pinnedSession = false
+
+/**
+ * Click-outside tracking gate. The mouse hook only reports left-button
+ * downs while the panel is interactive (main toggles this via
+ * setMouseTracking) — outside the panel a click means "collapse", inside
+ * it is normal panel interaction. When the panel is closed there is
+ * nothing to collapse, so the hook stays silent (and cheap).
+ */
+let mouseTracking = false
 
 // Persistent trampoline: an auto-registered JS callback only lives for the
 // duration of one FFI call, but SetWindowsHookExW fires the callback later —
@@ -380,16 +389,16 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
 }, koffi.pointer(koffi.proto('intptr_t (int nCode, uintptr_t wParam, intptr_t lParam)')))
 
 /**
- * Mouse hook: reports left-button clicks while a search session is pinned,
- * so main can cancel on click-outside even when the panel never reached the
- * OS foreground (Electron focus events are unreliable for programmatically
- * activated windows — see switcher.ts). Same purity discipline as the
+ * Mouse hook: reports left-button clicks while the panel is interactive,
+ * so main can collapse on click-outside even when the window never reached
+ * the OS foreground (Electron focus events are unreliable for a
+ * WS_EX_NOACTIVATE window — see window.ts). Same purity discipline as the
  * keyboard callback: no FFI/Electron calls inside the dispatch; the screen
  * point is decoded here (plain reads) and the event deferred.
  */
 const mousePtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bigint => {
   if (nCode >= 0 && hookPtr && callNextHookEx) {
-    if (pinnedSession && wParam === WM_LBUTTONDOWN) {
+    if (mouseTracking && wParam === WM_LBUTTONDOWN) {
       try {
         const m = koffi.decode(lParam, MSLLHOOKSTRUCT)
         defer(() => activeEvents?.onMouseDown({ x: m.pt_x, y: m.pt_y }))
@@ -400,6 +409,11 @@ const mousePtr = koffi.register((nCode: number, wParam: number, lParam: bigint):
   }
   return callNextHookEx ? callNextHookEx(hookPtr, nCode, wParam, lParam) : 1n
 }, koffi.pointer(koffi.proto('intptr_t (int nCode, uintptr_t wParam, intptr_t lParam)')))
+
+/** Enable/disable click-outside tracking while the panel is interactive. */
+export function setMouseTracking(enabled: boolean): void {
+  mouseTracking = enabled
+}
 
 function sendSyntheticAltUp(): void {
   if (!sendInput) return
@@ -515,5 +529,6 @@ export function stopKeyboardHook(): void {
   activeEvents = null
   state = 'idle'
   pinnedSession = false
+  mouseTracking = false
   clearTapTimer()
 }

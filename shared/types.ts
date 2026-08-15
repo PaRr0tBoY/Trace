@@ -50,7 +50,7 @@ export type FilesFilter = 'all' | 'clipboard' | 'other' | (string & {})
 export type TasksFilter = 'existing' | 'candidates'
 
 /** Top-level panel views (ADR-0004). */
-export type View = 'clipboard' | 'files' | 'tasks'
+export type View = 'clipboard' | 'files' | 'tasks' | 'notes'
 
 /** Restore-time preset: how long the panel keeps its last page after closing. */
 export type RestoreTime = 'instant' | 'relaxed' | 'delayed' | 'forever'
@@ -111,6 +111,37 @@ export interface FileEntry {
   isImage: boolean
   preview?: string
 }
+
+/* ------------------------------------------------------------------ */
+/* Notes (side-shelf notes feature, inspired by SideNotes/NotchNotes)   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A single note. Content is Markdown source text (heading/lists/tasks are
+ * typed inline); the title is derived from the first meaningful line and
+ * kept in sync main-side so the list stays cheap to render.
+ */
+export interface Note {
+  id: string
+  /** First meaningful line of content ('' for a blank note); recomputed on update. */
+  title: string
+  /** Markdown source text. */
+  content: string
+  /** Unix epoch ms when the note was created. */
+  createdAt: number
+  /** Unix epoch ms of the last content/flag change. */
+  updatedAt: number
+  /** Pinned notes sort above unpinned ones. */
+  pinned: boolean
+  /** Folded notes collapse to their title row in the list. */
+  folded: boolean
+}
+
+/** Editable surface exposed to the renderer. */
+export type NotePatch = Partial<Pick<Note, 'title' | 'content' | 'pinned' | 'folded'>>
+
+/** Payload sent over IPC: notes are small enough to ship verbatim. */
+export type NoteDto = Note
 
 /** Payload sent over IPC: same as ClipboardItem but with inline image previews. */
 export interface ClipboardItemDto extends Omit<ClipboardItem, 'data'> {
@@ -652,6 +683,9 @@ export interface Settings {
   fontSizeScale?: number
   /** Active UI language code ('system' | 'en' | 'es' | 'fr' | 'de' | ...). Default: 'system'. */
   language?: string
+  /** Notes view layout: 'list' = management list (default), 'single' = one
+   * note editor with the list inside a modal. */
+  noteViewMode?: 'list' | 'single'
   /** Master switch for the whole task system (capture + state machine + suggestions). */
   taskCaptureEnabled: boolean
   /** L0 foreground/window event capture. Off = nothing leaves the machine. */
@@ -768,6 +802,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hoverActivation: true,
   fontSizeScale: 1.0,
   language: 'system',
+  noteViewMode: 'single',
   taskCaptureEnabled: true,
   l0CaptureEnabled: true,
   evidenceRetentionDays: 30,

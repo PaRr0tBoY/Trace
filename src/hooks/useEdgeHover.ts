@@ -139,11 +139,22 @@ export function useEdgeHover(): void {
     let graceTimer: number | undefined
     let interactiveTimer: number | undefined
 
+    // True while the notes editor holds input focus. Editing keeps the panel
+    // open: leaving the blade with the cursor (or Alt+Tabbing away) must not
+    // retract the panel out from under an active keystroke.
+    const notesEditorActive = () => {
+      const el = document.activeElement
+      return el instanceof HTMLElement && !!el.closest('.notes-editor')
+    }
+
     const closePanelNow = () => {
       const s = useStore.getState()
       // Switcher session (ADR-0005): the panel is pinned open — the switcher
       // owns the page until Alt is released or an entry is clicked.
       if (s.switcherActive) return
+      // An active note edit holds the panel open — moving the cursor off the
+      // blade must not yank the editor away mid-keystroke.
+      if (notesEditorActive()) return
       if (s.styleFlyoutOpen) s.setStyleFlyoutOpen(false)
       // NOTE: the settings sheet stays open — the restore mechanism
       // (ADR-0004) remembers it within the restore time and resets it when
@@ -166,6 +177,7 @@ export function useEdgeHover(): void {
       // drags dragged out across the edge (user feedback 2026-08-14: never
       // collapse while the drag is still in flight).
       if (state.dragActive) return
+      if (notesEditorActive()) return
 
       // If the indicator style flyout is open, let it play its exit spring fir…
       // The Electron window resize (inside setOpen) would cut the flyout animation
@@ -204,6 +216,7 @@ export function useEdgeHover(): void {
       if (state.sliderActive) return
       // Any live drag keeps the panel up (see closePanel).
       if (state.dragActive) return
+      if (notesEditorActive()) return // editing a note holds the panel open
       if (graceTimer !== undefined) return // already closing
 
       // If position/display/slider was recently changed (< 1.75s ago), wait out remaining preview stay window
@@ -500,6 +513,9 @@ export function useEdgeHover(): void {
       // Don't close during a live drag — the drag surface may temporarily
       // shift focus to the OS drag-ghost or file manager.
       if (state.dragActive) return
+      // Clicking anywhere outside the panel hands the OS focus away; the
+      // panel must close then, even mid-edit — an active editor does NOT
+      // hold it open across a real focus loss (the note is saved live).
       scheduleClose(400)
     }
 

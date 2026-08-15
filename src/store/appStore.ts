@@ -10,7 +10,7 @@ import { create } from 'zustand'
 import { edge } from '../lib/edge'
 import { shouldRestoreToLanding } from '../lib/restore'
 import type { SuggestTitleContext, SuggestionAcceptOptions, DropResource } from '../../shared/ipc'
-import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View, TraceRecordDto, IgnoreReason } from '../../shared/types'
+import type { ClipboardItemDto, Settings, DragRequest, TaskDto, TaskPatch, TaskProposal, MemoryAction, MemoryListPayload, MemoryConflictResolution, MemoryFactPanelPayload, MemoryUserState, AppRef, ClipboardFilter, FilesFilter, TasksFilter, View, TraceRecordDto, IgnoreReason, NoteDto, NotePatch } from '../../shared/types'
 import { DEFAULT_SETTINGS } from '../../shared/types'
 import type { StationEntryDto } from '../../shared/station'
 
@@ -57,6 +57,7 @@ interface AppState {
   /** Delete every stale entry (T6 cleanup banner). */
   stationClearStale: () => Promise<void>
   suggestions: TaskProposal[]
+  notes: NoteDto[]
   settings: Settings
   /** True until the first `state:load` resolves. */
   hydrated: boolean
@@ -143,6 +144,7 @@ interface AppState {
   setItems: (items: ClipboardItemDto[]) => void
   setTasks: (tasks: TaskDto[]) => void
   setSuggestions: (suggestions: TaskProposal[]) => void
+  setNotes: (notes: NoteDto[]) => void
   setSettings: (next: Settings) => void
   /** Manual "Check for updates" click (fast GitHub API path, main-side). */
   startManualCheck: () => Promise<void>
@@ -228,6 +230,14 @@ interface AppState {
   /** Ask the provider chain for 1-3 title candidates for a task draft (null = no AI/failure). */
   suggestTaskTitle: (ctx: SuggestTitleContext) => Promise<string[] | null>
 
+  /* note mutations (delegate to main; authoritative list comes back) */
+  createNote: (content?: string) => Promise<string>
+  updateNote: (id: string, patch: NotePatch) => Promise<void>
+  deleteNote: (id: string) => Promise<void>
+  /** Last editing caret per note (renderer memory; restores on re-entry). */
+  noteCaret: Record<string, number>
+  setNoteCaret: (id: string, pos: number) => void
+
   /* memory panel (delegate to main; the refreshed buckets come back) */
   memories: MemoryListPayload | null
   loadMemories: () => Promise<void>
@@ -252,6 +262,7 @@ export const useStore = create<AppState>((set, get) => ({
   station: [],
   tasks: [],
   suggestions: [],
+  notes: [],
   settings: { ...DEFAULT_SETTINGS },
   hydrated: false,
   query: '',
@@ -352,7 +363,7 @@ export const useStore = create<AppState>((set, get) => ({
     // undefined — nothing to hydrate, don't crash on the destructure.
     const state = await edge.loadState()
     if (!state) return
-    const { items, station, settings, version, tasks, isStoreBuild } = state
+    const { items, station, settings, version, tasks, notes, isStoreBuild } = state
     set({
       items,
       station,
@@ -360,6 +371,7 @@ export const useStore = create<AppState>((set, get) => ({
       currentVersion: version,
       tasks,
       isStoreBuild,
+      notes,
       hydrated: true
     })
     edge.onCopyFlare(() => {
@@ -410,6 +422,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   setTasks: (tasks) => set({ tasks }),
   setSuggestions: (suggestions) => set({ suggestions }),
+  setNotes: (notes) => set({ notes }),
   setSettings: (next) => set({ settings: next }),
 
   async startManualCheck() {
@@ -696,6 +709,23 @@ export const useStore = create<AppState>((set, get) => ({
   async suggestTaskTitle(ctx) {
     return edge.suggestTaskTitle(ctx)
   },
+
+  async createNote(content) {
+    const res = await edge.createNote(content)
+    set({ notes: res.notes })
+    return res.createdId
+  },
+
+  async updateNote(id, patch) {
+    set({ notes: await edge.updateNote(id, patch) })
+  },
+
+  async deleteNote(id) {
+    set({ notes: await edge.deleteNote(id) })
+  },
+
+  noteCaret: {},
+  setNoteCaret: (id, pos) => set((s) => ({ noteCaret: { ...s.noteCaret, [id]: pos } })),
 
   memories: null,
   async loadMemories() {

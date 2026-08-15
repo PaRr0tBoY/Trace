@@ -1,0 +1,301 @@
+/**
+ * MarkdownPreview — Markdown → React renderer for note previews.
+ *
+ * Inline: **bold**, *italic*, ***bold italic***, ~~strike~~, `code`,
+ * [label](url), [[wiki link]], bare http(s) URLs. Block: #..###### headings,
+ * fenced code, bullet (-/•) / numbered / todo lists, `> ` blockquotes,
+ * `---` horizontal rules, paragraphs.
+ *
+ * Beyond NotchNotes' MarkdownEngine scope on purpose: NotchNotes itself does
+ * not render blockquotes or strike-through (they stay plain text there), but
+ * the Trace preview renders them per explicit product request. Still absent:
+ * tables, images, LaTeX. Output is plain React elements — note content is
+ * never injected as HTML. Links render without href so a click inside a
+ * preview opens the editor instead of navigating the panel.
+ */
+import { Fragment, useMemo } from 'react'
+import type { JSX, ReactNode } from 'react'
+
+type InlinePart =
+  | { kind: 'text' | 'bold' | 'italic' | 'boldItalic' | 'strike' | 'code'; text: string }
+  | { kind: 'link'; text: string; href: string }
+  | { kind: 'wiki' | 'auto'; text: string }
+
+// Longest markers first (`***` before `**` before `*`); `~~strike~~` renders
+// as a deletion line (product request — NotchNotes keeps it plain text).
+// Inline code allows newlines so a backtick-wrapped multi-line snippet stays
+// a code block instead of collapsing into one line.
+const INLINE_RE =
+  /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*|~~[^~\n]+~~|`[^`]+`|\[[^\]\n]+\]\([^)\s]+\)|\[\[[^\]\n]+\]\]|https?:\/\/[^\s<]+?(?=[\s<),;:!?。，；：！？]|$))/g
+
+/** Turn a protocol-less target (`acidev.cc`) into an https URL — window.open
+ * would otherwise resolve it against the app origin (dev: localhost:5173). */
+function externalUrl(target: string): string {
+  return /^[a-z][a-z0-9+.-]*:/i.test(target) ? target : `https://${target}`
+}
+
+function parseInline(text: string): InlinePart[] {
+  const parts: InlinePart[] = []
+  let last = 0
+  for (const m of text.matchAll(INLINE_RE)) {
+    const index = m.index
+    if (index > last) parts.push({ kind: 'text', text: text.slice(last, index) })
+    const token = m[0]
+    if (token.startsWith('***')) parts.push({ kind: 'boldItalic', text: token.slice(3, -3) })
+    else if (token.startsWith('**')) parts.push({ kind: 'bold', text: token.slice(2, -2) })
+    else if (token.startsWith('*')) parts.push({ kind: 'italic', text: token.slice(1, -1) })
+    else if (token.startsWith('~~')) parts.push({ kind: 'strike', text: token.slice(2, -2) })
+    else if (token.startsWith('`')) parts.push({ kind: 'code', text: token.slice(1, -1) })
+    else if (token.startsWith('[[')) parts.push({ kind: 'wiki', text: token.slice(2, -2) })
+    else if (token.startsWith('[')) {
+      const close = token.indexOf('](')
+      parts.push({ kind: 'link', text: token.slice(1, close), href: token.slice(close + 2, -1) })
+    } else {
+      parts.push({ kind: 'auto', text: token })
+    }
+    last = index + token.length
+  }
+  if (last < text.length) parts.push({ kind: 'text', text: text.slice(last) })
+  return parts
+}
+
+function renderInline(text: string, keyPrefix: string): ReactNode[] {
+  return parseInline(text).map((part, i) => {
+    const key = `${keyPrefix}-${i}`
+    switch (part.kind) {
+      case 'bold':
+        return <strong key={key}>{part.text}</strong>
+      case 'italic':
+        return <em key={key}>{part.text}</em>
+      case 'boldItalic':
+        return (
+          <strong key={key}>
+            <em>{part.text}</em>
+          </strong>
+        )
+      case 'strike':
+        return <s key={key}>{part.text}</s>
+      case 'code':
+        return <code key={key}>{part.text}</code>
+      case 'link':
+      case 'auto':
+        return (
+          <a
+            key={key}
+            className="md-link"
+            href={externalUrl(part.kind === 'link' ? part.href : part.text)}
+            title={part.kind === 'link' ? part.href : part.text}
+            // window.open resolves a protocol-less target against the app
+            // origin (dev: http://localhost:5173), so normalize to https
+            // here; the main process routes window.open to the system
+            // browser (window.ts setWindowOpenHandler → shell.openExternal).
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              window.open(externalUrl(part.kind === 'link' ? part.href : part.text), '_blank')
+            }}
+          >
+            {part.text}
+          </a>
+        )
+      case 'wiki':
+        // Wiki links have no target in Trace (no note graph) — visible, inert.
+        return <a key={key} className="md-link">
+          {part.text}
+        </a>
+      default: {
+        // Raw text may contain newlines from multi-line paragraphs — render
+        // them as <br/> so consecutive lines never merge into one.
+        const segs = part.text.split('\n')
+        if (segs.length === 1) return part.text
+        return segs.map((seg, j) =>
+          j === 0 ? seg : (
+            <Fragment key={j}>
+              <br />
+              {seg}
+            </Fragment>
+          )
+        )
+      }
+    }
+  })
+}
+
+/** Collect consecutive lines matching `re`, returning the match per line. */
+function collectList(start: number, lines: string[], re: RegExp): RegExpExecArray[] {
+  const items: RegExpExecArray[] = []
+  for (let i = start; i < lines.length; i++) {
+    const m = re.exec(lines[i])
+    if (!m) break
+    items.push(m)
+  }
+  return items
+}
+
+/** Block-starting prefixes — a paragraph ends where a new block begins. */
+const BLOCK_START = /^(```|#{1,6}\s|>|[-*•]\s|\d+\.\s)/
+
+function renderBlocks(text: string, onToggleTodo?: (line: number) => void): ReactNode[] {
+  const lines = text.split('\n')
+  const blocks: ReactNode[] = []
+  let i = 0
+  let blockIndex = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    // Fenced code block.
+    if (/^```/.test(line.trimStart())) {
+      const buf: string[] = []
+      i++
+      while (i < lines.length && !/^```/.test(lines[i].trimStart())) {
+        buf.push(lines[i])
+        i++
+      }
+      i++ // skip the closing fence
+      blocks.push(
+        <pre key={blockIndex++} className="md-code">
+          <code>{buf.join('\n')}</code>
+        </pre>
+      )
+      continue
+    }
+
+    // Heading.
+    const heading = /^(#{1,6})\s+(.+)$/.exec(line)
+    if (heading) {
+      const Tag = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'][heading[1].length - 1] as keyof JSX.IntrinsicElements
+      blocks.push(
+        <Tag key={blockIndex++} className="md-heading">
+          {renderInline(heading[2], `h${blockIndex}`)}
+        </Tag>
+      )
+      i++
+      continue
+    }
+
+    // Horizontal rule — a full line of 3+ dashes (NotchNotes HR).
+    if (/^\s*-{3,}\s*$/.test(line)) {
+      blocks.push(<hr key={blockIndex++} className="md-hr" />)
+      i++
+      continue
+    }
+
+    // Blockquote — consecutive `> ` lines merge into one quote block; each
+    // line keeps its own paragraph so multi-line quotes stay readable.
+    const quote = /^>\s?(.*)$/.exec(line)
+    if (quote) {
+      const items = collectList(i, lines, /^>\s?(.*)$/)
+      blocks.push(
+        <blockquote key={blockIndex++} className="md-quote">
+          {items.map((m, j) => (
+            <p key={j}>{renderInline(m[1], `q${blockIndex}-${j}`)}</p>
+          ))}
+        </blockquote>
+      )
+      i += items.length
+      continue
+    }
+
+    // Bullet / todo list — a todo marker anywhere in the block makes it a
+    // todo list (checked items render with a checkbox glyph). Empty items
+    // (`- [ ]` alone, or a bare `- ` from Enter-continuation) still belong
+    // to the list — a trailing blank item must not split the block.
+    const bullet = /^[-*•]\s+(.*)$/.exec(line)
+    if (bullet) {
+      const items = collectList(i, lines, /^[-*•]\s+(.*)$/)
+      const todos = items.map((m) => /^\[([ xX])\]\s*(.*)$/.exec(m[1]))
+      const isTodo = todos.some((t) => t !== null)
+      blocks.push(
+        <ul key={blockIndex++} className={isTodo ? 'md-todo' : 'md-bullets'}>
+          {items.map((m, j) => {
+            const t = todos[j]
+            if (t) {
+              const done = t[1].toLowerCase() === 'x'
+              // The checkbox toggles the task when a callback is wired up
+              // (preview mode); line = absolute line number in the source.
+              return (
+                <li key={j} className={done ? 'md-todo-done' : undefined}>
+                  <span
+                    className="md-todo-box"
+                    role="checkbox"
+                    aria-checked={done}
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onToggleTodo?.(i + j)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === ' ' || e.key === 'Enter') {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        onToggleTodo?.(i + j)
+                      }
+                    }}
+                  >
+                    {done ? '✓' : ''}
+                  </span>
+                  {renderInline(t[2], `t${blockIndex}-${j}`)}
+                </li>
+              )
+            }
+            return <li key={j}>{renderInline(m[1], `u${blockIndex}-${j}`)}</li>
+          })}
+        </ul>
+      )
+      i += items.length
+      continue
+    }
+
+    // Numbered list — empty items (`1. ` from Enter-continuation) keep the
+    // block together, same rule as bullets above.
+    if (/^\d+\.\s+/.test(line)) {
+      const items = collectList(i, lines, /^\d+\.\s+(.*)$/)
+      blocks.push(
+        <ol key={blockIndex++} className="md-bullets">
+          {items.map((m, j) => (
+            <li key={j}>{renderInline(m[1], `o${blockIndex}-${j}`)}</li>
+          ))}
+        </ol>
+      )
+      i += items.length
+      continue
+    }
+
+    // Blank line: paragraph separator.
+    if (line.trim() === '') {
+      i++
+      continue
+    }
+
+    // Paragraph — accumulate plain lines until a blank or a new block. Lines
+    // are joined with real newlines (not spaces) and rendered with <br/>, so
+    // consecutive elements never get squashed onto one line — a strike, a
+    // link and a code snippet on three lines stay on three lines.
+    const buf = [line]
+    i++
+    while (i < lines.length && lines[i].trim() !== '' && !BLOCK_START.test(lines[i])) {
+      buf.push(lines[i])
+      i++
+    }
+    blocks.push(
+      <p key={blockIndex++} className="md-para">
+        {renderInline(buf.join('\n'), `p${blockIndex}`)}
+      </p>
+    )
+  }
+
+  return blocks
+}
+
+export function MarkdownPreview({
+  text,
+  onToggleTodo
+}: {
+  text: string
+  /** Called with the source line of a clicked todo checkbox (preview toggle). */
+  onToggleTodo?: (line: number) => void
+}) {
+  const blocks = useMemo(() => renderBlocks(text, onToggleTodo), [text, onToggleTodo])
+  return <>{blocks}</>
+}

@@ -16,10 +16,13 @@
  *
  * Design (activation on demand, session-held while typing):
  *   - requestPanelFocus (renderer `ui:input-focus` from pointerdown/focusin
- *     on an editable element): strip WS_EX_NOACTIVATE, then win.focus() — the
- *     window truly activates and Chromium routes keys. skipTaskbar is
- *     re-asserted so no taskbar button appears. Stealing the foreground is
- *     exactly what the user asked for by clicking an input.
+ *     on an editable element, or from the notes view auto-focus on panel
+ *     open): strip WS_EX_NOACTIVATE, then win.focus() — falling back to
+ *     app.focus({ steal: true }) when the Windows foreground lock rejects
+ *     the plain focus (hover-open is not a user input event). skipTaskbar
+ *     is re-asserted so no taskbar button appears. Stealing the foreground
+ *     is exactly what the user asked for by clicking an input — or by the
+ *     notes editor auto-focusing.
  *   - While an input is focused the activated state is KEPT (input blur does
  *     not release it), so switching between inputs (input <-> textarea)
  *     never flickers the window or re-steals the foreground.
@@ -36,23 +39,27 @@
  * Every step fails silent: a hiccup degrades to "input focus request
  * ignored", never a crash.
  */
-import koffi from 'koffi'
 import { app } from 'electron'
+import koffi from 'koffi'
 import { getMainWindow } from './window'
+import { activateHwnd } from './windowSwitch'
 
 const WS_EX_NOACTIVATE = 0x08000000
 const GWL_EXSTYLE = -20
 
 type GetWindowLongPtrFn = (hwnd: unknown, index: number) => bigint
 type SetWindowLongPtrFn = (hwnd: unknown, index: number, value: bigint) => bigint
+type GetForegroundWindowFn = () => bigint
 
 let getWindowLongPtrW: GetWindowLongPtrFn | null = null
 let setWindowLongPtrW: SetWindowLongPtrFn | null = null
+let getForegroundWindow: GetForegroundWindowFn | null = null
 
 if (process.platform === 'win32') {
   try {
     const user32 = koffi.load('user32.dll')
     getWindowLongPtrW = user32.func('int64_t __stdcall GetWindowLongPtrW(void *hWnd, int nIndex)') as GetWindowLongPtrFn
+    getForegroundWindow = user32.func('int64_t __stdcall GetForegroundWindow()') as GetForegroundWindowFn
     setWindowLongPtrW = user32.func('int64_t __stdcall SetWindowLongPtrW(void *hWnd, int nIndex, int64_t dwNewLong)') as SetWindowLongPtrFn
   } catch (err) {
     console.error('[Focus] koffi user32 load failed — activation bridge disabled:', err)
@@ -73,8 +80,9 @@ export function requestPanelFocus(): void {
   } catch {
     // fail silent
   }
+  let hwnd: bigint | null = null
   try {
-    const hwnd = koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void'))
+    hwnd = BigInt(koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void')))
     const ex = getWindowLongPtrW ? Number(getWindowLongPtrW(hwnd, GWL_EXSTYLE)) : 0
     if (ex !== 0 && (ex & WS_EX_NOACTIVATE) !== 0 && setWindowLongPtrW) {
       setWindowLongPtrW(hwnd, GWL_EXSTYLE, BigInt(ex & ~WS_EX_NOACTIVATE))
@@ -84,6 +92,32 @@ export function requestPanelFocus(): void {
   }
   try {
     win.focus()
+    // Windows foreground lock: a hover-opened panel is not a "user input"
+    // event, so win.focus() can be silently ignored and keystrokes keep
+    // going to the external app while the caret merely appears inside.
+    // win.isFocused() is no reliable oracle here — webContents-internal
+    // activation alone reports focused — so compare against the real OS
+    // foreground window and steal when it is still someone else's.
+    const fg = getForegroundWindow ? getForegroundWindow() : null
+    if (fg === null || fg !== hwnd) {
+      try {
+        app.focus({ steal: true })
+      } catch {
+        // fail silent — escalation continues
+      }
+      win.focus()
+      // The lock can reject even app.focus() (re-hovering the edge is not
+      // a user-input event either). activateHwnd's AttachThreadInput +
+      // SetForegroundWindow chain works without input rights.
+      const fg2 = getForegroundWindow ? getForegroundWindow() : null
+      if (fg2 === null || fg2 !== hwnd) {
+        try {
+          activateHwnd(koffi.decode(win.getNativeWindowHandle(), koffi.pointer('void')))
+        } catch {
+          // fail silent — best effort
+        }
+      }
+    }
   } catch {
     // fail silent
   }
@@ -102,7 +136,6 @@ export function requestPanelFocus(): void {
     }
   }
 }
-
 /**
  * Input blur (`ui:input-blur`): intentionally a no-op. Early versions blurred
  * the window on every non-input click to hand the keyboard focus back, but

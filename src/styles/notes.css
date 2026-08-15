@@ -1,0 +1,636 @@
+/* Notes layer — list cards + full-height editor. Matches the item.css /
+ * tasks.css vocabulary (deep blacks, hairline edges, pill buttons). */
+
+/* ── List state ─────────────────────────────────────────────── */
+
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.notes-list-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px 4px;
+  flex-shrink: 0;
+}
+
+.notes-new-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--edge-strong);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.notes-new-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.notes-count {
+  font-size: 9.5px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.notes-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 10px 10px;
+}
+
+.notes-card {
+  background: var(--bg-2);
+  border: 1px solid var(--edge-light);
+  border-radius: 12px;
+  padding: 6px 6px;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.notes-card:hover {
+  background: var(--bg-3);
+  border-color: var(--edge-strong);
+}
+
+.notes-card.pinned {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.notes-card-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.notes-card-title {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.notes-card-preview {
+  margin: 2px 4px 2px 18px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+  /* Block children (MarkdownPreview) can't clamp with -webkit-box — cap by
+     height instead: 2 lines at 10px/1.5. */
+  max-height: 30px;
+  overflow: hidden;
+}
+
+.notes-card-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.notes-card-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.notes-card-btn.danger:hover {
+  background: rgba(248, 113, 113, 0.16);
+  color: #f87171;
+}
+
+/* Single-note mode: the last remaining note cannot be deleted — the button
+ * goes grey instead of leaving the editor with an empty page. */
+.notes-card-btn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* ── Empty state ────────────────────────────────────────────── */
+
+.notes-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 18px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  text-align: center;
+}
+
+.notes-empty p {
+  margin: 0;
+}
+
+/* ── Editor state ───────────────────────────────────────────── */
+
+.notes-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.notes-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px 4px;
+  flex-shrink: 0;
+}
+
+.notes-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.notes-bar-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+/* Stepper at the shelf edge: dimmed, no hover feedback. */
+.notes-bar-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+.notes-bar-btn.danger:hover {
+  background: rgba(248, 113, 113, 0.16);
+  color: #f87171;
+}
+
+/* Reading (pure render) mode: the toggle button stays lit and the editor
+ * caret is hidden — nothing suggests the text can be edited. */
+.notes-bar-btn.active {
+  background: rgba(var(--accent-rgb), 0.18);
+  color: var(--accent);
+}
+
+.notes-editor-title {
+  flex: 1;
+  min-width: 0;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notes-cm-host {
+  flex: 1;
+  min-height: 0;
+  margin: 0 8px;
+  border: 1px solid var(--edge-light);
+  border-radius: 12px;
+  background: var(--bg-2);
+  overflow: hidden;
+  transition: border-color 0.18s ease;
+}
+
+.notes-cm-host:focus-within {
+  border-color: var(--edge-strong);
+}
+
+/* Inline markdown decorations (live rendering; block markers are replaced
+ * by rendered widgets, inline markers stay visible-but-dimmed). */
+.cm-md-marker {
+  color: rgba(255, 255, 255, 0.45);
+  font-style: normal !important;
+  font-weight: normal !important;
+  text-decoration: none !important;
+}
+
+/* Rendered list marker widget: `•` for bullets, the number for ordered
+ * items, replacing the raw `-`/`1.` marker. */
+.cm-md-listmark {
+  color: var(--text-tertiary);
+  user-select: none;
+}
+
+.cm-md-strong {
+  font-weight: 700;
+}
+
+.cm-md-italic {
+  font-style: italic;
+}
+
+.cm-md-strike {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+.cm-md-inline-code,
+.cm-md-code-text {
+  font-family: Consolas, 'Cascadia Mono', 'SF Mono', monospace;
+}
+
+.cm-md-inline-code {
+  padding: 1px 4px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 11.5px;
+}
+
+.cm-md-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--accent-rgb), 0.45);
+  cursor: pointer;
+}
+
+/* Heading scale leads clearly from body (13px): h1 sits at 18px, each
+ * level steps down ~2px so the hierarchy reads at a glance in the narrow
+ * blade. h4+ keep body size but step to secondary text. */
+.cm-md-h1 {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.cm-md-h2 {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.cm-md-h3 {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cm-md-h4,
+.cm-md-h5,
+.cm-md-h6 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+/* Fenced code blocks and blockquotes get a full-line backdrop. Code text
+ * sits a step below body size, blockquote backdrop stays whisper-quiet so
+ * the accent edge line carries the emphasis. */
+.cm-md-code-block {
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11.5px;
+}
+
+.cm-md-code-block.cm-md-quote-line {
+  background: none;
+}
+
+.cm-md-quote-line {
+  background: rgba(var(--accent-rgb), 0.07);
+  border-left: 2px solid rgba(var(--accent-rgb), 0.5);
+}
+
+/* Task checkbox widget — fixed 13px geometry so the box never shifts
+ * between states; the check is drawn in CSS (no glyph metrics). Checked
+ * boxes fill with the theme accent and pop in, so completing a task
+ * reads as a small reward instead of a color swap. */
+.cm-task-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-right: 5px;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  background: transparent;
+  vertical-align: -1px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.cm-task-box.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  animation: cm-task-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.cm-task-box.checked::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 4px;
+  margin-left: -3.5px;
+  margin-top: -2px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg);
+}
+
+.cm-task-box:hover {
+  border-color: var(--accent);
+}
+
+@keyframes cm-task-pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* Single-note empty state: hint + create button instead of a fabricated note. */
+.notes-single-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.notes-single-empty p {
+  margin: 0;
+}
+
+.notes-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 8px 8px;
+  flex-shrink: 0;
+}
+
+.notes-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.notes-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.notes-cm-host[data-reading='true'] .cm-cursor,
+.notes-cm-host[data-reading='true'] .cm-selectionBackground {
+  display: none;
+}
+
+/* ── Markdown preview (MarkdownPreview) ─────────────────────── */
+
+.notes-card-preview > * {
+  margin: 0;
+}
+
+.notes-card-preview .md-heading {
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.notes-card-preview strong {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.notes-card-preview em {
+  color: var(--text-secondary);
+}
+
+.notes-card-preview code {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 0 3px;
+  font-size: 9.5px;
+}
+
+.notes-card-preview .md-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--accent-rgb), 0.45);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.notes-card-preview .md-hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 3px 0;
+}
+
+.notes-card-preview .md-bullets {
+  padding-left: 14px;
+}
+
+.notes-card-preview .md-todo {
+  padding-left: 0;
+  list-style: none;
+}
+
+.notes-card-preview .md-todo li {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.notes-card-preview .md-todo-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--edge-strong);
+  border-radius: 2px;
+  font-size: 7.5px;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.notes-card-preview .md-todo-done {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.notes-card-preview .md-code {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 3px 5px;
+  font-size: 9.5px;
+  white-space: pre-wrap;
+}
+
+.notes-card-preview .md-quote {
+  margin: 2px 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--edge-strong);
+  color: var(--text-secondary);
+}
+
+.notes-card-preview .md-quote p {
+  margin: 0;
+}
+
+/* ── Single-note mode: editor + all-notes modal ─────────────────── */
+
+.notes-single {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.notes-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: notes-fade-in 0.14s ease-out;
+}
+
+.notes-modal {
+  width: 236px;
+  height: 72%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-2);
+  border: 1px solid var(--edge-strong);
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  animation: notes-pop-in 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.notes-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 8px 8px 4px;
+  flex-shrink: 0;
+}
+
+.notes-modal-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  padding-left: 4px;
+}
+
+.notes-modal-search {
+  margin: 4px 10px 8px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--edge-light);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  font-size: 10.5px;
+  outline: none;
+  flex-shrink: 0;
+  transition: border-color 0.18s ease;
+}
+
+.notes-modal-search:focus {
+  border-color: var(--edge-strong);
+}
+
+.notes-modal-search::placeholder {
+  color: var(--text-tertiary);
+}
+
+.notes-modal-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+
+/* Invisible scrollbars — same convention as the panel list, settings,
+ * tasks: the notes UI scrolls without a visible scrollbar. */
+.notes-scroll,
+.notes-modal-scroll {
+  scrollbar-width: none; /* Firefox */
+}
+.notes-scroll::-webkit-scrollbar,
+.notes-modal-scroll::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+@keyframes notes-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes notes-pop-in {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}

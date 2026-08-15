@@ -10,6 +10,7 @@ import { StationStore, STATION_STORAGE_VERSION, type StationIndex } from '../sto
 import { ClipboardWatcher } from '../clipboard/ClipboardWatcher'
 import { loadSettings, saveSettings } from '../store/settings'
 import { TaskStore, type TaskIndex } from '../store/TaskStore'
+import { NoteStore, type NoteIndex } from '../store/NoteStore'
 import { openDatabase, closeDatabase, type TraceDatabase } from '../store/db'
 import { createSqliteSessionStore } from '../store/sessionStore'
 import {
@@ -137,6 +138,52 @@ const taskStore = new TaskStore({
   save: (index) => saveTasksFile(index),
   isItemAlive: (itemId) => store.get(itemId) !== undefined
 })
+
+/**
+ * Note persistence adapter: notes.json with the same DPAPI envelope as
+ * tasks.json (notes can carry sensitive work context).
+ */
+const noteStore = new NoteStore({
+  load: () => loadNotesFile(),
+  save: (index) => saveNotesFile(index)
+})
+
+function loadNotesFile(): NoteIndex | null {
+  try {
+    const file = PATHS.notesFile()
+    if (!existsSync(file)) return null
+    const text = readFileSync(file, 'utf8').trim()
+    if (!text) return null
+    const parsed = JSON.parse(text) as { encrypted?: boolean; payload?: string; notes?: unknown }
+    if (parsed.encrypted === true && typeof parsed.payload === 'string') {
+      if (!safeStorage.isEncryptionAvailable()) return null
+      return JSON.parse(safeStorage.decryptString(Buffer.from(parsed.payload, 'base64'))) as NoteIndex
+    }
+    if (Array.isArray(parsed.notes)) return parsed as NoteIndex
+    return null
+  } catch (err) {
+    console.error('[Notes] notes.json load failed:', err)
+    return null
+  }
+}
+
+function saveNotesFile(index: NoteIndex): void {
+  try {
+    const file = PATHS.notesFile()
+    if (safeStorage.isEncryptionAvailable()) {
+      const envelope = {
+        v: 1,
+        encrypted: true,
+        payload: safeStorage.encryptString(JSON.stringify(index)).toString('base64')
+      }
+      writeFileSync(file, JSON.stringify(envelope, null, 2), 'utf8')
+    } else {
+      writeFileSync(file, JSON.stringify(index, null, 2), 'utf8')
+    }
+  } catch (err) {
+    console.error('[Notes] notes.json save failed:', err)
+  }
+}
 
 function loadTasksFile(): TaskIndex | null {
   try {
@@ -400,6 +447,7 @@ export function initState(): void {
   }
   taskStore.load()
   taskStore.setPauseThreshold(loadSettings().taskPauseThresholdMinutes)
+  noteStore.load()
   const settings = loadSettings()
   getMemoryStore().load()
   getMemoryStore().setDecay({
@@ -620,6 +668,8 @@ export function stopStateTimers(): void {
     suggestionTimer = null
   }
   suggestionEngine?.stop()
+  // Notes write through a debounce; flush the pending save on quit.
+  noteStore.flush()
   if (evidencePurgeTimer !== null) {
     clearInterval(evidencePurgeTimer)
     evidencePurgeTimer = null
@@ -679,6 +729,10 @@ export function getWatcher(): ClipboardWatcher {
 
 export function getTaskStore(): TaskStore {
   return taskStore
+}
+
+export function getNoteStore(): NoteStore {
+  return noteStore
 }
 
 /**
@@ -1231,6 +1285,9 @@ export const pushState = {
   async tasks(): Promise<void> {
     const dto: TaskDto[] = await attachAppIcons(taskStore.toDto())
     send('state:tasks', dto)
+  },
+  notes(): void {
+    send('state:notes', noteStore.toDto())
   },
   async suggestions(suggestions: TaskProposal[]): Promise<void> {
     const dto: TaskProposal[] = await attachSuggestionIcons(suggestions)

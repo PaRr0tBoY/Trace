@@ -3,15 +3,16 @@
  *
  * Motion: when `open` flips true the blade's clip-path releases from the edge
  * strip (the "spoke") to the full panel — the reveal, driven by the CSS
- * transition in panel.css. Under the 'extended' motion level the background
- * layer (.blade-bg) also overshoots ~2% past the rest edge and settles back
- * (useOpenBounce) — a Dynamic-Island-style poke that moves only the black
- * shape; content in .blade stays put. 'standard' keeps the plain reveal
- * (scale pinned at 1). All compositor-friendly: scale is a transform
- * (Framer-driven), clip-path is a promoted compositor clip. No filter/blur —
- * repainting the whole blade every frame was the jank source. Unlike the
- * flyout presets, this motion is intentionally not gated on
- * prefers-reduced-motion (see useOpenBounce) — the reveal always animates
+ * transition in panel.css. The background layer (.blade-bg) also overshoots
+ * past the rest edge and settles back (useOpenBounce) — a Dynamic-Island-style
+ * poke that moves only the black shape; content in .blade stays put.
+ * 'standard' keeps the basic single exceed-and-settle (~2%); 'extended'
+ * doubles it — over-scale, then over-shrink on the pull-back, then settle
+ * (upstream's "bounced twice" feel, tamed). All compositor-friendly: scale
+ * is a transform (Framer-driven), clip-path is a promoted compositor clip.
+ * No filter/blur — repainting the whole blade every frame was the jank
+ * source. Unlike the flyout presets, this motion is intentionally not gated
+ * on prefers-reduced-motion (see useOpenBounce) — the reveal always animates
  * and the OS "animations off" setting was silently killing it.
  * When closed, the clip-path keeps only the spoke visible so the window stays
  * transparent and click-through.
@@ -43,9 +44,9 @@ const switcherActive = useStore((s) => s.switcherActive)
   const settingsOpen = useStore((s) => s.settingsOpen)
   const view = useStore((s) => s.view)
 
-  // Blade open motion — under 'extended' a Dynamic-Island-style
-  // exceed-and-settle timed to the clip reveal's end; 'standard' stays flat.
-  const openBounce = useOpenBounce()
+  // Blade open motion — Dynamic-Island-style exceed-and-settle timed to the
+  // clip reveal's end; 'extended' doubles the bounce (see useOpenBounce).
+  const openBounce = useOpenBounce(settings.motionLevel)
   const extended = settings.motionLevel === 'extended'
   // View/settings transitions: 'extended' slides with direction (x ±10);
   // 'standard' cross-fades — the slide is directional delight, not navigation.
@@ -280,9 +281,9 @@ const switcherActive = useStore((s) => s.switcherActive)
               : `inset(calc(50% - ${halfTrigger}px) calc(100% - ${settings.hotZoneWidth || 3}px) calc(50% - ${halfTrigger}px) 0px round 0px 24px 24px 0px)`
         }}
       >
-        {/* The black shape. The open bounce (extended level only, useOpenBounce)
-            lives here — content in .blade below never scales, so only the
-            background pokes past and settles back. */}
+        {/* The black shape. The open bounce (useOpenBounce) lives here —
+            content in .blade below never scales, so only the background
+            pokes past and settles back. */}
         <motion.div
           className="blade-bg"
           style={{
@@ -290,15 +291,13 @@ const switcherActive = useStore((s) => s.switcherActive)
             originY: 0.5
           }}
           animate={{
-            scale: switcherActive ? 1 : open && extended ? [1, 1.02, 1] : 1
+            scale: switcherActive ? 1 : open ? openBounce.keyframes : 1
           }}
           transition={{
             scale: switcherActive
               ? { duration: open ? 0.1 : 0.06, ease: open ? [0.22, 1, 0.36, 1] : [0, 0, 1, 1] }
               : open
-                ? extended
-                  ? openBounce
-                  : { duration: 0, ease: [0, 0, 1, 1] }
+                ? openBounce.transition
                 : { duration: 0.08, ease: [0, 0, 1, 1] }
           }}
         />

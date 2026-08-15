@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { Transition } from 'framer-motion'
+import type { MotionLevel } from '../../shared/types'
 
 /**
  * Returns Framer Motion spring presets calibrated to the current display.
@@ -42,13 +43,13 @@ export function useAdaptiveSpring() {
 }
 
 /**
- * The blade's open transition — a Dynamic-Island-style settle on the
- * background layer (.blade-bg in Panel.tsx): the black shape pokes ~2% of
- * the blade width (5.4px at 270px) past the rest edge and settles back while
- * the clip reveal opens. Content in .blade never scales — only the shape
- * moves.
+ * The blade's open bounce — a Dynamic-Island-style settle on the background
+ * layer (.blade-bg in Panel.tsx): the black shape pokes past the rest edge
+ * and settles back while the clip reveal opens. Content in .blade never
+ * scales — only the shape moves.
  *
- * Keyframe shape (times relative to the 0.42s total, keyframes [1, 1.02, 1]):
+ * Keyframe shape ('standard', times relative to the 0.42s total, keyframes
+ * [1, 1.02, 1]):
  *   1 → 1.02  0–150ms  exceed, expo-out — starts the instant the panel opens,
  *                      peaking exactly as the clip-path reveal reaches the
  *                      blade's full width (the clip's right edge passes 270px
@@ -58,6 +59,12 @@ export function useAdaptiveSpring() {
  *                      the poke hands off from the reveal like a relay.
  *   1.02 → 1  150–420ms pull-back, ease-in-out cubic — launches softly from
  *                      the peak, fastest at the midpoint, settles gradually.
+ *
+ * 'extended' doubles the overshoot: keyframes [1, 1.04, 0.985, 1] over 0.5s —
+ * over-scale past the rest edge, then the pull-back overshoots *below* 1,
+ * then recovers — the "bounced twice" feel, modeled on upstream's
+ * [0.92, 1.05, 0.98, 1] with the exaggerated 8% starting shrink dropped (the
+ * clip reveal already handles appearance, so the shape starts at 1).
  *
  * Why keyframes and not a spring: a single under-damped spring overshoots at
  * ~108ms — still inside the clip reveal, which keeps growing and masks the
@@ -70,20 +77,41 @@ export function useAdaptiveSpring() {
  * reveal is the app's core orientation feedback, and gating it on the OS
  * setting silently disabled every animation on machines with "Show
  * animations" off (the author's own setup — verified via Chromium
- * matchMedia). Motion level is the user's in-app choice instead: the bounce
- * plays only under 'extended'; 'standard' keeps the plain clip reveal.
+ * matchMedia). Motion level is the user's in-app choice instead: both levels
+ * bounce — 'standard' the basic single exceed-and-settle, 'extended' the
+ * double. The keyframes and transition are returned together because they
+ * are coupled (times[] must match the keyframe count).
  */
-export function useOpenBounce(): Transition {
-  return useMemo<Transition>(() => {
-    return {
-      duration: 0.42,
-      times: [0, 0.357, 1],
-      ease: [
-        [0.22, 1, 0.36, 1],
-        [0.65, 0, 0.35, 1]
-      ]
+export function useOpenBounce(
+  motionLevel: MotionLevel
+): { keyframes: number[]; transition: Transition } {
+  return useMemo(() => {
+    if (motionLevel === 'extended') {
+      return {
+        keyframes: [1, 1.04, 0.985, 1],
+        transition: {
+          duration: 0.5,
+          times: [0, 0.28, 0.56, 1],
+          ease: [
+            [0.22, 1, 0.36, 1],
+            [0.65, 0, 0.35, 1],
+            [0.22, 1, 0.36, 1]
+          ]
+        }
+      }
     }
-  }, [])
+    return {
+      keyframes: [1, 1.02, 1],
+      transition: {
+        duration: 0.42,
+        times: [0, 0.357, 1],
+        ease: [
+          [0.22, 1, 0.36, 1],
+          [0.65, 0, 0.35, 1]
+        ]
+      }
+    }
+  }, [motionLevel])
 }
 
 /**

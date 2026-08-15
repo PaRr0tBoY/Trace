@@ -393,13 +393,13 @@ export function Panel() {
           {!settingsOpen && view !== 'tasks' && <SearchBar />}
 
           <ToastStack />
-          <AnimatePresence mode="wait">
+          <AnimatePresence initial={false}>
             {settingsOpen ? (
               <motion.div
                 key="settings"
                 initial={{ opacity: 0, x: viewSlide }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: viewSlideOut }}
+                exit={{ opacity: 0, x: viewSlideOut, transition: { duration: 0.25 } }}
                 transition={{ duration: 0.15 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
@@ -412,7 +412,7 @@ export function Panel() {
                 key="tasks"
                 initial={{ opacity: 0, x: viewSlide }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: viewSlideOut }}
+                exit={{ opacity: 0, x: viewSlideOut, transition: { duration: 0.25 } }}
                 transition={{ duration: 0.15 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
@@ -425,7 +425,7 @@ export function Panel() {
                 key="files"
                 initial={{ opacity: 0, x: viewSlide }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: viewSlideOut }}
+                exit={{ opacity: 0, x: viewSlideOut, transition: { duration: 0.25 } }}
                 transition={{ duration: 0.15 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >
@@ -438,7 +438,7 @@ export function Panel() {
                 key="list"
                 initial={{ opacity: 0, x: viewSlide }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: viewSlideOut }}
+                exit={{ opacity: 0, x: viewSlideOut, transition: { duration: 0.25 } }}
                 transition={{ duration: 0.15 }}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
               >

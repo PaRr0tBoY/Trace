@@ -2,6 +2,7 @@ node_modules
 out
 dist
 *.log
+*.html
 drag_debug.txt
 clipboard_debug.log
 electron.vite.config.*.mjs
@@ -10,12 +11,7 @@ FIXES_CHECKLIST.md
 .vscode/*
 !.vscode/extensions.json
 
-docs/
 dev-app-update.yml
-
-
-# local tracker artifacts
-.scratch/
 
 # local research dir
 ref/

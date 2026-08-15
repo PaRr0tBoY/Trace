@@ -40,11 +40,11 @@ scripts/update-choco-package.mjs        发版时更新 choco 包（版本/URL/S
 
 ## 一次性设置（尚未完成的部分）
 
-### npm — 需要注册账号 `parrotboy`
+### npm — 用现有账号 + 创建 org `parrotboy`
 
-1. 到 npmjs.com 注册账号 `parrotboy`（或联系 npm 支持把现有账号改名）。
-2. `npm login`（确认 `npm whoami` 输出 parrotboy）。
-3. `cd npm-bootstrap && npm publish --access public`。
+1. 用当前登录的 npm 账号（`ryan2343`）在 **https://www.npmjs.com/org/create** 创建组织，名字填 `parrotboy`（免费；`npm org ls parrotboy` 返回 "Scope not found" 说明还没被占，先到先得）。
+2. `npm login`（确认 `npm whoami` 输出自己的账号）。
+3. `cd npm-bootstrap && npm publish --access public`（org 包默认私有，必须加 `--access public`）。
 4. 发布后验证：`npm view @parrotboy/trace`。之后无需再发。
 
 ### chocolatey — 需要 chocolatey.org 账号

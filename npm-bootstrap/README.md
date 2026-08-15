@@ -52,4 +52,4 @@ cd npm-bootstrap
 npm publish --access public
 ```
 
-需要 npm 账号 `parrotboy`（scope 与包名一致）。发布一次即可，后续 Trace 发版无需重发本包。
+需要 npm 账号 + 名为 `parrotboy` 的 npm 组织（[npmjs.com/org/create](https://www.npmjs.com/org/create) 免费创建，成员用现有账号即可）。发布一次即可，后续 Trace 发版无需重发本包。

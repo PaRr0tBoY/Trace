@@ -27,6 +27,7 @@ const files = ['bucket/trace.json', 'distrib/scoop/trace.json'];
 for (const f of files) {
   let text = readFileSync(f, 'utf8');
   text = text.replace(/"version":\s*"[^"]+"/, `"version": "${ver}"`);
+  text = text.replace(/v[\d.]+(?=\/Trace-Setup-[\d.]+\.exe)/g, tag);
   text = text.replace(/Trace-Setup-[\d.]+\.exe/g, `Trace-Setup-${ver}.exe`);
   text = text.replace(/"hash":\s*"[0-9a-f]{64}"/, `"hash": "${sha256}"`);
   writeFileSync(f, text);

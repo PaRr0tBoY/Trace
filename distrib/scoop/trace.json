@@ -5,7 +5,7 @@
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/PaRr0tBoY/Trace/releases/download/v2026.8.15/Trace-Setup-2026.8.16.exe",
+            "url": "https://github.com/PaRr0tBoY/Trace/releases/download/v2026.8.16/Trace-Setup-2026.8.16.exe",
             "hash": "1461c0ac057a67150188ae710e8a5c789020a7c9a853b983bdfec35851bb64d2",
             "installer": {
                 "script": "Start-Process \"$dir\\Trace-Setup-$version.exe\" -ArgumentList '/S' -Wait"

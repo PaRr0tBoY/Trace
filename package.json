@@ -3,7 +3,7 @@
   "version": "2026.8.15",
   "description": "Trace — a clipboard manager that lives on the left edge of your screen and expands on hover.",
   "author": "Trace",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": true,
   "main": "out/main/index.js",
   "type": "module",
@@ -66,6 +66,7 @@
       "icon": "resources/icon.ico"
     },
     "nsis": {
+      "include": "build/installer.nsh",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,

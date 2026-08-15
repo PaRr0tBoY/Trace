@@ -48,6 +48,12 @@ const switcherActive = useStore((s) => s.switcherActive)
   // clip reveal's end; 'extended' doubles the bounce (see useOpenBounce).
   const openBounce = useOpenBounce(settings.motionLevel)
   const extended = settings.motionLevel === 'extended'
+  // Snapshot the keyframes for the current open session. Switching the motion
+  // level mid-open must not replay the bounce (framer-motion treats a changed
+  // keyframe array as a new animation); the ref only refreshes while closed,
+  // so the next open picks up the new level.
+  const bounceKeyframes = useRef<number[]>(openBounce.keyframes)
+  if (!open) bounceKeyframes.current = openBounce.keyframes
   // View/settings transitions: 'extended' slides with direction (x ±10);
   // 'standard' cross-fades — the slide is directional delight, not navigation.
   const viewSlide = extended ? 10 : 0
@@ -291,7 +297,7 @@ const switcherActive = useStore((s) => s.switcherActive)
             originY: 0.5
           }}
           animate={{
-            scale: switcherActive ? 1 : open ? openBounce.keyframes : 1
+            scale: switcherActive ? 1 : open ? bounceKeyframes.current : 1
           }}
           transition={{
             scale: switcherActive

@@ -3,7 +3,8 @@
  *
  * Motion: when `open` flips true the blade's clip-path releases from the edge
  * strip (the "spoke") to the full panel — the reveal, driven by the CSS
- * transition in panel.css. The background layer (.blade-bg) also overshoots
+ * transition in panel.css. The background layer (.blade-bg, including the two
+ * edge flares that connect its corners to the screen edge) also overshoots
  * past the rest edge and settles back (useOpenBounce) — a Dynamic-Island-style
  * poke that moves only the black shape; content in .blade stays put.
  * 'standard' keeps the basic single exceed-and-settle (~2%); 'extended'
@@ -287,9 +288,11 @@ const switcherActive = useStore((s) => s.switcherActive)
               : `inset(calc(50% - ${halfTrigger}px) calc(100% - ${settings.hotZoneWidth || 3}px) calc(50% - ${halfTrigger}px) 0px round 0px 24px 24px 0px)`
         }}
       >
-        {/* The black shape. The open bounce (useOpenBounce) lives here —
-            content in .blade below never scales, so only the background
-            pokes past and settles back. */}
+        {/* The black shape — blade-bg plus the two edge flares (the reverse
+            curves connecting the blade's corners to the screen edge). The
+            open bounce (useOpenBounce) lives on this whole group: content in
+            .blade below never scales, so only the black shape — corners and
+            flares together — pokes past and settles back. */}
         <motion.div
           className="blade-bg"
           style={{
@@ -306,17 +309,18 @@ const switcherActive = useStore((s) => s.switcherActive)
                 ? openBounce.transition
                 : { duration: 0.08, ease: [0, 0, 1, 1] }
           }}
-        />
-        <div className={`flare-top${settings.stickPosition === 'right' ? ' flare-right' : ''}`}>
-          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 0 0 L 0 30 L 30 30 A 30 30 0 0 1 0 0 Z" fill="#000000" />
-          </svg>
-        </div>
-        <div className={`flare-bottom${settings.stickPosition === 'right' ? ' flare-right' : ''}`}>
-          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 0 30 L 0 0 L 30 0 A 30 30 0 0 0 0 30 Z" fill="#000000" />
-          </svg>
-        </div>
+        >
+          <div className={`flare-top${settings.stickPosition === 'right' ? ' flare-right' : ''}`}>
+            <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M 0 0 L 0 30 L 30 30 A 30 30 0 0 1 0 0 Z" fill="#000000" />
+            </svg>
+          </div>
+          <div className={`flare-bottom${settings.stickPosition === 'right' ? ' flare-right' : ''}`}>
+            <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M 0 30 L 0 0 L 30 0 A 30 30 0 0 0 0 30 Z" fill="#000000" />
+            </svg>
+          </div>
+        </motion.div>
         <div
           ref={bladeRef}
           className="blade"

@@ -56,7 +56,11 @@
 /* The background layer. It fills the blade and carries the Dynamic-Island-
    style open bounce (scale overshoot on .blade-bg, driven by Framer in
    Panel.tsx) — content in .blade above it stays put, only the black shape
-   pokes past the rest width and settles back, like BoringNotch's notch. */
+   pokes past the rest width and settles back, like BoringNotch's notch.
+   The edge flares (.flare-top/.flare-bottom) are children of this layer so
+   they ride the same transform: their reverse curves stay married to the
+   blade's corners while the shape bounces (upstream scales the whole
+   container; here content must not scale, so the flares join the shape). */
 .blade-bg {
   position: absolute;
   inset: 0;

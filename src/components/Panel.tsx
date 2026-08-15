@@ -3,15 +3,17 @@
  *
  * Motion: when `open` flips true the blade's clip-path releases from the edge
  * strip (the "spoke") to the full panel — the reveal, driven by the CSS
- * transition in panel.css. Under the 'extended' motion level the background
- * layer (.blade-bg) also overshoots ~2% past the rest edge and settles back
- * (useOpenBounce) — a Dynamic-Island-style poke that moves only the black
- * shape; content in .blade stays put. 'standard' keeps the plain reveal
- * (scale pinned at 1). All compositor-friendly: scale is a transform
- * (Framer-driven), clip-path is a promoted compositor clip. No filter/blur —
- * repainting the whole blade every frame was the jank source. Unlike the
- * flyout presets, this motion is intentionally not gated on
- * prefers-reduced-motion (see useOpenBounce) — the reveal always animates
+ * transition in panel.css. The background layer (.blade-bg, including the two
+ * edge flares that connect its corners to the screen edge) also overshoots
+ * past the rest edge and settles back (useOpenBounce) — a Dynamic-Island-style
+ * poke that moves only the black shape; content in .blade stays put.
+ * 'standard' keeps the basic single exceed-and-settle (~2%); 'extended'
+ * doubles it — over-scale, then over-shrink on the pull-back, then settle
+ * (upstream's "bounced twice" feel, tamed). All compositor-friendly: scale
+ * is a transform (Framer-driven), clip-path is a promoted compositor clip.
+ * No filter/blur — repainting the whole blade every frame was the jank
+ * source. Unlike the flyout presets, this motion is intentionally not gated
+ * on prefers-reduced-motion (see useOpenBounce) — the reveal always animates
  * and the OS "animations off" setting was silently killing it.
  * When closed, the clip-path keeps only the spoke visible so the window stays
  * transparent and click-through.
@@ -70,10 +72,16 @@ export function Panel() {
     (it) => !it.pinned && matchesClipboardFilter(it, clipboardFilter || 'all')
   ).length
 
-  // Blade open motion — under 'extended' a Dynamic-Island-style
-  // exceed-and-settle timed to the clip reveal's end; 'standard' stays flat.
-  const openBounce = useOpenBounce()
+  // Blade open motion — Dynamic-Island-style exceed-and-settle timed to the
+  // clip reveal's end; 'extended' doubles the bounce (see useOpenBounce).
+  const openBounce = useOpenBounce(settings.motionLevel)
   const extended = settings.motionLevel === 'extended'
+  // Snapshot the keyframes for the current open session. Switching the motion
+  // level mid-open must not replay the bounce (framer-motion treats a changed
+  // keyframe array as a new animation); the ref only refreshes while closed,
+  // so the next open picks up the new level.
+  const bounceKeyframes = useRef<number[]>(openBounce.keyframes)
+  if (!open) bounceKeyframes.current = openBounce.keyframes
   // View/settings transitions: 'extended' slides with direction (x ±10);
   // 'standard' cross-fades — the slide is directional delight, not navigation.
   const viewSlide = extended ? 10 : 0
@@ -310,9 +318,11 @@ export function Panel() {
               : `inset(calc(50% - ${halfTrigger}px) calc(100% - ${settings.hotZoneWidth || 3}px) calc(50% - ${halfTrigger}px) 0px round 0px 24px 24px 0px)`
         }}
       >
-        {/* The black shape. The open bounce (extended level only, useOpenBounce)
-            lives here — content in .blade below never scales, so only the
-            background pokes past and settles back. */}
+        {/* The black shape — blade-bg plus the two edge flares (the reverse
+            curves connecting the blade's corners to the screen edge). The
+            open bounce (useOpenBounce) lives on this whole group: content in
+            .blade below never scales, so only the black shape — corners and
+            flares together — pokes past and settles back. */}
         <motion.div
           className="blade-bg"
           style={{
@@ -320,53 +330,52 @@ export function Panel() {
             originY: 0.5
           }}
           animate={{
-            scale: switcherActive ? 1 : open && extended ? [1, 1.02, 1] : 1
+            scale: switcherActive ? 1 : open ? bounceKeyframes.current : 1
           }}
           transition={{
             scale: switcherActive
               ? { duration: open ? 0.1 : 0.06, ease: open ? [0.22, 1, 0.36, 1] : [0, 0, 1, 1] }
               : open
-                ? extended
-                  ? openBounce
-                  : { duration: 0, ease: [0, 0, 1, 1] }
+                ? openBounce.transition
                 : { duration: 0.08, ease: [0, 0, 1, 1] }
           }}
-        />
-        {/* Edge Location Hint Beacon (Ultra-subtle fast hairline pulse when touching edge at wrong position) */}
-        <AnimatePresence>
-          {!open && edgeHintActive && (settings.showEdgeLocationHint ?? false) && (
-            <motion.div
-              key="edge-location-beacon"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.5 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              style={{
-                position: 'absolute',
-                top: insetTop,
-                bottom: insetBottom,
-                [isRight ? 'right' : 'left']: 0,
-                width: 2,
-                boxSizing: 'border-box',
-                background: 'linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.65) 25%, rgba(255, 255, 255, 0.65) 75%, transparent)',
-                boxShadow: '0 0 6px rgba(255, 255, 255, 0.3)',
-                borderRadius: isRight ? '999px 0 0 999px' : '0 999px 999px 0',
-                pointerEvents: 'none',
-                zIndex: 99
-              }}
-            />
-          )}
-        </AnimatePresence>
-        <div className={`flare-top${settings.stickPosition === 'right' ? ' flare-right' : ''}`}>
-          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 0 0 L 0 30 L 30 30 A 30 30 0 0 1 0 0 Z" fill="#000000" />
-          </svg>
-        </div>
-        <div className={`flare-bottom${settings.stickPosition === 'right' ? ' flare-right' : ''}`}>
-          <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M 0 30 L 0 0 L 30 0 A 30 30 0 0 0 0 30 Z" fill="#000000" />
-          </svg>
-        </div>
+        >
+          {/* Edge Location Hint Beacon (Ultra-subtle fast hairline pulse when touching edge at wrong position) */}
+          <AnimatePresence>
+            {!open && edgeHintActive && (settings.showEdgeLocationHint ?? false) && (
+              <motion.div
+                key="edge-location-beacon"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.5 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                style={{
+                  position: 'absolute',
+                  top: insetTop,
+                  bottom: insetBottom,
+                  [isRight ? 'right' : 'left']: 0,
+                  width: 2,
+                  boxSizing: 'border-box',
+                  background: 'linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.65) 25%, rgba(255, 255, 255, 0.65) 75%, transparent)',
+                  boxShadow: '0 0 6px rgba(255, 255, 255, 0.3)',
+                  borderRadius: isRight ? '999px 0 0 999px' : '0 999px 999px 0',
+                  pointerEvents: 'none',
+                  zIndex: 99
+                }}
+              />
+            )}
+          </AnimatePresence>
+          <div className={`flare-top${settings.stickPosition === 'right' ? ' flare-right' : ''}`}>
+            <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M 0 0 L 0 30 L 30 30 A 30 30 0 0 1 0 0 Z" fill="#000000" />
+            </svg>
+          </div>
+          <div className={`flare-bottom${settings.stickPosition === 'right' ? ' flare-right' : ''}`}>
+            <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M 0 30 L 0 0 L 30 0 A 30 30 0 0 0 0 30 Z" fill="#000000" />
+            </svg>
+          </div>
+        </motion.div>
         <div
           ref={bladeRef}
           className="blade"

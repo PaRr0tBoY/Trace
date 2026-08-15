@@ -1,5 +1,5 @@
 /**
- * Transfer Station domain module (ADR-0006 / ADR-0007, ticket #3).
+ * Transfer Station domain module (ADR-0008, ticket #3).
  *
  * Pure logic, zero Electron imports, vitest-tested. Owns the station entry
  * model — paths, route (drag-in | clipboard), pinned, inTransit, capturedAt —
@@ -14,7 +14,7 @@
 import { statSync } from 'node:fs'
 import { extname, basename } from 'node:path'
 
-/** How an entry entered the station (ADR-0006): 拖入 or 剪贴板捕获. */
+/** How an entry entered the station (ADR-0008): 拖入 or 剪贴板捕获. */
 export type StationRoute = 'drag-in' | 'clipboard'
 
 /** Cached per-path stat snapshot used for staleness detection. */
@@ -30,7 +30,7 @@ export interface StationEntry {
   route: StationRoute
   pinned: boolean
   /**
-   * True while a move is staged (ADR-0007 M-a): the original files have been
+   * True while a move is staged (ADR-0008 M-a): the original files have been
    * renamed into the station staging area and are held here. In-transit
    * entries are immune to auto-pruning and can only be disposed of manually
    * (drag out again or delete).
@@ -79,6 +79,30 @@ export interface StationMigrationResult {
   migratedIds: string[]
 }
 
+/**
+ * The files of an entry that the APP itself owns and may dispose of (Recycle
+ * Bin) when the entry is deleted or pruned — never user originals.
+ *
+ * - In-transit entries hold staged copies (ADR-0008 M-a): every path is
+ *   app-owned by construction (stagedMove retargets into the stage dir).
+ * - Non-in-transit entries reference the user's originals, EXCEPT T7 staged
+ *   content: text/image drops the app wrote into the station content dir.
+ *   Those must be recycled too — otherwise a deleted entry leaves the
+ *   user's dropped text on disk forever.
+ *
+ * Comparison is case-insensitive on Windows paths and boundary-safe (a
+ * sibling directory that merely shares the prefix is not "inside").
+ */
+export function appOwnedPathsFor(entry: StationEntry, contentDir: string): string[] {
+  if (entry.inTransit) return [...entry.paths]
+  if (!contentDir) return []
+  const dir = contentDir.replace(/[\\/]+$/, '').toLowerCase()
+  return entry.paths.filter((p) => {
+    const lower = p.toLowerCase()
+    return lower === dir || lower.startsWith(`${dir}\\`) || lower.startsWith(`${dir}/`)
+  })
+}
+
 /** Same extension set as ItemStore.isImageExt; duplicated because it is not exported. */
 function isImageExt(p: string): boolean {
   return /\.(png|jpe?g|gif|webp|bmp|svg|avif|ico|tiff?|jfif|pjpeg|pjp)$/i.test(p)
@@ -117,7 +141,7 @@ export class TransferStation {
 
   /**
    * Restore persisted entries at startup (the read side of the JSON index;
-   * the persisted shape is StationEntry as-is, ADR-0006). Malformed rows are
+   * the persisted shape is StationEntry as-is, ADR-0008). Malformed rows are
    * dropped so a corrupt index can never break hydration.
    */
   hydrate(entries: StationEntry[]): void {
@@ -198,6 +222,13 @@ export class TransferStation {
     return removed
   }
 
+  /** Re-insert a previously pruned entry (used when file disposal failed and
+   * the entry must stay visible for retry). Preserves capturedAt so the next
+   * retention sweep retries on the same schedule. */
+  restore(entry: StationEntry): void {
+    this.entries.unshift(entry)
+  }
+
   pin(id: string, pinned: boolean): boolean {
     const idx = this.indexOf(id)
     if (idx < 0) return false
@@ -205,7 +236,7 @@ export class TransferStation {
     return true
   }
 
-  /** Flag an entry as in-transit (ADR-0007 M-a staging) or clear the flag. */
+  /** Flag an entry as in-transit (ADR-0008 M-a staging) or clear the flag. */
   setInTransit(id: string, inTransit: boolean): boolean {
     const idx = this.indexOf(id)
     if (idx < 0) return false
@@ -274,7 +305,7 @@ export class TransferStation {
   }
 
   /**
-   * First-launch migration (ADR-0006): legacy clipboard-stack `files` items
+   * First-launch migration (ADR-0008): legacy clipboard-stack `files` items
    * become station entries with route = 剪贴板, keeping id / capturedAt /
    * pinned. Image and other items are left untouched (they stay in the
    * stack). Entries without paths are skipped.

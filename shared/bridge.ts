@@ -33,7 +33,7 @@ export interface EdgeApi {
    */
   startDrag: (req: DragRequest) => void
 
-  /* Transfer station (ADR-0006) */
+  /* Transfer station (ADR-0008) */
   /** Full current station entry list (also included in loadState). */
   stationList: () => Promise<import('./station').StationEntryDto[]>
   /** Enter dragged-in file paths (route = 拖入). */

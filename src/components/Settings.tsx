@@ -486,7 +486,7 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
 
                   <div className="setting-divider" />
 
-                  {/* ── Drag-out mode (ADR-0007): copy vs staged move ── */}
+                  {/* ── Drag-out mode (ADR-0008): copy vs staged move ── */}
                   <div className="setting-row vertical" style={{ gap: 8 }}>
                     <div className="setting-info">
                       <div className="setting-title">{t('behaviour.moveModeTitle')}</div>

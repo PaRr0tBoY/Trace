@@ -458,7 +458,7 @@ export function Panel() {
                 style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
-                <NotesView />
+                <NotesView onFooterChange={setReportedFooter} />
                 <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to top, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
               </motion.div>
             ) : (
@@ -486,6 +486,8 @@ export function Panel() {
                 noun="item"
                 clearLabel={t('item.clear')}
                 clearTitle={t('item.clearScoped')}
+                confirmLabel={t('item.confirmClear')}
+                confirmTitle={t('item.confirmClearTitle')}
                 clearDisabled={clipboardScopeCount === 0}
                 onClear={clearScopedClipboard}
               />

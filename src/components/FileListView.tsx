@@ -1,7 +1,7 @@
 /**
  * FileListView — the files view body (ADR-0004).
  *
- * 'all' renders the grouped entries — transfer station cards (ADR-0006)
+ * 'all' renders the grouped entries — transfer station cards (ADR-0008)
  * first, then legacy stack file entries (reusing ClipboardItemCard).
  * Station entries are single-file since the grouping removal (2026-08-14)
  * and render as the clipboard card style with station routing. An
@@ -220,6 +220,8 @@ export function FileListView({ onFooterChange }: Props) {
           noun: 'item',
           clearLabel: t('item.clear'),
           clearTitle: t('item.clearScoped'),
+          confirmLabel: t('item.confirmClear'),
+          confirmTitle: t('item.confirmClearTitle'),
           clearDisabled: scopeCount === 0,
           onClear: clearScopedFiles
         }
@@ -228,6 +230,8 @@ export function FileListView({ onFooterChange }: Props) {
           noun: 'item',
           clearLabel: t('item.clear'),
           clearTitle: t('item.clearScoped'),
+          confirmLabel: t('item.confirmClear'),
+          confirmTitle: t('item.confirmClearTitle'),
           clearDisabled: !memberScopeClearable,
           onClear: clearScopedMembers
         })

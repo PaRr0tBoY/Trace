@@ -52,7 +52,7 @@ export type ManualCheckState =
 
 interface AppState {
   items: ClipboardItemDto[]
-  /** Transfer station entries (ADR-0006): files domain, separate from the stack. */
+  /** Transfer station entries (ADR-0008): files domain, separate from the stack. */
   station: StationEntryDto[]
   tasks: TaskDto[]
   setStation: (entries: StationEntryDto[]) => void

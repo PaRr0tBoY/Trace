@@ -157,7 +157,7 @@ app.whenReady().then(async () => {
   // starts with the hook uninstalled).
   setPanelInteractive(isInteractive())
 
-  // OS drag detection (T4b, ADR-0007): SetWinEventHook 0x0F/0x10 in a
+  // OS drag detection (T4b, ADR-0008): SetWinEventHook 0x0F/0x10 in a
   // utilityProcess + DragWindow poll fallback; feeds the dragSession state
   // machine (panel expand on file drag anywhere, heartbeat pause, retract).
   startDragDetect()

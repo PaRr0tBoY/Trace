@@ -98,7 +98,7 @@ export function collectFileMembers(items: ClipboardItemDto[]): FileMember[] {
 }
 
 /**
- * All file members across the transfer station (ADR-0006), in entry order.
+ * All file members across the transfer station (ADR-0008), in entry order.
  * Parallel to collectFileMembers; station entries carry their own per-path
  * metadata (stats cache) instead of FileEntry records.
  */

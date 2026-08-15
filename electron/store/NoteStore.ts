@@ -168,6 +168,13 @@ export class NoteStore {
     this.scheduleSave()
   }
 
+  /** Hard-delete every note (notes-view footer "clear all"). */
+  clearAll(): void {
+    if (this.notes.length === 0) return
+    this.notes = []
+    this.scheduleSave()
+  }
+
   /** Cancel any pending debounce and write immediately (app quit). */
   flush(): void {
     if (this.saveTimer !== null) {

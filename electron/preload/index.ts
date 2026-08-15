@@ -207,7 +207,7 @@ const api = {
 
   removeSubitem: (req: import('../../shared/types').DragRequest) => invoke('item:remove-subitem', req),
 
-  /* Transfer station (ADR-0006) */
+  /* Transfer station (ADR-0008) */
   stationList: () => invoke('station:list'),
   stationEnter: (paths: string[]) => invoke('station:enter', paths),
   stationEnterContent: (input: StationContentInput) => invoke('station:enter-content', input),

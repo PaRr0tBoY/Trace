@@ -22,12 +22,12 @@ export const PATHS = {
   indexFile: () => join(root(), 'items.json'),
   /** Path to the task index JSON. */
   tasksFile: () => join(root(), 'tasks.json'),
-  /** Path to the transfer station index JSON (ADR-0006). */
+  /** Path to the transfer station index JSON (ADR-0008). */
   stationFile: () => join(root(), 'station.json'),
   /** Directory for content staged from non-file drag-in (T7): text/image
    *  drops become real files here before entering the station. */
   stationContentDir: () => join(root(), 'station-content'),
-  /** Directory holding the files of in-transit entries (ADR-0007 M-a):
+  /** Directory holding the files of in-transit entries (ADR-0008 M-a):
    *  originals are taken over here at drag start. Never cleaned at startup
    *  (unlike tempDir) — in-transit entries own these files until the move
    *  completes or the entry is deleted. */

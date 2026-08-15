@@ -544,7 +544,7 @@ export class TaskStore {
     target.resources = mergeResources(target.resources, source.resources)
     target.lastActiveAt = Math.max(target.lastActiveAt, source.lastActiveAt)
     // Summing would double-count (a temp candidate task is ~0 anyway);
-    // the larger settled value wins (ADR-0006).
+    // the larger settled value wins (spec 实现决策 4).
     target.activeMs = Math.max(target.activeMs, source.activeMs)
     // A RUNNING source leaves RUNNING when it is absorbed — settle its
     // in-flight segment first (runningTaskCount only ever decreases here;
@@ -797,7 +797,7 @@ export class TaskStore {
       }
     }
 
-    // Leaving RUNNING settles the in-flight active segment (ADR-0006) and
+    // Leaving RUNNING settles the in-flight active segment (spec 实现决策 4) and
     // the open session (spec 实现决策 4) — one atomic transition.
     if (from === 'running') {
       this.settleActiveSegment(task, now)
@@ -874,7 +874,7 @@ export class TaskStore {
   }
 
   /**
-   * Fold the current RUNNING segment into activeMs (ADR-0006). Idempotent —
+   * Fold the current RUNNING segment into activeMs (spec 实现决策 4). Idempotent —
    * a task that already left RUNNING has nothing left to settle.
    */
   private settleActiveSegment(task: Task, now: number): void {

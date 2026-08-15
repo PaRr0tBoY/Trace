@@ -1,5 +1,5 @@
 /**
- * Drag-out staging decisions (ADR-0007 M-a) — pure module, zero Electron
+ * Drag-out staging decisions (ADR-0008 M-a) — pure module, zero Electron
  * imports, vitest-tested.
  *
  * Two seams:
@@ -21,7 +21,7 @@
  *      so a stalled session can never wedge. N = 30s initial per T4a,
  *      to be calibrated against real drag data.
  *
- * Both directions are safe by construction (ADR-0007 §5): cancel keeps the
+ * Both directions are safe by construction (ADR-0008 §5): cancel keeps the
  * file in the station; a wrong success only ever sends the staged copy to
  * the Recycle Bin, never permanently deletes anything.
  */

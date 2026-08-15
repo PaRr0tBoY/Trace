@@ -22,12 +22,17 @@ import {
 import { PATHS } from './paths'
 import { createId } from './ids'
 import { thumbUrl } from '../main/imageProtocol'
+import { hashText } from './textHash'
 
 /** Stable, content-based key used for deduplication. */
 function signature(data: ItemData): string {
   switch (data.kind) {
     case 'text':
-      return `text|${data.text}`
+      // The hash is the FULL content's identity — `data.text` is only the
+      // 300-char preview for large payload-backed items, so a preview-based
+      // signature would break dedup after restarts (and swallow short texts
+      // that equal another item's preview).
+      return `text|${data.contentHash ?? data.text}`
     case 'image':
       return `image|${data.imageId}`
     case 'image-collection':
@@ -105,10 +110,26 @@ export class ItemStore {
           }
         }
 
+        // Backfill the content hash for legacy items (captured before the
+        // hash existed): full payload on disk wins, preview is the fallback.
+        let migratedAnyHashes = false
+        for (const it of this.items) {
+          if (it.data.kind === 'text' && !it.data.contentHash) {
+            if (it.data.hasFullPayload) {
+              const p = this.textPayloadPath(it.id)
+              try {
+                if (existsSync(p)) it.data.contentHash = hashText(readFileSync(p, 'utf8'))
+              } catch { /* fall through to the preview fallback */ }
+            }
+            if (!it.data.contentHash) it.data.contentHash = hashText(it.data.text)
+            migratedAnyHashes = true
+          }
+        }
+
         this.rebuildIndex()
 
         // Auto-migrate legacy plain JSON: create backup & upgrade to DPAPI encryption
-        if (needsMigration || migratedAnyPayloads) {
+        if (needsMigration || migratedAnyPayloads || migratedAnyHashes) {
           console.log('[ItemStore] Migrating items.json to DPAPI safeStorage encryption and disk payloads...')
           try {
             const backupFile = `${file}.v1.bak`
@@ -214,6 +235,11 @@ export class ItemStore {
   add(data: ItemData, limit: number, sourceApp?: SourceApp): boolean {
     if (data.kind === 'text' && data.text.length > 500000) {
       data = { ...data, text: data.text.slice(0, 500000) }
+    }
+    // Identity hash from the FULL text, computed before the payload
+    // truncation below — the signature must stay stable across restarts.
+    if (data.kind === 'text') {
+      data = { ...data, contentHash: hashText(data.text) }
     }
     const sig = signature(data)
     const existingId = this.sigToId.get(sig)
@@ -380,6 +406,9 @@ export class ItemStore {
         if (it.data.kind === 'image-collection') {
           it.data.images.forEach((img) => this.removeImageFile(img.imageId))
         }
+        // Same contract as trim/delete/clearUnpinned: an expired large-text
+        // item must not leave its clipboard payload behind on disk.
+        if (it.data.kind === 'text') this.removeTextPayload(it.id)
       }
     }
     if (removedAny) {

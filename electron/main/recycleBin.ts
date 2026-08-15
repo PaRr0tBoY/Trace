@@ -1,7 +1,7 @@
 /**
  * Recycle Bin disposal (FOF_ALLOWUNDO) — shell32 SHFileOperationW via koffi.
  *
- * ADR-0007: no action in the station feature permanently deletes a file; the
+ * ADR-0008: no action in the station feature permanently deletes a file; the
  * worst case is a Recycle Bin copy. Deleting an in-transit entry (or
  * completing a staged move) sends the held files here instead of unlinking
  * them. SHFileOperationW handles files and directories in one call and
@@ -50,7 +50,7 @@ function buildMultiSz(paths: string[]): Buffer {
  * Move the given files/directories to the Recycle Bin (undo enabled, silent,
  * no confirmation or error dialogs). Returns false when the operation failed
  * or koffi is unavailable — callers must then keep their state unchanged so
- * the user can retry (ADR-0007: nothing is ever permanently deleted).
+ * the user can retry (ADR-0008: nothing is ever permanently deleted).
  */
 export function disposeToRecycleBin(paths: string[]): boolean {
   if (paths.length === 0) return true

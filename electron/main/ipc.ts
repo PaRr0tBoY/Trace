@@ -18,7 +18,6 @@ import { isTraceRecordDto, renderTraceReportHtml } from './traceReport'
 import { sendToMainWindow, setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData, prefetchFileIcons, stageMoveDrag } from './drag'
-import { disposeToRecycleBin } from './recycleBin'
 import { enterContentToStation } from './contentToFile'
 import { activateAppWindow } from './windowSwitch'
 import { switcherHover, switcherClick, switcherCancel } from './switcher'
@@ -228,7 +227,7 @@ export function registerIpc(): void {
     }
   })
 
-  /* --------------------------- transfer station (ADR-0006) --------------------------- */
+  /* --------------------------- transfer station (ADR-0008) --------------------------- */
 
   handle('station:list', () => getStationStore().toDto())
 
@@ -248,15 +247,14 @@ export function registerIpc(): void {
   })
 
   handle('station:delete', (id) => {
-    const entry = getStationStore().get(id)
-    // An in-transit entry holds its files in the staging area: deleting it
-    // sends them to the Recycle Bin (ADR-0007). A failed disposal keeps the
-    // entry so the user can retry — nothing is ever permanently deleted.
-    if (entry?.inTransit && entry.paths.length > 0 && !disposeToRecycleBin(entry.paths)) {
+    // App-owned files (in-transit staged copies + T7 content drops) are
+    // recycled inside the store; a failed disposal keeps the entry so the
+    // user can retry (ADR-0008: nothing is ever permanently deleted).
+    const removed = getStationStore().remove(id)
+    if (!removed && getStationStore().get(id)) {
       toast('Held files could not be sent to the Recycle Bin; entry kept for retry', 'error')
       return getStationStore().toDto()
     }
-    getStationStore().remove(id)
     // A deleted entry that is still on the clipboard must not zombie
     // re-enter on the next watcher tick (same contract as item:delete).
     getWatcher().resyncSignature()
@@ -405,7 +403,7 @@ export function registerIpc(): void {
   })
 
   handle('task:link-item', (taskId, itemId) => {
-    // Station entries link as files resources (ADR-0006): the station lookup
+    // Station entries link as files resources (ADR-0008): the station lookup
     // falls back when the id is not a clipboard-stack item.
     const item = getStore().get(itemId) ?? stationClipboardItem(itemId)
     if (item) {
@@ -456,6 +454,12 @@ export function registerIpc(): void {
 
   handle('note:delete', (id) => {
     getNoteStore().delete(id)
+    pushState.notes()
+    return getNoteStore().toDto()
+  })
+
+  handle('note:clearAll', () => {
+    getNoteStore().clearAll()
     pushState.notes()
     return getNoteStore().toDto()
   })
@@ -518,7 +522,7 @@ export function registerIpc(): void {
     const ref: ResourceRef | null =
       resource.kind === 'clipboard'
         ? (() => {
-            // Station entries link as files resources (ADR-0006): the station
+            // Station entries link as files resources (ADR-0008): the station
             // lookup falls back when the id is not a clipboard-stack item.
             const item = getStore().get(resource.itemId) ?? stationClipboardItem(resource.itemId)
             return item ? buildClipboardRef(item) : null
@@ -1061,7 +1065,7 @@ export function registerSendListeners(): void {
   on('item:start-drag', (sender, req) => {
     console.log('[IPC] item:start-drag req=', JSON.stringify(req))
     // Station whole-entry drags (no explicit paths) fall back to a files
-    // bundle built from the entry's paths (ADR-0006). Member drags carry
+    // bundle built from the entry's paths (ADR-0008). Member drags carry
     // explicit paths and are resolved by resolveDragData directly.
     let data = resolveDragData(req)
     if (!data) {
@@ -1080,7 +1084,7 @@ export function registerSendListeners(): void {
     }
     console.log('[IPC] start-drag: kind=', data.kind)
 
-    // ADR-0007 M-a: in move mode a station file drag stages the originals
+    // ADR-0008 M-a: in move mode a station file drag stages the originals
     // into the takeover area before the OS drag sources them; the entry is
     // retargeted and marked in-transit. 'skip' means a file is missing — the
     // drag must not start at all.

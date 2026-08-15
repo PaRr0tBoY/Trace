@@ -98,7 +98,7 @@ export interface InvokeMap {
   /** Copy a sub-item and paste it directly into the active application. */
   'item:paste-subitem': { args: [req: DragRequest]; result: boolean }
 
-  /* --------------------------- transfer station (ADR-0006) --------------------------- */
+  /* --------------------------- transfer station (ADR-0008) --------------------------- */
 
   /** Full current station entry list (also included in state:load). */
   'station:list': { args: []; result: StationEntryDto[] }
@@ -366,7 +366,7 @@ export type SmartExternalKind = 'wheel' | 'copy' | 'lock' | 'sleep'
 export interface EventMap {
   /** Full new item list whenever the history changes. */
   'state:items': [items: ClipboardItemDto[]]
-  /** Full new station entry list whenever the transfer station changes (ADR-0006). */
+  /** Full new station entry list whenever the transfer station changes (ADR-0008). */
   'state:station': [entries: StationEntryDto[]]
   /** Full task list whenever the task domain changes. */
   'state:tasks': [tasks: TaskDto[]]

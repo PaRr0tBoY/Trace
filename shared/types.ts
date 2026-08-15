@@ -74,7 +74,7 @@ export interface ScreenPoint {
 }
 
 /**
- * Drag-out semantics (ADR-0007): 'copy' drags the original paths and leaves
+ * Drag-out semantics (ADR-0008): 'copy' drags the original paths and leaves
  * entry and source untouched; 'move' stages the originals into the station
  * staging area at drag start (接管式移动) and completes on a successful drop.
  */
@@ -309,7 +309,7 @@ export interface Task {
   updatedAt: number
   lastActiveAt: number
   /**
-   * Cumulative time the task has spent in RUNNING (ms, ADR-0006). Settled
+   * Cumulative time the task has spent in RUNNING (ms, spec 实现决策 4). Settled
    * whenever the task leaves RUNNING (pause/complete/archive + idle timeout
    * + auto-switch displacement); never reset on resume. Displayed as
    * "Running {duration}".
@@ -347,7 +347,7 @@ export interface TaskDto extends Task {
  * one session is open globally (the RUNNING task's). Sessions are the
  * container for the activities observed during the run (1:N — an activity
  * never maps 1:1 to a session) and provide instance-level history on top of
- * the aggregate `activeMs` (ADR-0006), whose semantics are unchanged.
+ * the aggregate `activeMs` (spec 实现决策 4), whose semantics are unchanged.
  */
 export interface TaskSession {
   id: string // 's_' prefix
@@ -635,7 +635,7 @@ export interface Settings {
   /** When true, automatically clears unpinned items on device/app restart. */
   clearUnpinnedOnRestart: boolean
   /**
-   * Drag-out semantics (ADR-0007): 'copy' = destination gets a copy, entry
+   * Drag-out semantics (ADR-0008): 'copy' = destination gets a copy, entry
    * and source untouched; 'move' (default) = staged takeover move, the
    * original is taken into the station at drag start.
    */
@@ -646,7 +646,7 @@ export interface Settings {
   uiStyle: 'modern' | 'compact'
   /**
    * Accent theme for the panel UI, drag ghosts, and the copy indicator
-   * (ADR-0007/Ticket 3). The five color values live in shared/themes.ts.
+   * (ADR-0008/Ticket 3). The five color values live in shared/themes.ts.
    */
   themeColor: ThemeColor
   /** Flag to track if the onboarding tutorial is completed. */

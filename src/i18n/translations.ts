@@ -167,6 +167,8 @@ export interface TranslationKeys {
     unpin: string
     delete: string
     clear: string
+    confirmClear?: string
+    confirmClearTitle?: string
     clearLast1h?: string
     clearLast6h?: string
     clearLast24h?: string
@@ -190,7 +192,7 @@ export interface TranslationKeys {
     moreImages: string
     moreFiles: string
     singleFile: string
-    /** Station route badge (ADR-0006); only en is populated, others fall back to en. */
+    /** Station route badge (ADR-0008); only en is populated, others fall back to en. */
     routeClipboard?: string
     inTransit: string
     fileMissing: string
@@ -982,6 +984,8 @@ export const en: TranslationKeys = {
     "missingFilesBanner": "{count} entries lost their files",
     "clearMissing": "Clean up",
     "clearScoped": "Clear this view's items",
+    "confirmClear": "Confirm",
+    "confirmClearTitle": "Click again to confirm",
     "routeClipboard": "Clipboard",
     "scrollToTop": "Scroll to top"
   },
@@ -6520,6 +6524,8 @@ export const zhCN: TranslationKeys = {
     "missingFilesBanner": "{count} 个条目的文件已消失",
     "clearMissing": "清理",
     "clearScoped": "清空当前视图的条目",
+    "confirmClear": "确认清除",
+    "confirmClearTitle": "再次点击确认清除",
     "scrollToTop": "滚动到顶部"
   },
   "fileKinds": {
@@ -7130,6 +7136,8 @@ export const zhTW: TranslationKeys = {
     "missingFilesBanner": "{count} 個條目的檔案已消失",
     "clearMissing": "清理",
     "clearScoped": "清空目前檢視的項目",
+    "confirmClear": "確認清除",
+    "confirmClearTitle": "再次點擊確認清除",
     "scrollToTop": "捲動到頂部"
   },
   "fileKinds": {

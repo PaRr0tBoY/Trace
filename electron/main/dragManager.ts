@@ -1,5 +1,5 @@
 /**
- * Main-process side of drag detection (T4b, ADR-0007).
+ * Main-process side of drag detection (T4b, ADR-0008).
  *
  * Forks the detector into a utilityProcess (dragHost.js) — see dragHost.ts
  * for why the hook must not run in the Electron main process. This module
@@ -21,7 +21,7 @@
  * the moment the cursor crosses the blade edge).
  *
  * The end-time facts (fgExe/fgClass/curClass/curExe) are kept on
- * getLastDragEndFacts for T3's drop-success heuristic (ADR-0007 addendum
+ * getLastDragEndFacts for T3's drop-success heuristic (ADR-0008 addendum
  * point 2); this module only consumes the end event itself.
  */
 import { utilityProcess, screen } from 'electron'
@@ -235,7 +235,7 @@ function armTimeout(): void {
 
 function handleStart(msg: HostStartMsg): void {
   const cursorInPanel = cursorInPanelAt(msg.cursor)
-  // Real-drag data (ADR-0007 T4a + 2026-08-14 capture measurements): starts
+  // Real-drag data (ADR-0008 T4a + 2026-08-14 capture measurements): starts
   // come from the capture hook (OLE drags — ole32 captures the mouse to its
   // CLIPBRDWNDCLASS window) or the DragWindow poll, neither of which names
   // a source window the manager could classify; 0x0F never fires. Treating

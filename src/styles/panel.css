@@ -437,6 +437,19 @@
   border-color: rgba(255, 128, 128, 0.3);
   background: rgba(255, 80, 80, 0.15);
 }
+/* Two-step confirm armed: solid red — the button now means "execute".
+   The halo makes the state switch unmistakable at a glance. */
+.footer .text-btn.confirming:not(:disabled) {
+  color: #ffffff;
+  border-color: #dc2626;
+  background: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.22);
+}
+.footer .text-btn.confirming:hover:not(:disabled) {
+  color: #ffffff;
+  border-color: #ef4444;
+  background: #ef4444;
+}
 
 /* ----------------------------------------------------------------- */
 /* Toasts                                                            */

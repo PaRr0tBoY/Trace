@@ -7,7 +7,7 @@
  * the path, the pin button pins the parent entry. No delete — deletion is
  * entry-level.
  *
- * The parent entry may live in the transfer station (ADR-0006) instead of
+ * The parent entry may live in the transfer station (ADR-0008) instead of
  * the clipboard stack; actions then route to the station channels. Station
  * members skip the pin button (station cards pin at entry level) and can
  * render a split-out button via `onSplit`.
@@ -47,7 +47,7 @@ export function FileMemberRow({ member, showPin = true }: Props) {
 
   if (!entry) return null
   const isStation = !!stationEntry
-  // Missing on-disk files stay visible but dimmed (station staleness, ADR-0006).
+  // Missing on-disk files stay visible but dimmed (station staleness, ADR-0008).
   const dimmed = member.exists === false
 
   return (

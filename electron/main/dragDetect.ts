@@ -1,5 +1,5 @@
 /**
- * Drag detection (T4b, ADR-0007 T4a addendum + real-drag data 2026-08-14).
+ * Drag detection (T4b, ADR-0008 T4a addendum + real-drag data 2026-08-14).
  *
  * Runs inside a utilityProcess (dragHost.ts) — same isolation rationale as
  * keyboardHook.ts/hookHost.ts: an OS hook callback dispatched from the
@@ -133,7 +133,7 @@ export interface DragDetectStartFacts {
 export interface DragDetectEndFacts {
   reason: 'hook' | 'dragwindow' | 'capture'
   cursor: { x: number; y: number }
-  /** Drop-target heuristics for T3 (ADR-0007 addendum point 2). */
+  /** Drop-target heuristics for T3 (ADR-0008 addendum point 2). */
   fgExe: string
   fgClass: string
   curClass: string

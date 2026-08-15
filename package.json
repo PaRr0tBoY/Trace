@@ -1,6 +1,6 @@
 {
   "name": "trace",
-  "version": "2026.8.12",
+  "version": "2026.8.15",
   "description": "Trace — a clipboard manager that lives on the left edge of your screen and expands on hover.",
   "author": "Trace",
   "license": "MIT",
@@ -75,7 +75,7 @@
       "artifactName": "Trace-Setup-${version}.${ext}"
     },
     "appx": {
-      "identityName": "Deepender.EdgeDrop",
+      "identityName": "Parrotboy.Trace",
       "publisher": "CN=55FECDC4-7144-4A41-98FC-056C003F76FD",
       "publisherDisplayName": "Deepender",
       "applicationId": "EdgeDrop",

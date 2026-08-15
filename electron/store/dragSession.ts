@@ -1,8 +1,8 @@
 /**
- * Drag session state machine (T4b, ADR-0007).
+ * Drag session state machine (T4b, ADR-0008).
  *
  * Decides panel expand/retract, indicator visibility and always-on-top
- * heartbeat pause from the drag facts defined in ADR-0007:
+ * heartbeat pause from the drag facts defined in ADR-0008:
  * { isFileDrag, cursorInPanel, dragActive } plus the detection-zone fact
  * (user feedback 2026-08-14: a drag no longer pops the panel — a compact
  * indicator appears first, and the panel only expands once the cursor
@@ -10,7 +10,7 @@
  * Pure logic, zero Electron imports — vitest-tested directly (same pattern
  * as keyboardHook.ts's state machine).
  *
- * Behavior contract (ticket #7, amended by real-drag data — ADR-0007 T4a,
+ * Behavior contract (ticket #7, amended by real-drag data — ADR-0008 T4a,
  * and by the indicator rework — 2026-08-14):
  *   - A file drag starting with the panel closed shows the indicator and
  *     arms the detection zone (the screen space the expanded panel covers)
@@ -42,7 +42,7 @@
  * ended (stuck OLE session, source app died, event eaten). The manager
  * schedules an explicit end(timeout); this module also re-checks on every
  * event so a late start cannot resurrect a stale session. Initial value
- * 30 000 ms, to be calibrated against real drag data (ADR-0007 T4a addendum
+ * 30 000 ms, to be calibrated against real drag data (ADR-0008 T4a addendum
  * forbids fixing it without measurements).
  */
 

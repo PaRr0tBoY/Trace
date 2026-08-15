@@ -4,7 +4,7 @@
  * Pure functions, zero Electron imports — vitest drives them directly.
  * Content dropped as data (selected text, web-page images) has no original
  * path, so it is staged as a real file under the station content dir before
- * entering the station through the normal `station:enter` path (ADR-0006).
+ * entering the station through the normal `station:enter` path (ADR-0008).
  * Naming mirrors the text drag-out convention in drag.ts (`text-<ts>.txt`,
  * UTF-8 BOM so Notepad/Word detect the encoding).
  */

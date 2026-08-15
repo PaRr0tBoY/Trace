@@ -506,5 +506,19 @@ export function MarkdownEditor({
     if (view) view.dispatch({ effects: readOnly.reconfigure(reading ? EditorState.readOnly.of(true) : []) })
   }, [reading, editorRef, readOnly])
 
+  // External value changes (the footer "clear content" action, which flows
+  // through the store) replace the document live. Typing never reaches here
+  // — the store echoes the editor's own doc back, so doc === value. Reading
+  // mode's readOnly compartment would filter the replacement, so it is
+  // reconfigured off for the change and back on afterwards.
+  useEffect(() => {
+    const view = editorRef?.current
+    if (!view || view.state.doc.toString() === value) return
+    const wasReading = reading
+    view.dispatch({ effects: readOnly.reconfigure([]) })
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } })
+    if (wasReading) view.dispatch({ effects: readOnly.reconfigure(EditorState.readOnly.of(true)) })
+  }, [value, editorRef, reading, readOnly])
+
   return <div ref={hostRef} className="notes-cm-host" data-reading={reading} />
 }

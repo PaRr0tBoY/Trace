@@ -22,7 +22,13 @@ interface Harness {
   changes: () => number
 }
 
-function makeHarness(opts?: { now?: () => number; stat?: StationStoreDeps['stat']; createId?: () => string }): Harness {
+function makeHarness(opts?: {
+  now?: () => number
+  stat?: StationStoreDeps['stat']
+  createId?: () => string
+  contentDir?: StationStoreDeps['contentDir']
+  disposeFiles?: (paths: string[]) => boolean
+}): Harness {
   let saved: StationIndex | null = null
   const saves: StationIndex[] = []
   let changes = 0
@@ -37,7 +43,9 @@ function makeHarness(opts?: { now?: () => number; stat?: StationStoreDeps['stat'
     },
     now: opts?.now,
     stat: opts?.stat,
-    createId: opts?.createId
+    createId: opts?.createId,
+    contentDir: opts?.contentDir,
+    disposeFiles: opts?.disposeFiles
   })
   return {
     store,
@@ -237,5 +245,142 @@ describe('StationStore', () => {
     expect(dto[0].members).toEqual([{ name: 'img.PNG', ext: 'png', size: 7, isImage: true, exists: true }])
     expect(dto[1]).toMatchObject({ paths: ['c:\\a\\doc.pdf'] })
     expect(dto[1].members).toEqual([{ name: 'doc.pdf', ext: 'pdf', size: 5, isImage: false, exists: true }])
+  })
+
+  describe('app-owned file disposal (ADR-0007 / T7 content drops)', () => {
+    const contentDir = 'c:\\data\\station-content'
+
+    it('remove recycles only content-dir files; user originals are untouched', () => {
+      const disposed: string[][] = []
+      const h = makeHarness({
+        contentDir,
+        disposeFiles: (paths) => {
+          disposed.push([...paths])
+          return true
+        }
+      })
+      h.store.enter([`${contentDir}\\drop.txt`, 'c:\\originals\\report.pdf'], 'drag-in')
+      const contentEntry = h.saved()!.entries.find((e) => e.paths[0].startsWith(contentDir))!
+
+      expect(h.store.remove(contentEntry.id)).toBeDefined()
+      expect(disposed).toEqual([[`${contentDir}\\drop.txt`]])
+      expect(h.saved()?.entries.some((e) => e.paths[0] === 'c:\\originals\\report.pdf')).toBe(true)
+    })
+
+    it('remove keeps the entry when disposal fails (retry contract)', () => {
+      const h = makeHarness({ contentDir, disposeFiles: () => false })
+      h.store.enter([`${contentDir}\\drop.txt`], 'drag-in')
+      const id = h.saved()!.entries[0].id
+      const savesBefore = h.saves().length
+
+      expect(h.store.remove(id)).toBeUndefined()
+      expect(h.store.get(id)).toBeDefined()
+      expect(h.saved()?.entries.some((e) => e.id === id)).toBe(true)
+      expect(h.saves().length).toBe(savesBefore)
+    })
+
+    it('remove disposes every path of an in-transit entry (staged copies)', () => {
+      const disposed: string[][] = []
+      const h = makeHarness({
+        contentDir,
+        disposeFiles: (paths) => {
+          disposed.push([...paths])
+          return true
+        }
+      })
+      h.store.enter(['c:\\stage\\held.bin'], 'drag-in')
+      const id = h.saved()!.entries[0].id
+      h.store.retarget(id, ['c:\\stage\\held-a.bin', 'c:\\stage\\held-b.bin'])
+      h.store.setInTransit(id, true)
+
+      expect(h.store.remove(id)).toBeDefined()
+      expect(disposed).toEqual([['c:\\stage\\held-a.bin', 'c:\\stage\\held-b.bin']])
+    })
+
+    it('a sibling directory sharing the prefix is never disposed (boundary safety)', () => {
+      const disposed: string[][] = []
+      const h = makeHarness({
+        contentDir: 'c:\\data\\station-content',
+        disposeFiles: (paths) => {
+          disposed.push([...paths])
+          return true
+        }
+      })
+      h.store.enter(['c:\\data\\station-content-extra\\mine.pdf'], 'drag-in')
+      const id = h.saved()!.entries[0].id
+
+      h.store.remove(id)
+      expect(disposed).toEqual([])
+    })
+
+    it('prune recycles content files of expired entries', () => {
+      let clock = 1_000_000_000_000
+      const disposed: string[][] = []
+      const h = makeHarness({
+        now: () => clock,
+        contentDir,
+        disposeFiles: (paths) => {
+          disposed.push([...paths])
+          return true
+        }
+      })
+      h.store.enter([`${contentDir}\\old.txt`], 'drag-in')
+      const id = h.saved()!.entries[0].id
+      clock += 2 * 3600 * 1000
+
+      const pruned = h.store.prune(1)
+      expect(pruned.map((e) => e.id)).toEqual([id])
+      expect(disposed).toEqual([[`${contentDir}\\old.txt`]])
+    })
+
+    it('prune keeps the entry when disposal fails (retried next sweep)', () => {
+      let clock = 1_000_000_000_000
+      const h = makeHarness({ now: () => clock, contentDir, disposeFiles: () => false })
+      h.store.enter([`${contentDir}\\old.txt`], 'drag-in')
+      const id = h.saved()!.entries[0].id
+      clock += 2 * 3600 * 1000
+
+      expect(h.store.prune(1)).toHaveLength(0)
+      expect(h.store.get(id)).toBeDefined()
+      expect(h.saved()?.entries.some((e) => e.id === id)).toBe(true)
+    })
+
+    it('prune of user-original entries never calls the disposer', () => {
+      let clock = 1_000_000_000_000
+      let calls = 0
+      const h = makeHarness({
+        now: () => clock,
+        contentDir,
+        disposeFiles: () => {
+          calls++
+          return true
+        }
+      })
+      h.store.enter(['c:\\originals\\old.pdf'], 'drag-in')
+      const id = h.saved()!.entries[0].id
+      clock += 2 * 3600 * 1000
+
+      expect(h.store.prune(1).map((e) => e.id)).toEqual([id])
+      expect(calls).toBe(0)
+    })
+
+    it('contentDir may be a lazy getter — not resolved at construction', () => {
+      let resolved = false
+      const h = makeHarness({
+        contentDir: () => {
+          resolved = true
+          return contentDir
+        },
+        disposeFiles: () => true
+      })
+      // Import-time regression guard: constructing the store (as state.ts
+      // does at module scope) must not force a userData lookup.
+      expect(resolved).toBe(false)
+
+      h.store.enter([`${contentDir}\\drop.txt`], 'drag-in')
+      const id = h.saved()!.entries[0].id
+      h.store.remove(id)
+      expect(resolved).toBe(true)
+    })
   })
 })

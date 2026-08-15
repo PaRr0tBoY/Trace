@@ -1,5 +1,5 @@
 /**
- * Transfer Station types, renderer-facing (ADR-0006 / ADR-0007).
+ * Transfer Station types, renderer-facing (ADR-0008).
  *
  * The station domain module (electron/store/transferStation.ts) defines its
  * own structurally identical types; IPC payloads flow through these so the
@@ -24,7 +24,7 @@ export interface StationEntryDto {
   id: string
   route: StationRoute
   pinned: boolean
-  /** True while a move is staged (ADR-0007 M-a); immune to auto-pruning. */
+  /** True while a move is staged (ADR-0008 M-a); immune to auto-pruning. */
   inTransit: boolean
   capturedAt: number
   /** True when at least one path is missing on disk. */

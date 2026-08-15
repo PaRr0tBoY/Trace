@@ -79,7 +79,7 @@ function stageDragFile(data: ItemData): Staged | null {
     case 'files': {
       // Station drags (copy-mode originals and move-mode staged paths alike)
       // reach startDragOut as a files bundle — this case is their carrier
-      // (ADR-0006), not a stack leftover.
+      // (ADR-0008), not a stack leftover.
       const real = data.paths.filter((p) => existsSync(p))
       if (!real.length) return null
       return { file: real[0], files: real }
@@ -139,7 +139,7 @@ function stageDragFile(data: ItemData): Staged | null {
 }
 
 /* ------------------------------------------------------------------ */
-/* Staged takeover move (ADR-0007 M-a)                                  */
+/* Staged takeover move (ADR-0008 M-a)                                  */
 /* ------------------------------------------------------------------ */
 
 /** Facts the drag-session state machine (T4b) reports when a drag ends. */
@@ -185,7 +185,7 @@ function stagedPathFor(original: string, stageDir: string): string {
 
 /**
  * Take the paths into the staging area: same-volume rename is atomic;
- * cross-volume (EXDEV) falls back to copy+delete (ADR-0007 M-a). On any
+ * cross-volume (EXDEV) falls back to copy+delete (ADR-0008 M-a). On any
  * failure every already-staged path is rolled back so the caller can degrade
  * to a pass-through drag with the originals intact.
  */
@@ -325,7 +325,7 @@ function finalizeStagedDrag(record: StagedDragRecord, verdict: DragEndVerdict): 
   if (verdict !== 'success') return
   // Recycle Bin first: the entry is removed only once the held files are
   // actually gone, so a failed disposal keeps the in-transit entry for a
-  // retry (ADR-0007: the worst case is a Recycle Bin copy, never loss).
+  // retry (ADR-0008: the worst case is a Recycle Bin copy, never loss).
   if (!disposeToRecycleBin(record.stagedPaths)) {
     console.error(`[Drag] recycle-bin disposal failed for entry ${record.entryId}; keeping it in-transit`)
     return

@@ -130,6 +130,8 @@ export function TaskView({ onFooterChange }: Props) {
       noun: 'task',
       clearLabel: t('item.clear'),
       clearTitle: tasksFilter === 'candidates' ? t('tasks.dismissAll') : t('tasks.clearAll'),
+      confirmLabel: t('item.confirmClear'),
+      confirmTitle: t('item.confirmClearTitle'),
       onClear: clearCurrentTab
     })
   }, [tasksFilter, suggestions.length, tasks.length, clearCurrentTab, onFooterChange, t])

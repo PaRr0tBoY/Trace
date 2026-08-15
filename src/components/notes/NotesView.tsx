@@ -517,14 +517,30 @@ export function NotesView({ onFooterChange }: { onFooterChange?: (state: ViewFoo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onFooterChange, clearTarget?.id, clearTarget?.content, notes.length, t, updateNote, clearAllNotes])
 
-  // Single-note mode: keep currentId pointing at a live note. An empty shelf
-  // shows the empty state — deleting the last note never fabricates a new one.
+  // Single-note mode: the shelf always has a current note. An empty shelf
+  // auto-creates a blank note — this mode never shows the empty state
+  // (management mode does). Deleting the last note fabricates a fresh one.
+  // The ref absorbs StrictMode's double effect invocation and re-arms only
+  // once the created note actually lands, so a failed create can retry.
+  const autoCreateRef = useRef(false)
   useEffect(() => {
     if (noteViewMode !== 'single') return
     if (currentId !== null && notes.some((n) => n.id === currentId)) return
-    if (notes.length > 0) setCurrentId(notes[0].id)
-    else setCurrentId(null)
-  }, [noteViewMode, notes, currentId])
+    if (notes.length > 0) {
+      setCurrentId(notes[0].id)
+      return
+    }
+    if (autoCreateRef.current) return
+    autoCreateRef.current = true
+    void createNote('')
+      .then((id) => {
+        autoCreateRef.current = false
+        setCurrentId(id)
+      })
+      .catch(() => {
+        autoCreateRef.current = false
+      })
+  }, [noteViewMode, notes, currentId, createNote])
 
   // 智能收起 (Q3): remember which note the shelf is showing (session-scoped),
   // so a re-open within the restore TTL returns to the same note + caret.
@@ -612,6 +628,9 @@ export function NotesView({ onFooterChange }: { onFooterChange?: (state: ViewFoo
   if (noteViewMode === 'single') {
     return (
       <div className="notes-single">
+        {/* The shelf normally always has a note here (auto-created on an
+            empty shelf above). This branch is only a transient frame while
+            the create lands, plus a manual recovery if creation fails. */}
         {effectiveCurrent ? (
           <NoteEditor
             key={effectiveCurrent.id}

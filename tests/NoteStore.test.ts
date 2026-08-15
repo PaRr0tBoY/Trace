@@ -95,6 +95,23 @@ describe('NoteStore — create/update/delete', () => {
     store.delete(id)
     expect(store.toDto().map((n) => n.title)).toEqual(['B'])
   })
+
+  it('clearAll removes every note and persists the empty shelf', () => {
+    const { store, save } = makeHarness()
+    store.create('A')
+    store.create('B')
+    store.clearAll()
+    expect(store.toDto()).toEqual([])
+    vi.advanceTimersByTime(200)
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save.mock.calls[0][0].notes).toEqual([])
+  })
+
+  it('clearAll on an empty shelf is a no-op (no save)', () => {
+    const { store, save } = makeHarness()
+    store.clearAll()
+    expect(save).not.toHaveBeenCalled()
+  })
 })
 
 describe('NoteStore — ordering', () => {

@@ -215,7 +215,7 @@ function loadTasksFile(): TaskIndex | null {
 /**
  * Station persistence adapter: station.json with the same DPAPI envelope as
  * tasks.json — station entries carry real file paths (work context). The
- * persisted shape is the raw StationEntry list (ADR-0006); a corrupt or
+ * persisted shape is the raw StationEntry list (ADR-0008); a corrupt or
  * legacy file degrades to an empty station (entries are references, so
  * nothing is lost on disk).
  */
@@ -399,7 +399,7 @@ function handleSystemWake(): void {
 /** Initialize persistence + start the clipboard watcher. */
 export function initState(): void {
   store.load()
-  // Transfer station (ADR-0006): hydrate first, then migrate legacy
+  // Transfer station (ADR-0008): hydrate first, then migrate legacy
   // clipboard-stack file items into it (route = 剪贴板) so nothing
   // disappears silently on upgrade. The migrated ids are removed from the
   // stack afterwards — the stack keeps only text/image items from here on.
@@ -485,7 +485,7 @@ export function initState(): void {
     const settings = loadSettings()
     const foreground =
       settings.taskCaptureEnabled && settings.l0CaptureEnabled ? queryForegroundSnapshot() : null
-    // File copies land in the transfer station (ADR-0006), not the clipboard
+    // File copies land in the transfer station (ADR-0008), not the clipboard
     // stack; the HDROP capture pipeline is unchanged. Text/image copies keep
     // the stack path below.
     if (data.kind === 'files' && data.paths) {
@@ -537,7 +537,7 @@ export function initState(): void {
       watcher.resyncSignature()
       pushState.items()
     }
-    // Station retention rides the same sweep (ADR-0006: reuse autoDeleteHours;
+    // Station retention rides the same sweep (ADR-0008: reuse autoDeleteHours;
     // pinned/in-transit entries are exempt inside the domain module).
     if (stationStore.prune(loadSettings().autoDeleteHours).length > 0) {
       pushState.station()
@@ -653,7 +653,7 @@ function logClipboardCapture(item: ClipboardItem | undefined, foreground: Foregr
 function handleEvidenceEvent(event: UsageEvent): void {
   if (evidenceStore === null) return
   if (event.type === 'clipboard' && event.itemId) {
-    // Files are station entries now (ADR-0006): the preview falls back to the
+    // Files are station entries now (ADR-0008): the preview falls back to the
     // station lookup so the by-id detail keeps answering "what was copied".
     const item = getStore().get(event.itemId) ?? stationClipboardItem(event.itemId)
     evidenceStore.record(
@@ -714,7 +714,7 @@ export function getStore(): ItemStore {
   return store
 }
 
-/** Transfer station singleton (ADR-0006): files domain, distinct from the
+/** Transfer station singleton (ADR-0008): files domain, distinct from the
  * clipboard stack. Hydrated + migrated in initState(). */
 export function getStationStore(): StationStore {
   return stationStore
@@ -1335,7 +1335,7 @@ export { loadSettings, saveSettings }
  * Result of importing dropped files: how many stacks were created and whether
  * any overflow was chunked, so the IPC layer can show an informative toast.
 /**
- * Enter dropped file paths into the transfer station (ADR-0006).
+ * Enter dropped file paths into the transfer station (ADR-0008).
  *
  * Every dropped path — image files and folders included — is referenced by
  * its original path (the old drag-in image re-staging path is gone; image
@@ -1348,7 +1348,7 @@ export interface AddFilesResult {
 }
 
 /**
- * Enter dropped file paths into the transfer station (ADR-0006).
+ * Enter dropped file paths into the transfer station (ADR-0008).
  *
  * Every dropped path — image files and folders included — is referenced by
  * its original path (the old drag-in image re-staging path is gone; image
@@ -1359,7 +1359,7 @@ export function addFiles(paths: string[]): AddFilesResult {
   // Prevent duplicating entries when a user accidentally drops our own staged
   // temp files back into the app (real files dedupe by path anyway). The
   // takeover area is excluded too: in-transit files belong to their entry
-  // (ADR-0007), re-entering them would fork the held bundle.
+  // (ADR-0008), re-entering them would fork the held bundle.
   const clean = paths.filter(
     (p) => !p.startsWith(PATHS.tempDir()) && !p.startsWith(PATHS.stationStageDir())
   )

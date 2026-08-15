@@ -168,6 +168,21 @@ Windows-specific integration points: koffi (FFI) reads native clipboard formats,
 
 ## Quick Start
 
+### Install
+
+Trace is Windows 10/11 only. Every channel installs the same NSIS build, and the app self-updates from GitHub Releases via electron-updater:
+
+| Channel | Command |
+|---|---|
+| **GitHub Releases** (recommended) | Download `Trace-Setup-*.exe` from the [latest release](https://github.com/PaRr0tBoY/Trace/releases/latest) |
+| **npm** | `npm install -g --allow-scripts=@acidevv/trace @acidevv/trace` — or try it once with `npx --yes @acidevv/trace` |
+| **Scoop** (own bucket, live) | `scoop bucket add trace https://github.com/PaRr0tBoY/Trace` then `scoop install trace` |
+| **Scoop** (Extras) | `scoop install trace` — awaiting [PR #18532](https://github.com/ScoopInstaller/Extras/pull/18532) |
+| **winget** | `winget install PaRr0tBoY.Trace` — awaiting [PR #417780](https://github.com/microsoft/winget-pkgs/pull/417780) |
+| **Chocolatey** | `choco install trace` — awaiting moderation on chocolatey.org |
+
+> The npm package is a small bootstrap, not the app itself: its `postinstall` downloads the latest installer from GitHub Releases, verifies the SHA-512 against the release's `latest.yml`, and runs it silently (`/S`). No binaries are bundled in the package.
+
 ### Prerequisites
 
 - **Node.js** 18+ (npm 11+ blocks postinstall scripts by default)

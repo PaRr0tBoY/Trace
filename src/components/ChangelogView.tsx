@@ -17,15 +17,43 @@ interface ChangelogRelease {
 
 const CHANGELOG_DATA: ChangelogRelease[] = [
   {
-    version: 'v2026.8.12',
-    date: 'Aug 12, 2026',
+    version: 'v2026.8.15',
+    date: 'Aug 15, 2026',
     isLatest: true,
-    summary: "Trace's first release — task layer (candidates, guided editor, linked windows), AI observability, dual-row navigation with restore, 5 accent themes.",
+    summary: "The shelf grows from two domains to four: notes and the transfer station join the clipboard stack and tasks, the task resource model is rebuilt, and auto-update returns for GitHub builds.",
     highlights: [
       {
-        title: 'Smart Collapse & Auto-Focus',
-        description: 'Notes as the landing page no longer pins the panel open: passive signals (editor idle, external scroll/copy, lock/suspend) auto-collapse it, or abandon a pinned Alt+Tab search session — toggleable in Behaviour settings, with an optional read-first notes mode (auto-focus off).'
+        title: 'Notes on the Shelf',
+        description: 'A full Markdown notes editor lives on the blade: live-rendering CodeMirror with hidden inline markers (Obsidian-style), clickable checkboxes, a reading-mode toggle, single-note and list layouts with pin/fold, and caret restore across opens.'
       },
+      {
+        title: 'Transfer Station (ADR-0008)',
+        description: 'Files leave the clipboard stack for their own domain: OS-level drag detection with a compact indicator that expands only on approach, copy/staged-move drag-out modes, and a recycle-bin safety net — the station never hard-deletes a file.'
+      },
+      {
+        title: 'Smart Collapse & Auto-Focus',
+        description: 'Passive signals (external wheel scroll, external copy, idle, lock/suspend) auto-collapse the panel or abandon a pinned Alt+Tab search session instead of holding focus forever — toggleable in Behaviour settings, with an optional read-first notes mode.'
+      },
+      {
+        title: 'Task Resource Model (ADR-0009)',
+        description: 'Task resources are living links: drag a text/image resource out via OLE or click it to copy back to the clipboard stack top; station entries link as task file resources; evicted resources degrade to a visible "dead" placeholder.'
+      },
+      {
+        title: 'Auto-Update Restored',
+        description: 'GitHub builds check at startup and download in the background (Settings toggle, default on) with a manual check UI; Microsoft Store builds never self-update — updates flow through the Store.'
+      },
+      {
+        title: 'Performance & Polish',
+        description: 'SHA-256 text-hash dedup that survives restarts, blade-open bounce with edge flares and crossfade view transitions (motion levels), switcher type-to-search and icon prewarm, 31 languages (Persian added with the v0.2.7 upstream merge).'
+      }
+    ]
+  },
+  {
+    version: 'v2026.8.12',
+    date: 'Aug 12, 2026',
+    isLatest: false,
+    summary: "Trace's first release — task layer (candidates, guided editor, linked windows), AI observability, dual-row navigation with restore, 5 accent themes.",
+    highlights: [
       {
         title: 'Task Layer',
         description: 'Candidate task cards from foreground-activity clustering; guided create/edit editor with app grid, clipboard material picker and AI title fallback; task detail with linked windows (switch/launch); drop-to-bind from the panel.'

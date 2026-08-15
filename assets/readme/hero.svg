@@ -11,7 +11,7 @@
     <text x="56" y="220" font-size="17" fill="#9CA3AF">A work tracker built on the clipboard shelf: it watches</text>
     <text x="56" y="248" font-size="17" fill="#9CA3AF">the apps you switch between and the things you copy,</text>
     <text x="56" y="276" font-size="17" fill="#9CA3AF">cuts that into tasks, and keeps every resource attached.</text>
-    <text x="56" y="322" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="12.5" fill="#6B7280">Windows 10/11 · Electron 34 · TypeScript · 30 languages · local-first AI</text>
+    <text x="56" y="322" font-family="ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Menlo, monospace" font-size="12.5" fill="#6B7280">Windows 10/11 · Electron 34 · TypeScript · 31 languages · local-first AI</text>
   </g>
 
   <!-- ── Activity stream, cut into segments ──────────────────── -->

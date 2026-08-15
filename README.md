@@ -7,14 +7,15 @@
   On the edge of your screen, the shelf collects what you copy. Underneath it, Trace watches the
   whole slice of work: the apps you switch between, the windows you work in, the clips you gather.
   It cuts that slice into <strong>tasks</strong>, tracks their progress, and keeps every resource —
-  apps, windows, clips — attached to the task it belongs to.
+  apps, windows, clips, and files — attached to the task it belongs to.
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-3b82f6?style=flat&logo=windows&logoColor=white" alt="Platform: Windows 10/11" />
   <img src="https://img.shields.io/badge/electron-34-9ca3af?style=flat" alt="Electron 34" />
   <img src="https://img.shields.io/badge/typescript-5-3b82f6?style=flat&logo=typescript&logoColor=white" alt="TypeScript 5" />
-  <img src="https://img.shields.io/badge/tests-896%20unit-14b8a6?style=flat" alt="896 unit tests" />
+  <img src="https://img.shields.io/badge/tests-1111%20unit-14b8a6?style=flat" alt="1111 unit tests" />
+  <img src="https://img.shields.io/badge/languages-31-6b7280?style=flat" alt="31 languages" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-6b7280?style=flat" alt="Apache-2.0" /></a>
 </p>
 
@@ -38,9 +39,11 @@ Trace looks at your work from a cross-section: at any moment it knows the foregr
 
 The **task** is the hub, not the clipboard item. A task collects the windows you worked in (one click jumps back to them), the apps involved, and the clips you explicitly bind to it. Its state machine — one running task at a time, waiting, paused, completed — tracks progress honestly, with every transition annotated by who made it and why.
 
+The shelf itself now hosts **four domains** on one hover-to-open blade: the **clipboard stack** (text and images), the **transfer station** (files, kept apart because paths have a different lifecycle than content), **tasks**, and **notes** — a Markdown editor that lives where your work happens.
+
 None of this asks you to do anything extra. The observation is built directly on the clipboard mechanism you already use: the hover-to-open shelf on the screen edge is at once the **capture point**, the **resource repository**, and the **operation surface**. You copy, you drag, you work — Trace segments and suggests in the background, and the AI pass (titles, rationale, memory) is optional, off by default, and explainable.
 
-**This repository is a fork of [Edge-Drop](https://github.com/Deepender25/Edge-Drop).** The clipboard shelf is inherited and kept as the base; the task layer and the AI suggestion pipeline are rebuilt on top, with upstream's auto-update and sponsor plumbing removed.
+**This repository is a fork of [Edge-Drop](https://github.com/Deepender25/Edge-Drop).** The clipboard shelf is inherited and kept as the base; the task layer, the transfer station, and the notes domain are rebuilt on top, with upstream's branding and sponsor plumbing removed. Its auto-update machinery was replaced with one pointed at this repository's own releases (see [Privacy](#privacy)).
 
 > **Platform:** Windows 10/11 only. The drag-out pipeline uses Win32 OLE and the edge trigger uses transparent-window cursor polling — there is no macOS or Linux port.
 
@@ -97,9 +100,24 @@ None of this asks you to do anything extra. The observation is built directly on
 
 - **Guided editor.** Title, an app grid (most recently used first), and a clipboard material picker. When a provider is configured, the AI suggests a title and a one-line rationale; without one, the editor falls back to an algorithmic title — the flow never blocks on AI.
 - **Linked windows.** Each task remembers the foreground window it was created from. "Open app" jumps back to that window, or the app's latest window, or launches the app when it is gone.
-- **Explicit resource binding.** Drag a shelf item onto a task card or the binding panel to attach it as linked content. Clips never auto-attach — linkage is a decision, not a side effect.
+- **Explicit resource binding.** Drag a shelf item or a station file onto a task card or the binding panel to attach it as linked content. Clips never auto-attach — linkage is a decision, not a side effect.
+- **Living resources.** Task resources stay usable: drag a text/image resource out to any app via OLE, or click it to copy it back to the top of the clipboard stack; file resources drag out as the real paths. A resource that was evicted from history degrades to a "dead" placeholder instead of silently vanishing.
 - **Honest states.** One task runs at a time (single `RUNNING`); `WAITING` means the system infers you paused, `PAUSED` means you explicitly did, `COMPLETED` and `ARCHIVED` end the lifecycle. Every transition is annotated with its source (user / system) and reason — the UI can tell "you paused it" apart from "the system thinks you are resting".
 - **Task detail.** Linked apps and windows, bound content, confidence, and the creation reason — why this task was suggested in the first place.
+
+### Notes on the shelf
+
+- **A Markdown editor where your work happens.** Type in a live-rendering CodeMirror editor: headings, quotes, task lists and links render as you type, with inline markers hidden Obsidian-style and checkboxes that actually toggle.
+- **Write-first or read-first.** Single-note mode opens the editor focused (auto-focus, on by default); turn it off for read-first mode, or switch to list mode with pin and fold. A reading-mode toggle in the top bar swaps the editor for a clean rendered view.
+- **Yours, locally.** Notes persist to disk with debounced writes, survive restarts, and remember the current note and caret across opens; prev/next steppers move between notes without leaving the keyboard. Destructive actions (like clear-all) require a two-step arm/confirm.
+
+### The transfer station — files
+
+- **Files are paths, not snapshots.** Files stopped living in the clipboard stack: copies and drag-ins land in the transfer station, persisted as path references with pinned and in-transit flags, pruned on the same auto-delete timer as the stack (pinned and in-transit entries are exempt). Legacy file entries migrate silently on first launch.
+- **Drag detection that stays out of the way.** OS-level hooks (`SetWinEventHook` in a utility process) recognize a file drag from any app: while dragging, a compact indicator appears instead of the panel, and the blade expands only when the cursor approaches — a drag across the edge never yanks a panel open.
+- **Two drag-out modes.** *Copy* leaves the original in place. *Move* stages the original into the station at drag start and completes the move on drop — a cancelled drag keeps the file safe in the station. Nothing in the station domain is ever hard-deleted: deletions go through the Windows recycle bin.
+- **Everything becomes a file.** Drag text or images in from anywhere — they are written out as real files (UTF-8 BOM text, so Notepad and Word read the encoding right) and enter the station like any other drop.
+- **Staleness-aware.** An entry whose file was moved or deleted elsewhere is flagged with a banner and auto-revives when the file returns. The unified files view has extension tabs, a route filter (clipboard vs. drag-in), and pinned/in-transit badges.
 
 ### AI as an optional pass
 
@@ -112,10 +130,13 @@ None of this asks you to do anything extra. The observation is built directly on
 
 - **Hover to open.** A 3px hysteresis zone with a 120 ms dwell opens the panel; moving away closes it with a grace period. The collapsed window is 100% click-through, so the desktop stays fully usable. Hover can be disabled in Settings — `Alt+C` opens the panel instead.
 - **Pick your monitor and edge.** Left or right edge, any display; the choice survives reboots (session ID → geometry match → nearest → primary fallback). Fullscreen apps (games, video, presentations) suppress the trigger automatically via native `SHQueryUserNotificationState` detection.
-- **Multi-format clipboard.** Plain text, rich HTML, URLs, raw images, and multi-file selections. Duplicate copies are bumped to the top and counted.
+- **Multi-format clipboard.** Plain text, rich HTML, URLs, raw images, and multi-file selections. Duplicate copies are merged by SHA-256 content hash — dedup survives restarts — then bumped to the top and counted.
 - **Stacks.** Multi-file drag-ins and multi-image copies group into stacks (max 10) with expand / split / merge, plus a preview flyout for single files and collections.
-- **Native OLE drag-out.** Real file handles, not simulated drags: text goes out as a temp UTF-8 file, images and file stacks as files with rendered drag ghosts. Drag files *in* to add them.
-- **30 languages, 5 themes.** Full UI dictionaries for 30 languages with RTL layout for Arabic and Hebrew; Graphite / Cobalt / Verdigris / Amber / Violet accent themes applied to the panel, drag ghost, and copy indicator.
+- **Native OLE drag-out.** Real file handles, not simulated drags: text goes out as a temp UTF-8 file, images and file stacks as files with rendered drag ghosts. Drag files *in* to add them to the transfer station.
+- **Alt+Tab switcher.** Hold `Alt+Tab` to replace the system window list with a searchable switcher: tap to flip to the next MRU window, hold for the list, press `Enter` to pin a type-to-search session, `Esc` or click-outside to cancel. Windows of the same app can group into one row.
+- **Smart collapse.** When the notes editor or a pinned switcher search holds focus, passive signals — external wheel scroll, an external copy, 5 s of idle, lock/suspend — auto-collapse the panel or abandon the session instead of pinning it open. Toggleable in Settings.
+- **31 languages, 5 themes.** Full UI dictionaries for 31 languages (Persian joined in the v0.2.7 upstream merge) with RTL layout for Arabic and Hebrew; Graphite / Cobalt / Verdigris / Amber / Violet accent themes applied to the panel, drag ghost, and copy indicator.
+- **Motion & performance.** Motion levels with a blade-open bounce (double bounce on "extended"), edge flares that ride the opening animation, crossfade view transitions, and app icons prewarmed from a disk cache.
 - **Battery-aware.** Cursor polling slows on battery power; sleep and unlock events pause the clipboard watcher so no false copy indicators fire when you open the laptop lid.
 
 ### Privacy
@@ -123,7 +144,7 @@ None of this asks you to do anything extra. The observation is built directly on
 - **Three privacy planes.** Capture (foreground events), AI (anything leaving the machine), and Memory (what is retained) are enforced by a pure gate module — capture can be switched off entirely, AI only runs when you configure a provider, and denied data never reaches the model, not even as context. A denial always carries a reason for the trace log.
 - **Sensitive formats skipped.** Password managers and dictation tools (Bitwarden, KeePass, 1Password, `ExcludeClipboardContentFromMonitorProcessing`, …) are matched case-insensitively and never captured.
 - **Incognito and auto-delete.** One click suspends clipboard polling; auto-delete timers (1h / 6h / 24h / 7d) and clear-unpinned-on-restart keep history bounded.
-- **No telemetry, no auto-update.** There is no analytics or telemetry; the only network calls are the What's New release check and the AI providers you configure. Upstream's silent auto-updater was deliberately removed so a remote release can never overwrite a local build.
+- **No telemetry.** The only network calls are the update check, the What's New release check, and the AI providers you configure. GitHub builds check for updates at startup and download in the background (Settings toggle, default on); Microsoft Store builds never self-update — their updates flow through the Store.
 
 ---
 
@@ -137,11 +158,11 @@ The core loop, from raw events to adopted tasks — the same stream that fills t
 
 Three isolated processes follow a strict contract:
 
-1. **Main** (`electron/main/`) — Node.js runtime. Owns the clipboard watcher, the OLE drag pipeline, window/edge handling, and the task & suggestion engines. It is the single source of truth: every change pushes a full state snapshot to the renderer.
+1. **Main** (`electron/main/`) — Node.js runtime. Owns the clipboard watcher, the OLE drag pipeline, the transfer station, notes, the updater, window/edge handling, and the task & suggestion engines. It is the single source of truth: every change pushes a full state snapshot to the renderer.
 2. **Preload** (`electron/preload/`) — sandboxed bridge exposing `window.edge`, typed against `shared/ipc.ts` (`InvokeMap` / `EventMap` / `SendMap`) and `shared/bridge.ts` (`EdgeApi`). A new channel touches four files: contract, interface, preload implementation, and main handler.
 3. **Renderer** (`src/`) — React 18 UI. A Zustand store is a pure view cache of main's pushes; the renderer never persists anything itself.
 
-Windows-specific integration points: koffi (FFI) reads native clipboard formats and detects fullscreen apps; PowerShell handles HDROP file lists (bypassing Electron's single-file limit) and simulated paste; drag ghosts are rendered server-side with `@resvg/resvg-js`. The SuggestionEngine is a pure module — everything it needs is injected, so vitest drives it with a fake clock and a real task store.
+Windows-specific integration points: koffi (FFI) reads native clipboard formats, detects fullscreen apps, and drives the recycle bin (`SHFileOperationW`); a utility process runs the OS hooks that must not live in the main process — the keyboard hook and drag detection (`SetWinEventHook`); PowerShell handles HDROP file lists (bypassing Electron's single-file limit) and simulated paste; drag ghosts are rendered server-side with `@resvg/resvg-js`. The SuggestionEngine, the station, and the notes domains are pure modules — everything they need is injected, so vitest drives them with a fake clock and real stores.
 
 ---
 
@@ -168,7 +189,7 @@ npm run dev    # Electron + Vite HMR
 
 ```bash
 npm run typecheck   # tsc --noEmit for both node and web configs
-npm test            # 896 unit tests (vitest)
+npm test            # 1111 unit tests (vitest, 59 files)
 npm run package     # Windows NSIS installer into dist/
 npm run build:store # Windows MSIX for the Microsoft Store
 ```
@@ -184,33 +205,41 @@ npm run build:store # Windows MSIX for the Microsoft Store
 ├─ shared/                 IPC contracts & domain types
 │  ├─ ipc.ts               InvokeMap / EventMap / SendMap channel definitions
 │  ├─ bridge.ts            EdgeApi interface implemented by preload
-│  └─ types.ts             ItemData, Task, TaskProposal, Settings, DTOs
+│  ├─ types.ts             ItemData, Task, Note, Settings, DTOs
+│  ├─ station.ts           transfer-station entry types
+│  └─ idle.ts              shared idle guard (smart collapse)
 ├─ electron/
-│  ├─ main/                window & edge trigger, drag (OLE), suggestionEngine
-│  │                       (lifecycle controller), provider chain + decision
-│  │                       provider, currentTaskController, MemoryStore wiring,
-│  │                       ocr, windowSwitch (linked windows), focus,
-│  │                       imageProtocol, aiLog, fullscreen (koffi),
-│  │                       powershell, tray
+│  ├─ main/                window & edge trigger, drag (OLE), dragDetect +
+│  │                       dragHost (utility-process OS hooks), smartCollapse,
+│  │                       suggestionEngine (lifecycle controller), provider
+│  │                       chain + decision provider, currentTaskController,
+│  │                       MemoryStore wiring, ocr, windowSwitch (linked
+│  │                       windows), updater, focus, imageProtocol, aiLog,
+│  │                       fullscreen (koffi), recycleBin, powershell, tray
 │  ├─ preload/             sandboxed contextBridge
 │  ├─ clipboard/           ClipboardWatcher (600ms poll), formats (FNV-1a, HDROP)
-│  └─ store/               db.ts (SQLite canonical: 7 tables + FTS5 + WAL),
-│                          ItemStore, TaskStore (state machine + commit seam),
-│                          sessionStore, activityLedger (clustering),
-│                          evidenceStore, traceStore, recommendationHistory,
-│                          proposalGrading, memoryGraph (episodes/entities/facts),
-│                          episodeConsolidator, privacyGate, localModelManager /
-│                          localModelRuntime, MemoryStore, settings, paths
+│  └─ store/               db.ts (SQLite canonical store + FTS5 + WAL),
+│                          ItemStore (SHA-256 text-hash dedup), TaskStore
+│                          (state machine + commit seam), NoteStore,
+│                          stationStore / transferStation / dragSession /
+│                          stagedMove, sessionStore, activityLedger
+│                          (clustering), evidenceStore, traceStore,
+│                          recommendationHistory, proposalGrading,
+│                          memoryGraph (episodes/entities/facts),
+│                          episodeConsolidator, privacyGate,
+│                          localModelManager / localModelRuntime,
+│                          MemoryStore, settings, paths
 ├─ src/                    React renderer
 │  ├─ components/          Panel, Header, ItemList, PreviewFlyout, Settings,
+│  │  ├─ notes/            NotesView, markdownEditor (CodeMirror WYSIWYG)
 │  │  └─ tasks/            TaskView, TaskEditor, TaskDetail, TaskProposalCard,
 │  │                       TaskDropPanel, ContentPicker
 │  ├─ hooks/               useEdgeHover (hysteresis), useDragOut
 │  ├─ lib/                 fileTabs, theme, restore, taskEditor model
-│  ├─ i18n/                translations for 30 languages
+│  ├─ i18n/                translations for 31 languages
 │  └─ store/               Zustand appStore (view cache of main state)
 ├─ assets/readme/          hero and pipeline visuals
-└─ tests/                  44 vitest files, 896 cases
+└─ tests/                  59 vitest files, 1111 cases
 ```
 
 ---
@@ -223,22 +252,32 @@ npm run build:store # Windows MSIX for the Microsoft Store
 | Build tooling     | **electron-vite**           | Separate Main / Preload / Renderer builds with Vite HMR                   |
 | UI                | **React 18 + TypeScript 5** | Typed component tree; sandboxed renderer                                  |
 | State / animation | **Zustand + Framer Motion** | Single-source-of-truth pushes, spring physics                             |
-| Native FFI        | **koffi**                   | Fullscreen detection, native clipboard formats, window activation control |
+| Notes editor      | **CodeMirror 6**            | WYSIWYG Markdown with live decorations (Obsidian-style marker reveal)     |
+| Native FFI        | **koffi**                   | Fullscreen detection, native clipboard formats, window activation, recycle bin (`SHFileOperationW`) |
 | Scripting         | **PowerShell**              | HDROP file lists, simulated paste, WinRT OCR                              |
 | Drag ghosts       | **@resvg/resvg-js**         | Server-side SVG → PNG rendering                                           |
-| Storage           | **better-sqlite3**          | Canonical store (schema + migrations in place; business tables landing)   |
+| Storage           | **better-sqlite3**          | Evidence / trace / memory store (FTS5 + WAL); tasks, notes and the station are JSON-backed |
+| Updates           | **electron-updater**        | GitHub-release auto-updates for NSIS builds; disabled on Store builds     |
 | Local model       | **node-llama-cpp**          | Embedded Qwen3-0.6B Q8_0 for offline title drafts / candidate rerank — default off, downloads from Settings |
-| Tests             | **vitest**                  | 896 unit tests, engine tested with fake clock + injected deps             |
+| Tests             | **vitest**                  | 1111 unit tests, engines tested with fake clock + injected deps           |
 
 ---
 
 ## Status
 
-**Current release (v2026.08.12)** — task layer (candidates, guided editor, linked windows, drop-to-bind), dual-row navigation with restore, five accent themes, AI observability (`ai-log.jsonl`), OCR context, thumbnail protocol.
+**Current release (v2026.8.15)** — the shelf grew from two domains to four:
+
+- **Notes** — a full Markdown notes editor on the blade: live-rendering CodeMirror with hidden inline markers, clickable checkboxes, reading-mode toggle, single-note and list layouts, pin/fold, caret restore.
+- **Transfer station (ADR-0008)** — files moved out of the clipboard stack into their own domain: OS-level drag detection (`SetWinEventHook` in a utility process), compact drag indicator that expands only on approach, copy/staged-move drag-out modes, and a recycle-bin safety net — the station never hard-deletes a file.
+- **Smart collapse (ADR-0007)** — passive signals (external scroll/copy, idle, lock/suspend) end focus-held sessions instead of pinning the panel open; read-first notes mode via the auto-focus toggle.
+- **Task resource model (ADR-0009)** — task resources are living links: drag out via OLE or click to copy back to the stack top; station entries link as task file resources; evicted resources degrade to a visible "dead" placeholder.
+- **Foundation updates** — auto-update restored for GitHub builds (Settings toggle + manual check UI; Store builds update only through the Store), SHA-256 text-hash dedup that survives restarts, blade-open bounce + edge flares + crossfade view transitions (motion levels), switcher type-to-search and icon prewarm, 31 languages (Persian added with the upstream v0.2.7 merge).
 
 **Pipeline refactor (ADR-0005, v2026.08.13)** — the suggestion pipeline is rebuilt end to end: an activity ledger clusters the event stream, a current-task controller gates decisions (six triggers, hysteresis in Settings, ~0 LLM calls in steady state), a decision provider escalates to the agent chain on low confidence (fixed four-tool surface, ≤3 calls), proposals are graded L1/L2/L3 with semantic dedup and recommendation-history cooldowns, memory is a reviewable fact graph (episodes → entities → facts, deterministic retrieval, conflict adjudication in Settings), everything is traceable to its evidence, and the embedded local model is wired but off by default. Golden Dataset baseline: precision 1.0 / recall 0.9935 / 0 false positives (181 seeds).
 
-**Deliberately not planned** — silent auto-updates (removed; What's New reads GitHub releases instead), Linux/macOS ports, cloud sync. Windows-only by design.
+**Designed, not yet built** — ADR-0006: UIA-driven capture (a11y tree first, OCR fallback), an extended trace contract for algorithm/model intermediate states, a developer workstation with a live pipeline cross-section, a smart landing page, and a Morning Brief.
+
+**Deliberately not planned** — Linux/macOS ports, cloud sync, and self-updating Microsoft Store builds (Store builds update only through the Store).
 
 ---
 
@@ -251,6 +290,7 @@ npm run build:store # Windows MSIX for the Microsoft Store
 | Clipboard privacy    | Password-manager / dictation formats matched case-insensitively and skipped; incognito suspends polling               |
 | AI disclosure        | Nothing leaves the machine unless a provider is configured; privacy gates for capture, AI, and memory are independent |
 | Protocol confinement | `tracelocal://` thumbnails resolve strictly inside the app data directory with SHA-256 revalidation                   |
+| Update provenance    | NSIS builds check and download only from GitHub Releases (toggleable); MSIX builds never self-update — Store policy   |
 | PowerShell hardening | Absolute executable path, non-blocking exec, strict path validation                                                   |
 | Dev-safe startup     | Login-item registration is gated by `app.isPackaged` — dev builds never touch the registry                            |
 
@@ -258,4 +298,4 @@ npm run build:store # Windows MSIX for the Microsoft Store
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE). This is a fork of [Edge-Drop](https://github.com/Deepender25/Edge-Drop); upstream's branding, sponsor links, and auto-update plumbing were removed in this fork.
+Apache-2.0 — see [LICENSE](LICENSE). This is a fork of [Edge-Drop](https://github.com/Deepender25/Edge-Drop); upstream's branding and sponsor links were removed in this fork.

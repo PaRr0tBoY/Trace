@@ -200,13 +200,13 @@ export function syncLoginItemSettings(launchAtLogin?: boolean): void {
         openAtLogin: true,
         path: exePath,
         args: ['--hidden'],
-        name: 'Edge-Drop'
+        name: 'Trace'
       })
     } else {
       app.setLoginItemSettings({
         openAtLogin: false,
         path: exePath,
-        name: 'Edge-Drop'
+        name: 'Trace'
       })
     }
   } catch (err) {
@@ -1318,7 +1318,7 @@ const STATIC_CHANGELOG_FALLBACK = [
       },
       {
         title: 'Official Support Portal Integration',
-        description: 'Updated support link to open official Edge-Drop support page supporting both International Ko-fi and Indian UPI options.'
+        description: 'Updated support link to open official Trace support page supporting both International Ko-fi and Indian UPI options.'
       },
       {
         title: 'Localization & Typography Enhancements',
@@ -1370,7 +1370,7 @@ const STATIC_CHANGELOG_FALLBACK = [
       },
       {
         title: '5% Magnetic Tick Slider & Quit Action',
-        description: 'Continuous 0.002 1-to-1 real-time drag tracking with magnetic 5% snapping on release, plus an integrated Quit Edge-Drop button.'
+        description: 'Continuous 0.002 1-to-1 real-time drag tracking with magnetic 5% snapping on release, plus an integrated Quit Trace button.'
       }
     ]
   },

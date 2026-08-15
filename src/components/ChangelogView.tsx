@@ -92,7 +92,7 @@ const CHANGELOG_DATA: ChangelogRelease[] = [
       },
       {
         title: 'Official Support Portal Integration',
-        description: 'Updated support link to open official Edge-Drop support page supporting both International Ko-fi and Indian UPI options.'
+        description: 'Updated support link to open official Trace support page supporting both International Ko-fi and Indian UPI options.'
       },
       {
         title: 'Localization & Typography Enhancements',
@@ -216,7 +216,7 @@ const CHANGELOG_DATA: ChangelogRelease[] = [
       },
       {
         title: 'Automatic OS Disconnect Recovery',
-        description: 'When a secondary display hosting the panel is disconnected, Edge-Drop auto-heals its target back to the Primary Display.'
+        description: 'When a secondary display hosting the panel is disconnected, Trace auto-heals its target back to the Primary Display.'
       },
       {
         title: 'Brief Visual Confirmation Pop-Ups',
@@ -280,7 +280,7 @@ const CHANGELOG_DATA: ChangelogRelease[] = [
     version: 'v0.1.0',
     date: 'Jul 10, 2026',
     isLatest: false,
-    summary: 'Initial release of Edge-Drop, a zero-click desktop clipboard shelf living on the screen edge.',
+    summary: 'Initial release of Trace, a zero-click desktop clipboard shelf living on the screen edge.',
     highlights: [
       {
         title: 'Zero-Click Activation & Edge Hover',

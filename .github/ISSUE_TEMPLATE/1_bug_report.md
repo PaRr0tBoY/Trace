@@ -1,6 +1,6 @@
 ---
 name: 🐛 Report a Bug
-about: Report a bug or issue in Edge-Drop
+about: Report a bug or issue in Trace
 title: '[BUG]: '
 labels: 'bug'
 ---

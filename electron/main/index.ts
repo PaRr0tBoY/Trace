@@ -106,7 +106,7 @@ app.on('before-quit', () => {
 
 app.whenReady().then(async () => {
   // Set App User Model ID so native notifications are branded as "Trace" on Windows
-  app.setAppUserModelId('com.edgedrop.app')
+  app.setAppUserModelId('com.trace.app')
 
   ensureDirs()
   cleanTemp()

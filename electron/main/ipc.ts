@@ -15,8 +15,7 @@ import { rehomeTraceAfterMerge } from '../store/traceStore'
 import { getStore, getStationStore, stationClipboardItem, loadSettings, saveSettings, pushState, addFiles, getWatcher, getTaskStore, getSuggestionEngine, getTitleSuggester, getMemoryStore, getMemoryGraph, getTraceStore, getLocalModelManager, getLocalModelRuntime, resetLocalModelRuntime, ensureLocalModelLoaded } from './state'
 import type { FactRecord } from '../store/memoryGraph'
 import { isTraceRecordDto, renderTraceReportHtml } from './traceReport'
-import { getMainWindow } from './window'
-import { setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
+import { sendToMainWindow, setVisible, setInteractive, setHeartbeatPaused, setHotZoneWidth, setPreviewMode, getDisplayListOptions, repositionWindow } from './window'
 import { getOnboardingWindow } from './onboardingWindow'
 import { startDragOut, resolveDragData, prefetchFileIcons, stageMoveDrag } from './drag'
 import { disposeToRecycleBin } from './recycleBin'
@@ -58,10 +57,7 @@ function clipboardMatchesItem(data: ItemData): boolean {
 
 /** Fire a transient toast to the renderer (best-effort; renderer may be closed). */
 function toast(message: string, tone: 'info' | 'error' = 'info'): void {
-  const win = getMainWindow()
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('ui:toast', { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, message, tone })
-  }
+  sendToMainWindow('ui:toast', { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, message, tone })
 }
 
 /** Broadcast the local model manager status to every window (t54: progress / state / error). */
@@ -191,6 +187,31 @@ function buildResourcesFromIds(itemIds: string[] | undefined, existing?: Task): 
     }
   }
   return refs
+}
+
+/** Synchronizes launch at login settings with Windows Registry, resolving path drift after updates. */
+export function syncLoginItemSettings(launchAtLogin?: boolean): void {
+  if (!app.isPackaged) return
+  const wantLaunch = launchAtLogin ?? loadSettings().launchAtLogin
+  try {
+    const exePath = app.getPath('exe')
+    if (wantLaunch) {
+      app.setLoginItemSettings({
+        openAtLogin: true,
+        path: exePath,
+        args: ['--hidden'],
+        name: 'Edge-Drop'
+      })
+    } else {
+      app.setLoginItemSettings({
+        openAtLogin: false,
+        path: exePath,
+        name: 'Edge-Drop'
+      })
+    }
+  } catch (err) {
+    console.error('[IPC] Failed to sync login item settings:', err)
+  }
 }
 
 export function registerIpc(): void {
@@ -620,7 +641,6 @@ export function registerIpc(): void {
 
   handle('item:set-pinned', (id, pinned) => {
     getStore().setPinned(id, pinned)
-    pushState.items()
     return getStore().toDto()
   })
 
@@ -642,6 +662,18 @@ export function registerIpc(): void {
     return getStore().toDto()
   })
 
+  handle('item:delete-batch', (ids) => {
+    if (!ids || ids.length === 0) return getStore().toDto()
+    const items = ids.map((id) => getStore().get(id)).filter(Boolean)
+    getStore().deleteBatch(ids)
+    if (items.some((item) => item && clipboardMatchesItem(item.data))) {
+      clipboard.clear()
+    }
+    getWatcher().resyncSignature()
+    pushState.items()
+    return getStore().toDto()
+  })
+
   handle('item:clear', () => {
     getStore().clearUnpinned()
     // Clear the system clipboard unconditionally: the user wiped their history,
@@ -653,6 +685,10 @@ export function registerIpc(): void {
     return getStore().toDto()
   })
 
+  handle('item:get-full-text', (id) => {
+    return getStore().getFullText(id)
+  })
+
   handle('item:copy', async (id) => {
     const item = getStore().get(id)
     console.log('[IPC] item:copy id=', id, 'found=', !!item)
@@ -660,11 +696,13 @@ export function registerIpc(): void {
 
     const watcher = getWatcher()
     watcher.setPaused(true)
-    await writeItemToClipboard(item.data)
+    const fullText = item.data.kind === 'text' ? getStore().getFullText(id) : undefined
+    const itemDataWithFullText = item.data.kind === 'text' && fullText ? { ...item.data, text: fullText } : item.data
+    await writeItemToClipboard(itemDataWithFullText)
     console.log('[IPC] item:copy wrote to clipboard, kind=', item.data.kind)
 
     // Promote the copied item to the top of the history stack
-    getStore().add(item.data, loadSettings().historyLimit)
+    getStore().add(itemDataWithFullText, loadSettings().historyLimit)
     pushState.items()
 
     // Unpause after a short delay to allow OS clipboard event to settle.
@@ -748,17 +786,29 @@ export function registerIpc(): void {
       // Pass false to explicitly close and avoid toggle race conditions.
       pushState.togglePanel(false)
 
-      // Wait 50ms for layout updates, then simulate Ctrl+V
+      // 2. Write item to system clipboard
+      const fullText = item.data.kind === 'text' ? getStore().getFullText(id) : undefined
+      const itemDataWithFullText = item.data.kind === 'text' && fullText ? { ...item.data, text: fullText } : item.data
+      await writeItemToClipboard(itemDataWithFullText)
+      console.log('[IPC] item:paste wrote to clipboard, kind=', item.data.kind)
+
+      // 3. Touch item timestamp — moves unpinned items to the top of Recent.
+      getStore().touch(id)
+
+      // 4. Simulate Ctrl+V after 50ms
       setTimeout(() => {
         simulatePaste()
       }, 50)
-    } finally {
-      // Invalidate (not resync) the watcher signature after the pause expires.
-      // This ensures that if the user re-copies the SAME content from the source
-      // app right after paste, the watcher detects it as new (clipboard sig never
-      // changed, but our sentinel '__post-paste__' guarantees the next poll sees a diff).
+
+      // 5. Broadcast updated items list after panel has fully closed off-screen (250ms)
       setTimeout(() => {
-        watcher.invalidateSignature()
+        pushState.items()
+      }, 250)
+    } finally {
+      // Resync the watcher signature after paste so standard OS Ctrl+V does NOT
+      // increment item hitCounts or re-order items.
+      setTimeout(() => {
+        watcher.resyncSignature()
         watcher.setPaused(loadSettings().incognito)
       }, 350)
     }
@@ -829,13 +879,8 @@ export function registerIpc(): void {
       // next event gate (still correct, but the pause is the contract).
       applyIncognito(next.incognito)
     }
-    if (patch.launchAtLogin !== undefined && app.isPackaged) {
-      try {
-        app.setLoginItemSettings({
-          openAtLogin: next.launchAtLogin,
-          path: app.getPath('exe')
-        })
-      } catch { /* ignore */ }
+    if (patch.launchAtLogin !== undefined) {
+      syncLoginItemSettings(next.launchAtLogin)
     }
     if (patch.hotZoneWidth !== undefined) {
       setHotZoneWidth(patch.hotZoneWidth)
@@ -1050,10 +1095,12 @@ export function registerSendListeners(): void {
 /** Write any item payload back onto the system clipboard. */
 export async function writeItemToClipboard(data: ItemData): Promise<void> {
   switch (data.kind) {
-    case 'text':
+    case 'text': {
+      const textToUse = data.text
       clipboard.clear()
-      clipboard.write({ text: data.text, html: data.html })
+      clipboard.write({ text: textToUse, html: data.html })
       break
+    }
 
     case 'image': {
       const dto = getStore().toDto().find(

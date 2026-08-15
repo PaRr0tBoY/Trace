@@ -75,6 +75,7 @@ import {
   type AgentToolSet,
   type TitleSuggester
 } from '../store/decisionProvider'
+import { getMainWindow } from './window'
 
 const store = new ItemStore()
 const stationStore = new StationStore({
@@ -419,6 +420,7 @@ export function initState(): void {
     store.pruneExpired(loadSettings().autoDeleteHours)
     if (data.kind === 'image' && png && data.imageId) {
       store.stageImageBytes(data.imageId, png)
+      png = undefined as any
     }
     // One foreground read per capture, shared by the item's sourceApp
     // (ADR-0001) and the t14 attribution event — same source, same gate.
@@ -442,7 +444,10 @@ export function initState(): void {
       foreground ? { name: foreground.appName, exePath: foreground.exePath } : undefined
     )
     pushState.items()
-    logClipboardCapture(store.list()[0], foreground)
+    const win = getMainWindow()
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('ui:copy-flare')
+    }
   })
   watcher.setPaused(loadSettings().incognito)
 

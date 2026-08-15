@@ -73,8 +73,14 @@ export interface InvokeMap {
   /** Delete a single item (and its image file if present). */
   'item:delete': { args: [id: string]; result: ClipboardItemDto[] }
 
+  /** Delete a batch of items in a single atomic operation. */
+  'item:delete-batch': { args: [ids: string[]]; result: ClipboardItemDto[] }
+
   /** Delete every unpinned item. */
   'item:clear': { args: []; result: ClipboardItemDto[] }
+
+  /** Fetch the full text payload from disk for a large text item on-demand. */
+  'item:get-full-text': { args: [id: string]; result: string }
 
   /** Remove a specific sub-item from a bundle. */
   'item:remove-subitem': { args: [req: DragRequest]; result: boolean }
@@ -348,6 +354,12 @@ export interface EventMap {
    * shows it as a toast; `id` lets it dedupe/dismiss.
    */
   'ui:toast': [toast: { id: string; message: string; tone: 'info' | 'error' }]
+  /** Fired when an OS copy event (Ctrl+C) is detected by the main process watcher. */
+  'ui:copy-flare': []
+  /** Fired by electron-updater when a new update is available for GitHub builds. */
+  'app:update-available': [info: { version: string }]
+  /** Fired by electron-updater when the update has been fully downloaded and is ready to install. */
+  'app:update-downloaded': [info: { version: string }]
   /**
    * Main-process cursor poll signals: fired when the cursor enters/leaves
    * the screen-edge hot zone. The renderer uses this to open/close the panel

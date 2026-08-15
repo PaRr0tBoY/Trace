@@ -70,14 +70,18 @@ export let previewActive = false
 export let currentHotZoneWidth = 3
 export let currentStickDisplayId: number | undefined
 
-/**
- * Fix 3: Consecutive-stale-reads counter for getStickGeometry self-heal.
- * Tracks how many consecutive repositionWindow() calls have found the saved
- * stickDisplayId absent from the display list. The preference is only wiped
- * from disk after this reaches STALE_THRESHOLD (2), preventing transient TV
- * mirror ID renegotiations from destroying the user's saved monitor choice.
- */
 let staleIdConsecutiveCount = 0
+let cachedWorkArea = { x: 0, y: 0, width: 1920, height: 1080 }
+
+export function updateCachedWorkArea(): void {
+  try {
+    const all = screen.getAllDisplays()
+    const stick = all.find(d => d.id === currentStickDisplayId) || screen.getPrimaryDisplay()
+    if (stick && stick.workArea) {
+      cachedWorkArea = stick.workArea
+    }
+  } catch {}
+}
 
 export function setHotZoneWidth(width: number): void {
   currentHotZoneWidth = width
@@ -85,10 +89,26 @@ export function setHotZoneWidth(width: number): void {
 
 export function setStickDisplayId(id: number | undefined): void {
   currentStickDisplayId = id
+  updateCachedWorkArea()
 }
 
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow
+}
+
+/** Send only while the panel has a live, settled renderer frame. */
+export function sendToMainWindow(channel: string, ...args: unknown[]): boolean {
+  if (!mainWindow || mainWindow.isDestroyed()) return false
+  const contents = mainWindow.webContents
+  if (contents.isDestroyed() || contents.isLoadingMainFrame()) return false
+  try {
+    contents.send(channel, ...args)
+    return true
+  } catch {
+    // A frame can be disposed between the checks above and send(). Renderer
+    // hydration obtains the current state once its replacement frame is ready.
+    return false
+  }
 }
 
 /** True when the window currently accepts mouse clicks (blade is "open"). */
@@ -119,6 +139,15 @@ export function setInteractive(value: boolean): void {
     // Panel is closed: full click-through, no forwarding needed.
     mainWindow.setIgnoreMouseEvents(true, { forward: false })
     mainWindow.setAlwaysOnTop(true, 'screen-saver')
+
+    // Trigger gentle idle memory cleanup 1.5s after panel closes to reclaim RAM
+    if (global.gc) {
+      setTimeout(() => {
+        if (!interactive && global.gc) {
+          try { global.gc() } catch { /* ignore */ }
+        }
+      }, 1500)
+    }
   }
 }
 
@@ -147,15 +176,15 @@ export function setPreviewMode(active: boolean): void {
  */
 
 /** Proximity threshold for entering fast-poll mode (px from the edge). */
-const FAST_POLL_PROXIMITY_PX = 250
+const FAST_POLL_PROXIMITY_PX = 450
 /** Full-speed poll when edge is near. */
 const POLL_FAST_MS = 16
 /** Battery-power slow poll (panel closed, cursor far). */
-const POLL_SLOW_BATTERY_MS = 60
+const POLL_SLOW_BATTERY_MS = 100
 /** AC-power slow poll (panel closed, cursor far). */
-const POLL_SLOW_AC_MS = 35
+const POLL_SLOW_AC_MS = 75
 /** After leaving proximity, stay in fast mode for this long before throttling. */
-const SLOW_COOLDOWN_MS = 800
+const SLOW_COOLDOWN_MS = 1500
 
 let cursorPollTimer: ReturnType<typeof setInterval> | null = null
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null
@@ -215,14 +244,10 @@ function _pollTick(): void {
 
   const pt = screen.getCursorScreenPoint()
 
-  // Find the stick display (or fallback to primary)
-  const allDisplays = screen.getAllDisplays()
-  let stickDisplay = allDisplays.find(d => d.id === currentStickDisplayId)
-  if (!stickDisplay) {
-    stickDisplay = screen.getPrimaryDisplay()
+  if (cachedWorkArea.width === 1920 && cachedWorkArea.height === 1080) {
+    updateCachedWorkArea()
   }
-
-  const wa = stickDisplay.workArea
+  const wa = cachedWorkArea
 
   // Translate screen coords → stick display client coords.
   const clientX = pt.x - wa.x
@@ -299,17 +324,15 @@ function _pollTick(): void {
     lastEdgeState = newState
     _lastSentX = clientX
     _lastSentY = clientY
-    if (!mainWindow.webContents.isDestroyed()) {
-      mainWindow.webContents.send('window:cursor-edge', {
-        x: clientX,
-        y: clientY,
-        inEdge,
-        inZone: true,
-        stickPosition: settings.stickPosition,
-        displayWidth: wa.width,
-        displayHeight: wa.height
-      })
-    }
+    sendToMainWindow('window:cursor-edge', {
+      x: clientX,
+      y: clientY,
+      inEdge,
+      inZone: true,
+      stickPosition: settings.stickPosition,
+      displayWidth: wa.width,
+      displayHeight: wa.height
+    })
   }
 }
 
@@ -398,9 +421,7 @@ export function getStickGeometry(): { x: number; y: number; width: number; heigh
         stickDisplayWorkArea: recoveredViaBounds ? resolved.workArea : undefined,
         stickDisplayScaleFactor: recoveredViaBounds ? resolved.scaleFactor : undefined
       })
-      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
-        mainWindow.webContents.send('state:settings', settings)
-      }
+      sendToMainWindow('state:settings', settings)
       if (!recoveredViaBounds) {
         // Genuinely fell back — briefly show panel on new location.
         popUpAndRetract(1500)
@@ -417,9 +438,7 @@ export function getStickGeometry(): { x: number; y: number; width: number; heigh
         stickDisplayWorkArea: resolved.workArea,
         stickDisplayScaleFactor: resolved.scaleFactor
       })
-      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
-        mainWindow.webContents.send('state:settings', settings)
-      }
+      sendToMainWindow('state:settings', settings)
     } else if (settings.stickDisplayId !== undefined && (
       settings.stickDisplayWorkArea === undefined ||
       settings.stickDisplayScaleFactor === undefined
@@ -487,14 +506,13 @@ export function createWindow(): BrowserWindow {
       // An active Alt+Tab switcher session owns the panel — never collapse it
       // under the fullscreen-suppression logic (ADR-0005).
       if (runtime.switcherActive) return
-      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
-        mainWindow.webContents.send('window:toggle', false)
-      }
+      sendToMainWindow('window:toggle', false)
       setInteractive(false)
     }
   })
 
   const handleDisplayChange = (triggerPopUp = false) => {
+    updateCachedWorkArea()
     console.log('[Main] Display metrics/topology changed — validating bounds and repositioning window')
     repositionWindow()
     if (triggerPopUp) {
@@ -663,6 +681,7 @@ export function getDisplayListOptions(): Array<{
     else if (first.startsWith('fr')) langCode = 'fr'
     else if (first.startsWith('de')) langCode = 'de'
     else if (first.startsWith('hi')) langCode = 'hi'
+    else if (first.startsWith('fa')) langCode = 'fa'
     else if (first.startsWith('ja')) langCode = 'ja'
     else if (first.startsWith('ru')) langCode = 'ru'
     else langCode = 'en'
@@ -705,15 +724,15 @@ export function popUpAndRetract(durationMs = 1500): void {
 
   const wasAlreadyOpen = interactive
   console.log(`[Main] Popping up panel briefly to confirm new screen/edge location (wasAlreadyOpen=${wasAlreadyOpen})`)
-  mainWindow.webContents.send('window:toggle', true)
+  sendToMainWindow('window:toggle', true)
 
   if (popUpTimer !== null) clearTimeout(popUpTimer)
   if (!wasAlreadyOpen) {
     popUpTimer = setTimeout(() => {
       popUpTimer = null
-      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+      if (mainWindow && !mainWindow.isDestroyed()) {
         console.log('[Main] Retracting panel after brief confirmation pop-up')
-        mainWindow.webContents.send('window:toggle', false)
+        sendToMainWindow('window:toggle', false)
       }
     }, durationMs)
   }

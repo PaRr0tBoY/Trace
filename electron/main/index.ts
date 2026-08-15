@@ -14,11 +14,11 @@ import { ensureDirs, cleanTemp, PATHS } from '../store/paths'
 import { configureAiLog } from './aiLog'
 import { createWindow, getMainWindow, setInteractive, setVisible, startCursorPoll, stopCursorPoll, stopHeartbeat, setHotZoneWidth } from './window'
 import { createTray, registerIncognitoApplier } from './tray'
-import { registerIpc, registerSendListeners, getProviderChain } from './ipc'
+import { registerIpc, registerSendListeners, getProviderChain, syncLoginItemSettings } from './ipc'
 import { prewarmDragIcons } from './drag'
 import { loadAppIconCacheFromDisk, prewarmAppIcons, resolveAppIcon } from './appIcons'
 import { snapshotWindows } from './windowSnapshot'
-import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushState, stopStateTimers, setSuggestionChat, setSuggestionOcr } from './state'
+import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushState, stopStateTimers, setSuggestionChat, setSuggestionOcr, getStore } from './state'
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
 import { startKeyboardHook, stopKeyboardHook } from './hookManager'
@@ -43,6 +43,13 @@ app.disableHardwareAcceleration()
 
 // Restrict the renderer to a single webContents and forbid remote module usage.
 app.enableSandbox()
+
+// Keep V8's old-space heap bounded without starving a renderer that is loading
+// an existing clipboard history. This deliberately does not restore
+// --optimize-for-size: that flag made collections more aggressive and caused
+// visible animation hitches. Chromium image/compositor memory is handled by
+// the thumbnail path below rather than by this JavaScript heap limit.
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=512 --expose-gc')
 
 // ---- single instance -------------------------------------------------------
 const gotLock = app.requestSingleInstanceLock()
@@ -84,6 +91,9 @@ app.on('before-quit', () => {
   foregroundWatcher?.stop()
   attributor?.dispose()
   getWatcher().stop()
+  try {
+    getStore().persistSync()
+  } catch { /* ignore */ }
   try {
     const { globalShortcut } = require('electron')
     globalShortcut.unregisterAll()
@@ -192,14 +202,7 @@ app.whenReady().then(async () => {
   }
   setHotZoneWidth(settings.hotZoneWidth || 3)
   
-  if (app.isPackaged) {
-    try {
-      app.setLoginItemSettings({
-        openAtLogin: settings.launchAtLogin,
-        path: app.getPath('exe')
-      })
-    } catch { /* ignore in non-packaged / sandbox */ }
-  }
+  syncLoginItemSettings(settings.launchAtLogin)
   foregroundWatcher = new ForegroundWatcher({
     isEnabled: () => {
       const s = loadSettings()

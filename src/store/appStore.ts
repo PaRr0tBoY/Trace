@@ -151,6 +151,7 @@ interface AppState {
   setStyleFlyoutOpen: (open: boolean) => void
   previewFlyoutRect: { top: number; bottom: number } | null
   setPreviewFlyoutRect: (rect: { top: number; bottom: number } | null) => void
+  isInternalCopying: boolean
   copyFlareActive: boolean
   flareKey: number
   triggerCopyFlare: () => void
@@ -303,6 +304,7 @@ export const useStore = create<AppState>((set, get) => ({
     // AnimatePresence.onExitComplete callback is the one that calls setPreviewMode(false)
     // after the exit animation has fully settled.
   },
+  isInternalCopying: false,
   copyFlareActive: false,
   flareKey: 0,
 
@@ -315,6 +317,12 @@ export const useStore = create<AppState>((set, get) => ({
       currentVersion: version,
       tasks,
       hydrated: true
+    })
+    edge.onCopyFlare(() => {
+      if (!get().isInternalCopying) {
+        console.log('[appStore] OS copy event detected! Triggering copy flare indicator')
+        get().triggerCopyFlare()
+      }
     })
   },
   setStation: (station) => set({ station }),
@@ -347,13 +355,10 @@ export const useStore = create<AppState>((set, get) => ({
     const prevTop = prevItems.length > 0 ? prevItems[0] : null
     const newTop = items.length > 0 ? items[0] : null
 
-    if (get().hydrated && prevTop && newTop) {
-      if (
-        newTop.id !== prevTop.id ||
-        newTop.capturedAt !== prevTop.capturedAt ||
-        newTop.hitCount !== prevTop.hitCount
-      ) {
-        console.log('[appStore] Top item copied or re-copied! Triggering sine-curve copy flare for:', newTop.id)
+    if (get().hydrated && newTop) {
+      const isDifferentId = !prevTop || newTop.id !== prevTop.id
+      const isNewCapturedAt = prevTop && newTop.capturedAt !== prevTop.capturedAt
+      if ((isDifferentId || isNewCapturedAt) && !get().isInternalCopying) {
         get().triggerCopyFlare()
       }
     }
@@ -452,8 +457,14 @@ export const useStore = create<AppState>((set, get) => ({
     if (get().settings.showCopyIndicator === false) return
     if (flareTimer) clearTimeout(flareTimer)
     set({ copyFlareActive: true, flareKey: Date.now() })
+    if (!get().open) {
+      edge.setPreviewMode(true)
+    }
     flareTimer = setTimeout(() => {
       set({ copyFlareActive: false })
+      if (!get().open && !get().previewItemId && !get().styleFlyoutOpen) {
+        edge.setPreviewMode(false)
+      }
       flareTimer = null
     }, 1400)
   },
@@ -475,36 +486,61 @@ export const useStore = create<AppState>((set, get) => ({
       items: get().items.map((it) => (it.id === id ? { ...it, pinned } : it))
     })
     const items = await edge.setPinned(id, pinned)
-    set({ items })
-  },
-
-  async remove(id) {
-    set({ items: get().items.filter((it) => it.id !== id) })
-    const items = await edge.deleteItem(id)
-    set({ items })
-  },
-
-  async clear(ids?: string[]) {
-    if (!ids || ids.length === 0) {
-      const items = await edge.clearItems()
-      set({ items })
-    } else {
-      const idSet = new Set(ids)
-      set({ items: get().items.filter((it) => !idSet.has(it.id)) })
-      let items = get().items
-      for (const id of ids) {
-        items = await edge.deleteItem(id)
-      }
+    const current = get().items
+    if (items.length !== current.length || items.some((it, i) => it.id !== current[i]?.id || it.pinned !== current[i]?.pinned)) {
       set({ items })
     }
   },
 
+  async remove(id) {
+    const previousItems = get().items
+    set({ items: previousItems.filter((it) => it.id !== id) })
+    try {
+      const items = await edge.deleteItem(id)
+      set({ items })
+    } catch {
+      // Do not leave the UI claiming an item was deleted when the main-process
+      // persistence request failed (for example during a renderer reload).
+      set({ items: previousItems })
+      get().pushToast({ id: `delete-${Date.now()}`, message: 'Could not delete this item. Please try again.', tone: 'error' })
+    }
+  },
+
+  async clear(ids?: string[]) {
+    if (!ids || ids.length === 0) {
+      const previousItems = get().items
+      set({ items: previousItems.filter((it) => it.pinned) })
+      try {
+        const items = await edge.clearItems()
+        set({ items })
+      } catch {
+        set({ items: previousItems })
+        get().pushToast({ id: `clear-${Date.now()}`, message: 'Could not clear history. Please try again.', tone: 'error' })
+      }
+    } else {
+      const previousItems = get().items
+      const idSet = new Set(ids)
+      set({ items: previousItems.filter((it) => !idSet.has(it.id)) })
+      try {
+        const items = await edge.deleteBatchItems(ids)
+        set({ items })
+      } catch {
+        set({ items: previousItems })
+        get().pushToast({ id: `clear-${Date.now()}`, message: 'Could not clear history. Please try again.', tone: 'error' })
+      }
+    }
+  },
+
   async copy(id) {
+    set({ isInternalCopying: true })
     await edge.copyItem(id)
+    setTimeout(() => set({ isInternalCopying: false }), 400)
   },
 
   async paste(id) {
+    set({ isInternalCopying: true })
     await edge.pasteItem(id)
+    setTimeout(() => set({ isInternalCopying: false }), 600)
   },
 
   async pasteSubitem(req) {

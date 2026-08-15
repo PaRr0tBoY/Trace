@@ -153,7 +153,7 @@ export function useEdgeHover(): void {
       interactiveTimer = window.setTimeout(() => {
         interactiveTimer = undefined
         if (!useStore.getState().open) edge.setInteractive(false)
-      }, 180)
+      }, 300)
     }
 
     const closePanel = () => {
@@ -318,7 +318,7 @@ export function useEdgeHover(): void {
       edgeHintTimer = window.setTimeout(() => {
         edgeHintTimer = undefined
         useStore.getState().setEdgeHintActive(false)
-      }, 300)
+      }, 450)
     }
 
     // ── main-process cursor poll (replaces broken pointermove forwarding) ──
@@ -346,7 +346,7 @@ export function useEdgeHover(): void {
 
           const isHoverEnabled = state.settings.hoverActivation ?? true
 
-          if (inEdgeNear && !inZone && !state.open && isHoverEnabled && (state.settings.showEdgeLocationHint ?? true)) {
+          if (inEdgeNear && !inZone && !state.open && isHoverEnabled && (state.settings.showEdgeLocationHint ?? false)) {
             triggerEdgeHint()
           }
 
@@ -408,7 +408,7 @@ export function useEdgeHover(): void {
 
           const isHoverEnabled = state.settings.hoverActivation ?? true
 
-          if (inEdgeNear && !inZone && !state.open && isHoverEnabled && (state.settings.showEdgeLocationHint ?? true)) {
+          if (inEdgeNear && !inZone && !state.open && isHoverEnabled && (state.settings.showEdgeLocationHint ?? false)) {
             triggerEdgeHint()
           }
 

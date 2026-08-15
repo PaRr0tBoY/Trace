@@ -9,6 +9,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { net } from 'electron'
 import type { StationContentInput, StationEntryDto } from '../../shared/station'
 import { contentFileName, textContentBytes } from '../store/contentFile'
 import { PATHS } from '../store/paths'
@@ -36,8 +37,28 @@ function stageFile(name: string, bytes: Buffer): string | null {
   }
 }
 
+/**
+ * Download a remote web image into the station content dir. Runs in main
+ * because net.fetch is CORS-free (the sandboxed preload's fetch is not).
+ * Failures degrade to a skipped item, never abort the batch.
+ */
+async function stageImageUrl(url: string, now: number, index: number): Promise<string | null> {
+  try {
+    const res = await net.fetch(url, { redirect: 'follow' })
+    if (!res.ok) return null
+    const declared = Number(res.headers.get('content-length') ?? 0)
+    if (declared > MAX_IMAGE_BYTES) return null
+    const buf = Buffer.from(await res.arrayBuffer())
+    if (buf.byteLength === 0 || buf.byteLength > MAX_IMAGE_BYTES) return null
+    const mime = (res.headers.get('content-type') ?? '').split(';')[0]?.trim() ?? ''
+    return stageFile(contentFileName('image', mime, now, index), buf)
+  } catch {
+    return null
+  }
+}
+
 /** Stage the content (if any valid parts) and enter the station. */
-export function enterContentToStation(input: StationContentInput): StationEntryDto[] {
+export async function enterContentToStation(input: StationContentInput): Promise<StationEntryDto[]> {
   const paths: string[] = []
   const now = Date.now()
 
@@ -56,6 +77,11 @@ export function enterContentToStation(input: StationContentInput): StationEntryD
     }
     const name = contentFileName('image', img.mime ?? '', now, i + 1)
     const staged = stageFile(name, Buffer.from(img.data))
+    if (staged) paths.push(staged)
+  }
+
+  if (typeof input?.imageUrl === 'string' && input.imageUrl.length > 0) {
+    const staged = await stageImageUrl(input.imageUrl, now, images.length + 1)
     if (staged) paths.push(staged)
   }
 

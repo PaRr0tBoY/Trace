@@ -33,7 +33,8 @@ import type { ClipboardItemDto } from '../../shared/types'
  *  `id` stays the entry's id so the card can route actions back to the
  *  station. */
 function stationToItem(entry: StationEntryDto): ClipboardItemDto {
-  const member = entry.members[0]
+  const member = entry.members?.[0]
+  const firstPath = entry.paths?.[0] ?? ''
   const isImage = !!member?.isImage
   return {
     id: entry.id,
@@ -42,15 +43,15 @@ function stationToItem(entry: StationEntryDto): ClipboardItemDto {
     pinned: entry.pinned,
     data: {
       kind: 'files',
-      paths: [entry.paths[0]],
-      entries: member
+      paths: firstPath ? [firstPath] : [],
+      entries: member && firstPath
         ? [
             {
               name: member.name,
               ext: member.ext,
               size: member.size,
               isImage,
-              ...(isImage && member.exists ? { preview: `tracelocal://thumb/${encodeURIComponent(entry.paths[0])}` } : {})
+              ...(isImage && member.exists ? { preview: `tracelocal://thumb/${encodeURIComponent(firstPath)}` } : {})
             }
           ]
         : undefined

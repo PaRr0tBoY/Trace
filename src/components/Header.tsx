@@ -321,8 +321,8 @@ export function Header() {
                 height: 22,
                 borderRadius: 999,
                 background: 'rgba(255, 255, 255, 0.16)',
-                border: '1px solid rgba(255, 255, 255, 0.22)',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
+                border: '1px solid rgba(255, 255, 255, 0.24)',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
                 pointerEvents: 'none',
                 zIndex: 0
               }}

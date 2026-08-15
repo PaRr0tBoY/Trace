@@ -30,7 +30,7 @@ export function TickIndicatorIcon({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        filter: `drop-shadow(0 0 10px ${glowColor})`
+        filter: `drop-shadow(0 0 12px ${glowColor}) drop-shadow(0 0 4px ${glowColor})`
       }}
     >
       {/* Floating & Breathing Motion Wrapper — the endless breathe loop is
@@ -58,9 +58,9 @@ export function TickIndicatorIcon({
           style={{ display: 'block', overflow: 'visible' }}
         >
           <motion.path
-            d="M 4 12.5 L 9.5 17.5 L 20 6.5"
+            d="M 5.0 12.5 L 9.5 17.0 L 22.8 2.8"
             stroke={fillColor}
-            strokeWidth="4.2"
+            strokeWidth="3.2"
             strokeLinecap="round"
             strokeLinejoin="round"
             initial={{ pathLength: 0, opacity: 0 }}

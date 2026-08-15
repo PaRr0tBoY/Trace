@@ -32,7 +32,7 @@ export function extname(p: string): string {
  */
 export function isImageItem(it: ClipboardItemDto): boolean {
   if (it.data.kind === 'image' || it.data.kind === 'image-collection') return true
-  if (it.data.kind === 'files' && it.data.paths.length > 0) {
+  if (it.data.kind === 'files' && (it.data.paths?.length ?? 0) > 0) {
     return it.data.paths.every((p) => isImagePath(p))
   }
   return false
@@ -76,7 +76,7 @@ export function collectFileMembers(items: ClipboardItemDto[]): FileMember[] {
   const out: FileMember[] = []
   for (const it of items) {
     if (it.data.kind !== 'files' || isImageItem(it)) continue
-    const paths = it.data.paths
+    const paths = it.data.paths ?? []
     const entries = it.data.entries
     for (let i = 0; i < paths.length; i++) {
       const path = paths[i]
@@ -105,9 +105,10 @@ export function collectFileMembers(items: ClipboardItemDto[]): FileMember[] {
 export function collectStationMembers(entries: StationEntryDto[]): FileMember[] {
   const out: FileMember[] = []
   for (const it of entries) {
-    const paths = it.paths
+    const paths = it.paths ?? []
+    const members = it.members ?? []
     for (let i = 0; i < paths.length; i++) {
-      const m = it.members[i]
+      const m = members[i]
       const path = paths[i]
       out.push({
         itemId: it.id,

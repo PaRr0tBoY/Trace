@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { nativeImage } from 'electron'
+import { APP_CONFIG } from './config'
 
 const IMAGE_MIME_TYPES: Readonly<Record<string, string>> = {
   png: 'image/png',
@@ -29,6 +30,16 @@ const thumbCache = new Map<string, { bytes: Buffer; contentType: string }>()
 export interface StoredImage {
   filePath: string
   contentType: string
+}
+
+/** URL for a bounded thumbnail of a staged clipboard image. */
+export function thumbnailUrlForStoredImage(imageId: string): string {
+  return `${APP_CONFIG.imageProtocol}://thumb/${imageId}`
+}
+
+/** URL for a bounded thumbnail of an external image file. */
+export function thumbnailUrlForFile(filePath: string): string {
+  return `${APP_CONFIG.imageProtocol}://thumb/file/${encodeURIComponent(filePath.replace(/\\/g, '/'))}`
 }
 
 /**

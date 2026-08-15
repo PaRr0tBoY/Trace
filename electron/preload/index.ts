@@ -116,10 +116,11 @@ win.addEventListener('drop', (e: any) => {
 }, true)
 
 /**
- * Read non-file drag content (image items + plain text) and hand it to main
- * as `station:enter-content`. When the drop carries File objects at all, only
- * image items are considered — text/plain of a virtual file is not reliable
- * content, and the window must never navigate on a drop it did not claim.
+ * Read non-file drag content (image items + plain text + dragged links) and
+ * hand it to main as `station:enter-content`. When the drop carries File
+ * objects at all, only image items are considered — text/plain of a virtual
+ * file is not reliable content, and the window must never navigate on a drop
+ * it did not claim.
  */
 async function handleContentDrop(e: any): Promise<void> {
   const dt = e.dataTransfer
@@ -129,11 +130,31 @@ async function handleContentDrop(e: any): Promise<void> {
   e.preventDefault()
 
   let text = ''
+  let imageUrl = ''
   try {
     // A drop that carries File objects at all is treated as files-only:
     // text/plain of a virtual file is not reliable content.
     const hasFiles = dt.files && dt.files.length > 0
-    if (!hasFiles) text = dt.getData('text/plain')
+    if (!hasFiles) {
+      text = dt.getData('text/plain')
+      // Some apps publish a dragged link only as text/uri-list (no
+      // text/plain). Image URLs are downloaded by main; everything else
+      // enters the station as text so the link never vanishes.
+      const uriList = dt.getData('text/uri-list') || dt.getData('URL')
+      if (!text && uriList) {
+        const firstUrl = uriList
+          .split(/\r?\n/)
+          .map((u: string) => u.trim())
+          .find((u: string) => u && !u.startsWith('#'))
+        if (firstUrl) {
+          if (/\.(png|jpe?g|gif|webp|svg|avif|bmp)(\?.*)?$/i.test(firstUrl) || /^data:image\//i.test(firstUrl)) {
+            imageUrl = firstUrl
+          } else {
+            text = firstUrl
+          }
+        }
+      }
+    }
   } catch {
     /* dataTransfer access can throw for cross-app drags */
   }
@@ -147,10 +168,11 @@ async function handleContentDrop(e: any): Promise<void> {
     }
   }
 
-  if (!text && imageItems.length === 0) return
+  if (!text && imageItems.length === 0 && !imageUrl) return
 
   const input: StationContentInput = {}
   if (text) input.text = text
+  if (imageUrl) input.imageUrl = imageUrl
   for (const f of imageItems) {
     try {
       const buf = await f.arrayBuffer()
@@ -160,7 +182,7 @@ async function handleContentDrop(e: any): Promise<void> {
       /* unreadable content item — skip */
     }
   }
-  if (!input.text && !input.images) return
+  if (!input.text && !input.images && !input.imageUrl) return
   invoke('station:enter-content', input).catch((err) => console.error('[Preload] station:enter-content failed', err))
 }
 
@@ -169,13 +191,16 @@ const api = {
   loadState: () => invoke('state:load'),
   setPinned: (id: string, pinned: boolean) => invoke('item:set-pinned', id, pinned),
   deleteItem: (id: string) => invoke('item:delete', id),
+  deleteBatchItems: (ids: string[]) => invoke('item:delete-batch', ids),
   clearItems: () => invoke('item:clear'),
+  getFullText: (id: string) => invoke('item:get-full-text', id),
   copyItem: (id: string) => invoke('item:copy', id),
   copySubitem: (req: import('../../shared/types').DragRequest) => invoke('item:copy-subitem', req),
   pasteItem: (id: string) => invoke('item:paste', id),
   pasteSubitem: (req: import('../../shared/types').DragRequest) => invoke('item:paste-subitem', req),
   quitApp: () => invoke('app:quit'),
   startDrag: (req: DragRequest) => send('item:start-drag', req),
+
   removeSubitem: (req: import('../../shared/types').DragRequest) => invoke('item:remove-subitem', req),
 
   /* Transfer station (ADR-0006) */
@@ -266,6 +291,9 @@ const api = {
   onInternalDrop: (cb: (pos: { x: number; y: number }) => void) => on('item:internal-drop', cb),
   onCursorEdge: (cb: (data: EventArgs<'window:cursor-edge'>[0]) => void) => on('window:cursor-edge', cb),
   onToast: (cb: (toast: { id: string; message: string; tone: 'info' | 'error' }) => void) => on('ui:toast', cb),
+  onCopyFlare: (cb: () => void) => on('ui:copy-flare', cb),
+  onUpdateAvailable: (cb: (info: { version: string }) => void) => on('app:update-available', cb),
+  onUpdateDownloaded: (cb: (info: { version: string }) => void) => on('app:update-downloaded', cb),
   onSwitcherShow: (cb: (data: EventArgs<'switcher:show'>[0]) => void) => on('switcher:show', cb),
   onSwitcherSelect: (cb: (index: number) => void) => on('switcher:select', cb),
   onSwitcherPin: (cb: (initialQuery?: string) => void) => on('switcher:pin', cb),

@@ -58,7 +58,9 @@
     "autoDeleteDesc": "حذف العناصر المنسوخة تلقائياً (يحافظ على المثبّتة)",
     "never": "أبداً",
     "capacityTitle": "سعة السجل",
-    "capacityDesc": "الحد الأقصى للعناصر غير المثبّتة المخزّنة في السجل"
+    "capacityDesc": "الحد الأقصى للعناصر غير المثبّتة المخزّنة في السجل",
+    "movePastedToTopTitle": "نقل العناصر الملصقة إلى الأعلى",
+    "movePastedToTopDesc": "إعادة ترتيب العناصر غير المثبتة إلى أعلى العناصر الأخيرة كلما قمت بلصقها"
   },
   "position": {
     "edgePlacementTitle": "موضع الحافة",
@@ -134,7 +136,12 @@
     "moreImages": "+{count} صور أخرى",
     "moreFiles": "+{count} ملفات أخرى",
     "singleFile": "ملف واحد",
-    "scrollToTop": "التمرير للأعلى"
+    "scrollToTop": "التمرير للأعلى",
+    "clearLast1h": "مسح الساعة الأخيرة",
+    "clearLast6h": "مسح آخر 6 ساعات",
+    "clearLast24h": "مسح آخر 24 ساعة",
+    "clearAll": "مسح كل السجل",
+    "clearAllConfirm": "اضغط مرة أخرى للتأكيد"
   },
   "fileKinds": {
     "pdf": "PDF",

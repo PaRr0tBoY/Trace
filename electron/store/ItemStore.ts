@@ -90,18 +90,32 @@ export class ItemStore {
 
       if (parsedIndex && Array.isArray(parsedIndex.items)) {
         this.items = parsedIndex.items.filter((it) => it && it.data && typeof it.id === 'string')
+
+        // Auto-migrate large text items to disk payload files
+        let migratedAnyPayloads = false
+        for (const it of this.items) {
+          if (it.data.kind === 'text') {
+            if (!it.data.hasFullPayload && it.data.text.length > 300) {
+              this.writeTextPayload(it.id, it.data.text)
+              it.data.hasFullPayload = true
+              it.data.previewText = it.data.text.slice(0, 300)
+              it.data.text = it.data.previewText
+              migratedAnyPayloads = true
+            }
+          }
+        }
+
         this.rebuildIndex()
 
         // Auto-migrate legacy plain JSON: create backup & upgrade to DPAPI encryption
-        if (needsMigration) {
-          console.log('[ItemStore] Migrating legacy plain-text items.json to DPAPI safeStorage encryption...')
+        if (needsMigration || migratedAnyPayloads) {
+          console.log('[ItemStore] Migrating items.json to DPAPI safeStorage encryption and disk payloads...')
           try {
             const backupFile = `${file}.v1.bak`
             if (!existsSync(backupFile)) {
               writeFileSync(backupFile, rawBuffer)
             }
             this.persist()
-            console.log('[ItemStore] Auto-migration to DPAPI encryption completed successfully!')
           } catch (err) {
             console.error('[ItemStore] Auto-migration backup/persist failed:', err)
           }
@@ -123,8 +137,25 @@ export class ItemStore {
     for (const it of this.items) this.sigToId.set(signature(it.data), it.id)
   }
 
-  /** Persist the current index to disk. Called after every mutation. */
+  private persistTimer: ReturnType<typeof setTimeout> | null = null
+
+  /** Persist the current index to disk. Debounced to prevent main thread blocking during UI transitions. */
   private persist(): void {
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer)
+    }
+    this.persistTimer = setTimeout(() => {
+      this.persistTimer = null
+      this.persistSync()
+    }, 150)
+  }
+
+  /** Synchronous disk write (called by debounced timer or on app shutdown). */
+  public persistSync(): void {
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer)
+      this.persistTimer = null
+    }
     try {
       const indexObj: Index = { items: this.items }
       const jsonStr = JSON.stringify(indexObj)
@@ -163,6 +194,7 @@ export class ItemStore {
         if (it.data.kind === 'image-collection') {
           it.data.images.forEach((img) => this.removeImageFile(img.imageId))
         }
+        if (it.data.kind === 'text') this.removeTextPayload(it.id)
         stillNeed--
       } else {
         survivors.unshift(it)
@@ -180,6 +212,9 @@ export class ItemStore {
    * one is provided (re-copies refresh it, matching capturedAt).
    */
   add(data: ItemData, limit: number, sourceApp?: SourceApp): boolean {
+    if (data.kind === 'text' && data.text.length > 500000) {
+      data = { ...data, text: data.text.slice(0, 500000) }
+    }
     const sig = signature(data)
     const existingId = this.sigToId.get(sig)
     const now = Date.now()
@@ -203,11 +238,44 @@ export class ItemStore {
     }
 
     const id = createId()
-    const item: ClipboardItem = { id, data, capturedAt: now, hitCount: 1, pinned: false, ...(sourceApp ? { sourceApp } : {}) }
+    let finalData = data
+    if (data.kind === 'text' && data.text.length > 300) {
+      this.writeTextPayload(id, data.text)
+      finalData = {
+        ...data,
+        hasFullPayload: true,
+        previewText: data.text.slice(0, 300),
+        text: data.text.slice(0, 300)
+      }
+    }
+
+    const item: ClipboardItem = { id, data: finalData, capturedAt: now, hitCount: 1, pinned: false, ...(sourceApp ? { sourceApp } : {}) }
     this.items.unshift(item)
     this.sigToId.set(sig, id)
     if (data.kind === 'image') this.writeImageFile(data.imageId)
     this.trim(limit)
+    this.persist()
+    return true
+  }
+
+  /**
+   * Touch an item (e.g. on paste) to update its timestamp and hitCount,
+   * moving unpinned items to the front of the Recent list.
+   */
+  touch(id: string): boolean {
+    const idx = this.items.findIndex((it) => it.id === id)
+    if (idx < 0) return false
+    const it = this.items[idx]
+    const now = Date.now()
+    const updated: ClipboardItem = { ...it, hitCount: it.hitCount + 1, capturedAt: now }
+
+    if (!it.pinned) {
+      this.items.splice(idx, 1)
+      this.items.unshift(updated)
+    } else {
+      this.items[idx] = updated
+    }
+
     this.persist()
     return true
   }
@@ -228,7 +296,31 @@ export class ItemStore {
     if (removed.data.kind === 'image-collection') {
       removed.data.images.forEach((img) => this.removeImageFile(img.imageId))
     }
-    this.persist()
+    if (removed.data.kind === 'text') this.removeTextPayload(removed.id)
+    this.persistSync()
+  }
+
+  deleteBatch(ids: string[]): void {
+    if (!ids || ids.length === 0) return
+    const set = new Set(ids)
+    const toRemove: ClipboardItem[] = []
+    this.items = this.items.filter((it) => {
+      if (set.has(it.id)) {
+        toRemove.push(it)
+        return false
+      }
+      return true
+    })
+
+    for (const removed of toRemove) {
+      this.sigToId.delete(signature(removed.data))
+      if (removed.data.kind === 'image') this.removeImageFile(removed.data.imageId)
+      if (removed.data.kind === 'image-collection') {
+        removed.data.images.forEach((img) => this.removeImageFile(img.imageId))
+      }
+      if (removed.data.kind === 'text') this.removeTextPayload(removed.id)
+    }
+    this.persistSync()
   }
 
   public removeSubitem(req: DragRequest): boolean {
@@ -266,10 +358,11 @@ export class ItemStore {
         if (it.data.kind === 'image-collection') {
           it.data.images.forEach((img) => this.removeImageFile(img.imageId))
         }
+        if (it.data.kind === 'text') this.removeTextPayload(it.id)
       }
     }
     this.items = kept
-    this.persist()
+    this.persistSync()
   }
 
   pruneExpired(hours: number): boolean {
@@ -291,7 +384,7 @@ export class ItemStore {
     }
     if (removedAny) {
       this.items = kept
-      this.persist()
+      this.persistSync()
     }
     return removedAny
   }
@@ -307,6 +400,7 @@ export class ItemStore {
   /* ----------------------------- image files ----------------------------- */
 
   /**
+
    * Stage an image's bytes from a clipboard capture. The image was already
    * written to userData/images by the clipboard watcher (which has the raw
    * bytes); here we just no-op because the file already exists.
@@ -354,6 +448,37 @@ export class ItemStore {
     }
   }
 
+  private textPayloadPath(id: string): string {
+    return join(PATHS.payloadsDir(), `${id}.txt`)
+  }
+
+  private writeTextPayload(id: string, text: string): void {
+    try {
+      writeFileSync(this.textPayloadPath(id), text, 'utf8')
+    } catch { /* ignore */ }
+  }
+
+  private removeTextPayload(id: string): void {
+    try {
+      const p = this.textPayloadPath(id)
+      if (existsSync(p)) rmSync(p, { force: true })
+    } catch { /* ignore */ }
+  }
+
+  public getFullText(id: string): string {
+    const item = this.items.find((x) => x.id === id)
+    if (!item || item.data.kind !== 'text') return ''
+    if (item.data.hasFullPayload) {
+      try {
+        const p = this.textPayloadPath(id)
+        if (existsSync(p)) {
+          return readFileSync(p, 'utf8')
+        }
+      } catch { /* ignore */ }
+    }
+    return item.data.text
+  }
+
   /* ------------------------------- DTO ----------------------------------- */
 
   /** Snapshot the whole list as renderer-safe DTOs (images inlined). */
@@ -376,6 +501,7 @@ export class ItemStore {
           data: { kind: 'image-collection', images: imagesWithPreviews }
         }
       }
+
       return { ...it, data: it.data }
     })
   }
@@ -389,5 +515,4 @@ export class ItemStore {
     }
   }
 }
-
 

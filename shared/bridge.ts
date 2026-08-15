@@ -14,7 +14,9 @@ export interface EdgeApi {
   loadState: () => Promise<{ items: import('./types').ClipboardItemDto[]; station: import('./station').StationEntryDto[]; settings: Settings; version: string; tasks: TaskDto[] }>
   setPinned: (id: string, pinned: boolean) => Promise<import('./types').ClipboardItemDto[]>
   deleteItem: (id: string) => Promise<import('./types').ClipboardItemDto[]>
+  deleteBatchItems: (ids: string[]) => Promise<import('./types').ClipboardItemDto[]>
   clearItems: () => Promise<import('./types').ClipboardItemDto[]>
+  getFullText: (id: string) => Promise<string>
   removeSubitem: (req: DragRequest) => Promise<boolean>
   copyItem: (id: string) => Promise<boolean>
   copySubitem: (req: DragRequest) => Promise<boolean>
@@ -159,6 +161,9 @@ export interface EdgeApi {
     displayHeight: number
   }) => void) => () => void
   onToast: (cb: (toast: { id: string; message: string; tone: 'info' | 'error' }) => void) => () => void
+  onCopyFlare: (cb: () => void) => () => void
+  onUpdateAvailable: (cb: (info: { version: string }) => void) => () => void
+  onUpdateDownloaded: (cb: (info: { version: string }) => void) => () => void
 
   /* Alt+Tab switcher (ADR-0005) */
   switcherHover: (index: number) => void

@@ -227,8 +227,10 @@ export function ItemList() {
       ) : (
         <>
           {pinned.length > 0 && (
-            <section className="pinned-section">
-              <div 
+            <motion.section layout transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }} className="pinned-section">
+              <motion.div
+                layout
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
                 className={`section-label pinned-header-interactive ${pinnedCollapsed ? 'is-collapsed' : ''}`}
                 onClick={() => {
                   const next = !pinnedCollapsed
@@ -247,35 +249,42 @@ export function ItemList() {
                     <ChevronDownIcon style={{ transform: pinnedCollapsed ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.22s ease' }} />
                   </button>
                 </div>
-              </div>
+              </motion.div>
               <AnimatePresence initial={false}>
                 {!pinnedCollapsed && (
                   <motion.div
                     key="pinned-items-container"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                    style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}
+                    layout
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                    style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}
                   >
-                    {pinned.map((it, idx) => (
-                      <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} />
-                    ))}
+                    <AnimatePresence initial={false}>
+                      {pinned.map((it, idx) => (
+                        <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} />
+                      ))}
+                    </AnimatePresence>
                   </motion.div>
                 )}
               </AnimatePresence>
-            </section>
+            </motion.section>
           )}
 
           {recent.length > 0 && (
-            <section>
-              {pinned.length > 0 && <div className="section-label">{t('item.recent')}</div>}
+            <motion.section layout transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {pinned.length > 0 && (
+                <motion.div layout transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }} className="section-label">
+                  {t('item.recent')}
+                </motion.div>
+              )}
               <AnimatePresence initial={false}>
                 {recent.map((it, idx) => (
                   <ClipboardItemCard key={it.id} item={it} instant={filterInstant.instant || idx >= ENTER_ANIM_LIMIT} animateLayout={animateLayout} />
                 ))}
               </AnimatePresence>
-            </section>
+            </motion.section>
           )}
         </>
       )}

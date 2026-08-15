@@ -10,14 +10,22 @@ interface LiquidLoaderProps {
   fillColor?: string
   glowColor?: string
   speed?: number
+  active?: boolean
 }
 
 export function LiquidOctopusLoader({
   fillColor = '#ffffff',
   glowColor = 'rgba(255, 255, 255, 0.9)',
-  speed = 1.0
+  speed = 1.0,
+  active
 }: LiquidLoaderProps) {
   const octoRef = useRef<SVGPathElement | null>(null)
+
+  const open = useStore((s) => s.open)
+  const copyFlareActive = useStore((s) => s.copyFlareActive)
+  const settingsOpen = useStore((s) => s.settingsOpen)
+
+  const isAnimating = active ?? (open || copyFlareActive || settingsOpen)
 
   // Octopus path dimensions & center coordinates
   const bounds = useMemo(() => {
@@ -50,7 +58,7 @@ export function LiquidOctopusLoader({
     if (useStore.getState().settings.motionLevel !== 'extended') return
 
     // 1. Gentle logo pulse & breathing
-    const mainTl = gsap.timeline({ repeat: -1 })
+    const mainTl = gsap.timeline({ repeat: -1, paused: !isAnimating })
     mainTl.to(
       octoRef.current,
       {
@@ -81,11 +89,19 @@ export function LiquidOctopusLoader({
       }
     )
 
+    if (!isAnimating) {
+      mainTl.pause()
+      rotTween.pause()
+    } else {
+      mainTl.play()
+      rotTween.play()
+    }
+
     return () => {
       mainTl.kill()
       rotTween.kill()
     }
-  }, [speed, bounds])
+  }, [speed, bounds, isAnimating])
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>

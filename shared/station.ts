@@ -44,4 +44,7 @@ export interface StationContentInput {
     /** Image MIME (e.g. image/png); drives the staged file extension. */
     mime: string
   }[]
+  /** Remote web image URL (e.g. a dragged image link): main downloads it
+   *  before staging — preload's fetch would hit CORS, so net.fetch runs here. */
+  imageUrl?: string
 }

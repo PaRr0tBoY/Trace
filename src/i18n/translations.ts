@@ -38,6 +38,8 @@ export interface TranslationKeys {
     fullscreenProtectionDesc: string
     clearUnpinnedTitle: string
     clearUnpinnedDesc: string
+    movePastedToTopTitle: string
+    movePastedToTopDesc: string
     soundEffectsTitle: string
     soundEffectsDesc: string
     autoDeleteTitle: string
@@ -137,6 +139,11 @@ export interface TranslationKeys {
     unpin: string
     delete: string
     clear: string
+    clearLast1h?: string
+    clearLast6h?: string
+    clearLast24h?: string
+    clearAll?: string
+    clearAllConfirm?: string
     dropToSave: string
     dropToSaveDesc: string
     justNow: string
@@ -751,6 +758,8 @@ export const en: TranslationKeys = {
     "fullscreenProtectionDesc": "Automatically pause edge hover while playing games or watching fullscreen videos",
     "clearUnpinnedTitle": "Clear unpinned on restart",
     "clearUnpinnedDesc": "Wipe unpinned items whenever the app restarts",
+    "movePastedToTopTitle": "Move pasted items to top",
+    "movePastedToTopDesc": "Re-order unpinned items to the top of Recent whenever you paste them",
     "soundEffectsTitle": "Sound Effects",
     "soundEffectsDesc": "Play tactile audio feedback for toggles, sliders, and button clicks",
     "autoDeleteTitle": "Auto-delete timer",
@@ -850,6 +859,11 @@ export const en: TranslationKeys = {
     "unpin": "Unpin",
     "delete": "Delete",
     "clear": "Clear",
+    "clearLast1h": "Clear last hour",
+    "clearLast6h": "Clear last 6 hours",
+    "clearLast24h": "Clear last 24 hours",
+    "clearAll": "Clear all history",
+    "clearAllConfirm": "Tap again to confirm",
     "dropToSave": "Drop to save",
     "dropToSaveDesc": "Any file, image, link, or text",
     "justNow": "just now",
@@ -1294,6 +1308,8 @@ export const es: TranslationKeys = {
     "fullscreenProtectionDesc": "Pausar automáticamente el borde al jugar o ver vídeos a pantalla completa",
     "clearUnpinnedTitle": "Borrar no fijados al reiniciar",
     "clearUnpinnedDesc": "Eliminar elementos no fijados cada vez que se reinicia la aplicación",
+    "movePastedToTopTitle": "Mover los elementos pegados arriba",
+    "movePastedToTopDesc": "Reordena los elementos no fijados al principio de Recientes cada vez que los pegues",
     "soundEffectsTitle": "Efectos de sonido",
     "soundEffectsDesc": "Reproducir audio táctil para interruptores, deslizadores y clics de botones",
     "autoDeleteTitle": "Temporizador de eliminación automática",
@@ -1387,6 +1403,12 @@ export const es: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Borrar la última hora",
+    "clearLast6h": "Borrar las últimas 6 horas",
+    "clearLast24h": "Borrar las últimas 24 horas",
+    "clearAll": "Borrar todo el historial",
+    "clearAllConfirm": "Toca de nuevo para confirmar",
+
     "copy": "Copiar",
     "pinned": "FIJADO",
     "pin": "Fijar",
@@ -1836,6 +1858,8 @@ export const fr: TranslationKeys = {
     "fullscreenProtectionDesc": "Suspendre automatiquement le survol du bord pendant les jeux ou les vidéos en plein écran",
     "clearUnpinnedTitle": "Effacer les non épinglés au redémarrage",
     "clearUnpinnedDesc": "Supprimer les éléments non épinglés à chaque redémarrage de l'application",
+    "movePastedToTopTitle": "Déplacer les éléments collés en haut",
+    "movePastedToTopDesc": "Réorganise les éléments non épinglés en haut de Récents chaque fois que vous les collez",
     "soundEffectsTitle": "Effets sonores",
     "soundEffectsDesc": "Émettre un retour audio tactile pour les commutateurs, curseurs et clics de boutons",
     "autoDeleteTitle": "Minuteur de suppression automatique",
@@ -1929,6 +1953,12 @@ export const fr: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Effacer la dernière heure",
+    "clearLast6h": "Effacer les 6 dernières heures",
+    "clearLast24h": "Effacer les 24 dernières heures",
+    "clearAll": "Effacer tout l’historique",
+    "clearAllConfirm": "Appuyez à nouveau pour confirmer",
+
     "copy": "Copier",
     "pinned": "ÉPINGLÉ",
     "pin": "Épingler",
@@ -2378,6 +2408,8 @@ export const de: TranslationKeys = {
     "fullscreenProtectionDesc": "Rand-Hover bei Spielen oder Vollbildvideos automatisch pausieren",
     "clearUnpinnedTitle": "Unangepinnte beim Neustart löschen",
     "clearUnpinnedDesc": "Unangepinnte Elemente bei jedem App-Neustart entfernen",
+    "movePastedToTopTitle": "Eingefügte Elemente nach oben verschieben",
+    "movePastedToTopDesc": "Ordnet nicht angeheftete Elemente jedes Mal, wenn Sie sie einfügen, oben in „Zuletzt verwendet“ ein",
     "soundEffectsTitle": "Soundeffekte",
     "soundEffectsDesc": "Taktiles Audio-Feedback für Schalter, Schieberegler und Schaltflächen",
     "autoDeleteTitle": "Auto-Lösch-Timer",
@@ -2471,6 +2503,12 @@ export const de: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Letzte Stunde löschen",
+    "clearLast6h": "Letzte 6 Stunden löschen",
+    "clearLast24h": "Letzte 24 Stunden löschen",
+    "clearAll": "Gesamten Verlauf löschen",
+    "clearAllConfirm": "Zum Bestätigen erneut tippen",
+
     "copy": "Kopieren",
     "pinned": "ANGEPINNT",
     "pin": "Anpinnen",
@@ -2920,6 +2958,8 @@ export const it: TranslationKeys = {
     "fullscreenProtectionDesc": "Sospendi automaticamente l'hover del bordo durante i giochi o i video a schermo intero",
     "clearUnpinnedTitle": "Cancella non bloccati al riavvio",
     "clearUnpinnedDesc": "Elimina gli elementi non bloccati a ogni riavvio dell'app",
+    "movePastedToTopTitle": "Sposta gli elementi incollati in cima",
+    "movePastedToTopDesc": "Riordina gli elementi non fissati in cima a Recenti ogni volta che li incolli",
     "soundEffectsTitle": "Effetti sonori",
     "soundEffectsDesc": "Riproduci feedback audio tattile per interruttori, cursori e clic dei pulsanti",
     "autoDeleteTitle": "Timer di eliminazione automatica",
@@ -3013,6 +3053,12 @@ export const it: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Cancella ultima ora",
+    "clearLast6h": "Cancella ultime 6 ore",
+    "clearLast24h": "Cancella ultime 24 ore",
+    "clearAll": "Cancella tutta la cronologia",
+    "clearAllConfirm": "Tocca di nuovo per confermare",
+
     "copy": "Copia",
     "pinned": "BLOCCATO",
     "pin": "Blocca",
@@ -3462,6 +3508,8 @@ export const pt: TranslationKeys = {
     "fullscreenProtectionDesc": "Pausar automaticamente o hover da borda ao jogar ou assistir vídeos em tela cheia",
     "clearUnpinnedTitle": "Limpar não fixados ao reiniciar",
     "clearUnpinnedDesc": "Remover itens não fixados sempre que o app reiniciar",
+    "movePastedToTopTitle": "Mover itens colados para o topo",
+    "movePastedToTopDesc": "Reordena os itens não fixados para o topo de Recentes sempre que você os cola",
     "soundEffectsTitle": "Efeitos sonoros",
     "soundEffectsDesc": "Reproduzir feedback audio tátil para interruptores, controles deslizantes e cliques de botão",
     "autoDeleteTitle": "Temporizador de exclusão automática",
@@ -3555,6 +3603,12 @@ export const pt: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Limpar última hora",
+    "clearLast6h": "Limpar últimas 6 horas",
+    "clearLast24h": "Limpar últimas 24 horas",
+    "clearAll": "Limpar todo o histórico",
+    "clearAllConfirm": "Toque novamente para confirmar",
+
     "copy": "Copiar",
     "pinned": "FIXADO",
     "pin": "Fixar",
@@ -4004,6 +4058,8 @@ export const ru: TranslationKeys = {
     "fullscreenProtectionDesc": "Автоматически приостанавливать наведение у края во время игр или полноэкранных видео",
     "clearUnpinnedTitle": "Очищать незакреплённые при перезапуске",
     "clearUnpinnedDesc": "Удалять незакреплённые элементы при каждом перезапуске приложения",
+    "movePastedToTopTitle": "Перемещать вставленные элементы наверх",
+    "movePastedToTopDesc": "Перемещает незакреплённые элементы в начало списка «Недавние» при каждой вставке",
     "soundEffectsTitle": "Звуковые эффекты",
     "soundEffectsDesc": "Воспроизводить тактильный аудиоотклик для переключателей, ползунков и нажатий кнопок",
     "autoDeleteTitle": "Таймер автоудаления",
@@ -4097,6 +4153,12 @@ export const ru: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Очистить за последний час",
+    "clearLast6h": "Очистить за последние 6 часов",
+    "clearLast24h": "Очистить за последние 24 часа",
+    "clearAll": "Очистить всю историю",
+    "clearAllConfirm": "Нажмите ещё раз для подтверждения",
+
     "copy": "Копировать",
     "pinned": "ЗАКРЕПЛЕНО",
     "pin": "Закрепить",
@@ -4546,6 +4608,8 @@ export const ja: TranslationKeys = {
     "fullscreenProtectionDesc": "ゲーム中や全画面動画視聴時にエッジホバーを自動的に一時停止",
     "clearUnpinnedTitle": "再起動時にピン留め以外を消去",
     "clearUnpinnedDesc": "アプリ再起動のたびにピン留めされていない項目を削除",
+    "movePastedToTopTitle": "貼り付けたアイテムを上に移動",
+    "movePastedToTopDesc": "貼り付けるたびに、ピン留めされていないアイテムを「最近使用した項目」の先頭に並べ替えます",
     "soundEffectsTitle": "効果音",
     "soundEffectsDesc": "トグル、スライダー、ボタンクリックに触覚音声フィードバックを再生",
     "autoDeleteTitle": "自動削除タイマー",
@@ -4639,6 +4703,12 @@ export const ja: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "過去1時間を消去",
+    "clearLast6h": "過去6時間を消去",
+    "clearLast24h": "過去24時間を消去",
+    "clearAll": "履歴をすべて消去",
+    "clearAllConfirm": "もう一度タップして確認",
+
     "copy": "コピー",
     "pinned": "ピン留め",
     "pin": "ピン留め",
@@ -5088,6 +5158,8 @@ export const ko: TranslationKeys = {
     "fullscreenProtectionDesc": "게임 중이거나 전체화면 영상 시청 시 가장자리 호버 자동 일시정지",
     "clearUnpinnedTitle": "재시작 시 고정 안 됨 항목 삭제",
     "clearUnpinnedDesc": "앱이 다시 시작될 때마다 고정되지 않은 항목 제거",
+    "movePastedToTopTitle": "붙여넣은 항목을 맨 위로 이동",
+    "movePastedToTopDesc": "붙여넣을 때마다 고정되지 않은 항목을 최근 항목의 맨 위로 다시 정렬합니다",
     "soundEffectsTitle": "효과음",
     "soundEffectsDesc": "토글, 슬라이더, 버튼 클릭에 촉각 오디오 피드백 재생",
     "autoDeleteTitle": "자동 삭제 타이머",
@@ -5181,6 +5253,12 @@ export const ko: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "최근 1시간 지우기",
+    "clearLast6h": "최근 6시간 지우기",
+    "clearLast24h": "최근 24시간 지우기",
+    "clearAll": "전체 기록 지우기",
+    "clearAllConfirm": "확인하려면 다시 탭하세요",
+
     "copy": "복사",
     "pinned": "고정됨",
     "pin": "고정",
@@ -5630,6 +5708,8 @@ export const zhCN: TranslationKeys = {
     "fullscreenProtectionDesc": "玩游戏或观看全屏视频时自动暂停边缘悬停",
     "clearUnpinnedTitle": "重启时清除未固定项",
     "clearUnpinnedDesc": "应用每次重启时清除未固定的项",
+    "movePastedToTopTitle": "将粘贴的项目移至顶部",
+    "movePastedToTopDesc": "每次粘贴时，将未固定的项目重新排列到“最近使用”列表的顶部",
     "soundEffectsTitle": "音效",
     "soundEffectsDesc": "为开关、滑块和按钮点击播放触感音频反馈",
     "autoDeleteTitle": "自动删除计时器",
@@ -6171,6 +6251,8 @@ export const zhTW: TranslationKeys = {
     "fullscreenProtectionDesc": "玩遊戲或觀看全螢幕影片時自動暫停邊緣懸停",
     "clearUnpinnedTitle": "重啟時清除未固定項",
     "clearUnpinnedDesc": "應用程式每次重啟時清除未固定的項目",
+    "movePastedToTopTitle": "將貼上的項目移至頂端",
+    "movePastedToTopDesc": "每次貼上時，將未釘選的項目重新排列到「最近使用」的頂端",
     "soundEffectsTitle": "音效",
     "soundEffectsDesc": "為開關、滑桿和按鈕點擊播放觸感音訊回饋",
     "autoDeleteTitle": "自動刪除計時器",
@@ -6713,6 +6795,8 @@ export const hi: TranslationKeys = {
     "fullscreenProtectionDesc": "गेम खेलते समय या फुलस्क्रीन वीडियो देखते समय स्वचालित रूप से एज होवर रोकें",
     "clearUnpinnedTitle": "रीस्टार्ट पर अनपिन किए गए साफ़ करें",
     "clearUnpinnedDesc": "ऐप रीस्टार्ट होने पर अनपिन किए गए आइटम मिटाएँ",
+    "movePastedToTopTitle": "पेस्ट किए गए आइटम को सबसे ऊपर ले जाएँ",
+    "movePastedToTopDesc": "जब भी आप किसी आइटम को पेस्ट करें, तो अनपिन किए गए आइटम को हाल ही में उपयोग किए गए आइटम की सूची में सबसे ऊपर ले जाएँ",
     "soundEffectsTitle": "ध्वनि प्रभाव",
     "soundEffectsDesc": "टॉगल, स्लाइडर और बटन क्लिक के लिए स्पर्श ऑडियो फ़ीडबैक चलाएँ",
     "autoDeleteTitle": "स्वतः-हटाने टाइमर",
@@ -6806,6 +6890,12 @@ export const hi: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "पिछले 1 घंटे को साफ़ करें",
+    "clearLast6h": "पिछले 6 घंटे साफ़ करें",
+    "clearLast24h": "पिछले 24 घंटे साफ़ करें",
+    "clearAll": "पूरा इतिहास साफ़ करें",
+    "clearAllConfirm": "पुष्टि करने के लिए फिर से टैप करें",
+
     "copy": "कॉपी",
     "pinned": "पिन किया गया",
     "pin": "पिन करें",
@@ -7255,6 +7345,8 @@ export const ar: TranslationKeys = {
     "fullscreenProtectionDesc": "إيقاف تحويم الحافة تلقائياً أثناء الألعاب أو مقاطع الفيديو بملء الشاشة",
     "clearUnpinnedTitle": "مسح غير المثبّت عند إعادة التشغيل",
     "clearUnpinnedDesc": "حذف العناصر غير المثبّتة عند كل إعادة تشغيل للتطبيق",
+    "movePastedToTopTitle": "نقل العناصر الملصقة إلى الأعلى",
+    "movePastedToTopDesc": "إعادة ترتيب العناصر غير المثبتة إلى أعلى العناصر الأخيرة كلما قمت بلصقها",
     "soundEffectsTitle": "المؤثرات الصوتية",
     "soundEffectsDesc": "تشغيل ردود صوتية لمسية للمفاتيح والمنزلقات ونقرات الأزرار",
     "autoDeleteTitle": "مؤقت الحذف التلقائي",
@@ -7348,6 +7440,12 @@ export const ar: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "مسح الساعة الأخيرة",
+    "clearLast6h": "مسح آخر 6 ساعات",
+    "clearLast24h": "مسح آخر 24 ساعة",
+    "clearAll": "مسح كل السجل",
+    "clearAllConfirm": "اضغط مرة أخرى للتأكيد",
+
     "copy": "نسخ",
     "pinned": "مثبّت",
     "pin": "تثبيت",
@@ -7797,6 +7895,8 @@ export const bn: TranslationKeys = {
     "fullscreenProtectionDesc": "গেম খেলা বা ফুলস্ক্রিন ভিডিও দেখার সময় স্বয়ংক্রিয়ভাবে এজ হোভার বিরতি দিন",
     "clearUnpinnedTitle": "পুনরায় চালু হলে আনপিন করা মুছুন",
     "clearUnpinnedDesc": "অ্যাপ পুনরায় চালু হলে আনপিন করা আইটেমগুলি মুছে ফেলুন",
+    "movePastedToTopTitle": "পেস্ট করা আইটেমগুলো উপরে সরান",
+    "movePastedToTopDesc": "আপনি যখনই কোনো আইটেম পেস্ট করবেন, তখন আনপিন করা আইটেমগুলোকে সাম্প্রতিক তালিকার উপরে পুনর্বিন্যাস করুন",
     "soundEffectsTitle": "সাউন্ড ইফেক্ট",
     "soundEffectsDesc": "টগল, স্লাইডার এবং বোতাম ক্লিকের জন্য স্পর্শ অডিও প্রতিক্রিয়া চালান",
     "autoDeleteTitle": "স্বয়ংক্রিয় মুছে ফেলার টাইমার",
@@ -7890,6 +7990,12 @@ export const bn: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "গত ১ ঘণ্টা মুছুন",
+    "clearLast6h": "গত ৬ ঘণ্টা মুছুন",
+    "clearLast24h": "গত ২৪ ঘণ্টা মুছুন",
+    "clearAll": "সব ইতিহাস মুছুন",
+    "clearAllConfirm": "নিশ্চিত করতে আবার ট্যাপ করুন",
+
     "copy": "কপি",
     "pinned": "পিন করা",
     "pin": "পিন করুন",
@@ -8339,6 +8445,8 @@ export const tr: TranslationKeys = {
     "fullscreenProtectionDesc": "Oynarken veya tam ekran video izlerken kenar üzerinde gezinmeyi otomatik durdur",
     "clearUnpinnedTitle": "Yeniden başlatmada sabitlenmemişleri temizle",
     "clearUnpinnedDesc": "Uygulama her yeniden başladığında sabitlenmemiş öğeleri sil",
+    "movePastedToTopTitle": "Yapıştırılan öğeleri en üste taşı",
+    "movePastedToTopDesc": "Her yapıştırdığınızda sabitlenmemiş öğeleri Son Kullanılanlar listesinin en üstüne yeniden sıralar",
     "soundEffectsTitle": "Ses Efektleri",
     "soundEffectsDesc": "Anahtarlar, kaydırıcılar ve düğme tıklamaları için dokunsal ses geri bildirimi çal",
     "autoDeleteTitle": "Otomatik silme zamanlayıcısı",
@@ -8432,6 +8540,12 @@ export const tr: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Son 1 saati temizle",
+    "clearLast6h": "Son 6 saati temizle",
+    "clearLast24h": "Son 24 saati temizle",
+    "clearAll": "Tüm geçmişi temizle",
+    "clearAllConfirm": "Onaylamak için tekrar dokunun",
+
     "copy": "Kopyala",
     "pinned": "SABİTLENDİ",
     "pin": "Sabitle",
@@ -8881,6 +8995,8 @@ export const vi: TranslationKeys = {
     "fullscreenProtectionDesc": "Tự động tạm dừng di chuột ở mép khi đang chơi game hoặc xem video toàn màn hình",
     "clearUnpinnedTitle": "Xóa mục chưa ghim khi khởi động lại",
     "clearUnpinnedDesc": "Xóa các mục chưa ghim mỗi khi ứng dụng khởi động lại",
+    "movePastedToTopTitle": "Đưa các mục đã dán lên đầu",
+    "movePastedToTopDesc": "Sắp xếp lại các mục chưa ghim lên đầu mục Gần đây mỗi khi bạn dán chúng",
     "soundEffectsTitle": "Hiệu ứng âm thanh",
     "soundEffectsDesc": "Phát phản hồi âm thanh xúc giác cho công tắc, thanh trượt và nhấp nút",
     "autoDeleteTitle": "Bộ hẹn giờ tự động xóa",
@@ -8974,6 +9090,12 @@ export const vi: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Xóa 1 giờ qua",
+    "clearLast6h": "Xóa 6 giờ qua",
+    "clearLast24h": "Xóa 24 giờ qua",
+    "clearAll": "Xóa toàn bộ lịch sử",
+    "clearAllConfirm": "Nhấn lại để xác nhận",
+
     "copy": "Sao chép",
     "pinned": "ĐÃ GHIM",
     "pin": "Ghim",
@@ -9423,6 +9545,8 @@ export const pl: TranslationKeys = {
     "fullscreenProtectionDesc": "Automatycznie wstrzymuj najechanie na krawędź podczas grania lub oglądania filmów na pełnym ekranie",
     "clearUnpinnedTitle": "Wyczyść odpięte przy restarcie",
     "clearUnpinnedDesc": "Usuń odpięte elementy przy każdym restarcie aplikacji",
+    "movePastedToTopTitle": "Przenoś wklejone elementy na górę",
+    "movePastedToTopDesc": "Po każdym wklejeniu przenosi nieprzypięte elementy na początek listy Ostatnie",
     "soundEffectsTitle": "Efekty dźwiękowe",
     "soundEffectsDesc": "Odtwarzaj dotykowy sprzężenie dźwiękowe dla przełączników, suwaków i kliknięć przycisków",
     "autoDeleteTitle": "Czasomierz automatycznego usuwania",
@@ -9516,6 +9640,12 @@ export const pl: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Wyczyść ostatnią godzinę",
+    "clearLast6h": "Wyczyść ostatnie 6 godzin",
+    "clearLast24h": "Wyczyść ostatnie 24 godziny",
+    "clearAll": "Wyczyść całą historię",
+    "clearAllConfirm": "Dotknij ponownie, aby potwierdzić",
+
     "copy": "Kopiuj",
     "pinned": "PRZYPINIĘTE",
     "pin": "Przypnij",
@@ -9965,6 +10095,8 @@ export const nl: TranslationKeys = {
     "fullscreenProtectionDesc": "Rand-hover automatisch pauzeren tijdens games of volledig scherm-video's",
     "clearUnpinnedTitle": "Vastgezette wissen bij herstart",
     "clearUnpinnedDesc": "Niet-vastgezette items wissen telkens wanneer de app herstart",
+    "movePastedToTopTitle": "Geplakte items naar boven verplaatsen",
+    "movePastedToTopDesc": "Zet niet-vastgemaakte items telkens wanneer je ze plakt bovenaan bij Recent",
     "soundEffectsTitle": "Geluidseffecten",
     "soundEffectsDesc": "Tactiele audiofeedback afspelen voor schakelaars, schuifregelaars en knopklikken",
     "autoDeleteTitle": "Auto-verwijderingstimer",
@@ -10058,6 +10190,12 @@ export const nl: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Laatste uur wissen",
+    "clearLast6h": "Laatste 6 uur wissen",
+    "clearLast24h": "Laatste 24 uur wissen",
+    "clearAll": "Volledige geschiedenis wissen",
+    "clearAllConfirm": "Tik opnieuw om te bevestigen",
+
     "copy": "Kopiëren",
     "pinned": "VASTGEZET",
     "pin": "Vastzetten",
@@ -10507,6 +10645,8 @@ export const sv: TranslationKeys = {
     "fullscreenProtectionDesc": "Pausa automatiskt kantsvävning vid spel eller fullskärmsvideo",
     "clearUnpinnedTitle": "Rensa ofästa vid omstart",
     "clearUnpinnedDesc": "Ta bort ofästa objekt när appen startas om",
+    "movePastedToTopTitle": "Flytta inklistrade objekt till toppen",
+    "movePastedToTopDesc": "Flyttar om fästa objekt till toppen av Senaste varje gång du klistrar in dem",
     "soundEffectsTitle": "Ljudeffekter",
     "soundEffectsDesc": "Spela taktil ljudåterkoppling för växlare, skjutreglage och knapptryckningar",
     "autoDeleteTitle": "Timer för automatisk borttagning",
@@ -10600,6 +10740,12 @@ export const sv: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Rensa senaste timmen",
+    "clearLast6h": "Rensa senaste 6 timmarna",
+    "clearLast24h": "Rensa senaste 24 timmarna",
+    "clearAll": "Rensa all historik",
+    "clearAllConfirm": "Tryck igen för att bekräfta",
+
     "copy": "Kopiera",
     "pinned": "FÄST",
     "pin": "Fäst",
@@ -11049,6 +11195,8 @@ export const id: TranslationKeys = {
     "fullscreenProtectionDesc": "Jeda hover tepi secara otomatis saat bermain game atau menonton video layar penuh",
     "clearUnpinnedTitle": "Bersihkan yang tidak disematkan saat mulai ulang",
     "clearUnpinnedDesc": "Hapus item tidak disematkan setiap kali aplikasi dimulai ulang",
+    "movePastedToTopTitle": "Pindahkan item yang ditempel ke atas",
+    "movePastedToTopDesc": "Mengurutkan ulang item yang tidak disematkan ke bagian atas Terbaru setiap kali Anda menempelkannya",
     "soundEffectsTitle": "Efek Suara",
     "soundEffectsDesc": "Putar umpan balik audio taktil untuk saklar, penggeser, dan klik tombol",
     "autoDeleteTitle": "Pengatur waktu hapus otomatis",
@@ -11142,6 +11290,12 @@ export const id: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Hapus 1 jam terakhir",
+    "clearLast6h": "Hapus 6 jam terakhir",
+    "clearLast24h": "Hapus 24 jam terakhir",
+    "clearAll": "Hapus semua riwayat",
+    "clearAllConfirm": "Ketuk lagi untuk mengonfirmasi",
+
     "copy": "Salin",
     "pinned": "DISEMATKAN",
     "pin": "Sematkan",
@@ -11591,6 +11745,8 @@ export const uk: TranslationKeys = {
     "fullscreenProtectionDesc": "Автоматично призупиняти наведення на край під час ігор або перегляду повноекранних відео",
     "clearUnpinnedTitle": "Очищувати неприкріплене при перезапуску",
     "clearUnpinnedDesc": "Видаляти неприкріплені елементи при кожному перезапуску додатку",
+    "movePastedToTopTitle": "Переміщувати вставлені елементи вгору",
+    "movePastedToTopDesc": "Після кожного вставлення переміщує незакріплені елементи на початок списку «Нещодавні»",
     "soundEffectsTitle": "Звукові ефекти",
     "soundEffectsDesc": "Відтворювати тактильний аудіовідгук для перемикачів, повзунків та натискань кнопок",
     "autoDeleteTitle": "Таймер авто-видалення",
@@ -11684,6 +11840,12 @@ export const uk: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Очистити за останню годину",
+    "clearLast6h": "Очистити за останні 6 годин",
+    "clearLast24h": "Очистити за останні 24 години",
+    "clearAll": "Очистити всю історію",
+    "clearAllConfirm": "Натисніть ще раз для підтвердження",
+
     "copy": "Копіювати",
     "pinned": "ПРИКРІПЛЕНО",
     "pin": "Прикріпити",
@@ -12133,6 +12295,8 @@ export const el: TranslationKeys = {
     "fullscreenProtectionDesc": "Αυτόματη παύση αιώρησης άκρης κατά τη διάρκεια παιχνιδιών ή βίντεο πλήρους οθόνης",
     "clearUnpinnedTitle": "Καθαρισμός μη καρφιτσωμένων κατά την επανεκκίνηση",
     "clearUnpinnedDesc": "Διαγραφή μη καρφιτσωμένων στοιχείων κάθε φορά που η εφαρμογή επανεκκινεί",
+    "movePastedToTopTitle": "Μετακίνηση επικολλημένων στοιχείων στην κορυφή",
+    "movePastedToTopDesc": "Αναδιατάσσει τα μη καρφιτσωμένα στοιχεία στην κορυφή των Πρόσφατων κάθε φορά που τα επικολλάτε",
     "soundEffectsTitle": "Ηχητικά εφέ",
     "soundEffectsDesc": "Αναπαραγωγή απτικής ηχητικής ανάδρασης για διακόπτες, ρυθμιστές και κλικ κουμπιών",
     "autoDeleteTitle": "Χρονοδιακόπτης αυτόματης διαγραφής",
@@ -12226,6 +12390,12 @@ export const el: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Εκκαθάριση τελευταίας ώρας",
+    "clearLast6h": "Εκκαθάριση τελευταίων 6 ωρών",
+    "clearLast24h": "Εκκαθάριση τελευταίων 24 ωρών",
+    "clearAll": "Εκκαθάριση όλου του ιστορικού",
+    "clearAllConfirm": "Πατήστε ξανά για επιβεβαίωση",
+
     "copy": "Αντιγραφή",
     "pinned": "ΚΑΡΦΙΤΣΩΜΕΝΟ",
     "pin": "Καρφίσωσε",
@@ -12675,6 +12845,8 @@ export const cs: TranslationKeys = {
     "fullscreenProtectionDesc": "Automaticky pozastavit najíždění na okraj při hrách nebo sledování videa na celou obrazovku",
     "clearUnpinnedTitle": "Vymazat nepřipnuté při restartu",
     "clearUnpinnedDesc": "Odstranit nepřipnuté položky při každém restartu aplikace",
+    "movePastedToTopTitle": "Přesouvat vložené položky nahoru",
+    "movePastedToTopDesc": "Při každém vložení přesune nepřipnuté položky na začátek seznamu Nedávné",
     "soundEffectsTitle": "Zvukové efekty",
     "soundEffectsDesc": "Přehrávat hmatovou zvukovou odezvu pro přepínače, posuvníky a kliknutí tlačítek",
     "autoDeleteTitle": "Časovač automatického mazání",
@@ -12768,6 +12940,12 @@ export const cs: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Vymazat poslední hodinu",
+    "clearLast6h": "Vymazat posledních 6 hodin",
+    "clearLast24h": "Vymazat posledních 24 hodin",
+    "clearAll": "Vymazat celou historii",
+    "clearAllConfirm": "Potvrďte dalším klepnutím",
+
     "copy": "Kopírovat",
     "pinned": "PŘIPNUTO",
     "pin": "Připnout",
@@ -13217,6 +13395,8 @@ export const ro: TranslationKeys = {
     "fullscreenProtectionDesc": "Pauzează automat survolul marginii în timpul jocurilor sau al videoclipurilor pe ecran complet",
     "clearUnpinnedTitle": "Șterge nepinate la repornire",
     "clearUnpinnedDesc": "Șterge elementele nepinate ori de câte ori aplicația repornește",
+    "movePastedToTopTitle": "Mută elementele lipite în partea de sus",
+    "movePastedToTopDesc": "Reordonează elementele nefixate în partea de sus a secțiunii Recente de fiecare dată când le lipești",
     "soundEffectsTitle": "Efecte sonore",
     "soundEffectsDesc": "Redă feedback audio tactil pentru comutatoare, glisoare și clicuri de butoane",
     "autoDeleteTitle": "Cronometru ștergere automată",
@@ -13310,6 +13490,12 @@ export const ro: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Șterge ultima oră",
+    "clearLast6h": "Șterge ultimele 6 ore",
+    "clearLast24h": "Șterge ultimele 24 de ore",
+    "clearAll": "Șterge tot istoricul",
+    "clearAllConfirm": "Atinge din nou pentru confirmare",
+
     "copy": "Copiază",
     "pinned": "PINAT",
     "pin": "Păstrează",
@@ -13759,6 +13945,8 @@ export const hu: TranslationKeys = {
     "fullscreenProtectionDesc": "Játékok vagy teljes képernyős videók alatt automatikusan szüneteltesse az él-hoverelést",
     "clearUnpinnedTitle": "Nem rögzítettek törlése újraindításkor",
     "clearUnpinnedDesc": "Nem rögzített elemek törlése az alkalmazás minden újraindításakor",
+    "movePastedToTopTitle": "Beillesztett elemek áthelyezése felülre",
+    "movePastedToTopDesc": "Beillesztéskor a nem rögzített elemeket a Legutóbbiak lista tetejére rendezi",
     "soundEffectsTitle": "Hang effektek",
     "soundEffectsDesc": "Tapintási hang-visszacsatolás lejátszása kapcsolókhoz, csúszkákhoz és gombnyomásokhoz",
     "autoDeleteTitle": "Automatikus törlési időzítő",
@@ -13852,6 +14040,12 @@ export const hu: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Elmúlt óra törlése",
+    "clearLast6h": "Elmúlt 6 óra törlése",
+    "clearLast24h": "Elmúlt 24 óra törlése",
+    "clearAll": "Teljes előzmény törlése",
+    "clearAllConfirm": "Koppintson újra a megerősítéshez",
+
     "copy": "Másolás",
     "pinned": "RÖGZÍTETT",
     "pin": "Rögzítés",
@@ -14301,6 +14495,8 @@ export const da: TranslationKeys = {
     "fullscreenProtectionDesc": "Sæt automatisk hover ved kant på pause under spil eller fuldskærmsvideo",
     "clearUnpinnedTitle": "Ryd ikke-fastgjorte ved genstart",
     "clearUnpinnedDesc": "Slet ikke-fastgjorte elementer hver gang appen genstarter",
+    "movePastedToTopTitle": "Flyt indsatte elementer til toppen",
+    "movePastedToTopDesc": "Omarrangerer ikke-fastgjorte elementer til toppen af Seneste, hver gang du indsætter dem",
     "soundEffectsTitle": "Lydeffekter",
     "soundEffectsDesc": "Afspil taktil lydfeedback for kontakter, skydere og knapklik",
     "autoDeleteTitle": "Timer til automatisk sletning",
@@ -14394,6 +14590,12 @@ export const da: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Ryd sidste time",
+    "clearLast6h": "Ryd sidste 6 timer",
+    "clearLast24h": "Ryd sidste 24 timer",
+    "clearAll": "Ryd hele historikken",
+    "clearAllConfirm": "Tryk igen for at bekræfte",
+
     "copy": "Kopier",
     "pinned": "FASTGJORT",
     "pin": "Fastgør",
@@ -14843,6 +15045,8 @@ export const fi: TranslationKeys = {
     "fullscreenProtectionDesc": "Keskeytä automaattisesti reunan hover pelien tai koko näytön videoiden aikana",
     "clearUnpinnedTitle": "Tyhjennä kiinnittämättömät uudelleenkäynnistyksessä",
     "clearUnpinnedDesc": "Poista kiinnittämättömät kohteet aina kun sovellus käynnistyy uudelleen",
+    "movePastedToTopTitle": "Siirrä liitetyt kohteet alkuun",
+    "movePastedToTopDesc": "Järjestää kiinnittämättömät kohteet Uusimmat-luettelon alkuun aina, kun liität ne",
     "soundEffectsTitle": "Äänitehosteet",
     "soundEffectsDesc": "Toista taktiilista äänipalautetta vaihtimille, liukusäätimille ja painikkeiden painalluksille",
     "autoDeleteTitle": "Automaattisen poiston ajastin",
@@ -14936,6 +15140,12 @@ export const fi: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Tyhjennä viimeinen tunti",
+    "clearLast6h": "Tyhjennä viimeiset 6 tuntia",
+    "clearLast24h": "Tyhjennä viimeiset 24 tuntia",
+    "clearAll": "Tyhjennä koko historia",
+    "clearAllConfirm": "Vahvista napauttamalla uudelleen",
+
     "copy": "Kopioi",
     "pinned": "KIINNITETTY",
     "pin": "Kiinnitä",
@@ -15385,6 +15595,8 @@ export const th: TranslationKeys = {
     "fullscreenProtectionDesc": "หยุดโฮเวอร์ขอบอัตโนมัติขณะเล่นเกมหรือดูวิดีโอเต็มหน้าจอ",
     "clearUnpinnedTitle": "ล้างรายการที่ไม่ได้ปักหมุดเมื่อรีสตาร์ท",
     "clearUnpinnedDesc": "ลบรายการที่ไม่ได้ปักหมุดเมื่อแอปรีสตาร์ท",
+    "movePastedToTopTitle": "ย้ายรายการที่วางไปไว้ด้านบน",
+    "movePastedToTopDesc": "จัดเรียงรายการที่ไม่ได้ปักหมุดไปไว้ด้านบนของรายการล่าสุดทุกครั้งที่คุณวางรายการนั้น",
     "soundEffectsTitle": "เอฟเฟกต์เสียง",
     "soundEffectsDesc": "เล่นเสียงตอบสนองสัมผัสสำหรับสวิตช์ สไลเดอร์ และคลิกปุ่ม",
     "autoDeleteTitle": "ตัวจับเวลาลบอัตโนมัติ",
@@ -15478,6 +15690,12 @@ export const th: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "ล้างข้อมูล 1 ชั่วโมงล่าสุด",
+    "clearLast6h": "ล้างข้อมูล 6 ชั่วโมงล่าสุด",
+    "clearLast24h": "ล้างข้อมูล 24 ชั่วโมงล่าสุด",
+    "clearAll": "ล้างประวัติทั้งหมด",
+    "clearAllConfirm": "แตะอีกครั้งเพื่อยืนยัน",
+
     "copy": "คัดลอก",
     "pinned": "ปักหมุดแล้ว",
     "pin": "ปักหมุด",
@@ -15927,6 +16145,8 @@ export const he: TranslationKeys = {
     "fullscreenProtectionDesc": "השהה אוטומטית ריחוף קצה בעת משחק משחקים או צפייה בסרטונים במסך מלא",
     "clearUnpinnedTitle": "נקה פריטים לא מוצמדים באתחול",
     "clearUnpinnedDesc": "מחק פריטים לא מוצמדים בכל הפעלה מחדש של האפליקציה",
+    "movePastedToTopTitle": "העבר פריטים שהודבקו לראש הרשימה",
+    "movePastedToTopDesc": "מסדר מחדש פריטים שאינם מוצמדים בראש הפריטים האחרונים בכל פעם שמדביקים אותם",
     "soundEffectsTitle": "אפקטים קוליים",
     "soundEffectsDesc": "השמע משוב אודיו מישושי עבור מתגים, סליידרים ולחיצות כפתור",
     "autoDeleteTitle": "טיימר מחיקה אוטומטי",
@@ -16020,6 +16240,12 @@ export const he: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "נקה את השעה האחרונה",
+    "clearLast6h": "נקה את 6 השעות האחרונות",
+    "clearLast24h": "נקה את 24 השעות האחרונות",
+    "clearAll": "נקה את כל ההיסטוריה",
+    "clearAllConfirm": "הקש שוב כדי לאשר",
+
     "copy": "העתק",
     "pinned": "מוצמד",
     "pin": "הצמד",
@@ -16469,6 +16695,8 @@ export const no: TranslationKeys = {
     "fullscreenProtectionDesc": "Sett kant-hover automatisk på pause under spill eller fullskjermvideo",
     "clearUnpinnedTitle": "Fjern ikke-festede ved omstart",
     "clearUnpinnedDesc": "Slett ikke-festede elementer hver gang appen starter på nytt",
+    "movePastedToTopTitle": "Flytt innlimte elementer til toppen",
+    "movePastedToTopDesc": "Flytter ikke-festede elementer til toppen av Nylige hver gang du limer dem inn",
     "soundEffectsTitle": "Lydeffekter",
     "soundEffectsDesc": "Spill av taktil lyd-tilbakemelding for brytere, glidebrytere og knappeklikk",
     "autoDeleteTitle": "Timer for automatisk sletting",
@@ -16562,6 +16790,12 @@ export const no: TranslationKeys = {
     "themeVioletDesc": "Purple — the original Trace look",
   },
   "item": {
+    "clearLast1h": "Tøm siste time",
+    "clearLast6h": "Tøm siste 6 timer",
+    "clearLast24h": "Tøm siste 24 timer",
+    "clearAll": "Tøm all historikk",
+    "clearAllConfirm": "Trykk igjen for å bekrefte",
+
     "copy": "Kopier",
     "pinned": "FESTET",
     "pin": "Fest",

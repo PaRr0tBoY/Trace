@@ -58,7 +58,9 @@
     "autoDeleteDesc": "Elimina automaticamente gli elementi copiati (mantiene i bloccati)",
     "never": "Mai",
     "capacityTitle": "Capacità cronologia",
-    "capacityDesc": "Numero massimo di elementi non bloccati memorizzati nella cronologia"
+    "capacityDesc": "Numero massimo di elementi non bloccati memorizzati nella cronologia",
+    "movePastedToTopTitle": "Sposta gli elementi incollati in cima",
+    "movePastedToTopDesc": "Riordina gli elementi non fissati in cima a Recenti ogni volta che li incolli"
   },
   "position": {
     "edgePlacementTitle": "Posizionamento bordo",
@@ -134,7 +136,12 @@
     "moreImages": "+{count} altre immagini",
     "moreFiles": "+{count} altri file",
     "singleFile": "1 file",
-    "scrollToTop": "Torna in cima"
+    "scrollToTop": "Torna in cima",
+    "clearLast1h": "Cancella ultima ora",
+    "clearLast6h": "Cancella ultime 6 ore",
+    "clearLast24h": "Cancella ultime 24 ore",
+    "clearAll": "Cancella tutta la cronologia",
+    "clearAllConfirm": "Tocca di nuovo per confermare"
   },
   "fileKinds": {
     "pdf": "PDF",

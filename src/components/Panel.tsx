@@ -42,7 +42,9 @@ export function Panel() {
   // outside the view-transition animation); clipboard is derived locally.
   const [reportedFooter, setReportedFooter] = useState<ViewFooterState | null>(null)
   const clear = useStore((s) => s.clear)
+
   const settings = useStore((s) => s.settings)
+  const isRight = settings.stickPosition === 'right'
   const settingsOpen = useStore((s) => s.settingsOpen)
   const view = useStore((s) => s.view)
 
@@ -82,6 +84,10 @@ export function Panel() {
   // The actual pixel height of the trigger zone on the left edge
   const triggerHeightPx = window.innerHeight * settings.hotZoneHeight
   const halfTrigger = triggerHeightPx / 2
+  // The edge-hint beacon hugs the same trigger band as the clip path.
+  const insetTop = `calc(50% - ${halfTrigger}px)`
+  const insetBottom = `calc(50% - ${halfTrigger}px)`
+  const edgeHintActive = useStore((s) => s.edgeHintActive)
 
   // The height of the complete pop-up panel
   const panelHeightStr = `${(settings.panelHeight || 0.6) * 100}vh`
@@ -183,7 +189,16 @@ export function Panel() {
     }
   }, [internalDragReq, setInternalDragReq, setDragActive])
 
-  const hasFiles = (e: React.DragEvent) => e.dataTransfer.types.includes('Files')
+  const hasDragContent = (e: React.DragEvent) => {
+    const types = Array.from(e.dataTransfer?.types || [])
+    return (
+      types.includes('Files') ||
+      types.includes('text/uri-list') ||
+      types.includes('text/plain') ||
+      types.includes('text/html') ||
+      types.includes('URL')
+    )
+  }
 
   /**
    * Route an OS file drop by its coordinates: task row -> link files,
@@ -226,14 +241,16 @@ export function Panel() {
   }
 
   const onDragEnter = (e: React.DragEvent) => {
-    if (hasFiles(e)) {
+    if (hasDragContent(e)) {
       e.preventDefault()
       setDragActive(true)
     }
   }
 
   const onDragOver = (e: React.DragEvent) => {
-    if (hasFiles(e)) e.preventDefault()
+    if (hasDragContent(e)) {
+      e.preventDefault()
+    }
   }
 
   const onDragLeave = (e: React.DragEvent) => {
@@ -253,8 +270,6 @@ export function Panel() {
       // Dropped on the general panel background: no-op. Batch-member split
       // lives on the card button only (T5).
       setInternalDragReq(null)
-    } else if (hasFiles(e)) {
-      e.preventDefault()
     }
     // No setDragActive(false) here either — an OS drop is settled by the
     // main drag:active push once DoDragDrop returns; internal drops are
@@ -313,6 +328,31 @@ export function Panel() {
                 : { duration: 0.08, ease: [0, 0, 1, 1] }
           }}
         />
+        {/* Edge Location Hint Beacon (Ultra-subtle fast hairline pulse when touching edge at wrong position) */}
+        <AnimatePresence>
+          {!open && edgeHintActive && (settings.showEdgeLocationHint ?? false) && (
+            <motion.div
+              key="edge-location-beacon"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              style={{
+                position: 'absolute',
+                top: insetTop,
+                bottom: insetBottom,
+                [isRight ? 'right' : 'left']: 0,
+                width: 2,
+                boxSizing: 'border-box',
+                background: 'linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.65) 25%, rgba(255, 255, 255, 0.65) 75%, transparent)',
+                boxShadow: '0 0 6px rgba(255, 255, 255, 0.3)',
+                borderRadius: isRight ? '999px 0 0 999px' : '0 999px 999px 0',
+                pointerEvents: 'none',
+                zIndex: 99
+              }}
+            />
+          )}
+        </AnimatePresence>
         <div className={`flare-top${settings.stickPosition === 'right' ? ' flare-right' : ''}`}>
           <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M 0 0 L 0 30 L 30 30 A 30 30 0 0 1 0 0 Z" fill="#000000" />

@@ -25,8 +25,9 @@ import { useDragOut } from '../hooks/useDragOut'
 import { edge } from '../lib/edge'
 import { basename, formatBytes, previewText, relativeTime, formatImageDisplayName } from '../lib/format'
 import { getFileKind } from '../lib/fileType'
+import { parseUrlPreview } from '../lib/urlPreview'
 import { playButtonClickSound, playToggleSound, playDeleteSound, playCardExpandSound } from '../lib/soundEffects'
-import { CopyIcon, FileKindIcon, ImageIcon, LinkIcon, PinIcon, PinFillIcon, TrashIcon, ChevronUpIcon, ExpandIcon, ContractIcon, ExternalLinkIcon } from './icons'
+import { CopyIcon, FileKindIcon, ImageIcon, LinkIcon, PinIcon, PinFillIcon, TrashIcon, ChevronUpIcon, ExpandIcon, ContractIcon, ExternalLinkIcon, GlobeIcon } from './icons'
 import '../styles/item.css'
 
 import { tryPaste } from '../lib/tryPaste'
@@ -120,7 +121,7 @@ function ClipboardItemBase({ item, instant, animateLayout, stationEntry }: Props
   useEffect(() => {
     if (!open) setExpanded(false)
   }, [open])
-  const isBundle = (item.data.kind === 'files' && item.data.paths.length > 1) || item.data.kind === 'image-collection'
+  const isBundle = (item.data.kind === 'files' && (item.data.paths?.length ?? 0) > 1) || item.data.kind === 'image-collection'
 
   const onCopy = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -187,7 +188,7 @@ function ClipboardItemBase({ item, instant, animateLayout, stationEntry }: Props
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: -4, transition: { duration: 0.12, ease: [0.32, 0, 0.67, 0] } }}
       transition={{
-        layout: { type: 'spring', stiffness: 280, damping: 28, mass: 0.8 },
+        layout: { duration: 0.22, ease: [0.16, 1, 0.3, 1] },
         type: 'spring',
         stiffness: 300,
         damping: 30,
@@ -313,15 +314,17 @@ function ClipboardItemBase({ item, instant, animateLayout, stationEntry }: Props
           </div>
         </div>
 
-        <div 
-          className="actions" 
-          onClick={(e) => e.stopPropagation()} 
+        <div
+          className="actions"
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
           style={{ display: isBundle && expanded ? 'none' : undefined }}
         >
           <button
             className={`act${item.pinned ? ' active' : ''}`}
             title={item.pinned ? t('item.unpin') : t('item.pin')}
             onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
               e.currentTarget.blur()
               playToggleSound(!item.pinned)
               if (stationEntry) {
@@ -361,6 +364,7 @@ function ClipboardItemBase({ item, instant, animateLayout, stationEntry }: Props
               title={t('flyout.openLink')}
               onClick={(e) => {
                 e.stopPropagation()
+                e.preventDefault()
                 e.currentTarget.blur()
                 playButtonClickSound()
                 window.open((item.data as any).text, '_blank')
@@ -374,6 +378,8 @@ function ClipboardItemBase({ item, instant, animateLayout, stationEntry }: Props
             className="act danger"
             title={t('item.delete')}
             onClick={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
               e.currentTarget.blur()
               playDeleteSound()
               if (stationEntry) {
@@ -525,10 +531,10 @@ function BundleFluidPreview({
                 >
                   <motion.img
                     src={img.preview}
-                    style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 4, background: 'rgba(0,0,0,0.5)' }}
-                    draggable={false}
                     loading="lazy"
                     decoding="async"
+                    style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 4, background: 'rgba(0,0,0,0.5)' }}
+                    draggable={false}
                   />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)' }}>
@@ -557,9 +563,9 @@ function BundleFluidPreview({
                     <motion.img
                       key={img.imageId}
                       src={img.preview}
-                      className="bundle-stack-card"
                       loading="lazy"
                       decoding="async"
+                      className="bundle-stack-card"
                       animate={{ 
                         x: realIndex * 20 - 20, 
                         y: realIndex * 6, 
@@ -637,9 +643,9 @@ function BundleFluidPreview({
                         <img 
                           src={entry.preview} 
                           alt="" 
+                          loading="lazy"
+                          decoding="async"
                           draggable={false} 
-                          loading="lazy" 
-                          decoding="async" 
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} 
                         />
                       </div>
@@ -694,9 +700,9 @@ function BundleFluidPreview({
                         <img 
                           src={entry.preview} 
                           alt="" 
+                          loading="lazy"
+                          decoding="async"
                           draggable={false} 
-                          loading="lazy" 
-                          decoding="async" 
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} 
                         />
                       ) : (
@@ -730,10 +736,20 @@ function Preview({ item }: { item: ClipboardItemDto }) {
   switch (item.data.kind) {
     case 'text':
       if (item.data.isUrl) {
+        const info = parseUrlPreview(item.data.text)
         return (
-          <>
-            <div className="preview single">{item.data.text}</div>
-          </>
+          <div className="link-preview-card">
+            <div className="link-preview-header">
+              <div className="link-brand-pill">
+                <GlobeIcon width={12} height={12} style={{ color: 'rgba(255, 255, 255, 0.75)', flexShrink: 0 }} />
+                <span className="link-service">{info.serviceName}</span>
+                <span className="link-dot">·</span>
+                <span className="link-domain">{info.domain}</span>
+              </div>
+            </div>
+            {info.title && <div className="link-title">{info.title}</div>}
+            <div className="preview single link-url">{item.data.text}</div>
+          </div>
         )
       }
       return <div className="preview">{previewText(item.data.text)}</div>
@@ -746,9 +762,9 @@ function Preview({ item }: { item: ClipboardItemDto }) {
               className="thumb"
               src={item.data.preview}
               alt=""
-              draggable={false}
               loading="lazy"
               decoding="async"
+              draggable={false}
             />
           ) : (
             <div className="preview">[{t('item.imageItem')}]</div>
@@ -757,7 +773,7 @@ function Preview({ item }: { item: ClipboardItemDto }) {
       )
 
     case 'files': {
-      const first = item.data.paths[0]
+      const first = item.data.paths?.[0] ?? ''
       const entry = item.data.entries?.[0]
       const rawName = entry?.name ?? basename(first)
       const displayName = formatImageDisplayName(first, item.capturedAt)
@@ -765,7 +781,7 @@ function Preview({ item }: { item: ClipboardItemDto }) {
       const isImage = entry?.isImage || getFileKind(first).kind === 'image'
 
       // Single image file — show its thumbnail.
-      if (item.data.paths.length === 1 && isImage) {
+      if ((item.data.paths?.length ?? 0) === 1 && isImage) {
         return (
           <>
             <div className="thumb-wrap">
@@ -774,9 +790,9 @@ function Preview({ item }: { item: ClipboardItemDto }) {
                   className="thumb"
                   src={entry.preview}
                   alt=""
-                  draggable={false}
                   loading="lazy"
                   decoding="async"
+                  draggable={false}
                 />
               ) : (
                 <div className="preview">[image: {displayName}]</div>
@@ -839,9 +855,9 @@ function KindBadge({ item }: { item: ClipboardItemDto }) {
         </span>
       )
     case 'files': {
-      const firstPath = item.data.paths[0]
+      const firstPath = item.data.paths?.[0] ?? ''
       const info = getFileKind(firstPath)
-      const count = item.data.paths.length
+      const count = item.data.paths?.length ?? 0
       const isImage = count === 1 && (item.data.entries?.[0]?.isImage || info.kind === 'image')
       if (isImage) {
         return (

@@ -58,7 +58,9 @@
     "autoDeleteDesc": "Automatycznie usuwaj skopiowane elementy (zachowuje przypięte)",
     "never": "Nigdy",
     "capacityTitle": "Pojemność historii",
-    "capacityDesc": "Maksymalna liczba odpiętych elementów przechowywanych w historii"
+    "capacityDesc": "Maksymalna liczba odpiętych elementów przechowywanych w historii",
+    "movePastedToTopTitle": "Przenoś wklejone elementy na górę",
+    "movePastedToTopDesc": "Po każdym wklejeniu przenosi nieprzypięte elementy na początek listy Ostatnie"
   },
   "position": {
     "edgePlacementTitle": "Położenie krawędzi",
@@ -134,7 +136,12 @@
     "moreImages": "+{count} więcej obrazów",
     "moreFiles": "+{count} więcej plików",
     "singleFile": "1 plik",
-    "scrollToTop": "Przewiń na górę"
+    "scrollToTop": "Przewiń na górę",
+    "clearLast1h": "Wyczyść ostatnią godzinę",
+    "clearLast6h": "Wyczyść ostatnie 6 godzin",
+    "clearLast24h": "Wyczyść ostatnie 24 godziny",
+    "clearAll": "Wyczyść całą historię",
+    "clearAllConfirm": "Dotknij ponownie, aby potwierdzić"
   },
   "fileKinds": {
     "pdf": "PDF",

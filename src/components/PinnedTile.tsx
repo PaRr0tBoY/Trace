@@ -33,9 +33,9 @@ export function PinnedTile({ entry, onExpand }: Props) {
     startDrag({ id: entry.id })
   }, [entry.id, setInternalDragReq, startDrag])
 
-  const first = entry.paths[0]
+  const first = entry.paths?.[0] ?? ''
   const info = getFileKind(first)
-  const name = entry.members[0]?.name ?? basename(first)
+  const name = entry.members?.[0]?.name ?? basename(first)
 
   return (
     <motion.div

@@ -27,6 +27,8 @@ const masterEn = {
     fullscreenProtectionDesc: 'Automatically pause edge hover while playing games or watching fullscreen videos',
     clearUnpinnedTitle: 'Clear unpinned on restart',
     clearUnpinnedDesc: 'Wipe unpinned items whenever the app restarts',
+    movePastedToTopTitle: 'Move pasted items to top',
+    movePastedToTopDesc: 'Re-order unpinned items to the top of Recent whenever you paste them',
     soundEffectsTitle: 'Sound Effects',
     soundEffectsDesc: 'Play tactile audio feedback for toggles, sliders, and button clicks',
     autoUpdatesTitle: 'Automatic updates',
@@ -258,6 +260,7 @@ const languagesList = [
   { code: 'zh-TW', name: 'Chinese (Traditional)', nativeName: '繁體中文' },
   { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी' },
   { code: 'ar', name: 'Arabic', nativeName: 'العربية', rtl: true },
+  { code: 'fa', name: 'Persian', nativeName: 'فارسی', rtl: true },
   { code: 'bn', name: 'Bengali', nativeName: 'বাংলা' },
   { code: 'tr', name: 'Turkish', nativeName: 'Türkçe' },
   { code: 'vi', name: 'Vietnamese', nativeName: 'Tiếng Việt' },
@@ -291,6 +294,7 @@ const langCodeToVar = {
   'zh-TW': 'zhTW',
   'hi': 'hi',
   'ar': 'ar',
+  'fa': 'fa',
   'bn': 'bn',
   'tr': 'tr',
   'vi': 'vi',
@@ -310,7 +314,7 @@ const langCodeToVar = {
   'no': 'no'
 };
 
-// Custom translations overrides for all 30 languages
+// Custom translation overrides
 const overrides = {
   pl: {
     filters: { all: 'Wszystko', text: 'Tekst', links: 'Linki', images: 'Obrazy', files: 'Pliki' },
@@ -459,6 +463,8 @@ let fileContent = `export interface TranslationKeys {
     fullscreenProtectionDesc: string
     clearUnpinnedTitle: string
     clearUnpinnedDesc: string
+    movePastedToTopTitle: string
+    movePastedToTopDesc: string
     soundEffectsTitle: string
     soundEffectsDesc: string
     autoUpdatesTitle: string
@@ -698,5 +704,5 @@ fileContent += `}\n`;
 
 const targetPath = path.join(__dirname, '../src/i18n/translations.ts');
 fs.writeFileSync(targetPath, fileContent, 'utf8');
-console.log('Successfully wrote src/i18n/translations.ts with 30 fully working languages!');
+console.log('Successfully wrote src/i18n/translations.ts with all configured languages!');
 

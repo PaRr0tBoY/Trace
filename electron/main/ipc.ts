@@ -31,6 +31,7 @@ import { acceptWithResource } from './suggestionDrop'
 import { ProviderChain, testProvider } from './provider'
 import { logAi } from './aiLog'
 import { applyIncognito } from './tray'
+import { checkForUpdatesManual, isStoreBuild, quitAndInstallUpdate, startUpdateDownload, syncAutoUpdaterState } from './updater'
 import type { ItemData, MemoryFactDto, MemoryFactPanelPayload, MemoryListPayload, ResourceRef, Task } from '../../shared/types'
 
 /**
@@ -221,7 +222,8 @@ export function registerIpc(): void {
       station: getStationStore().toDto(),
       settings: loadSettings(),
       version: app.getVersion(),
-      tasks: getTaskStore().toDto()
+      tasks: getTaskStore().toDto(),
+      isStoreBuild: isStoreBuild()
     }
   })
 
@@ -911,6 +913,10 @@ export function registerIpc(): void {
     if (patch.localModelEnabled === true) {
       ensureLocalModelLoaded()
     }
+    if (patch.autoUpdates !== undefined) {
+      // Keep electron-updater's download flags in lockstep with the setting.
+      syncAutoUpdaterState()
+    }
     pushState.settings(next)
     return next
   })
@@ -960,6 +966,16 @@ export function registerIpc(): void {
 
   handle('app:quit', () => {
     app.quit()
+  })
+
+  /* --------------------------- auto-update --------------------------- */
+
+  handle('updater:check-manual', () => checkForUpdatesManual())
+
+  handle('updater:start-download', () => startUpdateDownload())
+
+  handle('app:install-update', () => {
+    quitAndInstallUpdate()
   })
 }
 
@@ -1232,7 +1248,7 @@ function parseReleaseBodyToCleanText(body: string): { summary: string; highlight
 
 const STATIC_CHANGELOG_FALLBACK = [
   {
-    version: 'v2026.08.12',
+    version: 'v2026.8.12',
     date: 'Aug 12, 2026',
     isLatest: true,
     summary: "Trace's first release — task layer (candidates, guided editor, linked windows), AI observability, dual-row navigation with restore, 5 accent themes.",

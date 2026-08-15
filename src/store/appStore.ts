@@ -26,6 +26,22 @@ export interface ToastMsg {
 /** Settings sheet tabs. Lifted into the store so restore can remember/reset them (ADR-0004). */
 export type SettingsTab = 'behaviour' | 'position' | 'appearance' | 'tasks' | 'privacy'
 
+/** Auto-update banner payload (Settings behaviour tab). */
+export interface UpdateInfo {
+  hasUpdate: boolean
+  latestVersion: string
+  downloaded: boolean
+}
+
+/** Manual update check lifecycle (Settings behaviour tab). */
+export type ManualCheckState =
+  | { status: 'idle' }
+  | { status: 'checking' }
+  | { status: 'available'; version: string }
+  | { status: 'up-to-date'; version: string }
+  | { status: 'downloading' }
+  | { status: 'error'; error: string }
+
 interface AppState {
   items: ClipboardItemDto[]
   /** Transfer station entries (ADR-0006): files domain, separate from the stack. */
@@ -104,6 +120,12 @@ interface AppState {
   toasts: ToastMsg[]
   tutorialStep: number
   currentVersion: string
+  /** Auto-update banner state (null = no update surfaced). */
+  updateInfo: UpdateInfo | null
+  /** Manual update check lifecycle (settings sheet). */
+  manualCheckState: ManualCheckState
+  /** True when running as a Microsoft Store (MSIX) build — updates come from the Store. */
+  isStoreBuild: boolean
   /** Item ID currently being previewed in the flyout. */
   previewItemId: string | null
   previewItemRect: { y: number; height: number } | null
@@ -122,6 +144,20 @@ interface AppState {
   setTasks: (tasks: TaskDto[]) => void
   setSuggestions: (suggestions: TaskProposal[]) => void
   setSettings: (next: Settings) => void
+  /** Manual "Check for updates" click (fast GitHub API path, main-side). */
+  startManualCheck: () => Promise<void>
+  /** Manual "Download & Update" click. */
+  startManualDownload: () => Promise<void>
+  /** Reset the manual check panel back to idle. */
+  resetManualCheck: () => void
+  /** Main pushed a new update is available (background auto-check). */
+  setUpdateAvailable: (info: { version: string }) => void
+  /** Main pushed the update finished downloading (ready to install). */
+  setUpdateDownloaded: (info: { version: string }) => void
+  /** Dismiss the update banner. */
+  dismissUpdate: () => void
+  /** Quit + install the downloaded update. */
+  installUpdate: () => Promise<void>
 
   /* UI */
   setQuery: (q: string) => void
@@ -280,6 +316,9 @@ export const useStore = create<AppState>((set, get) => ({
   toasts: [],
   tutorialStep: 0,
   currentVersion: '',
+  updateInfo: null,
+  manualCheckState: { status: 'idle' },
+  isStoreBuild: false,
   previewItemId: null,
   previewItemRect: null,
   sliderActive: false,
@@ -309,13 +348,14 @@ export const useStore = create<AppState>((set, get) => ({
   flareKey: 0,
 
   async hydrate() {
-    const { items, station, settings, version, tasks } = await edge.loadState()
-    set({ 
-      items, 
-      station, 
-      settings, 
+    const { items, station, settings, version, tasks, isStoreBuild } = await edge.loadState()
+    set({
+      items,
+      station,
+      settings,
       currentVersion: version,
       tasks,
+      isStoreBuild,
       hydrated: true
     })
     edge.onCopyFlare(() => {
@@ -367,6 +407,54 @@ export const useStore = create<AppState>((set, get) => ({
   setTasks: (tasks) => set({ tasks }),
   setSuggestions: (suggestions) => set({ suggestions }),
   setSettings: (next) => set({ settings: next }),
+
+  async startManualCheck() {
+    set({ manualCheckState: { status: 'checking' } })
+    try {
+      const result = await edge.checkForUpdatesManual()
+      if (result.status === 'available' && result.version) {
+        set({
+          manualCheckState: { status: 'available', version: result.version },
+          updateInfo: { hasUpdate: true, latestVersion: result.version, downloaded: false }
+        })
+      } else if (result.status === 'up-to-date') {
+        set({ manualCheckState: { status: 'up-to-date', version: result.version || '' } })
+      } else {
+        set({ manualCheckState: { status: 'error', error: result.error || 'Failed to check for updates' } })
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to check for updates'
+      set({ manualCheckState: { status: 'error', error: msg } })
+    }
+  },
+
+  async startManualDownload() {
+    set({ manualCheckState: { status: 'downloading' } })
+    try {
+      await edge.startUpdateDownload()
+    } catch {
+      /* main logs the failure; the banner keeps its state */
+    }
+  },
+
+  resetManualCheck: () => set({ manualCheckState: { status: 'idle' } }),
+
+  setUpdateAvailable: (info) =>
+    set({ updateInfo: { hasUpdate: true, latestVersion: info.version, downloaded: false } }),
+
+  setUpdateDownloaded: (info) =>
+    set((s) => ({
+      updateInfo: s.updateInfo
+        ? { ...s.updateInfo, downloaded: true }
+        : { hasUpdate: true, latestVersion: info.version, downloaded: true },
+      manualCheckState: { status: 'idle' }
+    })),
+
+  dismissUpdate: () => set({ updateInfo: null, manualCheckState: { status: 'idle' } }),
+
+  async installUpdate() {
+    await edge.installUpdate()
+  },
 
   setQuery: (query) => set({ query }),
   setOpen: (open) => {

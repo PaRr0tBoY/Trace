@@ -30,6 +30,14 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
   ]
   const patch = useStore((s) => s.patchSettings)
   const currentVersion = useStore((s) => s.currentVersion)
+  const updateInfo = useStore((s) => s.updateInfo)
+  const checkState = useStore((s) => s.manualCheckState)
+  const isStoreBuild = useStore((s) => s.isStoreBuild)
+  const startManualCheck = useStore((s) => s.startManualCheck)
+  const startManualDownload = useStore((s) => s.startManualDownload)
+  const resetManualCheck = useStore((s) => s.resetManualCheck)
+  const dismissUpdate = useStore((s) => s.dismissUpdate)
+  const installUpdate = useStore((s) => s.installUpdate)
   const styleFlyoutOpen = useStore((s) => s.styleFlyoutOpen)
   const setStyleFlyoutOpen = useStore((s) => s.setStyleFlyoutOpen)
   const settingsSubView = useStore((s) => s.settingsSubView)
@@ -244,7 +252,7 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
           </button>
         </div>
         <div className="app-version-footer">
-          {t('footer.version')} {currentVersion || '2026.08.12'}
+          {t('footer.version')} {currentVersion || '2026.8.12'}
         </div>
       </div>
 
@@ -616,6 +624,143 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                       onChange={(v) => patch({ switcherGroupWindows: v })}
                     />
                   </div>
+
+                  {/* ── Automatic updates (GitHub releases, electron-updater) ── */}
+                  {!isStoreBuild && (
+                    <>
+                      <div className="setting-divider" />
+                      <div className="setting-row">
+                        <div className="setting-info">
+                          <div className="setting-title">{t('behaviour.autoUpdatesTitle')}</div>
+                          <div className="setting-desc">
+                            {(settings.autoUpdates ?? true)
+                              ? t('behaviour.autoUpdatesDescOn')
+                              : t('behaviour.autoUpdatesDescOff')}
+                          </div>
+                        </div>
+                        <Toggle
+                          checked={settings.autoUpdates ?? true}
+                          onChange={(v) => patch({ autoUpdates: v })}
+                        />
+                      </div>
+
+                      {updateInfo?.downloaded ? (
+                        <div style={{ marginTop: 12, background: 'rgba(76, 175, 80, 0.08)', border: '1px solid rgba(76, 175, 80, 0.25)', borderRadius: 10, padding: 12 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 600, color: '#ffffff', letterSpacing: '-0.01em' }}>
+                            {t('behaviour.updateReadyTitle', { version: updateInfo.latestVersion })}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.7)', marginTop: 3, lineHeight: 1.45 }}>
+                            {t('behaviour.updateReadyDesc')}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+                            <button
+                              className="pill action"
+                              style={{ background: 'var(--accent)', color: '#ffffff', border: 'none' }}
+                              onClick={() => { playButtonClickSound(); void installUpdate() }}
+                            >
+                              {t('behaviour.restartToUpdate')}
+                            </button>
+                            <button
+                              className="pill"
+                              onClick={() => { playButtonClickSound(); dismissUpdate() }}
+                            >
+                              {t('behaviour.skip')}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (settings.autoUpdates ?? true) === false ? (
+                        <div style={{ marginTop: 12, background: 'rgba(255, 255, 255, 0.035)', border: '1px solid var(--divider)', borderRadius: 10, padding: 12 }}>
+                          {checkState.status === 'idle' && (
+                            <button
+                              className="pill action"
+                              style={{ background: 'var(--accent)', color: '#ffffff', border: 'none' }}
+                              onClick={() => { playButtonClickSound(); void startManualCheck() }}
+                            >
+                              {t('behaviour.checkForUpdates')}
+                            </button>
+                          )}
+                          {checkState.status === 'checking' && (
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#ffffff', letterSpacing: '-0.01em' }}>
+                              {t('behaviour.checkingForUpdates')}
+                            </div>
+                          )}
+                          {checkState.status === 'available' && (
+                            <>
+                              <div style={{ fontSize: 13.5, fontWeight: 600, color: '#ffffff', letterSpacing: '-0.01em' }}>
+                                {t('behaviour.updateAvailableTitle', { version: checkState.version || '' })}
+                              </div>
+                              <div style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.65)', marginTop: 3, lineHeight: 1.45 }}>
+                                {t('behaviour.updateAvailableDesc')}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+                                <button
+                                  className="pill action"
+                                  style={{ background: 'var(--accent)', color: '#ffffff', border: 'none' }}
+                                  onClick={() => { playButtonClickSound(); void startManualDownload() }}
+                                >
+                                  {t('behaviour.downloadAndUpdate')}
+                                </button>
+                                <button
+                                  className="pill"
+                                  onClick={() => { playButtonClickSound(); resetManualCheck() }}
+                                >
+                                  {t('behaviour.skip')}
+                                </button>
+                              </div>
+                            </>
+                          )}
+                          {checkState.status === 'up-to-date' && (
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#ffffff', letterSpacing: '-0.01em' }}>
+                              {t('behaviour.isUpToDate')}{checkState.version ? ` (v${checkState.version})` : ''}
+                            </div>
+                          )}
+                          {checkState.status === 'downloading' && (
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: '#ffffff', letterSpacing: '-0.01em' }}>
+                              {t('behaviour.downloadingUpdate')}
+                            </div>
+                          )}
+                          {checkState.status === 'error' && (
+                            <>
+                              <div style={{ fontSize: 13.5, fontWeight: 600, color: '#ff6b6b', letterSpacing: '-0.01em' }}>
+                                {t('behaviour.updateCheckFailed')}
+                              </div>
+                              <button
+                                className="pill"
+                                style={{ marginTop: 10 }}
+                                onClick={() => { playButtonClickSound(); resetManualCheck() }}
+                              >
+                                {t('behaviour.tryAgain')}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ) : (updateInfo?.hasUpdate || checkState.status === 'available') ? (
+                        <div style={{ marginTop: 12, background: 'rgba(255, 255, 255, 0.035)', border: '1px solid var(--divider)', borderRadius: 10, padding: 12 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 600, color: '#ffffff', letterSpacing: '-0.01em' }}>
+                            {t('behaviour.updateAvailableTitle', { version: updateInfo?.latestVersion || (checkState.status === 'available' ? checkState.version : '') })}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.65)', marginTop: 3, lineHeight: 1.45 }}>
+                            {t('behaviour.updateAvailableDesc')}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+                            <button
+                              className="pill action"
+                              style={{ background: 'var(--accent)', color: '#ffffff', border: 'none' }}
+                              onClick={() => { playButtonClickSound(); void startManualDownload() }}
+                            >
+                              {t('behaviour.downloadAndUpdate')}
+                            </button>
+                            <button
+                              className="pill"
+                              onClick={() => { playButtonClickSound(); dismissUpdate() }}
+                            >
+                              {t('behaviour.skip')}
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
 
                   <div className="setting-divider" />
 

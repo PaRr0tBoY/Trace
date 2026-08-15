@@ -11,7 +11,7 @@ import type { ProviderTestResult, SuggestTitleContext, SuggestionAcceptOptions, 
 
 export interface EdgeApi {
   /* Renderer -> Main */
-  loadState: () => Promise<{ items: import('./types').ClipboardItemDto[]; station: import('./station').StationEntryDto[]; settings: Settings; version: string; tasks: TaskDto[] }>
+  loadState: () => Promise<{ items: import('./types').ClipboardItemDto[]; station: import('./station').StationEntryDto[]; settings: Settings; version: string; tasks: TaskDto[]; isStoreBuild: boolean }>
   setPinned: (id: string, pinned: boolean) => Promise<import('./types').ClipboardItemDto[]>
   deleteItem: (id: string) => Promise<import('./types').ClipboardItemDto[]>
   deleteBatchItems: (ids: string[]) => Promise<import('./types').ClipboardItemDto[]>
@@ -23,6 +23,10 @@ export interface EdgeApi {
   pasteItem: (id: string) => Promise<boolean>
   pasteSubitem: (req: DragRequest) => Promise<boolean>
   quitApp: () => Promise<void>
+  /* Auto-update (GitHub releases) */
+  checkForUpdatesManual: () => Promise<{ status: string; version?: string; error?: string }>
+  startUpdateDownload: () => Promise<void>
+  installUpdate: () => Promise<void>
   /**
    * Begin a native OS drag-out. Fire-and-forget: must be called synchronously
    * from the DOM `dragstart` event, and main calls `event.sender.startDrag`.

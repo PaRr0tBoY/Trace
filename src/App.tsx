@@ -40,6 +40,12 @@ export default function App() {
     const offTasks = edge.onTasks((tasks) => setTasks(tasks))
     const offSuggestions = edge.onSuggestions((suggestions) => setSuggestions(suggestions))
     const offSettings = edge.onSettings((next) => setSettings(next))
+    const offUpdateAvailable = edge.onUpdateAvailable((info) => {
+      useStore.getState().setUpdateAvailable(info)
+    })
+    const offUpdateDownloaded = edge.onUpdateDownloaded((info) => {
+      useStore.getState().setUpdateDownloaded(info)
+    })
     const offToast = edge.onToast((t) => pushToast(t))
     const offToggle = edge.onToggle((forceOpen) => {
       // Switcher session (ADR-0005): the panel is pinned open — toggle must
@@ -105,6 +111,8 @@ export default function App() {
       offTasks()
       offSuggestions()
       offSettings()
+      offUpdateAvailable()
+      offUpdateDownloaded()
       offToast()
       offToggle()
       offOpenSettings()

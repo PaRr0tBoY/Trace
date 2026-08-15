@@ -730,6 +730,12 @@ export interface Settings {
    * (drill-in on click). Default off — native behavior.
    */
   switcherGroupWindows: boolean
+  /**
+   * Automatic updates via GitHub releases (electron-updater). When true the
+   * app checks at startup and downloads in the background; when false it
+   * stays network-silent and only manual checks run. Default: true.
+   */
+  autoUpdates?: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -788,7 +794,8 @@ export const DEFAULT_SETTINGS: Settings = {
   localModelManualPath: undefined,
   landing: { view: 'tasks', filter: 'existing' },
   restoreTime: 'relaxed',
-  switcherGroupWindows: false
+  switcherGroupWindows: false,
+  autoUpdates: true
 }
 
 /* ------------------------------------------------------------------ */

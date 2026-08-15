@@ -199,6 +199,10 @@ const api = {
   pasteItem: (id: string) => invoke('item:paste', id),
   pasteSubitem: (req: import('../../shared/types').DragRequest) => invoke('item:paste-subitem', req),
   quitApp: () => invoke('app:quit'),
+  /* Auto-update (GitHub releases) */
+  checkForUpdatesManual: () => invoke('updater:check-manual'),
+  startUpdateDownload: () => invoke('updater:start-download'),
+  installUpdate: () => invoke('app:install-update'),
   startDrag: (req: DragRequest) => send('item:start-drag', req),
 
   removeSubitem: (req: import('../../shared/types').DragRequest) => invoke('item:remove-subitem', req),

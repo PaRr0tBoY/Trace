@@ -1,6 +1,6 @@
 {
   "name": "trace",
-  "version": "2026.08.12",
+  "version": "2026.8.12",
   "description": "Trace — a clipboard manager that lives on the left edge of your screen and expands on hover.",
   "author": "Trace",
   "license": "MIT",
@@ -103,6 +103,7 @@
     "@radix-ui/react-separator": "^1.1.11",
     "@resvg/resvg-js": "^2.6.2",
     "better-sqlite3": "^12.11.1",
+    "electron-updater": "^6.8.9",
     "framer-motion": "^11.0.24",
     "gsap": "^3.15.0",
     "koffi": "^3.1.2",

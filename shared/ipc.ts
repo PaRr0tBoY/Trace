@@ -65,7 +65,7 @@ export interface SuggestionAcceptOptions {
 
 export interface InvokeMap {
   /** Returns the full current item list + station entries + settings + tasks on startup. */
-  'state:load': { args: []; result: { items: ClipboardItemDto[]; station: StationEntryDto[]; settings: Settings; version: string; tasks: TaskDto[] } }
+  'state:load': { args: []; result: { items: ClipboardItemDto[]; station: StationEntryDto[]; settings: Settings; version: string; tasks: TaskDto[]; isStoreBuild: boolean } }
 
   /** Set an item's pinned state. */
   'item:set-pinned': { args: [id: string, pinned: boolean]; result: ClipboardItemDto[] }
@@ -318,6 +318,17 @@ export interface InvokeMap {
    * native save dialog; returns the saved path, or null when canceled/failed.
    */
   'trace:export-report': { args: [records: import('./types').TraceRecordDto[]]; result: string | null }
+
+  /* --------------------------- auto-update --------------------------- */
+
+  /** Quit and install the downloaded update (electron-updater quitAndInstall). */
+  'app:install-update': { args: []; result: void }
+
+  /** Manual update check on user click: fast GitHub API path, electron-updater fallback. */
+  'updater:check-manual': { args: []; result: { status: string; version?: string; error?: string } }
+
+  /** Start downloading the available update (manual mode). */
+  'updater:start-download': { args: []; result: void }
 }
 
 /* ------------------------------------------------------------------ */

@@ -15,6 +15,7 @@ import { configureAiLog } from './aiLog'
 import { createWindow, getMainWindow, setInteractive, setVisible, startCursorPoll, stopCursorPoll, stopHeartbeat, setHotZoneWidth } from './window'
 import { createTray, registerIncognitoApplier } from './tray'
 import { registerIpc, registerSendListeners, getProviderChain, syncLoginItemSettings } from './ipc'
+import { initAutoUpdater } from './updater'
 import { prewarmDragIcons } from './drag'
 import { loadAppIconCacheFromDisk, prewarmAppIcons, resolveAppIcon } from './appIcons'
 import { snapshotWindows } from './windowSnapshot'
@@ -222,6 +223,10 @@ app.whenReady().then(async () => {
   foregroundWatcher.setPaused(settings.incognito)
   foregroundWatcher.start()
   pushState.settings(settings)
+
+  // Background update checks (electron-updater) — network-silent when the
+  // user disabled automatic updates in settings.
+  initAutoUpdater()
 
   // Keep the tray checkmarks in sync after settings change from the UI.
   // (Tray menu is rebuilt on each open, so no extra wiring is needed here.)

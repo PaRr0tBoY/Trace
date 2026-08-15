@@ -86,7 +86,7 @@ jobs:
           CHOCO_API_KEY: ${{ secrets.CHOCO_API_KEY }}
         run: |
           $ver = "$env:GITHUB_REF_NAME" -replace '^v', ''
-          choco push "distrib\chocolatey\trace.$ver.nupkg" --source https://community.chocolatey.org/api/v2/ --key $env:CHOCO_API_KEY
+          choco push "distrib\chocolatey\trace.$ver.nupkg" --source https://push.chocolatey.org/ --key $env:CHOCO_API_KEY
 
   winget:
     name: Update winget manifest

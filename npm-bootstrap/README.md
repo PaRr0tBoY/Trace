@@ -1,15 +1,15 @@
-# @parrotboy/trace
+# @acidevv/trace
 
 一条命令安装 [Trace](https://github.com/PaRr0tBoY/Trace)（Windows 剪贴板管理器）。
 
 ```bash
-npm install -g --allow-scripts=@parrotboy/trace @parrotboy/trace
+npm install -g --allow-scripts=@acidevv/trace @acidevv/trace
 ```
 
 或一次性试用（不污染全局）：
 
 ```bash
-npx --yes @parrotboy/trace
+npx --yes @acidevv/trace
 ```
 
 ## 它是怎么工作的
@@ -52,4 +52,4 @@ cd npm-bootstrap
 npm publish --access public
 ```
 
-需要 npm 账号 + 名为 `parrotboy` 的 npm 组织（[npmjs.com/org/create](https://www.npmjs.com/org/create) 免费创建，成员用现有账号即可）。发布一次即可，后续 Trace 发版无需重发本包。
+需要 npm 账号（现有 `ryan2343`）+ 名为 `acidevv` 的 npm 组织（已创建）。发布一次即可，后续 Trace 发版无需重发本包。

@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * @parrotboy/trace — one-command installer bootstrap for Trace (Windows clipboard manager).
+ * @acidevv/trace — one-command installer bootstrap for Trace (Windows clipboard manager).
  *
  * What it does:
  *   1. Fetches `latest.yml` from the latest GitHub release (the same metadata file
@@ -48,7 +48,7 @@ function fail(msg) {
 
 function httpsGet(url, redirectsLeft = MAX_REDIRECTS, toFile = null) {
   return new Promise((resolve, reject) => {
-    const req = httpLib(url).get(url, { headers: { 'user-agent': 'npm:@parrotboy/trace' } }, (res) => {
+    const req = httpLib(url).get(url, { headers: { 'user-agent': 'npm:@acidevv/trace' } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
         if (redirectsLeft <= 0) return reject(new Error(`too many redirects for ${url}`));

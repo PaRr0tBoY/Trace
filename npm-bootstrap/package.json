@@ -1,5 +1,5 @@
 {
-  "name": "@parrotboy/trace",
+  "name": "@acidevv/trace",
   "version": "1.0.0",
   "description": "One-command installer for Trace — a Windows clipboard manager. Downloads the latest release from GitHub and installs it silently (SHA-512 verified).",
   "license": "MIT",

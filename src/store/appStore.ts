@@ -16,6 +16,14 @@ import type { StationEntryDto } from '../../shared/station'
 
 let flareTimer: ReturnType<typeof setTimeout> | null = null
 
+/**
+ * Monotonic switcher session counter: hideSwitcher's 150ms collapse-finish
+ * timer must only clean up the session that scheduled it. Re-arming Alt+Tab
+ * inside that window bumps the epoch and the stale timer bails out instead
+ * of wiping the new session's entries (blank-screen race).
+ */
+let switcherEpoch = 0
+
 /** A transient user-facing notice shown as a toast. */
 export interface ToastMsg {
   id: string
@@ -58,6 +66,13 @@ interface AppState {
   stationClearStale: () => Promise<void>
   suggestions: TaskProposal[]
   notes: NoteDto[]
+  /**
+   * Which note the single-note mode was last showing (session-scoped, 智能收起
+   * Q3): a re-open within the restore TTL returns to the same note; applying
+   * the landing page (TTL expired / first launch) clears it back to note #1.
+   */
+  notesCurrentId: string | null
+  setNotesCurrentId: (id: string | null) => void
   settings: Settings
   /** True until the first `state:load` resolves. */
   hydrated: boolean
@@ -234,6 +249,8 @@ interface AppState {
   createNote: (content?: string) => Promise<string>
   updateNote: (id: string, patch: NotePatch) => Promise<void>
   deleteNote: (id: string) => Promise<void>
+  /** Delete every note (notes-view footer "clear all"). */
+  clearAllNotes: () => Promise<void>
   /** Last editing caret per note (renderer memory; restores on re-entry). */
   noteCaret: Record<string, number>
   setNoteCaret: (id: string, pos: number) => void
@@ -263,6 +280,8 @@ export const useStore = create<AppState>((set, get) => ({
   tasks: [],
   suggestions: [],
   notes: [],
+  notesCurrentId: null,
+  setNotesCurrentId: (notesCurrentId) => set({ notesCurrentId }),
   settings: { ...DEFAULT_SETTINGS },
   hydrated: false,
   query: '',
@@ -281,14 +300,21 @@ export const useStore = create<AppState>((set, get) => ({
   switcherControlKey: null,
   switcherPrevOpen: false,
   showSwitcher: ({ entries, selectedIndex }) => {
+    switcherEpoch++
     set({ switcherActive: true, switcherEntries: entries, switcherSelected: selectedIndex, switcherPinned: false, switcherSeedQuery: '', switcherControlKey: null, switcherPrevOpen: get().open, open: true })
   },
   setSwitcherSelected: (index) => set({ switcherSelected: index }),
   setSwitcherPinned: (pinned, seedQuery) => set({ switcherPinned: pinned, switcherSeedQuery: seedQuery ?? '' }),
   setSwitcherControlKey: (switcherControlKey) => set({ switcherControlKey }),
   hideSwitcher: () => {
+    const epoch = switcherEpoch
     const prevOpen = get().switcherPrevOpen
-    const finish = () => set({ switcherActive: false, switcherEntries: [], switcherPinned: false, switcherSeedQuery: '', switcherControlKey: null })
+    const finish = () => {
+      // A new session took over while the collapse animation played: this
+      // stale timer must not wipe it.
+      if (switcherEpoch !== epoch) return
+      set({ switcherActive: false, switcherEntries: [], switcherPinned: false, switcherSeedQuery: '', switcherControlKey: null })
+    }
     if (prevOpen) {
       // Panel was already open before the session: no collapse animation,
       // switch straight back to the previous page.
@@ -510,6 +536,9 @@ export const useStore = create<AppState>((set, get) => ({
       patch.view = landing.view
       if (landing.view === 'clipboard') patch.clipboardFilter = landing.filter
       if (landing.view === 'tasks') patch.tasksFilter = landing.filter
+      // Landing on notes = back to the shelf default (note #1): forget the
+      // remembered note so the freshly mounted NotesView starts clean.
+      if (landing.view === 'notes') patch.notesCurrentId = null
       patch.filesFilter = 'all'
       patch.settingsOpen = false
       patch.settingsSubView = 'main'
@@ -722,6 +751,10 @@ export const useStore = create<AppState>((set, get) => ({
 
   async deleteNote(id) {
     set({ notes: await edge.deleteNote(id) })
+  },
+
+  async clearAllNotes() {
+    set({ notes: await edge.clearAllNotes() })
   },
 
   noteCaret: {},

@@ -40,6 +40,7 @@ import { MemoryStore, type MemoryIndex } from '../store/MemoryStore'
 import type { ClipboardItem, ClipboardItemDto, Settings, TaskProposal, TaskDto, UsageEvent } from '../../shared/types'
 import type { StationEntryDto } from '../../shared/station'
 import { createId } from '../store/ids'
+import { signalSmartExternalActivity } from './smartCollapse'
 import { BrowserWindow, powerMonitor, safeStorage, app } from 'electron'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -77,12 +78,19 @@ import {
   type TitleSuggester
 } from '../store/decisionProvider'
 import { getMainWindow } from './window'
+import { disposeToRecycleBin } from './recycleBin'
 
 const store = new ItemStore()
 const stationStore = new StationStore({
   loadIndex: () => loadStationFile(),
   saveIndex: (index) => saveStationFile(index),
-  onChange: () => pushState.station()
+  onChange: () => pushState.station(),
+  // App-owned files only (in-transit staged copies + T7 content drops) —
+  // user originals are never disposed. A failed disposal keeps the entry.
+  // contentDir is a lazy getter: resolving userData at module import time
+  // would break tests that import this module without a full electron mock.
+  contentDir: () => PATHS.stationContentDir(),
+  disposeFiles: (paths) => disposeToRecycleBin(paths)
 })
 const watcher = new ClipboardWatcher(600)
 let pruneTimer: ReturnType<typeof setInterval> | null = null
@@ -370,8 +378,10 @@ function saveIgnoredSignatures(signatures: string[]): void {
   }
 }
 
-function handleSystemSleep(): void {
+function handleSystemSleep(kind: 'sleep' | 'lock'): void {
   watcher.setPaused(true)
+  // 智能收起: suspend/lock means the user is gone — collapse the panel.
+  signalSmartExternalActivity(kind)
 }
 
 function handleSystemWake(): void {
@@ -495,6 +505,10 @@ export function initState(): void {
     const win = getMainWindow()
     if (win && !win.isDestroyed()) {
       win.webContents.send('ui:copy-flare')
+      // 智能收起: a copy with the panel NOT focused means the user copied
+      // elsewhere — external activity. A copy made inside the panel (notes
+      // editor Ctrl+C) keeps the window focused and never signals.
+      if (!win.isFocused()) signalSmartExternalActivity('copy')
     }
   })
   watcher.setPaused(loadSettings().incognito)
@@ -504,8 +518,8 @@ export function initState(): void {
   powerMonitor.removeAllListeners('resume')
   powerMonitor.removeAllListeners('unlock-screen')
 
-  powerMonitor.on('suspend', handleSystemSleep)
-  powerMonitor.on('lock-screen', handleSystemSleep)
+  powerMonitor.on('suspend', () => handleSystemSleep('sleep'))
+  powerMonitor.on('lock-screen', () => handleSystemSleep('lock'))
   powerMonitor.on('resume', handleSystemWake)
   powerMonitor.on('unlock-screen', handleSystemWake)
 

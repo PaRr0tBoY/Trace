@@ -23,6 +23,7 @@
 import { useEffect, useRef } from 'react'
 import { edge } from '../lib/edge'
 import { useStore } from '../store/appStore'
+import { createIdleGuard, type IdleGuard } from '../../shared/idle'
 
 const TRIGGER_PX = 3    // leftmost px that count as "the edge"
 const DWELL_MS = 40      // cursor must linger this long to open
@@ -147,14 +148,48 @@ export function useEdgeHover(): void {
       return el instanceof HTMLElement && !!el.closest('.notes-editor')
     }
 
-    const closePanelNow = () => {
+    // ── 智能收起 (Smart Collapse Fallbacks) ─────────────────────────────
+    // The editor focus hold above blocks the cursor-leave close entirely —
+    // with notes as the landing page the panel would never retract when the
+    // user simply moves the mouse away to work. Two passive fallbacks:
+    //   1. idle guard: cursor outside the blade + no keystroke/click in the
+    //      editor for SMART_COLLAPSE_IDLE_MS → force-collapse.
+    //   2. main-side signals (external wheel / copy / lock / suspend) → force-
+    //      collapse immediately. Gated on smartCollapseFallbacks + hover mode.
+    const smartCollapseEnabled = () => {
+      const s = useStore.getState()
+      return (s.settings.smartCollapseFallbacks ?? true) && (s.settings.hoverActivation ?? true)
+    }
+
+    // Created lazily by armNoteIdle. Armed ONCE per departure (the cursor-edge
+    // poll calls scheduleClose every frame while outside — re-arming each
+    // frame would restart the timer forever); activity touch()es it; the
+    // cursor re-entering the blade stops it; firing disarms it so the next
+    // departure arms a fresh guard.
+    let noteIdleGuard: IdleGuard | null = null
+    let noteIdleArmed = false
+    const armNoteIdle = () => {
+      noteIdleGuard?.dispose()
+      noteIdleGuard = createIdleGuard({
+        onIdle: () => {
+          noteIdleArmed = false
+          console.log('[EdgeHover] notes editor idle — collapse (smart collapse)')
+          closePanelNow({ bypassEditorHold: true })
+        }
+      })
+      noteIdleGuard.touch()
+      noteIdleArmed = true
+    }
+
+    const closePanelNow = (opts?: { bypassEditorHold?: boolean }) => {
       const s = useStore.getState()
       // Switcher session (ADR-0005): the panel is pinned open — the switcher
       // owns the page until Alt is released or an entry is clicked.
       if (s.switcherActive) return
       // An active note edit holds the panel open — moving the cursor off the
-      // blade must not yank the editor away mid-keystroke.
-      if (notesEditorActive()) return
+      // blade must not yank the editor away mid-keystroke. Smart-collapse
+      // signals bypass this hold deliberately (the note is saved live).
+      if (!opts?.bypassEditorHold && notesEditorActive()) return
       if (s.styleFlyoutOpen) s.setStyleFlyoutOpen(false)
       // NOTE: the settings sheet stays open — the restore mechanism
       // (ADR-0004) remembers it within the restore time and resets it when
@@ -216,7 +251,15 @@ export function useEdgeHover(): void {
       if (state.sliderActive) return
       // Any live drag keeps the panel up (see closePanel).
       if (state.dragActive) return
-      if (notesEditorActive()) return // editing a note holds the panel open
+      if (notesEditorActive()) {
+        // The editor focus hold blocks the cursor-leave close — with 智能收起
+        // enabled this is exactly the "user moved away without clicking" case:
+        // arm the idle guard (cursor is already outside the blade, since only
+        // the leave paths call scheduleClose). With it disabled the panel
+        // stays open until an explicit action (Esc / click-outside).
+        if (smartCollapseEnabled() && !noteIdleArmed) armNoteIdle()
+        return
+      }
       if (graceTimer !== undefined) return // already closing
 
       // If position/display/slider was recently changed (< 1.75s ago), wait out remaining preview stay window
@@ -241,6 +284,10 @@ export function useEdgeHover(): void {
         window.clearTimeout(interactiveTimer)
         interactiveTimer = undefined
       }
+      // Cursor (or focus) re-entered the panel: the notes idle guard must
+      // stop — being in the blade is never idle.
+      noteIdleGuard?.stop()
+      noteIdleArmed = false
       // User re-entered the clipboard — clear the preview grace period flags so the
       // next time they leave, the panel retracts at normal speed (250ms)
       useStore.getState().resetPositionChangedTime()
@@ -563,9 +610,43 @@ export function useEdgeHover(): void {
       useStore.getState().setDragActive(false)
     }
 
+    // ── 智能收起 (Smart Collapse Fallbacks) listeners ────────────────────
+    // Main-side passive signals (external wheel / copy / lock / suspend):
+    // force-collapse past the editor focus hold. The switcher branch never
+    // reaches the renderer (main abandons the session itself).
+    const unsubSmartExternal = window.edge.onSmartExternalActivity(() => {
+      const s = useStore.getState()
+      if (!s.open) return
+      if (s.switcherActive) return // defensive — main owns the switcher branch
+      if (s.dragActive || s.sliderActive || s.debugHoldOpen) return
+      console.log('[EdgeHover] smart-collapse signal — collapse')
+      closePanelNow({ bypassEditorHold: true })
+    })
+    // Keystrokes (IME composition included via keydown) restart the idle
+    // window only while the cursor is genuinely outside the blade (typing in
+    // the editor with the cursor inside is normal editing — never idle).
+    // Composition events are an extra belt for IME input that skips keydown.
+    const onSmartKeyDown = () => {
+      if (notesEditorActive() && !isInsideBlade()) noteIdleGuard?.touch()
+      else noteIdleGuard?.stop()
+    }
+    const onSmartCompositionStart = () => {
+      if (notesEditorActive() && !isInsideBlade()) noteIdleGuard?.touch()
+      else noteIdleGuard?.stop()
+    }
+    const onSmartPointerDown = () => {
+      // A click brings the pointer back into the panel: stop the guard (the
+      // next departure re-arms it). Pointer activity only counts as idle
+      // reset while the cursor is genuinely outside the blade.
+      if (isInsideBlade()) noteIdleGuard?.stop()
+      else noteIdleGuard?.touch()
+    }
     // ── register ───────────────────────────────────────────────────────────
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('blur', onWindowBlur)
+    window.addEventListener('keydown', onSmartKeyDown, true)
+    window.addEventListener('compositionstart', onSmartCompositionStart, true)
+    window.addEventListener('pointerdown', onSmartPointerDown, true)
     window.addEventListener(PANEL_LEAVE_EVENT, onPanelLeave)
     window.addEventListener(PANEL_ENTER_EVENT, onPanelEnter)
     document.addEventListener('dragenter', onDocDragEnter)
@@ -581,8 +662,12 @@ export function useEdgeHover(): void {
       unsubCursorEdge()
       unsubDragActive()
       unsubDragIndicator()
+      unsubSmartExternal()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('blur', onWindowBlur)
+      window.removeEventListener('keydown', onSmartKeyDown, true)
+      window.removeEventListener('compositionstart', onSmartCompositionStart, true)
+      window.removeEventListener('pointerdown', onSmartPointerDown, true)
       window.removeEventListener(PANEL_LEAVE_EVENT, onPanelLeave)
       window.removeEventListener(PANEL_ENTER_EVENT, onPanelEnter)
       document.removeEventListener('dragenter', onDocDragEnter)
@@ -590,6 +675,8 @@ export function useEdgeHover(): void {
       document.removeEventListener('dragleave', onDocDragLeave)
       document.removeEventListener('drop', onDocDrop, true)
       document.removeEventListener('dragend', onDocDragEnd, true)
+      noteIdleGuard?.dispose()
+      noteIdleGuard = null
       window.clearTimeout(dwellTimer)
       window.clearTimeout(graceTimer)
       window.clearTimeout(interactiveTimer)

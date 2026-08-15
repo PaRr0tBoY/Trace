@@ -356,6 +356,26 @@ export function stopCursorPoll(): void {
   }
 }
 
+/**
+ * True when a physical screen point lands inside the panel window rect.
+ * Shared by the click-outside (panelMouseDown / switcherMouseDown) and
+ * smart-collapse wheel paths — single source for the bounds check.
+ * Callers keep their own visibility/interactivity guards (a hidden or
+ * click-through panel must never be hit-tested).
+ */
+export function pointInPanelRect(pt: import('../../shared/types').ScreenPoint): boolean {
+  const win = getMainWindow()
+  if (!win || win.isDestroyed()) return false
+  try {
+    // Physical screen point vs the panel's screen rect (DIP → physical).
+    const b = win.getBounds()
+    const sr = screen.dipToScreenRect(win, b)
+    return pt.x >= sr.x && pt.x <= sr.x + sr.width && pt.y >= sr.y && pt.y <= sr.y + sr.height
+  } catch {
+    return false
+  }
+}
+
 /** The screen rect the expanded panel occupies (drag detection zone). */
 export function getStickGeometry(): { x: number; y: number; width: number; height: number } {
   let settings = loadSettings()

@@ -351,7 +351,8 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                       {([
                         { id: 'clipboard' as const, label: t('filters.clipboard') },
                         { id: 'tasks' as const, label: t('filters.tasks') },
-                        { id: 'files' as const, label: t('filters.files') }
+                        { id: 'files' as const, label: t('filters.files') },
+                        { id: 'notes' as const, label: t('filters.notes') }
                       ]).map((opt) => (
                         <button
                           key={opt.id}
@@ -363,6 +364,7 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                             // filter to that view's default.
                             if (opt.id === 'clipboard') patch({ landing: { view: 'clipboard', filter: 'all' } })
                             else if (opt.id === 'tasks') patch({ landing: { view: 'tasks', filter: 'existing' } })
+                            else if (opt.id === 'notes') patch({ landing: { view: 'notes' } })
                             else patch({ landing: { view: 'files' } })
                           }}
                         >
@@ -370,8 +372,8 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                         </button>
                       ))}
                     </div>
-                    {/* Level 2: follows the selected view. Files has no
-                        second level — always 'all' (ADR-0004). */}
+                    {/* Level 2: follows the selected view. Files and notes
+                        have no second level — always 'all' (ADR-0004). */}
                     <div className="setting-pills" style={{ opacity: settings.restoreTime === 'forever' ? 0.45 : 1, transition: 'opacity 0.2s ease' }}>
                       {settings.landing.view === 'clipboard' && (
                         ([
@@ -413,6 +415,14 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                           {t('filters.all')}
                         </button>
                       )}
+                      {settings.landing.view === 'notes' && (
+                        <button
+                          className="pill active"
+                          disabled
+                        >
+                          {t('filters.all')}
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -445,6 +455,33 @@ export function Settings({ inlineIndicatorStyle }: { inlineIndicatorStyle?: bool
                         : settings.restoreTime === 'delayed' ? t('behaviour.restoreDelayedDesc')
                         : t('behaviour.restoreForeverDesc')}
                     </div>
+                  </div>
+
+                  <div className="setting-divider" />
+
+                  {/* ── Smart collapse & auto-focus (智能收起) ── */}
+                  <div className="setting-row">
+                    <div className="setting-info">
+                      <div className="setting-title">{t('behaviour.smartCollapseTitle')}</div>
+                      <div className="setting-desc">{t('behaviour.smartCollapseDesc')}</div>
+                    </div>
+                    <Toggle
+                      checked={settings.smartCollapseFallbacks}
+                      onChange={(v) => patch({ smartCollapseFallbacks: v })}
+                    />
+                  </div>
+
+                  <div className="setting-divider" />
+
+                  <div className="setting-row">
+                    <div className="setting-info">
+                      <div className="setting-title">{t('behaviour.autoFocusTitle')}</div>
+                      <div className="setting-desc">{t('behaviour.autoFocusDesc')}</div>
+                    </div>
+                    <Toggle
+                      checked={settings.autoFocus}
+                      onChange={(v) => patch({ autoFocus: v })}
+                    />
                   </div>
 
                   <div className="setting-divider" />

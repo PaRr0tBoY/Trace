@@ -12,7 +12,7 @@
  * drill-in window list. Row indices in DTOs stay in the ungrouped z-order
  * space so hover/click map straight back to the snapshot.
  */
-import { getMainWindow, setInteractive, isInteractive } from './window'
+import { getMainWindow, setInteractive, isInteractive, pointInPanelRect } from './window'
 import koffi from 'koffi'
 import { app, screen } from 'electron'
 import { runtime } from './config'
@@ -22,7 +22,8 @@ import { releasePanelFocusNow, requestPanelFocus } from './focus'
 import { isFullscreenAppActive } from './fullscreen'
 import { setHookPinned } from './hookManager'
 import { loadSettings } from '../store/settings'
-import type { SwitcherEntryDto } from '../../shared/types'
+import type { SwitcherEntryDto, ScreenPoint } from '../../shared/types'
+import { createIdleGuard, type IdleGuard } from '../../shared/idle'
 
 // user32 mouse glue for the search-field click fallback (see activatePanel).
 const MOUSEEVENTF_LEFTDOWN = 0x0002
@@ -127,10 +128,11 @@ let selectedWin = 0
 /** Panel interactivity before the session started — restored on exit. */
 let prevInteractive = false
 /** Safety net: a session must end (execute) within this window or it is reset. */
-let sessionTimer: NodeJS.Timeout | undefined
-// Long enough that a user holding Alt to browse the list never hits it; short
-// enough that a stuck session (lost Alt-up) self-heals. Reset on any interaction.
-const SESSION_TIMEOUT_MS = 30000
+// 智能收起 (Smart Collapse Fallbacks) idle guard for the pinned search
+// session: "stopped actively switching" for SMART_COLLAPSE_IDLE_MS (arrows /
+// hover / typing touch it) abandons the session. Replaces the old 30s
+// SESSION_TIMEOUT_MS — the smart-collapse strategy is the single fallback.
+let idleGuard: IdleGuard | null = null
 
 export function isSwitcherActive(): boolean {
   return active
@@ -214,8 +216,6 @@ export function switcherShow(opts: { shiftDown: boolean }): void {
       entries: rows.map(rowToDto),
       selectedIndex: selectedRow
     })
-    clearTimeout(sessionTimer)
-    sessionTimer = setTimeout(resetSession, SESSION_TIMEOUT_MS)
     // Deferred window work (also keeps the hook callback lean).
     setTimeout(() => {
       if (!active) return
@@ -256,10 +256,10 @@ function ensureBlurWatch(): void {
   })
 }
 
-/** Force-end a session (timeout / error path) — never leave the panel pinned. */
+/** Force-end a session (idle / abandonment / error path) — never leave the panel pinned. */
 function resetSession(): void {
-  clearTimeout(sessionTimer)
-  sessionTimer = undefined
+  idleGuard?.dispose()
+  idleGuard = null
   stopForegroundWatch()
   const wasActive = active
   active = false
@@ -272,18 +272,16 @@ function resetSession(): void {
   }
 }
 
-/** Extend the safety net on user interaction (Tab/hover/click). */
-function touchSession(): void {
-  if (!active || !sessionTimer) return
-  clearTimeout(sessionTimer)
-  sessionTimer = setTimeout(resetSession, SESSION_TIMEOUT_MS)
+/** 智能收起: selection activity while pinned restarts the idle window. */
+function touchIdleGuard(): void {
+  idleGuard?.touch()
 }
 
 /** Tab / Shift+Tab repeat (keyboardHook onAdvance). */
 export function switcherAdvance(delta: 1 | -1): void {
   if (!active || rows.length === 0) return
   selectRow(rows[(selectedRow + delta + rows.length) % rows.length])
-  touchSession()
+  touchIdleGuard()
   console.log('[Switcher] advance to', selectedRow, 'of', rows.length)
   broadcast('switcher:select', selectedRow)
 }
@@ -294,7 +292,7 @@ export function switcherHover(index: number): void {
   const row = rowByIndex(index)
   if (!row) return
   selectRow(row, index)
-  touchSession()
+  touchIdleGuard()
 }
 
 /** Enter while armed (keyboardHook onPin): pin the session open for search. */
@@ -302,13 +300,27 @@ export function switcherPin(initialQuery?: string): void {
   if (!active) return
   setHookPinned(true)
   broadcast('switcher:pin', initialQuery)
+  // 智能收起: the idle guard arms once pinned — "stopped actively switching"
+  // for 5s abandons the session. The pin gesture itself counts as activity.
+  // Gated on the setting: when 智能收起 is off the session has no passive
+  // fallback (explicit actions only — Esc / click-outside).
+  idleGuard?.dispose()
+  idleGuard = null
+  if (loadSettings().smartCollapseFallbacks) {
+    idleGuard = createIdleGuard({
+      onIdle: () => {
+        console.log('[Switcher] idle — cancel session (smart collapse)')
+        resetSession()
+      }
+    })
+    idleGuard.touch()
+  }
   // The panel has been a non-activated NOACTIVATE window all session, so the
   // search input can't receive keys. requestPanelFocus strips NOACTIVATE and
   // calls win.focus() — but the foreground lock refuses that here (no click
   // ever granted this process input rights; keys went to the hook host).
   // Real activation happens on Alt-up (switcherPinReleased), see there.
   requestPanelFocus()
-  touchSession()
   // click-outside detection: watch the OS foreground once pinned.
   startForegroundWatch()
 }
@@ -415,9 +427,9 @@ export function switcherPinReleased(): void {
   activatePanel()
 }
 
-/** Any keydown while pinned: keep the safety timeout alive during typing. */
+/** Any keydown while pinned: selection activity — keep the idle guard alive during typing. */
 export function switcherTouch(): void {
-  touchSession()
+  touchIdleGuard()
   // Keydown reached the hook, so the user is typing — if the keystroke
   // isn't landing in the panel (activation failed), pull the foreground
   // back so the very next key reaches the search field.
@@ -446,6 +458,8 @@ export function switcherControlKey(key: 'enter' | 'escape' | 'up' | 'down' | 'le
     switcherCancel()
     return
   }
+  // Arrows/enter while pinned are selection activity.
+  touchIdleGuard()
   broadcast('switcher:control-key', key)
 }
 
@@ -456,21 +470,45 @@ export function switcherControlKey(key: 'enter' | 'escape' | 'up' | 'down' | 'le
  * on the switcher — drop the session like Esc. The click target's own
  * activation is untouched (the mouse hook never swallows).
  */
-export function switcherMouseDown(pt: { x: number; y: number }): void {
+export function switcherMouseDown(pt: ScreenPoint): void {
   if (!active) return
-  const win = getMainWindow()
-  if (!win || win.isDestroyed()) return
-  try {
-    // Physical screen point vs the panel's screen rect (DIP→physical).
-    const b = win.getBounds()
-    const sr = screen.dipToScreenRect(win, b)
-    if (pt.x >= sr.x && pt.x <= sr.x + sr.width && pt.y >= sr.y && pt.y <= sr.y + sr.height) return
-    console.log('[Switcher] click outside panel — cancel session')
-    setHookPinned(false)
-    resetSession()
-  } catch (err) {
-    console.error('[Switcher] click-outside check failed:', err)
+  if (pointInPanelRect(pt)) {
+    touchIdleGuard() // clicking inside the panel is selection activity
+    return
   }
+  console.log('[Switcher] click outside panel — cancel session')
+  setHookPinned(false)
+  resetSession()
+}
+
+/**
+ * Mouse-wheel while pinned (keyboardHook onMouseWheel): the wheel goes to the
+ * window under the cursor, so a wheel outside the panel means the user went
+ * back to work elsewhere — abandon the session like click-outside. Inside the
+ * panel it is list-scrolling: selection activity. Passive signal — gated on
+ * 智能收起 (Smart Collapse Fallbacks).
+ */
+export function switcherMouseWheel(pt: ScreenPoint): void {
+  if (!active) return
+  if (!loadSettings().smartCollapseFallbacks) return
+  if (pointInPanelRect(pt)) {
+    touchIdleGuard()
+    return
+  }
+  console.log('[Switcher] wheel outside panel — cancel session (smart collapse)')
+  setHookPinned(false)
+  resetSession()
+}
+
+/**
+ * 智能收起 (Smart Collapse Fallbacks) entry: a passive external-activity
+ * signal arrived while a session is live — drop it like Esc.
+ */
+export function abandonSwitcherSession(): void {
+  if (!active) return
+  console.log('[Switcher] external activity — cancel session (smart collapse)')
+  setHookPinned(false)
+  resetSession()
 }
 
 /**
@@ -487,8 +525,8 @@ export function switcherExecute(): void {
   active = false
   runtime.switcherActive = false
   setHookPinned(false)
-  clearTimeout(sessionTimer)
-  sessionTimer = undefined
+  idleGuard?.dispose()
+  idleGuard = null
   broadcast('switcher:hide')
   console.log('[Switcher] execute →', target?.title ?? '(none)')
   releasePanelFocusNow()

@@ -230,6 +230,9 @@ export interface InvokeMap {
   /** Hard-delete a note. Returns the full note list. */
   'note:delete': { args: [id: string]; result: NoteDto[] }
 
+  /** Delete every note (notes-view footer "clear all"). Returns the full note list. */
+  'note:clearAll': { args: []; result: NoteDto[] }
+
   /* --------------------------- ai provider --------------------------- */
 
   /** Test a provider connection (one 1-token chat completion). */
@@ -349,6 +352,17 @@ export interface InvokeMap {
 /* Main -> Renderer  (webContents.send / ipcRenderer.on)              */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Smart collapse (智能收起) shared types                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Passive external-activity signal kinds for `smart:external-activity`.
+ * Single source of truth — consumers must import this, never re-declare
+ * the literal union.
+ */
+export type SmartExternalKind = 'wheel' | 'copy' | 'lock' | 'sleep'
+
 export interface EventMap {
   /** Full new item list whenever the history changes. */
   'state:items': [items: ClipboardItemDto[]]
@@ -383,6 +397,13 @@ export interface EventMap {
   'ui:toast': [toast: { id: string; message: string; tone: 'info' | 'error' }]
   /** Fired when an OS copy event (Ctrl+C) is detected by the main process watcher. */
   'ui:copy-flare': []
+  /**
+   * 智能收起 (Smart Collapse Fallbacks): main detected passive external
+   * activity while the panel is open — the renderer force-collapses,
+   * bypassing the notes-editor focus hold. The switcher-session branch is
+   * handled entirely main-side (abandon the session) and never reaches here.
+   */
+  'smart:external-activity': [kind: SmartExternalKind]
   /** Fired by electron-updater when a new update is available for GitHub builds. */
   'app:update-available': [info: { version: string }]
   /** Fired by electron-updater when the update has been fully downloaded and is ready to install. */

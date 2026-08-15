@@ -94,6 +94,8 @@ export interface EdgeApi {
   createNote: (content?: string) => Promise<{ notes: NoteDto[]; createdId: string }>
   updateNote: (id: string, patch: NotePatch) => Promise<NoteDto[]>
   deleteNote: (id: string) => Promise<NoteDto[]>
+  /** Delete every note. Returns the full note list. */
+  clearAllNotes: () => Promise<NoteDto[]>
 
   /* AI provider */
   testProvider: (config: ProviderConfig) => Promise<ProviderTestResult>
@@ -173,6 +175,8 @@ export interface EdgeApi {
   }) => void) => () => void
   onToast: (cb: (toast: { id: string; message: string; tone: 'info' | 'error' }) => void) => () => void
   onCopyFlare: (cb: () => void) => () => void
+  /** 智能收起 (Smart Collapse Fallbacks): passive external activity → force-collapse. */
+  onSmartExternalActivity: (cb: (kind: import('./ipc').SmartExternalKind) => void) => () => void
   onUpdateAvailable: (cb: (info: { version: string }) => void) => () => void
   onUpdateDownloaded: (cb: (info: { version: string }) => void) => () => void
 

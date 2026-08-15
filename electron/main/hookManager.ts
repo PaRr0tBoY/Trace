@@ -34,6 +34,7 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
       else if (m.type === 'pin-released') events.onPinReleased()
       else if (m.type === 'control-key') events.onControlKey((m.key ?? 'enter') as 'enter' | 'escape' | 'up' | 'down' | 'left' | 'right')
       else if (m.type === 'mouse-down' && typeof m.x === 'number' && typeof m.y === 'number') events.onMouseDown({ x: m.x, y: m.y })
+      else if (m.type === 'mouse-wheel' && typeof m.x === 'number' && typeof m.y === 'number') events.onMouseWheel({ x: m.x, y: m.y })
     })
     child.on('exit', () => {
       child = null

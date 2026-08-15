@@ -13,7 +13,7 @@ export const MAX_STACK = 10
 
 /** Discriminated union describing the payload of a clipboard item. */
 export type ItemData =
-  | { kind: 'text'; text: string; html?: string; isUrl: boolean; isColor?: boolean; hasFullPayload?: boolean; previewText?: string }
+  | { kind: 'text'; text: string; html?: string; isUrl: boolean; isColor?: boolean; hasFullPayload?: boolean; previewText?: string; contentHash?: string }
   | { kind: 'image'; imageId: string; width: number; height: number; bytes: number; ext?: string }
   | { kind: 'image-collection'; images: { imageId: string; width: number; height: number; bytes: number; ext?: string }[] }
   | { kind: 'files'; paths: string[] }
@@ -65,6 +65,15 @@ export type MotionLevel = 'standard' | 'extended'
 export type ThemeColor = 'graphite' | 'cobalt' | 'verdigris' | 'amber' | 'violet'
 
 /**
+ * A point in physical screen pixels, as reported by the low-level input
+ * hooks (WH_MOUSE_LL) and compared against `screen.dipToScreenRect` bounds.
+ */
+export interface ScreenPoint {
+  x: number
+  y: number
+}
+
+/**
  * Drag-out semantics (ADR-0007): 'copy' drags the original paths and leaves
  * entry and source untouched; 'move' stages the originals into the station
  * staging area at drag start (接管式移动) and completes on a successful drop.
@@ -73,12 +82,14 @@ export type MoveMode = 'copy' | 'move'
 
 /**
  * Landing page applied on first launch and after the restore time expires
- * (ADR-0004). The files view has no second level — it always lands on 'all'
- * because dynamic extension tabs may not exist.
+ * (ADR-0004). The files and notes views have no second level — they always
+ * land on 'all' (files: dynamic extension tabs may not exist; notes: the
+ * shelf has no second-level filter).
  */
 export type LandingPage =
   | { view: 'clipboard'; filter: ClipboardFilter }
   | { view: 'files' }
+  | { view: 'notes' }
   | { view: 'tasks'; filter: TasksFilter }
 
 /**
@@ -146,7 +157,7 @@ export type NoteDto = Note
 /** Payload sent over IPC: same as ClipboardItem but with inline image previews. */
 export interface ClipboardItemDto extends Omit<ClipboardItem, 'data'> {
   data:
-  | { kind: 'text'; text: string; html?: string; isUrl: boolean; isColor?: boolean; hasFullPayload?: boolean; previewText?: string }
+  | { kind: 'text'; text: string; html?: string; isUrl: boolean; isColor?: boolean; hasFullPayload?: boolean; previewText?: string; contentHash?: string }
   | { kind: 'image'; imageId: string; width: number; height: number; bytes: number; preview: string; ext?: string }
   | { kind: 'image-collection'; images: { imageId: string; width: number; height: number; bytes: number; preview: string; ext?: string }[] }
   | { kind: 'files'; paths: string[]; previews?: string[]; entries?: FileEntry[] }
@@ -751,7 +762,7 @@ export interface Settings {
   localModelManualPath?: string
   /**
    * Landing page applied on first launch and after the restore time expires
-   * (ADR-0004). The files view has no second level.
+   * (ADR-0004). The files and notes views have no second level.
    */
   landing: LandingPage
   /**
@@ -759,6 +770,20 @@ export interface Settings {
    * the landing page (ADR-0004). 'forever' disables restoring entirely.
    */
   restoreTime: RestoreTime
+  /**
+   * 智能收起 (Smart Collapse Fallbacks): passive signals — external wheel
+   * scroll, external copy, foreground loss, lock/suspend, and an idle guard
+   * while the notes editor / switcher search holds focus — auto-collapse the
+   * panel (notes) or abandon the switcher session. When off, only explicit
+   * actions (Esc / click-outside) collapse. Default: on.
+   */
+  smartCollapseFallbacks: boolean
+  /**
+   * Auto-focus the notes editor when the notes page opens (read-first mode
+   * when off). Notes only — the switcher search field always focuses.
+   * Default: on.
+   */
+  autoFocus: boolean
   /**
    * Alt+Tab switcher: group multiple windows of the same app into one row
    * (drill-in on click). Default off — native behavior.
@@ -829,6 +854,8 @@ export const DEFAULT_SETTINGS: Settings = {
   localModelManualPath: undefined,
   landing: { view: 'tasks', filter: 'existing' },
   restoreTime: 'relaxed',
+  smartCollapseFallbacks: true,
+  autoFocus: true,
   switcherGroupWindows: false,
   autoUpdates: true
 }

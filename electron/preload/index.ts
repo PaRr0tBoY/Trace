@@ -251,6 +251,7 @@ const api = {
   createNote: (content?: string) => invoke('note:create', content),
   updateNote: (id: string, patch: import('../../shared/types').NotePatch) => invoke('note:update', id, patch),
   deleteNote: (id: string) => invoke('note:delete', id),
+  clearAllNotes: () => invoke('note:clearAll'),
 
   /* AI provider */
   testProvider: (config: import('../../shared/types').ProviderConfig) => invoke('ai:test-provider', config),
@@ -303,6 +304,7 @@ const api = {
   onCursorEdge: (cb: (data: EventArgs<'window:cursor-edge'>[0]) => void) => on('window:cursor-edge', cb),
   onToast: (cb: (toast: { id: string; message: string; tone: 'info' | 'error' }) => void) => on('ui:toast', cb),
   onCopyFlare: (cb: () => void) => on('ui:copy-flare', cb),
+  onSmartExternalActivity: (cb: (kind: EventArgs<'smart:external-activity'>[0]) => void) => on('smart:external-activity', cb),
   onUpdateAvailable: (cb: (info: { version: string }) => void) => on('app:update-available', cb),
   onUpdateDownloaded: (cb: (info: { version: string }) => void) => on('app:update-downloaded', cb),
   onSwitcherShow: (cb: (data: EventArgs<'switcher:show'>[0]) => void) => on('switcher:show', cb),

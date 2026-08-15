@@ -27,7 +27,8 @@ startKeyboardHook({
   onTouch: () => process.parentPort?.postMessage({ type: 'touch' }),
   onPinReleased: () => process.parentPort?.postMessage({ type: 'pin-released' }),
   onControlKey: (key) => process.parentPort?.postMessage({ type: 'control-key', key }),
-  onMouseDown: (pt) => process.parentPort?.postMessage({ type: 'mouse-down', x: pt.x, y: pt.y })
+  onMouseDown: (pt) => process.parentPort?.postMessage({ type: 'mouse-down', x: pt.x, y: pt.y }),
+  onMouseWheel: (pt) => process.parentPort?.postMessage({ type: 'mouse-wheel', x: pt.x, y: pt.y })
 })
 
 process.parentPort?.on('message', (e: { data?: { type?: string; pinned?: boolean } }) => {

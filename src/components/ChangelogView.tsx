@@ -23,6 +23,10 @@ const CHANGELOG_DATA: ChangelogRelease[] = [
     summary: "Trace's first release — task layer (candidates, guided editor, linked windows), AI observability, dual-row navigation with restore, 5 accent themes.",
     highlights: [
       {
+        title: 'Smart Collapse & Auto-Focus',
+        description: 'Notes as the landing page no longer pins the panel open: passive signals (editor idle, external scroll/copy, lock/suspend) auto-collapse it, or abandon a pinned Alt+Tab search session — toggleable in Behaviour settings, with an optional read-first notes mode (auto-focus off).'
+      },
+      {
         title: 'Task Layer',
         description: 'Candidate task cards from foreground-activity clustering; guided create/edit editor with app grid, clipboard material picker and AI title fallback; task detail with linked windows (switch/launch); drop-to-bind from the panel.'
       },

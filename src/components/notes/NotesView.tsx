@@ -13,13 +13,14 @@
  * component only renders what the store holds.
  */
 import { AnimatePresence, motion } from 'framer-motion'
-import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
-import { Bold, Italic, Strikethrough, Code, Link, Quote, List, ListOrdered, ListChecks, BookOpen, PenLine } from 'lucide-react'
+import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Bold, Italic, Strikethrough, Code, Link, Quote, List, ListOrdered, ListChecks, BookOpen, PenLine, Eraser } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useStore } from '../../store/appStore'
 import { useTranslation } from '../../i18n'
 import type { NoteDto } from '../../../shared/types'
 import { PinIcon, PinFillIcon, TrashIcon, PlusIcon, ChevronLeftIcon, ChevronUpIcon, ChevronDownIcon, ExpandIcon, ContractIcon, BundleIcon, CloseIcon } from '../icons'
+import type { ViewFooterState } from '../ViewFooter'
 import { playButtonClickSound } from '../../lib/soundEffects'
 import { edge } from '../../lib/edge'
 import { MarkdownPreview } from './markdown'
@@ -98,6 +99,21 @@ function NoteEditor({
       initialContent.current = pendingValue.current
     }
   }
+
+  // External content changes (the footer "clear content" action, which flows
+  // through the store) win over any pending local edit: reset the draft refs
+  // and cancel the debounce so a stale flush can never push old text back
+  // over the cleared note. Typing never trips this — the store echoes the
+  // editor's own doc back, so pendingValue already equals note.content.
+  useEffect(() => {
+    if (pendingValue.current === note.content) return
+    if (saveTimer.current !== null) {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
+    pendingValue.current = note.content
+    initialContent.current = note.content
+  }, [note.content])
 
   // Flush the debounced edit when leaving the editor (back / delete / view switch).
   useEffect(() => {
@@ -424,16 +440,24 @@ function NotesModal({
   )
 }
 
-export function NotesView() {
+export function NotesView({ onFooterChange }: { onFooterChange?: (state: ViewFooterState | null) => void }) {
   const { t } = useTranslation()
   const notes = useStore((s) => s.notes)
   const query = useStore((s) => s.query)
   const open = useStore((s) => s.open)
   const createNote = useStore((s) => s.createNote)
+  const updateNote = useStore((s) => s.updateNote)
+  const clearAllNotes = useStore((s) => s.clearAllNotes)
   const pushToast = useStore((s) => s.pushToast)
   const noteViewMode = useStore((s) => s.settings.noteViewMode ?? 'single')
+  const autoFocus = useStore((s) => s.settings.autoFocus ?? true)
+  const notesCurrentId = useStore((s) => s.notesCurrentId)
+  const setNotesCurrentId = useStore((s) => s.setNotesCurrentId)
+  const restoreEpoch = useStore((s) => s.restoreEpoch)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [currentId, setCurrentId] = useState<string | null>(null)
+  // 智能收起 (Q3): mount on the remembered note so a re-open within the
+  // restore TTL returns to the same note instead of resetting to note #1.
+  const [currentId, setCurrentId] = useState<string | null>(notesCurrentId)
   const [modalOpen, setModalOpen] = useState(false)
 
   const filtered = useMemo(() => {
@@ -458,6 +482,41 @@ export function NotesView() {
     return next ? next.id : null
   }
 
+  // Footer (the shared toolbar lives in Panel, outside the view transition):
+  // the notes view reports its own clear semantics per context —
+  //   - management list: clear = delete EVERY note (all, incl. pinned)
+  //   - editor (either variant): clear = empty the open note's content
+  // Both use the two-step confirm so a stray click never destroys data.
+  const clearTarget = noteViewMode === 'single' ? effectiveCurrent : editing
+  useLayoutEffect(() => {
+    if (!onFooterChange) return
+    if (clearTarget) {
+      onFooterChange({
+        count: 1,
+        noun: 'note',
+        clearLabel: t('notes.clearContent'),
+        clearTitle: t('notes.clearContentTitle'),
+        confirmLabel: t('notes.confirmClear'),
+        confirmTitle: t('notes.confirmClearTitle'),
+        clearDisabled: clearTarget.content.length === 0,
+        clearIcon: <Eraser size={14} strokeWidth={2} />,
+        onClear: () => void updateNote(clearTarget.id, { content: '' })
+      })
+    } else {
+      onFooterChange({
+        count: notes.length,
+        noun: 'note',
+        clearLabel: t('notes.clearAll'),
+        clearTitle: t('notes.clearAllTitle'),
+        confirmLabel: t('notes.confirmClear'),
+        confirmTitle: t('notes.confirmClearTitle'),
+        clearDisabled: notes.length === 0,
+        onClear: () => void clearAllNotes()
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onFooterChange, clearTarget?.id, clearTarget?.content, notes.length, t, updateNote, clearAllNotes])
+
   // Single-note mode: keep currentId pointing at a live note. An empty shelf
   // shows the empty state — deleting the last note never fabricates a new one.
   useEffect(() => {
@@ -466,6 +525,28 @@ export function NotesView() {
     if (notes.length > 0) setCurrentId(notes[0].id)
     else setCurrentId(null)
   }, [noteViewMode, notes, currentId])
+
+  // 智能收起 (Q3): remember which note the shelf is showing (session-scoped),
+  // so a re-open within the restore TTL returns to the same note + caret.
+  useEffect(() => {
+    if (noteViewMode !== 'single') return
+    setNotesCurrentId(currentId)
+  }, [noteViewMode, currentId, setNotesCurrentId])
+
+  // 智能收起 (Q3): the restore mechanism applied the landing page (TTL
+  // expired / first launch) — store.notesCurrentId was cleared by setOpen, so
+  // snap back to the shelf default (note #1). Within the TTL restoreEpoch is
+  // untouched and the local currentId simply survives.
+  useEffect(() => {
+    if (noteViewMode !== 'single') return
+    const saved = useStore.getState().notesCurrentId
+    if (saved !== null && notes.some((n) => n.id === saved)) {
+      setCurrentId(saved)
+    } else {
+      setCurrentId(notes.length > 0 ? notes[0].id : null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restoreEpoch, noteViewMode])
 
   // Single-note mode: typing while the editor is open calls up the all-notes
   // modal (the management list lives there) instead of the clipboard search.
@@ -493,7 +574,11 @@ export function NotesView() {
   // restores it), and Chromium silently drops element.focus() on such a
   // window — so ask main to truly activate the window first, then focus
   // next frame. Re-runs when the open note changes (steppers / modal pick).
+  // 自动聚焦 (autoFocus): when off, opening the notes page is read-first —
+  // no focus grab, no OS activation; the editor focuses on click instead
+  // (and the cursor-leave close keeps working without the focus hold).
   useEffect(() => {
+    if (!autoFocus) return
     const target = noteViewMode === 'single' ? effectiveCurrent : editing
     if (!open || !target) return
     edge.requestInputFocus()
@@ -501,7 +586,7 @@ export function NotesView() {
       document.querySelector<HTMLElement>('.notes-editor .cm-content')?.focus()
     })
     return () => cancelAnimationFrame(raf)
-  }, [open, noteViewMode, effectiveCurrent?.id, editing?.id])
+  }, [open, noteViewMode, effectiveCurrent?.id, editing?.id, autoFocus])
 
   const handleNew = () => {
     playButtonClickSound()

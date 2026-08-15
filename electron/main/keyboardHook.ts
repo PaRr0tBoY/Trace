@@ -30,6 +30,7 @@
  * Alt combination pass through untouched.
  */
 import koffi from 'koffi'
+import type { ScreenPoint } from '../../shared/types'
 
 const WH_KEYBOARD_LL = 13
 const WH_MOUSE_LL = 14
@@ -40,6 +41,7 @@ const WM_KEYUP = 0x101
 const WM_SYSKEYDOWN = 0x104
 const WM_SYSKEYUP = 0x105
 const WM_LBUTTONDOWN = 0x201
+const WM_MOUSEWHEEL = 0x20a
 const VK_TAB = 0x09
 const VK_MENU = 0x12
 const VK_LMENU = 0xA4
@@ -116,6 +118,8 @@ let callNextHookEx: CallNextHookExFn | null = null
 let peekMessageW: PeekMessageWFn | null = null
 let getAsyncKeyState: GetAsyncKeyStateFn | null = null
 let sendInput: SendInputFn | null = null
+let timeBeginPeriod: ((period: number) => number) | null = null
+let timeEndPeriod: ((period: number) => number) | null = null
 
 if (process.platform === 'win32') {
   try {
@@ -129,6 +133,19 @@ if (process.platform === 'win32') {
     sendInput = user32.func('SendInput', 'uint32_t', ['uint32_t', 'INPUT *', 'int'])
   } catch (err) {
     console.error('[Hook] koffi user32 load failed — Alt+Tab takeover disabled:', err)
+  }
+  // High-resolution timer request (winmm). The 4ms message pump is quantized
+  // to the OS default ~15.6ms granularity without it — which throttles every
+  // mouse message system-wide while the mouse hook is installed (measured:
+  // 15ms effective tick, ~533 msg/s cap; with timeBeginPeriod(1): 4ms).
+  // Requested only while the mouse hook lives; the OS releases it
+  // automatically if this process dies. Failure is non-fatal (degraded pump).
+  try {
+    const winmm = koffi.load('winmm.dll')
+    timeBeginPeriod = winmm.func('timeBeginPeriod', 'uint32_t', ['uint32_t'])
+    timeEndPeriod = winmm.func('timeEndPeriod', 'uint32_t', ['uint32_t'])
+  } catch {
+    /* non-fatal: pump runs at the OS timer granularity */
   }
 }
 
@@ -167,7 +184,14 @@ export interface KeyboardHookEvents {
    * mouse hook reports the click position and main decides whether it
    * landed outside the panel (switcher session or collapsed panel).
    */
-  onMouseDown: (pt: { x: number; y: number }) => void
+  onMouseDown: (pt: ScreenPoint) => void
+  /**
+   * Mouse-wheel while the panel is interactive, in physical screen pixels.
+   * Feeds 智能收起 (Smart Collapse Fallbacks): a wheel event landing outside
+   * the panel means the user went back to work elsewhere — main decides
+   * bounds, then collapses (or abandons the switcher session).
+   */
+  onMouseWheel: (pt: ScreenPoint) => void
 }
 
 type HookState = 'idle' | 'altDown' | 'pending' | 'tap' | 'armed' | 'pinned'
@@ -398,21 +422,61 @@ const kbPtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bi
  */
 const mousePtr = koffi.register((nCode: number, wParam: number, lParam: bigint): bigint => {
   if (nCode >= 0 && hookPtr && callNextHookEx) {
-    if (mouseTracking && wParam === WM_LBUTTONDOWN) {
+    if (mouseTracking && (wParam === WM_LBUTTONDOWN || wParam === WM_MOUSEWHEEL)) {
       try {
         const m = koffi.decode(lParam, MSLLHOOKSTRUCT)
-        defer(() => activeEvents?.onMouseDown({ x: m.pt_x, y: m.pt_y }))
+        const pt: ScreenPoint = { x: m.pt_x, y: m.pt_y }
+        defer(() => {
+          if (wParam === WM_LBUTTONDOWN) activeEvents?.onMouseDown(pt)
+          else activeEvents?.onMouseWheel(pt)
+        })
       } catch {
-        // ignore malformed structs — click-outside detection degrades
+        // ignore malformed structs — click-outside / smart-collapse degrades
       }
     }
   }
   return callNextHookEx ? callNextHookEx(hookPtr, nCode, wParam, lParam) : 1n
 }, koffi.pointer(koffi.proto('intptr_t (int nCode, uintptr_t wParam, intptr_t lParam)')))
 
-/** Enable/disable click-outside tracking while the panel is interactive. */
+/**
+ * Enable/disable click-outside tracking while the panel is interactive.
+ * The hook itself is installed/uninstalled with the gate: WH_MOUSE_LL is a
+ * SYNCHRONOUS global hook — every mouse message system-wide (moves, wheel,
+ * clicks) waits for this process's pump while it is installed, so it must
+ * never live longer than the panel's interactive window. While the panel is
+ * closed the system input chain does not traverse Trace at all.
+ */
 export function setMouseTracking(enabled: boolean): void {
   mouseTracking = enabled
+  if (enabled) {
+    installMouseHook()
+    // The pump must drain mouse traffic promptly; without the high-res
+    // request the 4ms interval runs at ~15.6ms and caps global mouse
+    // throughput at ~533 msg/s (measured — see hook-pump-probe).
+    timeBeginPeriod?.(1)
+  } else {
+    uninstallMouseHook()
+    timeEndPeriod?.(1)
+  }
+}
+
+/** Install the mouse hook. Idempotent; failure degrades click-outside only. */
+function installMouseHook(): void {
+  if (!setWindowsHookExW || mouseHookPtr) return
+  mouseHookPtr = setWindowsHookExW(WH_MOUSE_LL, mousePtr, null, 0)
+  if (!mouseHookPtr) {
+    console.error('[Hook] mouse hook failed — click-outside detection disabled')
+  } else {
+    console.log('[Hook] ✓ WH_MOUSE_LL installed (click-outside tracking active)')
+  }
+}
+
+/** Remove the mouse hook so system input stops traversing this process. */
+function uninstallMouseHook(): void {
+  if (mouseHookPtr && unhookWindowsHookEx) {
+    unhookWindowsHookEx(mouseHookPtr)
+    mouseHookPtr = null
+  }
 }
 
 function sendSyntheticAltUp(): void {
@@ -475,20 +539,20 @@ export function startKeyboardHook(events: KeyboardHookEvents): void {
     console.error('[Hook] SetWindowsHookExW failed — Alt+Tab takeover disabled')
     return
   }
-  // Same pump drives the mouse hook; failure only disables click-outside
-  // detection (keyboard takeover is unaffected).
-  mouseHookPtr = setWindowsHookExW(WH_MOUSE_LL, mousePtr, null, 0)
-  if (!mouseHookPtr) {
-    console.error('[Hook] mouse hook failed — click-outside detection disabled')
-  }
+  // The MOUSE hook is intentionally NOT installed here: it is installed on
+  // demand by setMouseTracking('panel-open') and removed on 'panel-close',
+  // so the synchronous global mouse chain is only taxed while the panel is
+  // interactive (the only window where click-outside reporting means
+  // anything). The same pump drives both hooks while installed.
   pumpTimer = setInterval(() => {
     if (peekMessageW) {
       // Bounded drain: an unbounded while loop starves libuv timers while
-      // key-repeat messages keep arriving (the Tap/hold timer must fire on
-      // schedule, not whenever the key stream stops). 8 msgs/tick at 4ms is
-      // far above any real key rate, so nothing is dropped.
+      // messages keep arriving (the tap/hold timer must fire on schedule).
+      // 64 msgs/tick at the 4ms design tick ≈ 16k msg/s — far above any real
+      // input rate (1000Hz gaming mice ≈ 1k/s, hi-res wheel bursts ≈ 2-3k/s),
+      // so bursts drain in one tick and nothing is dropped.
       let n = 0
-      while (peekMessageW(pumpMsg, null, 0, 0, PM_REMOVE) && n++ < 8) {
+      while (peekMessageW(pumpMsg, null, 0, 0, PM_REMOVE) && n++ < 64) {
         // dispatch is done by the system; the hook callback runs inside peek
       }
     }
@@ -522,10 +586,8 @@ export function stopKeyboardHook(): void {
     unhookWindowsHookEx(hookPtr)
     hookPtr = null
   }
-  if (mouseHookPtr && unhookWindowsHookEx) {
-    unhookWindowsHookEx(mouseHookPtr)
-    mouseHookPtr = null
-  }
+  uninstallMouseHook()
+  timeEndPeriod?.(1)
   activeEvents = null
   state = 'idle'
   pinnedSession = false

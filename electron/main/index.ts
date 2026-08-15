@@ -8,11 +8,11 @@
  *   3. On 'window-all-closed' we DON'T quit (the panel is hidden, not closed).
  *   4. Quit from the tray menu tears everything down cleanly.
  */
-import { app, BrowserWindow, protocol, session, screen } from 'electron'
+import { app, BrowserWindow, protocol, session } from 'electron'
 import { APP_CONFIG, runtime } from './config'
 import { ensureDirs, cleanTemp, PATHS } from '../store/paths'
 import { configureAiLog } from './aiLog'
-import { createWindow, getMainWindow, isInteractive, setInteractive, setVisible, startCursorPoll, stopCursorPoll, stopHeartbeat, setHotZoneWidth } from './window'
+import { createWindow, getMainWindow, isInteractive, setInteractive, setVisible, startCursorPoll, stopCursorPoll, stopHeartbeat, setHotZoneWidth, pointInPanelRect } from './window'
 import { createTray, registerIncognitoApplier } from './tray'
 import { registerIpc, registerSendListeners, getProviderChain, syncLoginItemSettings } from './ipc'
 import { initAutoUpdater } from './updater'
@@ -22,10 +22,12 @@ import { snapshotWindows } from './windowSnapshot'
 import { initState, getWatcher, getTaskStore, loadSettings, saveSettings, pushState, stopStateTimers, setSuggestionChat, setSuggestionOcr, getStore } from './state'
 import { createOnboardingWindow } from './onboardingWindow'
 import { startFullscreenMonitor, stopFullscreenMonitor, triggerFullscreenCheck } from './fullscreen'
-import { startKeyboardHook, stopKeyboardHook } from './hookManager'
+import { startKeyboardHook, stopKeyboardHook, setPanelInteractive } from './hookManager'
 import { startDragDetect, stopDragDetect } from './dragManager'
 import { releasePanelFocusNow } from './focus'
-import { switcherShow, switcherAdvance, switcherExecute, switcherTapExecute, switcherPin, switcherPinReleased, switcherTouch, switcherControlKey, switcherMouseDown } from './switcher'
+import { switcherShow, switcherAdvance, switcherExecute, switcherTapExecute, switcherPin, switcherPinReleased, switcherTouch, switcherControlKey, switcherMouseDown, switcherMouseWheel } from './switcher'
+import { signalSmartExternalActivity } from './smartCollapse'
+import type { ScreenPoint } from '../../shared/types'
 import { ForegroundWatcher } from './foreground'
 import { ocrFromForeground } from './ocr'
 import { createAttributor, type Attributor } from './attributor'
@@ -141,8 +143,19 @@ app.whenReady().then(async () => {
     onMouseDown: (pt) => {
       switcherMouseDown(pt)
       panelMouseDown(pt)
+    },
+    // 智能收起 (Smart Collapse Fallbacks): wheel outside the panel = the user
+    // went back to work elsewhere without clicking.
+    onMouseWheel: (pt) => {
+      switcherMouseWheel(pt)
+      smartExternalWheel(pt)
     }
   })
+  // Replay the panel's current interactive state into the freshly forked
+  // host: the mouse hook is installed on demand, so a panel that was already
+  // open when the host came up must re-arm click-outside tracking (the host
+  // starts with the hook uninstalled).
+  setPanelInteractive(isInteractive())
 
   // OS drag detection (T4b, ADR-0007): SetWinEventHook 0x0F/0x10 in a
   // utilityProcess + DragWindow poll fallback; feeds the dragSession state
@@ -346,23 +359,29 @@ function registerImageProtocol(): void {
  * collapse when it lands outside the panel's bounds. Clicks inside the
  * panel pass through untouched (the hook never swallows).
  */
-function panelMouseDown(pt: { x: number; y: number }): void {
+function panelMouseDown(pt: ScreenPoint): void {
   if (runtime.switcherActive) return // the switcher owns click-outside
   const win = getMainWindow()
   if (!win || win.isDestroyed() || !win.isVisible() || !isInteractive()) return
-  try {
-    // Physical screen point vs the panel's screen rect (DIP → physical).
-    const b = win.getBounds()
-    const sr = screen.dipToScreenRect(win, b)
-    if (pt.x >= sr.x && pt.x <= sr.x + sr.width && pt.y >= sr.y && pt.y <= sr.y + sr.height) return
-    console.log('[Panel] click outside panel — collapse')
-    setInteractive(false)
-    // Restore WS_EX_NOACTIVATE so the next hover-open starts from a clean
-    // non-activatable state (a window left activatable re-activates oddly
-    // and its next focus request can be refused).
-    releasePanelFocusNow()
-    pushState.togglePanel(false)
-  } catch (err) {
-    console.error('[Panel] click-outside check failed:', err)
-  }
+  if (pointInPanelRect(pt)) return
+  console.log('[Panel] click outside panel — collapse')
+  setInteractive(false)
+  // Restore WS_EX_NOACTIVATE so the next hover-open starts from a clean
+  // non-activatable state (a window left activatable re-activates oddly
+  // and its next focus request can be refused).
+  releasePanelFocusNow()
+  pushState.togglePanel(false)
+}
+
+/**
+ * Mouse-wheel while the panel is interactive (mouse hook). A wheel inside the
+ * panel is scrolling the panel itself (notes / lists) — never a signal. A
+ * wheel outside means the user went back to work elsewhere without clicking:
+ * feed 智能收起 (Smart Collapse Fallbacks), which abandons a switcher session
+ * or force-collapses the panel. The wheel only arrives while the panel is
+ * interactive (hook gate), so no interactivity guard is needed here.
+ */
+function smartExternalWheel(pt: ScreenPoint): void {
+  if (pointInPanelRect(pt)) return
+  signalSmartExternalActivity('wheel')
 }

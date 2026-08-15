@@ -103,6 +103,8 @@ describe('clampSettings — task domain fields', () => {
     expect(clampSettings({ ...DEFAULT_SETTINGS, landing: { view: 'clipboard', filter: 'images' } }).landing).toEqual({ view: 'clipboard', filter: 'images' })
     expect(clampSettings({ ...DEFAULT_SETTINGS, landing: { view: 'clipboard', filter: 'bogus' as never } }).landing).toEqual({ view: 'clipboard', filter: 'all' })
     expect(clampSettings({ ...DEFAULT_SETTINGS, landing: { view: 'files', filter: 'anything' as never } }).landing).toEqual({ view: 'files' })
+    expect(clampSettings({ ...DEFAULT_SETTINGS, landing: { view: 'notes' } }).landing).toEqual({ view: 'notes' })
+    expect(clampSettings({ ...DEFAULT_SETTINGS, landing: { view: 'notes', filter: 'bogus' as never } }).landing).toEqual({ view: 'notes' })
     expect(clampSettings({ ...DEFAULT_SETTINGS, landing: 'garbage' as never }).landing).toEqual(DEFAULT_SETTINGS.landing)
   })
 
@@ -111,6 +113,15 @@ describe('clampSettings — task domain fields', () => {
     expect(clampSettings({ ...DEFAULT_SETTINGS, restoreTime: 'delayed' }).restoreTime).toBe('delayed')
     expect(clampSettings({ ...DEFAULT_SETTINGS, restoreTime: 'forever' }).restoreTime).toBe('forever')
     expect(clampSettings({ ...DEFAULT_SETTINGS, restoreTime: 'bogus' as never }).restoreTime).toBe('relaxed')
+  })
+
+  it('clamps smart-collapse and auto-focus to explicit booleans (default on)', () => {
+    expect(clampSettings(DEFAULT_SETTINGS).smartCollapseFallbacks).toBe(true)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, smartCollapseFallbacks: false }).smartCollapseFallbacks).toBe(false)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, smartCollapseFallbacks: undefined as never }).smartCollapseFallbacks).toBe(true)
+    expect(clampSettings(DEFAULT_SETTINGS).autoFocus).toBe(true)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, autoFocus: false }).autoFocus).toBe(false)
+    expect(clampSettings({ ...DEFAULT_SETTINGS, autoFocus: undefined as never }).autoFocus).toBe(true)
   })
 })
 

@@ -124,6 +124,8 @@ export function clampSettings(input: Settings): Settings {
     out.landing = ok ? { view: 'tasks', filter: landing.filter } : { view: 'tasks', filter: 'existing' }
   } else if (landing.view === 'files') {
     out.landing = { view: 'files' }
+  } else if (landing.view === 'notes') {
+    out.landing = { view: 'notes' }
   } else {
     out.landing = { ...DEFAULT_SETTINGS.landing }
   }
@@ -132,6 +134,10 @@ export function clampSettings(input: Settings): Settings {
   out.restoreTime = restoreTime === 'instant' || restoreTime === 'relaxed' || restoreTime === 'delayed' || restoreTime === 'forever'
     ? restoreTime
     : 'relaxed'
+  // 智能收起 (Smart Collapse Fallbacks): explicit false only (default on).
+  out.smartCollapseFallbacks = out.smartCollapseFallbacks !== false
+  // Auto-focus the notes editor on open: explicit false only (default on).
+  out.autoFocus = out.autoFocus !== false
   // Alt+Tab window grouping: explicit true only (default off).
   out.switcherGroupWindows = out.switcherGroupWindows === true
   return out

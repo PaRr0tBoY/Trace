@@ -22,11 +22,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      # npm >= 11 blocks dependency postinstall scripts unless approved.
-      # package.json `allowScripts` covers the pinned versions; this config is a
-      # belt-and-suspenders fallback for any resolved version drift.
-      - name: Allow required postinstall scripts
-        run: npm config set allow-scripts "electron,esbuild,koffi,better-sqlite3,node-llama-cpp"
+      # node 22 ships npm 10, which has no allow-scripts gate — postinstall
+      # scripts run normally during npm ci. If the runner is later upgraded to
+      # npm >= 11, package.json `allowScripts` covers the pinned versions.
       - name: Install dependencies
         run: npm ci
       - name: Verify

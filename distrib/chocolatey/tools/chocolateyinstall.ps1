@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
-$url      = 'https://github.com/PaRr0tBoY/Trace/releases/download/v2026.8.15/Trace-Setup-2026.8.15.exe'
-$checksum = '2FCAA90AF26A4389C0B236D80D3023D357BA6A81DF9BFCBFCD1D21418065B9CA'
+$url      = 'https://github.com/PaRr0tBoY/Trace/releases/download/v2026.8.16/Trace-Setup-2026.8.16.exe'
+$checksum = '1461C0AC057A67150188AE710E8A5C789020A7C9A853B983BDFEC35851BB64D2'
 
 $packageArgs = @{
   packageName    = 'trace'

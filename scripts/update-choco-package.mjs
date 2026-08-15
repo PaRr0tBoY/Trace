@@ -32,6 +32,7 @@ writeFileSync(nuspec, n);
 const ps1 = 'distrib/chocolatey/tools/chocolateyinstall.ps1';
 let p = readFileSync(ps1, 'utf8');
 p = p.replace(/v[\d.]+(?=\/Trace-Setup-[\d.]+\.exe)/, tag);
+p = p.replace(/Trace-Setup-[\d.]+\.exe/g, `Trace-Setup-${ver}.exe`);
 p = p.replace(/(\$checksum\s*=\s*')[0-9A-Fa-f]+(')/, `$1${sha256}$2`);
 writeFileSync(ps1, p);
 

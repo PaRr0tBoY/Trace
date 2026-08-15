@@ -91,7 +91,7 @@ node scripts/update-choco-package.mjs
 
 ### NSIS 安装器自定义（`build/installer.nsh`）
 
-- `build/installer.nsh` 覆盖 electron-builder 默认的 `CHECK_APP_RUNNING`：默认实现用 PowerShell `Get-CimInstance`（WMI）探测运行中的应用，`nsExec::Exec` 无超时等待——WMI 卡死（`Win32_Process` 枚举对每个客户端返回 `0x80041032`）时安装器会永久冻结在"正在安装"页（2026-08-15 实机复现：进度条 ~1/4、无报错、`$INSTDIR` 从未创建）。自定义宏把 `IsPowerShellAvailable` 置 1，强制走模板自带的 tasklist/taskkill 原生回退路径：语义（重试/杀进程/提示）与默认一致，但每次调用有界、不依赖 WMI。
+- `build/installer.nsh` 覆盖 electron-builder 默认的 `CHECK_APP_RUNNING`：默认实现用 PowerShell `Get-CimInstance`（WMI）探测运行中的应用，`nsExec::Exec` 无超时等待——WMI 卡死（`Win32_Process` 枚举对每个客户端返回 `0x80041032`）时安装器会永久冻结在"正在安装"页（2026-08-15 实机复现：进度条 ~1/4、无报错、`$INSTDIR` 从未创建）。模板的 tasklist/taskkill 回退同样会卡（32 位 tasklist 在病态机器上挂死）。自定义宏用原生 Toolhelp 快照扫描进程（`CreateToolhelp32Snapshot`/`Process32FirstW`）+ `TerminateProcess` 结束应用：**零子进程、零 WMI、零 tasklist**，结构上不可能等待外部组件；重试/杀进程/提示语义与默认一致。注意该文件在模板 `common.nsh` 之前被 include，只能用原生 NSIS 指令（不能用 LogicLib、`${APP_EXECUTABLE_FILENAME}` 未定义——比较用 `${PRODUCT_FILENAME}.exe`）。
 - 改 `installer.nsh` 后重新打包即可生效；本地验证：`Trace-Setup-<ver>.exe /S /currentuser` 应数秒完成。
 - 关联环境坑：WMI provider 卡死时，卡在 WMI 调用里的进程（含安装器拉起的 powershell）无法被 TerminateProcess，只能等 WMI 恢复（管理员 `Restart-Service winmgmt` 或重启）后才会退出。
 

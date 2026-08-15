@@ -348,7 +348,11 @@ export const useStore = create<AppState>((set, get) => ({
   flareKey: 0,
 
   async hydrate() {
-    const { items, station, settings, version, tasks, isStoreBuild } = await edge.loadState()
+    // Standalone renderer (plain browser / mock-free): loadState no-ops to
+    // undefined — nothing to hydrate, don't crash on the destructure.
+    const state = await edge.loadState()
+    if (!state) return
+    const { items, station, settings, version, tasks, isStoreBuild } = state
     set({
       items,
       station,

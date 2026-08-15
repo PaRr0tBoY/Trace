@@ -15,12 +15,20 @@ declare global {
 
 export const edge: EdgeApi = new Proxy({} as EdgeApi, {
   get(_target, prop) {
-    const g = globalThis as any
-    if (g.window && g.window.edge) {
-      const targetApi = g.window.edge
-      const val = targetApi[prop]
-      return typeof val === 'function' ? val.bind(targetApi) : val
-    }
-    return () => {}
+    // The bridge may be absent entirely, or present but partial (a mock or
+    // extension stub). EdgeApi members are all functions, so any non-function
+    // value means "unavailable" — no-op instead of leaking undefined through.
+    if (typeof prop !== 'string') return () => {}
+    // globalThis isn't indexed in the node tsconfig; the renderer's window
+    // only exists in a browser/Electron context, so narrow before reading.
+    const g: object = globalThis
+    const win: Window | undefined = 'window' in g ? (g.window as Window) : undefined
+    const targetApi = win?.edge
+    const val = targetApi?.[prop as keyof EdgeApi]
+    if (typeof val === 'function') return val.bind(targetApi)
+    // Every on* member returns an unsubscribe function, so its no-op must be
+    // callable twice: edge.onX(cb) → () => {}. Plain members return undefined
+    // (callers guard or fire-and-forget).
+    return prop.startsWith('on') ? () => () => {} : () => {}
   }
 })

@@ -368,6 +368,7 @@ export function Panel() {
           className="blade"
           style={{ height: panelHeightStr }}
         >
+          <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
           <AnimatePresence initial={false}>
             {switcherActive ? (
               <motion.div
@@ -376,7 +377,7 @@ export function Panel() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.1 }}
-                style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+                style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}
               >
                 <SwitcherView />
               </motion.div>
@@ -386,13 +387,14 @@ export function Panel() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.1 }}
-                style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+                style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}
               >
           <Header />
 
           {!settingsOpen && view !== 'tasks' && <SearchBar />}
 
           <ToastStack />
+          <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
           <AnimatePresence initial={false}>
             {settingsOpen ? (
               <motion.div
@@ -401,7 +403,7 @@ export function Panel() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: viewSlideOut, transition: { duration: 0.25 } }}
                 transition={{ duration: 0.15 }}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
+                style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
                 <Settings />
@@ -414,7 +416,7 @@ export function Panel() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: viewSlideOut, transition: { duration: 0.25 } }}
                 transition={{ duration: 0.15 }}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
+                style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
                 <TaskView onFooterChange={setReportedFooter} />
@@ -427,7 +429,7 @@ export function Panel() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: viewSlideOut, transition: { duration: 0.25 } }}
                 transition={{ duration: 0.15 }}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
+                style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
                 <FileListView onFooterChange={setReportedFooter} />
@@ -440,13 +442,14 @@ export function Panel() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: viewSlideOut, transition: { duration: 0.25 } }}
                 transition={{ duration: 0.15 }}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
+                style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
               >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 18, background: 'linear-gradient(to bottom, #000000, transparent)', pointerEvents: 'none', zIndex: 10 }} />
                 <ItemList />
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
           {/* One toolbar for every content view, fixed below the animated
               content area (user feedback 2026-08-14). Settings and switcher
               sessions have no footer. */}
@@ -468,6 +471,7 @@ export function Panel() {
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
         </div>
       </motion.div>
     </div>
